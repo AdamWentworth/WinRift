@@ -1,0 +1,20 @@
+FROM golang:1.26 AS build
+
+WORKDIR /src
+COPY services/core/go.mod services/core/go.sum* ./
+RUN go mod download
+
+COPY services/core ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/winrift-api ./cmd/api \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/winrift-worker ./cmd/worker \
+    && CGO_ENABLED=0 GOOS=linux go build -o /out/winrift-patchctl ./cmd/patchctl
+
+FROM gcr.io/distroless/static-debian12
+
+WORKDIR /
+COPY --from=build /out/winrift-api /winrift-api
+COPY --from=build /out/winrift-worker /winrift-worker
+COPY --from=build /out/winrift-patchctl /winrift-patchctl
+
+EXPOSE 8000
+CMD ["/winrift-api"]

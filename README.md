@@ -1,0 +1,71 @@
+# WinRift
+
+WinRift is being rebuilt as a League of Legends build-matchup analytics tool. The new MVP focuses on champion, opponent, role, item, rune, and summoner-spell outcomes from ranked match data.
+
+The previous implementation is preserved under `legacy/` for reference and fixtures.
+
+## Stack
+
+- Go core service in `services/core/`, with separate `api`, `worker`, and `patchctl` entrypoints
+- ClickHouse analytics database
+- Vite React TypeScript web app in `apps/web/`
+- Docker Compose for local development
+
+Go is used for the API/collector because the target deployment is a lightweight home server: small binaries, low idle memory, simple concurrency, and clean rate-limit handling.
+
+## Quick Start
+
+1. Put your Riot key in the root `.env`.
+2. Start the stack:
+
+```bash
+docker compose up --build
+```
+
+3. Open the app:
+
+```text
+http://localhost:5173
+```
+
+4. API health is available at:
+
+```text
+http://localhost:8000/api/health
+```
+
+The collector worker is behind the `worker` Compose profile so normal local startup will not spend Riot API budget. Run it explicitly with `docker compose --profile worker up worker`, or call `POST /api/dev/collector/seed` in development.
+
+## Local API
+
+```bash
+cd services/core
+go run ./cmd/api
+```
+
+The API reads `.env` from either the repo root or the core service directory. API keys are never logged by the app.
+
+## Local Web
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+## Verification
+
+```bash
+cd services/core && go test ./...
+cd apps/web && npm test && npm run build
+```
+
+## Docs
+
+- [Architecture](docs/architecture.md)
+- [Riot API Notes](docs/riot-api.md)
+- [Data Dictionary](docs/data-dictionary.md)
+- [Collector Runbook](docs/collector-runbook.md)
+- [Patch Lifecycle](docs/patch-lifecycle.md)
+- [ClickHouse Queries](docs/clickhouse-queries.md)
+- [Policy-Safe Live UX](docs/policy-safe-live-ux.md)

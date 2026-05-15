@@ -1,0 +1,533 @@
+package clickhouse
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	_ "github.com/ClickHouse/clickhouse-go/v2"
+
+	"winrift/services/core/internal/analytics"
+	"winrift/services/core/internal/config"
+)
+
+type Repository struct {
+	db *sql.DB
+}
+
+type BuildRow struct {
+	ChampionID          uint16
+	Role                string
+	OpponentChampionID  uint16
+	PatchBucket         string
+	RankBucket          string
+	FinalItemsSignature string
+	Core2Signature      string
+	Core3Signature      string
+	RuneSignature       string
+	SpellSignature      string
+	Wins                int
+	Games               int
+	WinRate             float64
+	Confidence          float64
+}
+
+type PatchSnapshot struct {
+	Patch            string
+	Platform         string
+	QueueID          uint16
+	Status           string
+	Matches          uint64
+	Participants     uint64
+	RawRetainedUntil time.Time
+}
+
+func NewRepository(cfg config.Config) (*Repository, error) {
+	dsn := fmt.Sprintf("clickhouse://%s:%d/%s?username=%s&password=%s", cfg.ClickHouseHost, cfg.ClickHousePort, cfg.ClickHouseDatabase, cfg.ClickHouseUser, cfg.ClickHousePassword)
+	db, err := sql.Open("clickhouse", dsn)
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(time.Hour)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		return nil, err
+	}
+	return &Repository{db: db}, nil
+}
+
+func (r *Repository) MatchExists(ctx context.Context, matchID string) (bool, error) {
+	var count uint64
+	err := r.db.QueryRowContext(ctx, "SELECT count() FROM raw_matches FINAL WHERE match_id = ?", matchID).Scan(&count)
+	return count > 0, err
+}
+
+func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.NormalizedMatch) error {
+	if err := r.insertRawMatch(ctx, normalized.RawMatch); err != nil {
+		return err
+	}
+	if err := r.insertRawTimeline(ctx, normalized.RawTimeline); err != nil {
+		return err
+	}
+	for _, row := range normalized.Participants {
+		if err := r.insertParticipant(ctx, row); err != nil {
+			return err
+		}
+	}
+	for _, row := range normalized.Matchups {
+		if err := r.insertMatchup(ctx, row); err != nil {
+			return err
+		}
+	}
+	for _, row := range normalized.TimelineParticipantFrames {
+		if err := r.insertTimelineParticipantFrame(ctx, row); err != nil {
+			return err
+		}
+	}
+	for _, row := range normalized.TimelineItemEvents {
+		if err := r.insertTimelineItemEvent(ctx, row); err != nil {
+			return err
+		}
+	}
+	for _, row := range normalized.TimelineCombatEvents {
+		if err := r.insertTimelineCombatEvent(ctx, row); err != nil {
+			return err
+		}
+	}
+	for _, row := range normalized.TimelineObjectiveEvents {
+		if err := r.insertTimelineObjectiveEvent(ctx, row); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, error) {
+	query := `
+		SELECT
+			champion_id,
+			role,
+			opponent_champion_id,
+			patch_bucket,
+			rank_bucket,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			sum(wins) AS wins,
+			sum(games) AS games,
+			wins / games AS win_rate
+		FROM
+		(
+			SELECT
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch_bucket,
+				rank_bucket,
+				final_items_signature,
+				core2_signature,
+				core3_signature,
+				rune_signature,
+				spell_signature,
+				wins,
+				games
+			FROM build_analytics_mv
+			UNION ALL
+			SELECT
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch AS patch_bucket,
+				rank_bucket,
+				final_items_signature,
+				core2_signature,
+				core3_signature,
+				rune_signature,
+				spell_signature,
+				wins,
+				games
+			FROM patch_build_metrics FINAL
+		)
+		WHERE 1 = 1`
+	args := []any{}
+	if filters["champion_id"] != "" {
+		query += " AND champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if filters["role"] != "" {
+		query += " AND role = ?"
+		args = append(args, filters["role"])
+	}
+	if filters["opponent_champion_id"] != "" {
+		query += " AND opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		query += " AND patch_bucket = ?"
+		args = append(args, filters["patch"])
+	}
+	if filters["rank_bucket"] != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filters["rank_bucket"])
+	}
+	query += ` GROUP BY champion_id, role, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature HAVING games >= ? ORDER BY win_rate DESC, games DESC LIMIT ?`
+	args = append(args, minGames, limit)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BuildRow
+	for rows.Next() {
+		var row BuildRow
+		if err := rows.Scan(&row.ChampionID, &row.Role, &row.OpponentChampionID, &row.PatchBucket, &row.RankBucket, &row.FinalItemsSignature, &row.Core2Signature, &row.Core3Signature, &row.RuneSignature, &row.SpellSignature, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) MarkPatchCollecting(ctx context.Context, patch, platform string, queueID uint16) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO patch_snapshots (patch, platform, queue_id, status, started_at, matches, participants, notes) VALUES (?, ?, ?, 'collecting', now(), 0, 0, '')`,
+		patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) CompilePatchMetrics(ctx context.Context, patch, platform string, queueID uint16, rawRetainedUntil time.Time) error {
+	if err := r.markPatchCompiling(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
+	if err := r.compilePatchBuildMetrics(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
+	if err := r.compilePatchItemTimingMetrics(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
+	if err := r.compilePatchPowerCurveMetrics(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
+	if err := r.deleteLiveBuildAggregate(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
+	return r.markPatchClosed(ctx, patch, platform, queueID, rawRetainedUntil)
+}
+
+func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform string, queueID uint16) error {
+	if err := r.requirePatchClosed(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
+	statements := []string{
+		`ALTER TABLE raw_timelines DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE raw_matches DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE participants DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE participant_matchups DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE build_analytics_mv DELETE WHERE patch_bucket = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_participant_frames DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_item_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_combat_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+	}
+	for _, statement := range statements {
+		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) requirePatchClosed(ctx context.Context, patch, platform string, queueID uint16) error {
+	var status string
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT status FROM patch_snapshots FINAL WHERE patch = ? AND platform = ? AND queue_id = ? LIMIT 1`,
+		patch, platform, queueID,
+	).Scan(&status)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("patch %s/%s/%d has no lifecycle snapshot", patch, platform, queueID)
+	}
+	if err != nil {
+		return err
+	}
+	if status != "closed" {
+		return fmt.Errorf("patch %s/%s/%d is %q, not closed", patch, platform, queueID, status)
+	}
+	return nil
+}
+
+func (r *Repository) markPatchCompiling(ctx context.Context, patch, platform string, queueID uint16) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO patch_snapshots
+		(patch, platform, queue_id, status, started_at, closed_at, raw_retained_until, matches, participants, compiled_at, notes)
+		SELECT
+			?, ?, ?, 'compiling', min(toDateTime(intDiv(game_creation, 1000))), NULL, NULL, count(), count() * 10, NULL, ''
+		FROM raw_matches FINAL
+		WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		patch, platform, queueID, patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) markPatchClosed(ctx context.Context, patch, platform string, queueID uint16, rawRetainedUntil time.Time) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO patch_snapshots
+		(patch, platform, queue_id, status, started_at, closed_at, raw_retained_until, matches, participants, compiled_at, notes)
+		SELECT
+			?, ?, ?, 'closed', min(toDateTime(intDiv(game_creation, 1000))), now(), ?, count(), count() * 10, now(), ''
+		FROM raw_matches FINAL
+		WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		patch, platform, queueID, rawRetainedUntil, patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) deleteLiveBuildAggregate(ctx context.Context, patch, platform string, queueID uint16) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`ALTER TABLE build_analytics_mv DELETE WHERE patch_bucket = ? AND platform = ? AND queue_id = ?`,
+		patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) compilePatchBuildMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO patch_build_metrics
+		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature, wins, games)
+		SELECT
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			toUInt64(sum(win)) AS wins,
+			toUInt64(count()) AS games
+		FROM participant_matchups FINAL
+		WHERE patch = ? AND platform = ? AND queue_id = ?
+		GROUP BY
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature`,
+		patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) compilePatchItemTimingMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO patch_item_timing_metrics
+		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_signature, games, avg_timing_ms, p50_timing_ms, p75_timing_ms, p90_timing_ms)
+		WITH item_purchases AS
+		(
+			SELECT
+				pm.patch AS patch,
+				pm.platform AS platform,
+				pm.queue_id AS queue_id,
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				pm.opponent_champion_id AS opponent_champion_id,
+				pm.rank_bucket AS rank_bucket,
+				pm.match_id AS match_id,
+				pm.participant_id AS participant_id,
+				tie.item_id AS item_id,
+				min(tie.timestamp_ms) AS first_purchase_ms
+			FROM participant_matchups FINAL AS pm
+			INNER JOIN timeline_item_events FINAL AS tie
+				ON pm.match_id = tie.match_id
+				AND pm.participant_id = tie.participant_id
+			WHERE pm.patch = ? AND pm.platform = ? AND pm.queue_id = ?
+				AND tie.event_type = 'ITEM_PURCHASED'
+				AND tie.item_id NOT IN (3340, 3363, 3364, 3330, 3348, 2052)
+			GROUP BY
+				pm.patch,
+				pm.platform,
+				pm.queue_id,
+				pm.champion_id,
+				pm.role,
+				pm.opponent_champion_id,
+				pm.rank_bucket,
+				pm.match_id,
+				pm.participant_id,
+				tie.item_id
+		),
+		item_slots AS
+		(
+			SELECT
+				*,
+				row_number() OVER (PARTITION BY match_id, participant_id ORDER BY first_purchase_ms, item_id) AS item_slot
+			FROM item_purchases
+		)
+		SELECT
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			toUInt8(item_slot) AS item_slot,
+			toString(item_id) AS item_signature,
+			toUInt64(count()) AS games,
+			avg(first_purchase_ms) AS avg_timing_ms,
+			quantile(0.50)(first_purchase_ms) AS p50_timing_ms,
+			quantile(0.75)(first_purchase_ms) AS p75_timing_ms,
+			quantile(0.90)(first_purchase_ms) AS p90_timing_ms
+		FROM item_slots
+		WHERE item_slot <= 3
+		GROUP BY
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_slot,
+			item_id`,
+		patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) compilePatchPowerCurveMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO patch_power_curve_metrics
+		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, minute_mark, games, avg_level, avg_total_gold, avg_cs, avg_jungle_cs, avg_damage_done_to_champions, avg_damage_taken)
+		SELECT
+			pm.patch AS patch,
+			pm.platform AS platform,
+			pm.queue_id AS queue_id,
+			pm.champion_id AS champion_id,
+			pm.role AS role,
+			pm.opponent_champion_id AS opponent_champion_id,
+			pm.rank_bucket AS rank_bucket,
+			toUInt8(round(tpf.timestamp_ms / 60000)) AS minute_mark,
+			toUInt64(count()) AS games,
+			avg(tpf.level) AS avg_level,
+			avg(tpf.total_gold) AS avg_total_gold,
+			avg(tpf.minions_killed) AS avg_cs,
+			avg(tpf.jungle_minions_killed) AS avg_jungle_cs,
+			avg(tpf.total_damage_done_to_champions) AS avg_damage_done_to_champions,
+			avg(tpf.total_damage_taken) AS avg_damage_taken
+		FROM participant_matchups FINAL AS pm
+		INNER JOIN timeline_participant_frames FINAL AS tpf
+			ON pm.match_id = tpf.match_id
+			AND pm.participant_id = tpf.participant_id
+		WHERE pm.patch = ? AND pm.platform = ? AND pm.queue_id = ?
+			AND tpf.timestamp_ms BETWEEN 590000 AND 1210000
+			AND toUInt8(round(tpf.timestamp_ms / 60000)) IN (10, 15, 20)
+		GROUP BY
+			pm.patch,
+			pm.platform,
+			pm.queue_id,
+			pm.champion_id,
+			pm.role,
+			pm.opponent_champion_id,
+			pm.rank_bucket,
+			minute_mark`,
+		patch, platform, queueID,
+	)
+	return err
+}
+
+func (r *Repository) insertRawMatch(ctx context.Context, row analytics.RawMatch) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO raw_matches (match_id, platform, queue_id, patch, game_creation, game_start_timestamp, game_end_timestamp, duration_seconds, raw_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, row.MatchID, row.Platform, row.QueueID, row.Patch, row.GameCreation, row.GameStartTimestamp, row.GameEndTimestamp, row.DurationSeconds, row.RawJSON)
+	return err
+}
+
+func (r *Repository) insertRawTimeline(ctx context.Context, row analytics.RawTimeline) error {
+	_, err := r.db.ExecContext(ctx, `INSERT INTO raw_timelines (match_id, platform, patch, queue_id, raw_json) VALUES (?, ?, ?, ?, ?)`, row.MatchID, row.Platform, row.Patch, row.QueueID, row.RawJSON)
+	return err
+}
+
+func (r *Repository) insertParticipant(ctx context.Context, row analytics.ParticipantRow) error {
+	_, err := r.db.ExecContext(ctx, participantInsertSQL, participantArgs(row)...)
+	return err
+}
+
+func (r *Repository) insertMatchup(ctx context.Context, row analytics.MatchupRow) error {
+	args := participantArgs(row.ParticipantRow)
+	args = append(args, row.OpponentParticipantID, row.OpponentChampionID, row.OpponentRole)
+	_, err := r.db.ExecContext(ctx, matchupInsertSQL, args...)
+	return err
+}
+
+func (r *Repository) insertTimelineParticipantFrame(ctx context.Context, row analytics.TimelineParticipantFrameRow) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO timeline_participant_frames (match_id, platform, patch, queue_id, timestamp_ms, participant_id, level, xp, current_gold, total_gold, minions_killed, jungle_minions_killed, position_x, position_y, total_damage_done_to_champions, total_damage_taken) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TimestampMS, row.ParticipantID, row.Level, row.XP, row.CurrentGold, row.TotalGold, row.MinionsKilled, row.JungleMinionsKilled, row.PositionX, row.PositionY, row.TotalDamageDoneToChampions, row.TotalDamageTaken,
+	)
+	return err
+}
+
+func (r *Repository) insertTimelineItemEvent(ctx context.Context, row analytics.TimelineItemEventRow) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO timeline_item_events (match_id, platform, patch, queue_id, timestamp_ms, participant_id, event_type, item_id, before_id, after_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TimestampMS, row.ParticipantID, row.EventType, row.ItemID, row.BeforeID, row.AfterID,
+	)
+	return err
+}
+
+func (r *Repository) insertTimelineCombatEvent(ctx context.Context, row analytics.TimelineCombatEventRow) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO timeline_combat_events (match_id, platform, patch, queue_id, timestamp_ms, killer_id, victim_id, assisting_participant_ids, bounty, shutdown_bounty, position_x, position_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TimestampMS, row.KillerID, row.VictimID, row.AssistingParticipantIDs, row.Bounty, row.ShutdownBounty, row.PositionX, row.PositionY,
+	)
+	return err
+}
+
+func (r *Repository) insertTimelineObjectiveEvent(ctx context.Context, row analytics.TimelineObjectiveEventRow) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO timeline_objective_events (match_id, platform, patch, queue_id, timestamp_ms, event_type, killer_id, team_id, monster_type, monster_sub_type, building_type, tower_type, lane_type, position_x, position_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TimestampMS, row.EventType, row.KillerID, row.TeamID, row.MonsterType, row.MonsterSubType, row.BuildingType, row.TowerType, row.LaneType, row.PositionX, row.PositionY,
+	)
+	return err
+}
+
+const participantColumns = `match_id, platform, patch, queue_id, participant_id, puuid, team_id, champion_id, champion_name, role, win, kills, deaths, assists, item0, item1, item2, item3, item4, item5, trinket_item, summoner_spell1, summoner_spell2, primary_rune_tree, secondary_rune_tree, keystone, rune_signature, spell_signature, final_items_signature, core2_signature, core3_signature, rank_bucket`
+
+const participantPlaceholders = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
+
+const participantInsertSQL = `INSERT INTO participants (` + participantColumns + `) VALUES (` + participantPlaceholders + `)`
+
+const matchupInsertSQL = `INSERT INTO participant_matchups (` + participantColumns + `, opponent_participant_id, opponent_champion_id, opponent_role) VALUES (` + participantPlaceholders + `, ?, ?, ?)`
+
+func participantArgs(row analytics.ParticipantRow) []any {
+	return []any{row.MatchID, row.Platform, row.Patch, row.QueueID, row.ParticipantID, row.PUUID, row.TeamID, row.ChampionID, row.ChampionName, row.Role, row.Win, row.Kills, row.Deaths, row.Assists, row.Item0, row.Item1, row.Item2, row.Item3, row.Item4, row.Item5, row.TrinketItem, row.SummonerSpell1, row.SummonerSpell2, row.PrimaryRuneTree, row.SecondaryRuneTree, row.Keystone, row.RuneSignature, row.SpellSignature, row.FinalItemsSignature, row.Core2Signature, row.Core3Signature, row.RankBucket}
+}

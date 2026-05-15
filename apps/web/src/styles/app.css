@@ -1,0 +1,302 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #101417;
+  color: #edf1f4;
+  letter-spacing: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #101417;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.topbar {
+  align-items: center;
+  border-bottom: 1px solid #2d3439;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+}
+
+.topbar h1 {
+  font-size: 28px;
+  line-height: 1;
+  margin: 0 0 8px;
+}
+
+.topbar p {
+  color: #aab5bc;
+  margin: 0;
+}
+
+.status-chip {
+  background: #25322f;
+  border: 1px solid #3f5f55;
+  border-radius: 8px;
+  color: #bfe8d8;
+  padding: 8px 12px;
+}
+
+.workspace {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+.left-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.panel {
+  background: #171d21;
+  border: 1px solid #2b343a;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.panel-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.panel-heading h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.filter-grid,
+.live-form {
+  display: grid;
+  gap: 12px;
+}
+
+.filter-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+label {
+  color: #aab5bc;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+
+input,
+select {
+  background: #0f1417;
+  border: 1px solid #334047;
+  border-radius: 6px;
+  color: #edf1f4;
+  min-height: 38px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.live-form {
+  grid-template-columns: minmax(0, 1fr) 92px 88px 42px;
+}
+
+.icon-button,
+.text-button {
+  align-items: center;
+  border: 1px solid #47565f;
+  border-radius: 6px;
+  color: #edf1f4;
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 38px;
+}
+
+.icon-button {
+  background: #23313d;
+  width: 42px;
+}
+
+.icon-button.primary,
+.text-button {
+  background: #2b5d6f;
+  border-color: #3d7f96;
+}
+
+.text-button {
+  padding: 0 12px;
+}
+
+.text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.state-panel {
+  align-items: center;
+  background: #11171a;
+  border: 1px solid #2b343a;
+  border-radius: 8px;
+  color: #aab5bc;
+  display: flex;
+  min-height: 140px;
+  justify-content: center;
+}
+
+.compact-state {
+  margin-top: 12px;
+  min-height: 48px;
+}
+
+.role-row {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto;
+  margin: 12px 0;
+}
+
+.teams-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.team-list h3 {
+  color: #aab5bc;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.live-player {
+  align-items: center;
+  background: #11171a;
+  border: 1px solid #293137;
+  border-radius: 8px;
+  color: #edf1f4;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px;
+  width: 100%;
+}
+
+.live-player.selected {
+  border-color: #c6903a;
+}
+
+.live-player img {
+  border-radius: 6px;
+  height: 34px;
+  object-fit: cover;
+  width: 34px;
+}
+
+.results-panel {
+  min-width: 0;
+}
+
+.results-table {
+  overflow-x: auto;
+}
+
+.results-row {
+  align-items: center;
+  border-bottom: 1px solid #263137;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 120px 120px 120px minmax(180px, 1fr) 80px 80px 92px 64px;
+  min-width: 920px;
+  padding: 10px 0;
+}
+
+.results-head {
+  color: #aab5bc;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.item-strip {
+  display: flex;
+  gap: 4px;
+}
+
+.item-strip img {
+  border: 1px solid #39464e;
+  border-radius: 5px;
+  height: 28px;
+  width: 28px;
+}
+
+.item-strip.compact img {
+  height: 26px;
+  width: 26px;
+}
+
+.item-pill {
+  background: #243039;
+  border-radius: 5px;
+  font-size: 12px;
+  padding: 5px;
+}
+
+.muted {
+  color: #8e9aa2;
+}
+
+.sample {
+  color: #cfd7dc;
+}
+
+.low-sample {
+  color: #e2b86f;
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    padding: 16px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .filter-grid,
+  .teams-grid,
+  .live-form {
+    grid-template-columns: 1fr;
+  }
+
+  .icon-button {
+    width: 100%;
+  }
+}
