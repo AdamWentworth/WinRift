@@ -399,6 +399,18 @@ func ShouldIngest(rawMatch []byte) bool {
 	return payload.Info.QueueID == RankedSoloQueueID && payload.Info.MapID == SummonersRiftMap && payload.Info.GameMode == "CLASSIC"
 }
 
+func MatchPatch(rawMatch []byte) (string, bool) {
+	var payload matchPayload
+	if err := json.Unmarshal(rawMatch, &payload); err != nil {
+		return "", false
+	}
+	patch := PatchBucket(payload.Info.GameVersion)
+	if patch == "" || patch == "unknown" {
+		return patch, false
+	}
+	return patch, true
+}
+
 func PatchBucket(version string) string {
 	parts := strings.Split(version, ".")
 	if len(parts) < 2 {

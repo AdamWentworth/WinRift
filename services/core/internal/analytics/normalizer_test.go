@@ -47,6 +47,16 @@ func TestShouldIngestFixture(t *testing.T) {
 	}
 }
 
+func TestMatchPatch(t *testing.T) {
+	patch, ok := MatchPatch([]byte(`{"info":{"gameVersion":"16.10.1.123"}}`))
+	if !ok {
+		t.Fatal("expected patch parse to succeed")
+	}
+	if patch != "16.10" {
+		t.Fatalf("patch = %q, want 16.10", patch)
+	}
+}
+
 func TestNormalizeTimelineEvents(t *testing.T) {
 	raw, err := os.ReadFile(legacyMatchFixture)
 	if err != nil {

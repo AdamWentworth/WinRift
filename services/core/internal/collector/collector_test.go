@@ -12,24 +12,30 @@ import (
 
 type fakeRiot struct {
 	matchIDs      []string
+	matches       map[string][]byte
 	match         []byte
 	timeline      []byte
+	timelineCalls int
 	leagueEntries map[string][]riot.LeagueEntry
 }
 
-func (f fakeRiot) MatchIDsByPUUID(context.Context, string, string, int) ([]string, error) {
+func (f *fakeRiot) MatchIDsByPUUID(context.Context, string, string, int) ([]string, error) {
 	return f.matchIDs, nil
 }
 
-func (f fakeRiot) MatchByID(context.Context, string, string) ([]byte, error) {
+func (f *fakeRiot) MatchByID(_ context.Context, matchID, _ string) ([]byte, error) {
+	if f.matches != nil {
+		return f.matches[matchID], nil
+	}
 	return f.match, nil
 }
 
-func (f fakeRiot) TimelineByMatchID(context.Context, string, string) ([]byte, error) {
+func (f *fakeRiot) TimelineByMatchID(context.Context, string, string) ([]byte, error) {
+	f.timelineCalls++
 	return f.timeline, nil
 }
 
-func (f fakeRiot) LeagueEntriesByPUUID(_ context.Context, puuid, _ string) ([]riot.LeagueEntry, error) {
+func (f *fakeRiot) LeagueEntriesByPUUID(_ context.Context, puuid, _ string) ([]riot.LeagueEntry, error) {
 	return f.leagueEntries[puuid], nil
 }
 
@@ -74,7 +80,7 @@ func TestCollectAddsDiscoveredParticipantsToFrontier(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := &fakeRepo{}
-	collector := New(fakeRiot{
+	collector := New(&fakeRiot{
 		matchIDs: []string{"NA1_1"},
 		match:    raw,
 		timeline: []byte(`{"info":{"frames":[]}}`),
@@ -99,7 +105,7 @@ func TestCollectAddsDiscoveredParticipantsToFrontier(t *testing.T) {
 }
 
 func TestCollectStopsAtRequestBudget(t *testing.T) {
-	collector := New(fakeRiot{matchIDs: []string{"NA1_1"}}, &fakeRepo{})
+	collector := New(&fakeRiot{matchIDs: []string{"NA1_1"}}, &fakeRepo{})
 
 	result := collector.CollectFromPUUIDWithOptions(context.Background(), "seed-puuid", "NA1", CollectOptions{
 		MatchCount:  1,
@@ -128,7 +134,7 @@ func TestCollectEnrichesRankBucketFromLeagueEntries(t *testing.T) {
 	}
 	targetPUUID := fixture.Participants[0].PUUID
 	repo := &fakeRepo{}
-	collector := New(fakeRiot{
+	collector := New(&fakeRiot{
 		matchIDs: []string{"NA1_1"},
 		match:    raw,
 		timeline: []byte(`{"info":{"frames":[]}}`),
@@ -162,5 +168,45 @@ func TestCollectEnrichesRankBucketFromLeagueEntries(t *testing.T) {
 		if participant.PUUID == targetPUUID && participant.RankBucket != "GOLD" {
 			t.Fatalf("rank bucket = %q, want GOLD", participant.RankBucket)
 		}
+	}
+}
+
+func TestCollectStopsAtTargetPatchBoundaryBeforeTimeline(t *testing.T) {
+	oldPatchMatch := []byte(`{
+		"metadata": {"matchId": "NA1_old"},
+		"info": {
+			"gameId": 1,
+			"gameVersion": "16.9.1.123",
+			"queueId": 420,
+			"mapId": 11,
+			"gameMode": "CLASSIC"
+		}
+	}`)
+	riotClient := &fakeRiot{
+		matchIDs: []string{"NA1_old", "NA1_older"},
+		matches:  map[string][]byte{"NA1_old": oldPatchMatch},
+	}
+	collector := New(riotClient, &fakeRepo{})
+
+	result := collector.CollectFromPUUIDWithOptions(context.Background(), "seed-puuid", "NA1", CollectOptions{
+		MatchCount:  2,
+		MaxRequests: 10,
+		TargetPatch: "16.10",
+	})
+
+	if !result.PatchBoundaryReached {
+		t.Fatal("expected target patch boundary")
+	}
+	if result.MatchesInserted != 0 {
+		t.Fatalf("matches inserted = %d, want 0", result.MatchesInserted)
+	}
+	if result.MatchesSkipped != 1 {
+		t.Fatalf("matches skipped = %d, want 1", result.MatchesSkipped)
+	}
+	if result.RequestsUsed != 2 {
+		t.Fatalf("requests used = %d, want 2", result.RequestsUsed)
+	}
+	if riotClient.timelineCalls != 0 {
+		t.Fatalf("timeline calls = %d, want 0", riotClient.timelineCalls)
 	}
 }

@@ -44,6 +44,7 @@ type Result struct {
 	RankBudgetExhausted   bool
 	AuthFailed            bool
 	RateLimited           bool
+	PatchBoundaryReached  bool
 	RankSnapshotsInserted int
 	Errors                []string
 }
@@ -56,6 +57,7 @@ type CollectOptions struct {
 	RankEnrichmentEnabled bool
 	RankSnapshotTTL       time.Duration
 	RankMaxRequests       int
+	TargetPatch           string
 }
 
 func New(riot RiotClient, repo Repository) Collector {
@@ -73,11 +75,12 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 	}
 	normalizedPlatform := riot.NormalizePlatform(platform)
 	log.Printf(
-		"collector start puuid=%s platform=%s match_count=%d max_requests=%d rank_enabled=%t rank_max_requests=%d",
+		"collector start puuid=%s platform=%s match_count=%d max_requests=%d target_patch=%s rank_enabled=%t rank_max_requests=%d",
 		shortID(puuid),
 		normalizedPlatform,
 		options.MatchCount,
 		options.MaxRequests,
+		normalizedTargetPatch(options.TargetPatch),
 		options.RankEnrichmentEnabled,
 		options.RankMaxRequests,
 	)
@@ -123,6 +126,13 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 			result.MatchesSkipped++
 			log.Printf("collector match skipped match_id=%s reason=not_ranked_solo_summoners_rift", matchID)
 			continue
+		}
+		if !targetPatchMatches(match, options.TargetPatch) {
+			patch, _ := analytics.MatchPatch(match)
+			result.MatchesSkipped++
+			result.PatchBoundaryReached = true
+			log.Printf("collector match skipped match_id=%s reason=target_patch_boundary patch=%s target_patch=%s action=move_to_next_puuid", matchID, patch, normalizedTargetPatch(options.TargetPatch))
+			break
 		}
 		if !result.spendRequest(options.MaxRequests) {
 			log.Printf("collector budget exhausted before timeline fetch match_id=%s requests=%d max_requests=%d", matchID, result.RequestsUsed, options.MaxRequests)
@@ -174,7 +184,7 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 		log.Printf("collector match inserted match_id=%s frontier_added=%d total_inserted=%d", matchID, added, result.MatchesInserted)
 	}
 	log.Printf(
-		"collector complete puuid=%s platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d budget_exhausted=%t rank_budget_exhausted=%t auth_failed=%t rate_limited=%t",
+		"collector complete puuid=%s platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d patch_boundary=%t budget_exhausted=%t rank_budget_exhausted=%t auth_failed=%t rate_limited=%t",
 		shortID(puuid),
 		normalizedPlatform,
 		result.MatchIDsSeen,
@@ -185,6 +195,7 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 		result.RankRequestsUsed,
 		result.RankSnapshotsInserted,
 		len(result.Errors),
+		result.PatchBoundaryReached,
 		result.BudgetExhausted,
 		result.RankBudgetExhausted,
 		result.AuthFailed,
@@ -299,6 +310,19 @@ func applyRankBuckets(normalized *analytics.NormalizedMatch, buckets map[string]
 		}
 	}
 	normalized.Matchups = analytics.BuildMatchupRows(normalized.Participants)
+}
+
+func targetPatchMatches(match []byte, targetPatch string) bool {
+	target := normalizedTargetPatch(targetPatch)
+	if target == "" {
+		return true
+	}
+	patch, ok := analytics.MatchPatch(match)
+	return ok && strings.EqualFold(strings.TrimSpace(patch), target)
+}
+
+func normalizedTargetPatch(targetPatch string) string {
+	return strings.TrimSpace(targetPatch)
 }
 
 func (r *Result) spendRequest(maxRequests int) bool {

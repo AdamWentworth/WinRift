@@ -28,8 +28,9 @@ func main() {
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
+		"collector platforms=%s target_patch=%s idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
 		strings.Join(platforms, ","),
+		cfg.CollectorTargetPatch,
 		cfg.CollectorIdleSleep,
 		cfg.CollectorUsableRequestsPerRegion(),
 		cfg.CollectorRateLimitRequests,
@@ -130,8 +131,9 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		return collector.Result{BudgetExhausted: true}
 	}
 	log.Printf(
-		"collector platform pass start platform=%s frontier_rows=%d match_request_budget=%d rank_request_budget=%d theoretical_max_matches=%d",
+		"collector platform pass start platform=%s target_patch=%s frontier_rows=%d match_request_budget=%d rank_request_budget=%d theoretical_max_matches=%d",
 		platform,
+		cfg.CollectorTargetPatch,
 		len(entries),
 		budget.MatchRequests,
 		budget.RankRequests,
@@ -158,6 +160,7 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 			RankEnrichmentEnabled: rankEnabled,
 			RankSnapshotTTL:       cfg.RankSnapshotTTL,
 			RankMaxRequests:       rankRequestsLeft,
+			TargetPatch:           cfg.CollectorTargetPatch,
 		})
 		passResult.MatchIDsSeen += result.MatchIDsSeen
 		passResult.MatchesInserted += result.MatchesInserted
@@ -171,6 +174,7 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		passResult.RateLimited = passResult.RateLimited || result.RateLimited
 		passResult.BudgetExhausted = passResult.BudgetExhausted || result.BudgetExhausted
 		passResult.RankBudgetExhausted = passResult.RankBudgetExhausted || result.RankBudgetExhausted
+		passResult.PatchBoundaryReached = passResult.PatchBoundaryReached || result.PatchBoundaryReached
 		requestsLeft -= result.RequestsUsed
 		if requestsLeft < 0 {
 			requestsLeft = 0
@@ -187,7 +191,7 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 			log.Printf("frontier update platform=%s puuid=%s: %v", entry.Platform, shortValue(entry.PUUID), err)
 		}
 		log.Printf(
-			"collector platform=%s puuid=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d status=%s",
+			"collector platform=%s puuid=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d patch_boundary=%t errors=%d status=%s",
 			entry.Platform,
 			shortValue(entry.PUUID),
 			result.MatchIDsSeen,
@@ -197,6 +201,7 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 			result.RequestsUsed,
 			result.RankRequestsUsed,
 			result.RankSnapshotsInserted,
+			result.PatchBoundaryReached,
 			len(result.Errors),
 			status,
 		)
@@ -205,7 +210,7 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		}
 	}
 	log.Printf(
-		"collector platform pass complete platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d budget_exhausted=%t rank_budget_exhausted=%t auth_failed=%t rate_limited=%t",
+		"collector platform pass complete platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d patch_boundary=%t budget_exhausted=%t rank_budget_exhausted=%t auth_failed=%t rate_limited=%t",
 		platform,
 		passResult.MatchIDsSeen,
 		passResult.MatchesInserted,
@@ -215,6 +220,7 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		passResult.RankRequestsUsed,
 		passResult.RankSnapshotsInserted,
 		len(passResult.Errors),
+		passResult.PatchBoundaryReached,
 		passResult.BudgetExhausted,
 		passResult.RankBudgetExhausted,
 		passResult.AuthFailed,
