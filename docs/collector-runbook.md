@@ -73,12 +73,14 @@ At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECT
 For broad multi-platform collection, use smaller per-platform budgets. For example:
 
 ```text
-COLLECTOR_PLATFORMS=NA1,EUW1,EUN1,KR,BR1,LA1,LA2,JP1,OC1,TR1,RU,PH2,SG2,TH2,TW2,VN2
+COLLECTOR_PLATFORMS=NA1,EUW1,EUN1,KR,BR1,LA1,LA2,JP1,OC1,TR1,RU,SG2,TW2,VN2
 COLLECTOR_FRONTIER_BATCH_SIZE=1
 COLLECTOR_MAX_REQUESTS_PER_PASS=12
 RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
 COLLECTOR_AUTO_SEED_CHALLENGER=true
 ```
+
+`PH2` and `TH2` are known Riot platform values, but their platform API hostnames did not resolve from the local Docker network during testing. Leave them out unless those hosts resolve in your environment.
 
 ## Safety
 
