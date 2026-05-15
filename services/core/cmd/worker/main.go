@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"winrift/services/core/internal/analytics"
 	"winrift/services/core/internal/clickhouse"
 	"winrift/services/core/internal/collector"
 	"winrift/services/core/internal/config"
@@ -23,14 +24,27 @@ func main() {
 	if err != nil {
 		log.Fatalf("clickhouse: %v", err)
 	}
+	if cfg.CollectorPruneOldPatches {
+		pruned, err := repo.DeletePatchesOutsideWindow(context.Background(), cfg.CollectorCurrentPatch, cfg.CollectorPatchRetention)
+		if err != nil {
+			log.Fatalf("collector patch retention prune failed: %v", err)
+		}
+		log.Printf(
+			"collector patch retention prune current_patch=%s retained_patches=%s pruned_patches=%s",
+			cfg.CollectorCurrentPatch,
+			strings.Join(analytics.PatchWindow(cfg.CollectorCurrentPatch, cfg.CollectorPatchRetention), ","),
+			strings.Join(pruned, ","),
+		)
+	}
 
 	matchCollector := collector.New(riotClient, repo)
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s target_patch=%s idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
 		strings.Join(platforms, ","),
-		cfg.CollectorTargetPatch,
+		cfg.CollectorCurrentPatch,
+		cfg.CollectorPatchRetention,
 		cfg.CollectorIdleSleep,
 		cfg.CollectorUsableRequestsPerRegion(),
 		cfg.CollectorRateLimitRequests,
@@ -131,9 +145,10 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		return collector.Result{BudgetExhausted: true}
 	}
 	log.Printf(
-		"collector platform pass start platform=%s target_patch=%s frontier_rows=%d match_request_budget=%d rank_request_budget=%d theoretical_max_matches=%d",
+		"collector platform pass start platform=%s current_patch=%s patch_retention=%d frontier_rows=%d match_request_budget=%d rank_request_budget=%d theoretical_max_matches=%d",
 		platform,
-		cfg.CollectorTargetPatch,
+		cfg.CollectorCurrentPatch,
+		cfg.CollectorPatchRetention,
 		len(entries),
 		budget.MatchRequests,
 		budget.RankRequests,
@@ -160,7 +175,8 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 			RankEnrichmentEnabled: rankEnabled,
 			RankSnapshotTTL:       cfg.RankSnapshotTTL,
 			RankMaxRequests:       rankRequestsLeft,
-			TargetPatch:           cfg.CollectorTargetPatch,
+			CurrentPatch:          cfg.CollectorCurrentPatch,
+			PatchRetentionCount:   cfg.CollectorPatchRetention,
 		})
 		passResult.MatchIDsSeen += result.MatchIDsSeen
 		passResult.MatchesInserted += result.MatchesInserted

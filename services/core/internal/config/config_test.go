@@ -39,3 +39,20 @@ func TestCollectorRankRequestBudget(t *testing.T) {
 		t.Fatalf("disabled rank budget = %d, want 0", got)
 	}
 }
+
+func TestLoadPatchRetentionConfig(t *testing.T) {
+	t.Setenv("COLLECTOR_CURRENT_PATCH", "16.10")
+	t.Setenv("COLLECTOR_PATCH_RETENTION_COUNT", "2")
+	t.Setenv("COLLECTOR_PRUNE_OLD_PATCHES_ON_START", "true")
+
+	cfg := Load()
+	if cfg.CollectorCurrentPatch != "16.10" {
+		t.Fatalf("current patch = %q, want 16.10", cfg.CollectorCurrentPatch)
+	}
+	if cfg.CollectorPatchRetention != 2 {
+		t.Fatalf("patch retention = %d, want 2", cfg.CollectorPatchRetention)
+	}
+	if !cfg.CollectorPruneOldPatches {
+		t.Fatal("expected prune old patches on start")
+	}
+}

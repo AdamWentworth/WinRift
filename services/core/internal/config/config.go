@@ -27,7 +27,9 @@ type Config struct {
 	RiotAuthFailureMarkerPath   string
 	CollectorPlatforms          []string
 	CollectorDefaultMatchCount  int
-	CollectorTargetPatch        string
+	CollectorCurrentPatch       string
+	CollectorPatchRetention     int
+	CollectorPruneOldPatches    bool
 	CollectorInterval           time.Duration
 	CollectorIdleSleep          time.Duration
 	CollectorFrontierBatchSize  int
@@ -65,7 +67,9 @@ func Load() Config {
 		RiotAuthFailureMarkerPath:   env("RIOT_AUTH_FAILURE_MARKER_PATH", "/run/winrift/riot-auth-failed"),
 		CollectorPlatforms:          splitList(env("COLLECTOR_PLATFORMS", defaultPlatform)),
 		CollectorDefaultMatchCount:  envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
-		CollectorTargetPatch:        env("COLLECTOR_TARGET_PATCH", ""),
+		CollectorCurrentPatch:       env("COLLECTOR_CURRENT_PATCH", env("COLLECTOR_TARGET_PATCH", "")),
+		CollectorPatchRetention:     envInt("COLLECTOR_PATCH_RETENTION_COUNT", 2),
+		CollectorPruneOldPatches:    envBool("COLLECTOR_PRUNE_OLD_PATCHES_ON_START", false),
 		CollectorInterval:           time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 120)) * time.Second,
 		CollectorIdleSleep:          time.Duration(envInt("COLLECTOR_IDLE_SLEEP_SECONDS", 15)) * time.Second,
 		CollectorFrontierBatchSize:  envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),

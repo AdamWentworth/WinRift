@@ -422,6 +422,63 @@ func PatchBucket(version string) string {
 	return parts[0] + "." + parts[1]
 }
 
+func PatchInWindow(patch, currentPatch string, retentionCount int) bool {
+	if strings.TrimSpace(currentPatch) == "" {
+		return true
+	}
+	if retentionCount <= 0 {
+		retentionCount = 1
+	}
+	patchMajor, patchMinor, ok := parsePatchBucket(patch)
+	if !ok {
+		return false
+	}
+	currentMajor, currentMinor, ok := parsePatchBucket(currentPatch)
+	if !ok {
+		return false
+	}
+	if patchMajor != currentMajor {
+		return false
+	}
+	minMinor := currentMinor - retentionCount + 1
+	return patchMinor >= minMinor && patchMinor <= currentMinor
+}
+
+func PatchWindow(currentPatch string, retentionCount int) []string {
+	currentMajor, currentMinor, ok := parsePatchBucket(currentPatch)
+	if !ok {
+		return nil
+	}
+	if retentionCount <= 0 {
+		retentionCount = 1
+	}
+	window := make([]string, 0, retentionCount)
+	for offset := 0; offset < retentionCount; offset++ {
+		minor := currentMinor - offset
+		if minor < 1 {
+			break
+		}
+		window = append(window, fmt.Sprintf("%d.%d", currentMajor, minor))
+	}
+	return window
+}
+
+func parsePatchBucket(patch string) (int, int, bool) {
+	parts := strings.Split(strings.TrimSpace(patch), ".")
+	if len(parts) < 2 {
+		return 0, 0, false
+	}
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, false
+	}
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, false
+	}
+	return major, minor, true
+}
+
 func FinalItemsSignature(participant matchParticipant) string {
 	items := []int{participant.Item0, participant.Item1, participant.Item2, participant.Item3, participant.Item4, participant.Item5}
 	return joinNonZero(items)

@@ -168,14 +168,15 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 	}
 	platform := s.defaultPlatform(body.Platform)
 	log.Printf(
-		"dev collector seed start riot_ids=%d puuids=%d platform=%s match_count=%d max_requests=%d frontier_only=%t target_patch=%s rank_enabled=%t rank_max_requests=%d",
+		"dev collector seed start riot_ids=%d puuids=%d platform=%s match_count=%d max_requests=%d frontier_only=%t current_patch=%s patch_retention=%d rank_enabled=%t rank_max_requests=%d",
 		len(body.RiotIDs),
 		len(body.PUUIDs),
 		platform,
 		body.MatchCount,
 		body.MaxRequests,
 		body.FrontierOnly,
-		s.cfg.CollectorTargetPatch,
+		s.cfg.CollectorCurrentPatch,
+		s.cfg.CollectorPatchRetention,
 		s.cfg.RankEnrichmentEnabled,
 		s.cfg.RankEnrichmentMaxRequests,
 	)
@@ -305,7 +306,8 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 			RankEnrichmentEnabled: rankEnabled,
 			RankSnapshotTTL:       s.cfg.RankSnapshotTTL,
 			RankMaxRequests:       rankRequestsLeft,
-			TargetPatch:           s.cfg.CollectorTargetPatch,
+			CurrentPatch:          s.cfg.CollectorCurrentPatch,
+			PatchRetentionCount:   s.cfg.CollectorPatchRetention,
 		})
 		seen += result.MatchIDsSeen
 		inserted += result.MatchesInserted
@@ -358,7 +360,7 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 		"matchIdsSeen": seen, "matchesInserted": inserted, "matchesSkipped": skipped,
 		"frontierAdded": frontierAdded, "requestsUsed": requestsUsed,
 		"rankRequestsUsed": rankRequestsUsed, "rankSnapshotsInserted": rankSnapshotsInserted,
-		"targetPatch": s.cfg.CollectorTargetPatch, "patchBoundaryHits": patchBoundaryHits,
+		"currentPatch": s.cfg.CollectorCurrentPatch, "patchRetentionCount": s.cfg.CollectorPatchRetention, "patchBoundaryHits": patchBoundaryHits,
 		"rankEnrichmentEnabled": s.cfg.RankEnrichmentEnabled,
 		"errors":                errorsOut,
 	})

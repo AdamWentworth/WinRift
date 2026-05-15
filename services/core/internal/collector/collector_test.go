@@ -171,12 +171,12 @@ func TestCollectEnrichesRankBucketFromLeagueEntries(t *testing.T) {
 	}
 }
 
-func TestCollectStopsAtTargetPatchBoundaryBeforeTimeline(t *testing.T) {
+func TestCollectStopsAtPatchRetentionBoundaryBeforeTimeline(t *testing.T) {
 	oldPatchMatch := []byte(`{
 		"metadata": {"matchId": "NA1_old"},
 		"info": {
 			"gameId": 1,
-			"gameVersion": "16.9.1.123",
+			"gameVersion": "16.8.1.123",
 			"queueId": 420,
 			"mapId": 11,
 			"gameMode": "CLASSIC"
@@ -189,9 +189,10 @@ func TestCollectStopsAtTargetPatchBoundaryBeforeTimeline(t *testing.T) {
 	collector := New(riotClient, &fakeRepo{})
 
 	result := collector.CollectFromPUUIDWithOptions(context.Background(), "seed-puuid", "NA1", CollectOptions{
-		MatchCount:  2,
-		MaxRequests: 10,
-		TargetPatch: "16.10",
+		MatchCount:          2,
+		MaxRequests:         10,
+		CurrentPatch:        "16.10",
+		PatchRetentionCount: 2,
 	})
 
 	if !result.PatchBoundaryReached {
@@ -208,5 +209,39 @@ func TestCollectStopsAtTargetPatchBoundaryBeforeTimeline(t *testing.T) {
 	}
 	if riotClient.timelineCalls != 0 {
 		t.Fatalf("timeline calls = %d, want 0", riotClient.timelineCalls)
+	}
+}
+
+func TestCollectAcceptsPreviousPatchInRetentionWindow(t *testing.T) {
+	previousPatchMatch := []byte(`{
+		"metadata": {"matchId": "NA1_previous"},
+		"info": {
+			"gameId": 1,
+			"gameVersion": "16.9.1.123",
+			"queueId": 420,
+			"mapId": 11,
+			"gameMode": "CLASSIC",
+			"participants": []
+		}
+	}`)
+	riotClient := &fakeRiot{
+		matchIDs: []string{"NA1_previous"},
+		matches:  map[string][]byte{"NA1_previous": previousPatchMatch},
+		timeline: []byte(`{"info":{"frames":[]}}`),
+	}
+	collector := New(riotClient, &fakeRepo{})
+
+	result := collector.CollectFromPUUIDWithOptions(context.Background(), "seed-puuid", "NA1", CollectOptions{
+		MatchCount:          1,
+		MaxRequests:         10,
+		CurrentPatch:        "16.10",
+		PatchRetentionCount: 2,
+	})
+
+	if result.PatchBoundaryReached {
+		t.Fatal("did not expect previous patch to hit retention boundary")
+	}
+	if riotClient.timelineCalls != 1 {
+		t.Fatalf("timeline calls = %d, want 1", riotClient.timelineCalls)
 	}
 }

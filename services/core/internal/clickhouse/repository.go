@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
@@ -242,6 +245,102 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 	for _, statement := range statements {
 		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) DeletePatchesOutsideWindow(ctx context.Context, currentPatch string, retentionCount int) ([]string, error) {
+	if strings.TrimSpace(currentPatch) == "" {
+		return nil, nil
+	}
+	patches, err := r.StoredPatches(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var prune []string
+	for _, patch := range patches {
+		if !analytics.PatchInWindow(patch, currentPatch, retentionCount) {
+			prune = append(prune, patch)
+		}
+	}
+	if len(prune) == 0 {
+		return nil, nil
+	}
+	if err := r.DeletePatches(ctx, prune); err != nil {
+		return nil, err
+	}
+	return prune, nil
+}
+
+func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT patch
+		FROM
+		(
+			SELECT patch FROM raw_matches
+			UNION ALL SELECT patch FROM raw_timelines
+			UNION ALL SELECT patch FROM participants
+			UNION ALL SELECT patch FROM participant_matchups
+			UNION ALL SELECT patch_bucket AS patch FROM build_analytics_mv
+			UNION ALL SELECT patch FROM timeline_participant_frames
+			UNION ALL SELECT patch FROM timeline_item_events
+			UNION ALL SELECT patch FROM timeline_combat_events
+			UNION ALL SELECT patch FROM timeline_objective_events
+			UNION ALL SELECT patch FROM patch_build_metrics
+			UNION ALL SELECT patch FROM patch_item_timing_metrics
+			UNION ALL SELECT patch FROM patch_power_curve_metrics
+			UNION ALL SELECT patch FROM patch_snapshots
+		)
+		WHERE patch != ''
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	patches := []string{}
+	for rows.Next() {
+		var patch string
+		if err := rows.Scan(&patch); err != nil {
+			return nil, err
+		}
+		patches = append(patches, patch)
+	}
+	sort.Slice(patches, func(i, j int) bool {
+		return patchLess(patches[i], patches[j])
+	})
+	return patches, rows.Err()
+}
+
+func (r *Repository) DeletePatches(ctx context.Context, patches []string) error {
+	statements := []struct {
+		table  string
+		column string
+	}{
+		{table: "raw_timelines", column: "patch"},
+		{table: "raw_matches", column: "patch"},
+		{table: "participants", column: "patch"},
+		{table: "participant_matchups", column: "patch"},
+		{table: "build_analytics_mv", column: "patch_bucket"},
+		{table: "timeline_participant_frames", column: "patch"},
+		{table: "timeline_item_events", column: "patch"},
+		{table: "timeline_combat_events", column: "patch"},
+		{table: "timeline_objective_events", column: "patch"},
+		{table: "patch_build_metrics", column: "patch"},
+		{table: "patch_item_timing_metrics", column: "patch"},
+		{table: "patch_power_curve_metrics", column: "patch"},
+		{table: "patch_snapshots", column: "patch"},
+	}
+	for _, patch := range patches {
+		patch = strings.TrimSpace(patch)
+		if patch == "" {
+			continue
+		}
+		for _, statement := range statements {
+			query := fmt.Sprintf("ALTER TABLE %s DELETE WHERE %s = ? SETTINGS mutations_sync = 2", statement.table, statement.column)
+			if _, err := r.db.ExecContext(ctx, query, patch); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -530,4 +629,22 @@ const matchupInsertSQL = `INSERT INTO participant_matchups (` + participantColum
 
 func participantArgs(row analytics.ParticipantRow) []any {
 	return []any{row.MatchID, row.Platform, row.Patch, row.QueueID, row.ParticipantID, row.PUUID, row.TeamID, row.ChampionID, row.ChampionName, row.Role, row.Win, row.Kills, row.Deaths, row.Assists, row.Item0, row.Item1, row.Item2, row.Item3, row.Item4, row.Item5, row.TrinketItem, row.SummonerSpell1, row.SummonerSpell2, row.PrimaryRuneTree, row.SecondaryRuneTree, row.Keystone, row.RuneSignature, row.SpellSignature, row.FinalItemsSignature, row.Core2Signature, row.Core3Signature, row.RankBucket}
+}
+
+func patchLess(left, right string) bool {
+	leftParts := strings.Split(left, ".")
+	rightParts := strings.Split(right, ".")
+	if len(leftParts) >= 2 && len(rightParts) >= 2 {
+		leftMajor, leftMajorErr := strconv.Atoi(leftParts[0])
+		leftMinor, leftMinorErr := strconv.Atoi(leftParts[1])
+		rightMajor, rightMajorErr := strconv.Atoi(rightParts[0])
+		rightMinor, rightMinorErr := strconv.Atoi(rightParts[1])
+		if leftMajorErr == nil && leftMinorErr == nil && rightMajorErr == nil && rightMinorErr == nil {
+			if leftMajor != rightMajor {
+				return leftMajor < rightMajor
+			}
+			return leftMinor < rightMinor
+		}
+	}
+	return left < right
 }

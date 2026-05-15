@@ -57,6 +57,33 @@ func TestMatchPatch(t *testing.T) {
 	}
 }
 
+func TestPatchInWindow(t *testing.T) {
+	cases := []struct {
+		patch   string
+		current string
+		retain  int
+		want    bool
+	}{
+		{patch: "16.10", current: "16.10", retain: 2, want: true},
+		{patch: "16.9", current: "16.10", retain: 2, want: true},
+		{patch: "16.8", current: "16.10", retain: 2, want: false},
+		{patch: "16.11", current: "16.10", retain: 2, want: false},
+		{patch: "17.1", current: "16.10", retain: 2, want: false},
+	}
+	for _, tc := range cases {
+		if got := PatchInWindow(tc.patch, tc.current, tc.retain); got != tc.want {
+			t.Fatalf("PatchInWindow(%q, %q, %d) = %t, want %t", tc.patch, tc.current, tc.retain, got, tc.want)
+		}
+	}
+}
+
+func TestPatchWindow(t *testing.T) {
+	window := PatchWindow("16.10", 2)
+	if len(window) != 2 || window[0] != "16.10" || window[1] != "16.9" {
+		t.Fatalf("window = %+v, want [16.10 16.9]", window)
+	}
+}
+
 func TestNormalizeTimelineEvents(t *testing.T) {
 	raw, err := os.ReadFile(legacyMatchFixture)
 	if err != nil {

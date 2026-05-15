@@ -57,7 +57,8 @@ type CollectOptions struct {
 	RankEnrichmentEnabled bool
 	RankSnapshotTTL       time.Duration
 	RankMaxRequests       int
-	TargetPatch           string
+	CurrentPatch          string
+	PatchRetentionCount   int
 }
 
 func New(riot RiotClient, repo Repository) Collector {
@@ -74,13 +75,15 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 		options.MatchCount = 1
 	}
 	normalizedPlatform := riot.NormalizePlatform(platform)
+	patchWindow := analytics.PatchWindow(options.CurrentPatch, options.PatchRetentionCount)
 	log.Printf(
-		"collector start puuid=%s platform=%s match_count=%d max_requests=%d target_patch=%s rank_enabled=%t rank_max_requests=%d",
+		"collector start puuid=%s platform=%s match_count=%d max_requests=%d current_patch=%s patch_window=%s rank_enabled=%t rank_max_requests=%d",
 		shortID(puuid),
 		normalizedPlatform,
 		options.MatchCount,
 		options.MaxRequests,
-		normalizedTargetPatch(options.TargetPatch),
+		normalizedPatch(options.CurrentPatch),
+		strings.Join(patchWindow, ","),
 		options.RankEnrichmentEnabled,
 		options.RankMaxRequests,
 	)
@@ -127,11 +130,11 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 			log.Printf("collector match skipped match_id=%s reason=not_ranked_solo_summoners_rift", matchID)
 			continue
 		}
-		if !targetPatchMatches(match, options.TargetPatch) {
+		if !patchPolicyAccepts(match, options.CurrentPatch, options.PatchRetentionCount) {
 			patch, _ := analytics.MatchPatch(match)
 			result.MatchesSkipped++
 			result.PatchBoundaryReached = true
-			log.Printf("collector match skipped match_id=%s reason=target_patch_boundary patch=%s target_patch=%s action=move_to_next_puuid", matchID, patch, normalizedTargetPatch(options.TargetPatch))
+			log.Printf("collector match skipped match_id=%s reason=patch_retention_boundary patch=%s current_patch=%s retained_patches=%s action=move_to_next_puuid", matchID, patch, normalizedPatch(options.CurrentPatch), strings.Join(patchWindow, ","))
 			break
 		}
 		if !result.spendRequest(options.MaxRequests) {
@@ -312,17 +315,17 @@ func applyRankBuckets(normalized *analytics.NormalizedMatch, buckets map[string]
 	normalized.Matchups = analytics.BuildMatchupRows(normalized.Participants)
 }
 
-func targetPatchMatches(match []byte, targetPatch string) bool {
-	target := normalizedTargetPatch(targetPatch)
-	if target == "" {
+func patchPolicyAccepts(match []byte, currentPatch string, retentionCount int) bool {
+	current := normalizedPatch(currentPatch)
+	if current == "" {
 		return true
 	}
 	patch, ok := analytics.MatchPatch(match)
-	return ok && strings.EqualFold(strings.TrimSpace(patch), target)
+	return ok && analytics.PatchInWindow(patch, current, retentionCount)
 }
 
-func normalizedTargetPatch(targetPatch string) string {
-	return strings.TrimSpace(targetPatch)
+func normalizedPatch(patch string) string {
+	return strings.TrimSpace(patch)
 }
 
 func (r *Result) spendRequest(maxRequests int) bool {
