@@ -28,6 +28,7 @@ type Config struct {
 	CollectorPlatforms          []string
 	CollectorDefaultMatchCount  int
 	CollectorInterval           time.Duration
+	CollectorIdleSleep          time.Duration
 	CollectorFrontierBatchSize  int
 	CollectorMaxRequests        int
 	CollectorRateLimitRequests  int
@@ -64,6 +65,7 @@ func Load() Config {
 		CollectorPlatforms:          splitList(env("COLLECTOR_PLATFORMS", defaultPlatform)),
 		CollectorDefaultMatchCount:  envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
 		CollectorInterval:           time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 120)) * time.Second,
+		CollectorIdleSleep:          time.Duration(envInt("COLLECTOR_IDLE_SLEEP_SECONDS", 15)) * time.Second,
 		CollectorFrontierBatchSize:  envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),
 		CollectorMaxRequests:        envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 0),
 		CollectorRateLimitRequests:  envInt("COLLECTOR_RATE_LIMIT_REQUESTS", 100),

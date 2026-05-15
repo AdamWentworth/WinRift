@@ -25,7 +25,7 @@ func TestIsRiotAuthError(t *testing.T) {
 	}
 }
 
-func TestAllocatePlatformBudgetSharesRegionalBudget(t *testing.T) {
+func TestAllocatePlatformBudgetSharesAvailableBudget(t *testing.T) {
 	cfg := config.Config{
 		CollectorInterval:          120 * time.Second,
 		CollectorRateLimitRequests: 100,
@@ -34,24 +34,45 @@ func TestAllocatePlatformBudgetSharesRegionalBudget(t *testing.T) {
 		RankEnrichmentEnabled:      true,
 		RankEnrichmentMaxRequests:  5,
 	}
-	budgets := newRegionCycleBudgets(cfg, []string{"NA1", "BR1", "LA1", "LA2"})
-	americas := budgets["AMERICAS"]
 
-	first := allocatePlatformBudget(cfg, americas)
+	first := allocatePlatformBudget(cfg, 90, 4)
 	if first.TotalRequests != 23 || first.MatchRequests != 18 || first.RankRequests != 5 {
 		t.Fatalf("first budget = %+v, want total=23 match=18 rank=5", first)
 	}
-	recordRegionBudgetUse(americas, first.TotalRequests)
 
-	second := allocatePlatformBudget(cfg, americas)
+	second := allocatePlatformBudget(cfg, 67, 3)
 	if second.TotalRequests != 23 || second.MatchRequests != 18 || second.RankRequests != 5 {
 		t.Fatalf("second budget = %+v, want total=23 match=18 rank=5", second)
 	}
-	recordRegionBudgetUse(americas, second.TotalRequests)
 
-	third := allocatePlatformBudget(cfg, americas)
+	third := allocatePlatformBudget(cfg, 44, 2)
 	if third.TotalRequests != 22 || third.MatchRequests != 17 || third.RankRequests != 5 {
 		t.Fatalf("third budget = %+v, want total=22 match=17 rank=5", third)
+	}
+}
+
+func TestRegionRequestLedgerWaitsForRollingWindow(t *testing.T) {
+	cfg := config.Config{
+		CollectorInterval:          120 * time.Second,
+		CollectorRateLimitRequests: 100,
+		CollectorRateLimitWindow:   120 * time.Second,
+		CollectorRateLimitReserve:  10,
+	}
+	ledger := newRegionRequestLedger(cfg)
+	start := time.Date(2026, 5, 15, 5, 0, 0, 0, time.UTC)
+	ledger.Record("AMERICAS", 90, start)
+
+	if got := ledger.Available("AMERICAS", start.Add(30*time.Second)); got != 0 {
+		t.Fatalf("available = %d, want 0", got)
+	}
+	if got := ledger.Wait("AMERICAS", start.Add(30*time.Second)); got != 90*time.Second {
+		t.Fatalf("wait after 30s = %s, want 90s", got)
+	}
+	if got := ledger.Wait("AMERICAS", start.Add(60*time.Second)); got != 60*time.Second {
+		t.Fatalf("wait after 60s = %s, want 60s", got)
+	}
+	if got := ledger.Available("AMERICAS", start.Add(121*time.Second)); got != 90 {
+		t.Fatalf("available after window = %d, want 90", got)
 	}
 }
 

@@ -26,10 +26,11 @@ func main() {
 
 	matchCollector := collector.New(riotClient, repo)
 	platforms := collectorPlatforms(cfg)
+	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s interval=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
+		"collector platforms=%s idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
 		strings.Join(platforms, ","),
-		cfg.CollectorInterval,
+		cfg.CollectorIdleSleep,
 		cfg.CollectorUsableRequestsPerRegion(),
 		cfg.CollectorRateLimitRequests,
 		cfg.CollectorRateLimitWindow,
@@ -44,46 +45,73 @@ func main() {
 		}
 		log.Printf("seed frontier: %v", err)
 	}
-	interval := cfg.CollectorInterval
+	ledger := newRegionRequestLedger(cfg)
+	recordSeedRequests(ledger, seedRequestsByRegion)
+	regions := configuredRegions(platforms)
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
-		regionBudgets := newRegionCycleBudgets(cfg, platforms)
-		debitRegionBudgets(regionBudgets, seedRequestsByRegion)
-		seedRequestsByRegion = nil
+		regionPlatformsRemaining := cloneCounts(platformCountsByRegion)
+		requestsThisSweep := 0
+		platformsWithWork := 0
 		for _, platform := range platforms {
 			region, err := riot.RegionForPlatform(platform)
 			if err != nil {
 				log.Printf("collector platform skipped platform=%s err=%v", platform, err)
 				continue
 			}
+			remainingPlatforms := regionPlatformsRemaining[region]
+			if remainingPlatforms <= 0 {
+				remainingPlatforms = 1
+			}
+			regionPlatformsRemaining[region]--
 			if rateLimitedRegions[region] {
 				log.Printf("collector platform skipped platform=%s region=%s reason=region_rate_limited_this_pass", platform, region)
 				continue
 			}
-			budget := allocatePlatformBudget(cfg, regionBudgets[region])
+			available := ledger.Available(region, time.Now())
+			if available <= 0 {
+				log.Printf("collector platform deferred platform=%s region=%s reason=region_budget_wait wait=%s", platform, region, ledger.Wait(region, time.Now()).Round(time.Second))
+				continue
+			}
+			budget := allocatePlatformBudget(cfg, available, remainingPlatforms)
 			log.Printf(
-				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_requests=%d region_remaining=%d region_platforms_remaining=%d",
+				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_requests=%d region_available=%d region_platforms_remaining=%d",
 				platform,
 				region,
 				budget.TotalRequests,
 				budget.MatchRequests,
 				budget.RankRequests,
-				regionBudgets[region].Remaining,
-				regionBudgets[region].PlatformsRemaining,
+				available,
+				remainingPlatforms,
 			)
 			result := runPlatformPass(ctx, cfg, matchCollector, repo, platform, budget)
-			recordRegionBudgetUse(regionBudgets[region], result.RequestsUsed+result.RankRequestsUsed)
+			requestsUsed := result.RequestsUsed + result.RankRequestsUsed
+			ledger.Record(region, requestsUsed, time.Now())
+			requestsThisSweep += requestsUsed
+			if requestsUsed > 0 || result.MatchIDsSeen > 0 || result.MatchesInserted > 0 || result.MatchesSkipped > 0 {
+				platformsWithWork++
+			}
 			if result.AuthFailed {
 				log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
 			}
 			if result.RateLimited {
 				rateLimitedRegions[region] = true
+				ledger.MarkFull(region, time.Now())
 			}
 		}
 
-		log.Printf("collector cycle complete platforms=%d sleeping=%s", len(platforms), interval)
-		time.Sleep(interval)
+		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
+		log.Printf(
+			"collector sweep complete platforms=%d active_platforms=%d requests=%d sleep=%s",
+			len(platforms),
+			platformsWithWork,
+			requestsThisSweep,
+			sleepFor.Round(time.Second),
+		)
+		if sleepFor > 0 {
+			time.Sleep(sleepFor)
+		}
 	}
 }
 
@@ -201,36 +229,12 @@ type platformRequestBudget struct {
 	RankRequests  int
 }
 
-type regionCycleBudget struct {
-	Remaining          int
-	PlatformsRemaining int
-}
-
-func newRegionCycleBudgets(cfg config.Config, platforms []string) map[string]*regionCycleBudget {
-	counts := map[string]int{}
-	for _, platform := range platforms {
-		region, err := riot.RegionForPlatform(platform)
-		if err != nil {
-			continue
-		}
-		counts[region]++
-	}
-	budgets := make(map[string]*regionCycleBudget, len(counts))
-	for region, count := range counts {
-		budgets[region] = &regionCycleBudget{
-			Remaining:          cfg.CollectorUsableRequestsPerRegion(),
-			PlatformsRemaining: count,
-		}
-	}
-	return budgets
-}
-
-func allocatePlatformBudget(cfg config.Config, budget *regionCycleBudget) platformRequestBudget {
-	if budget == nil || budget.Remaining <= 0 || budget.PlatformsRemaining <= 0 {
+func allocatePlatformBudget(cfg config.Config, available, platformsRemaining int) platformRequestBudget {
+	if available <= 0 || platformsRemaining <= 0 {
 		return platformRequestBudget{}
 	}
-	total := budget.Remaining / budget.PlatformsRemaining
-	if budget.Remaining%budget.PlatformsRemaining != 0 {
+	total := available / platformsRemaining
+	if available%platformsRemaining != 0 {
 		total++
 	}
 	if total < 0 {
@@ -251,35 +255,135 @@ func allocatePlatformBudget(cfg config.Config, budget *regionCycleBudget) platfo
 	}
 }
 
-func recordRegionBudgetUse(budget *regionCycleBudget, requestsUsed int) {
-	if budget == nil {
-		return
-	}
-	if requestsUsed < 0 {
-		requestsUsed = 0
-	}
-	budget.Remaining -= requestsUsed
-	if budget.Remaining < 0 {
-		budget.Remaining = 0
-	}
-	budget.PlatformsRemaining--
-	if budget.PlatformsRemaining < 0 {
-		budget.PlatformsRemaining = 0
+type regionRequestLedger struct {
+	limit   int
+	window  time.Duration
+	entries map[string][]time.Time
+}
+
+func newRegionRequestLedger(cfg config.Config) *regionRequestLedger {
+	return &regionRequestLedger{
+		limit:   cfg.CollectorUsableRequestsPerRegion(),
+		window:  cfg.CollectorRateLimitWindow,
+		entries: map[string][]time.Time{},
 	}
 }
 
-func debitRegionBudgets(budgets map[string]*regionCycleBudget, requestsByRegion map[string]int) {
+func (l *regionRequestLedger) Available(region string, now time.Time) int {
+	l.prune(region, now)
+	available := l.limit - len(l.entries[region])
+	if available < 0 {
+		return 0
+	}
+	return available
+}
+
+func (l *regionRequestLedger) Record(region string, requests int, now time.Time) {
+	if requests <= 0 {
+		return
+	}
+	l.prune(region, now)
+	for range requests {
+		l.entries[region] = append(l.entries[region], now)
+	}
+}
+
+func (l *regionRequestLedger) MarkFull(region string, now time.Time) {
+	l.prune(region, now)
+	for len(l.entries[region]) < l.limit {
+		l.entries[region] = append(l.entries[region], now)
+	}
+}
+
+func (l *regionRequestLedger) Wait(region string, now time.Time) time.Duration {
+	l.prune(region, now)
+	if len(l.entries[region]) < l.limit {
+		return 0
+	}
+	wait := l.entries[region][0].Add(l.window).Sub(now)
+	if wait < 0 {
+		return 0
+	}
+	return wait
+}
+
+func (l *regionRequestLedger) EarliestWait(regions []string, now time.Time) time.Duration {
+	var best time.Duration
+	for _, region := range regions {
+		wait := l.Wait(region, now)
+		if wait <= 0 {
+			return 0
+		}
+		if best == 0 || wait < best {
+			best = wait
+		}
+	}
+	return best
+}
+
+func (l *regionRequestLedger) prune(region string, now time.Time) {
+	cutoff := now.Add(-l.window)
+	entries := l.entries[region]
+	firstActive := 0
+	for firstActive < len(entries) && !entries[firstActive].After(cutoff) {
+		firstActive++
+	}
+	if firstActive > 0 {
+		entries = append([]time.Time(nil), entries[firstActive:]...)
+		l.entries[region] = entries
+	}
+}
+
+func recordSeedRequests(ledger *regionRequestLedger, requestsByRegion map[string]int) {
+	now := time.Now()
 	for region, requestsUsed := range requestsByRegion {
-		budget := budgets[region]
-		if budget == nil || requestsUsed <= 0 {
+		if requestsUsed <= 0 {
 			continue
 		}
-		budget.Remaining -= requestsUsed
-		if budget.Remaining < 0 {
-			budget.Remaining = 0
-		}
-		log.Printf("collector first cycle budget debit region=%s seed_requests=%d remaining=%d", region, requestsUsed, budget.Remaining)
+		ledger.Record(region, requestsUsed, now)
+		log.Printf("collector first sweep budget debit region=%s seed_requests=%d remaining=%d", region, requestsUsed, ledger.Available(region, now))
 	}
+}
+
+func nextSweepSleep(cfg config.Config, ledger *regionRequestLedger, regions []string, requestsUsed int) time.Duration {
+	if requestsUsed > 0 {
+		return 0
+	}
+	wait := ledger.EarliestWait(regions, time.Now())
+	if wait > 0 {
+		return wait
+	}
+	return cfg.CollectorIdleSleep
+}
+
+func countPlatformsByRegion(platforms []string) map[string]int {
+	counts := map[string]int{}
+	for _, platform := range platforms {
+		region, err := riot.RegionForPlatform(platform)
+		if err != nil {
+			continue
+		}
+		counts[region]++
+	}
+	return counts
+}
+
+func cloneCounts(counts map[string]int) map[string]int {
+	out := make(map[string]int, len(counts))
+	for key, value := range counts {
+		out[key] = value
+	}
+	return out
+}
+
+func configuredRegions(platforms []string) []string {
+	counts := countPlatformsByRegion(platforms)
+	regions := make([]string, 0, len(counts))
+	for region := range counts {
+		regions = append(regions, region)
+	}
+	sort.Strings(regions)
+	return regions
 }
 
 func maxMatchesForBudget(frontierRows, matchCount, matchRequests int) int {

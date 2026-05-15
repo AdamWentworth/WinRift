@@ -50,6 +50,7 @@ RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS=120
 RIOT_AUTH_FAILURE_EXIT=true
 RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
 COLLECTOR_INTERVAL_SECONDS=120
+COLLECTOR_IDLE_SLEEP_SECONDS=15
 COLLECTOR_FRONTIER_BATCH_SIZE=3
 COLLECTOR_MAX_REQUESTS_PER_PASS=0
 COLLECTOR_RATE_LIMIT_REQUESTS=100
@@ -76,7 +77,7 @@ For a detached worker, follow progress with:
 docker compose logs -f worker
 ```
 
-At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each pass walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, updates counters/status, and sleeps using `COLLECTOR_INTERVAL_SECONDS`. The default local cadence is 120 seconds.
+At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, and records Riot requests in a rolling regional budget ledger. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
 
 For broad multi-platform collection, use smaller per-platform budgets. For example:
 
@@ -107,7 +108,8 @@ Safety knobs:
 - `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`: longest 429 `Retry-After` sleep before deferring the region to the next collector cycle.
 - `RIOT_AUTH_FAILURE_EXIT`: when true, the API and worker stop when a Riot auth failure marker appears.
 - `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate an auth-failure stop.
-- `COLLECTOR_INTERVAL_SECONDS`: sleep time between worker cycles. `120` seconds lines up with the personal/development `100 requests / 2 minutes` bucket.
+- `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
+- `COLLECTOR_IDLE_SLEEP_SECONDS`: short pause when a sweep does no Riot work and no regional rate-limit wait is required.
 - `COLLECTOR_RATE_LIMIT_REQUESTS`: Riot application request bucket size for one region.
 - `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS`: Riot application request bucket window.
 - `COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS`: requests held back per region as safety headroom.
@@ -130,6 +132,6 @@ For each region, the worker computes a usable cycle budget:
 usable_region_requests = min(rate_limit_requests, rate_limit_requests * interval / rate_limit_window) - reserve_requests
 ```
 
-With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per cycle. The worker splits that regional budget across the active platforms in the same region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for rank snapshots, and gives the remainder to match collection.
+With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per rolling two-minute window. The worker splits currently available regional budget across active platforms in that region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for rank snapshots, and gives the remainder to match collection. If a region spends all 90 requests in 30 seconds, it waits about 90 seconds for that region; if it spends them in 60 seconds, it waits about 60 seconds.
 
 Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment can cost up to 10 extra requests per match on a cold cache, so the worker caps it separately and caches snapshots for `RANK_SNAPSHOT_TTL_HOURS`.
