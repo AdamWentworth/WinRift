@@ -45,7 +45,7 @@ func Load() Config {
 		CORSOrigins:                splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
 		DefaultPlatform:            env("DEFAULT_PLATFORM", "NA1"),
 		CollectorDefaultMatchCount: envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
-		CollectorInterval:          time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 3600)) * time.Second,
+		CollectorInterval:          time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 300)) * time.Second,
 		CollectorFrontierBatchSize: envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),
 		CollectorMaxRequests:       envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 60),
 		CollectorRecheckInterval:   time.Duration(envInt("COLLECTOR_RECHECK_HOURS", 24)) * time.Hour,

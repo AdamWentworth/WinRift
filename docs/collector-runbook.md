@@ -43,6 +43,7 @@ Set one or both in `.env`:
 ```text
 COLLECTOR_SEED_RIOT_IDS=Example#NA1
 COLLECTOR_SEED_PUUIDS=
+COLLECTOR_INTERVAL_SECONDS=300
 COLLECTOR_FRONTIER_BATCH_SIZE=3
 COLLECTOR_MAX_REQUESTS_PER_PASS=60
 COLLECTOR_RECHECK_HOURS=24
@@ -64,7 +65,7 @@ For a detached worker, follow progress with:
 docker compose logs -f worker
 ```
 
-At startup, the worker resolves env seeds into `collector_frontier`. Each pass pulls due frontier rows, collects recent ranked matches, stores normalized rows, queues discovered participants, updates counters/status, and sleeps using `COLLECTOR_INTERVAL_SECONDS`.
+At startup, the worker resolves env seeds into `collector_frontier`. Each pass pulls due frontier rows, collects recent ranked matches, stores normalized rows, queues discovered participants, updates counters/status, and sleeps using `COLLECTOR_INTERVAL_SECONDS`. The default local cadence is 300 seconds.
 
 ## Safety
 
@@ -75,6 +76,7 @@ If Riot returns 401 or 403, the worker exits immediately. This prevents an expir
 Safety knobs:
 
 - `COLLECTOR_FRONTIER_BATCH_SIZE`: max PUUIDs checked per worker pass.
+- `COLLECTOR_INTERVAL_SECONDS`: sleep time between worker passes. Keep this at 300 seconds or higher on a development/personal key unless you also lower request budgets.
 - `COLLECTOR_MAX_REQUESTS_PER_PASS`: approximate Riot request budget per pass.
 - `COLLECTOR_DISCOVERY_DELAY_MINUTES`: delay before newly discovered participants are eligible.
 - `COLLECTOR_RECHECK_HOURS`: delay before revisiting a checked PUUID.
