@@ -9,6 +9,43 @@ ORDER BY ingested_at DESC
 LIMIT 20;
 ```
 
+## Collector Frontier
+
+```sql
+SELECT
+  platform,
+  status,
+  source,
+  priority,
+  attempts,
+  matches_seen,
+  matches_inserted,
+  errors,
+  next_check_at
+FROM collector_frontier FINAL
+ORDER BY priority DESC, next_check_at ASC
+LIMIT 50;
+```
+
+## Rank Snapshot Cache
+
+```sql
+SELECT
+  platform,
+  queue_type,
+  rank_bucket,
+  tier,
+  division,
+  league_points,
+  wins,
+  losses,
+  fetched_at,
+  expires_at
+FROM summoner_rank_snapshots FINAL
+ORDER BY fetched_at DESC
+LIMIT 50;
+```
+
 ## Champion vs Opponent Builds
 
 ```sql

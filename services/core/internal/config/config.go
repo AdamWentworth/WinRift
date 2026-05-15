@@ -22,6 +22,13 @@ type Config struct {
 	DefaultPlatform            string
 	CollectorDefaultMatchCount int
 	CollectorInterval          time.Duration
+	CollectorFrontierBatchSize int
+	CollectorMaxRequests       int
+	CollectorRecheckInterval   time.Duration
+	CollectorDiscoveryDelay    time.Duration
+	RankEnrichmentEnabled      bool
+	RankSnapshotTTL            time.Duration
+	RankEnrichmentMaxRequests  int
 }
 
 func Load() Config {
@@ -39,6 +46,13 @@ func Load() Config {
 		DefaultPlatform:            env("DEFAULT_PLATFORM", "NA1"),
 		CollectorDefaultMatchCount: envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
 		CollectorInterval:          time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 3600)) * time.Second,
+		CollectorFrontierBatchSize: envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),
+		CollectorMaxRequests:       envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 60),
+		CollectorRecheckInterval:   time.Duration(envInt("COLLECTOR_RECHECK_HOURS", 24)) * time.Hour,
+		CollectorDiscoveryDelay:    time.Duration(envInt("COLLECTOR_DISCOVERY_DELAY_MINUTES", 60)) * time.Minute,
+		RankEnrichmentEnabled:      envBool("RANK_ENRICHMENT_ENABLED", false),
+		RankSnapshotTTL:            time.Duration(envInt("RANK_SNAPSHOT_TTL_HOURS", 24)) * time.Hour,
+		RankEnrichmentMaxRequests:  envInt("RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS", 20),
 	}
 }
 
@@ -65,6 +79,14 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func envBool(key string, fallback bool) bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if value == "" {
+		return fallback
+	}
+	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
 
 func splitOrigins(value string) []string {

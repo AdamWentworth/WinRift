@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -25,6 +26,20 @@ type NormalizedMatch struct {
 	TimelineItemEvents        []TimelineItemEventRow
 	TimelineCombatEvents      []TimelineCombatEventRow
 	TimelineObjectiveEvents   []TimelineObjectiveEventRow
+}
+
+type RankSnapshot struct {
+	PUUID        string
+	Platform     string
+	QueueType    string
+	Tier         string
+	Division     string
+	LeaguePoints int
+	Wins         int
+	Losses       int
+	RankBucket   string
+	FetchedAt    time.Time
+	ExpiresAt    time.Time
 }
 
 type RawMatch struct {
@@ -273,6 +288,10 @@ type timelinePosition struct {
 }
 
 func NormalizeMatch(rawMatch, rawTimeline []byte, platform, rankBucket string) (NormalizedMatch, error) {
+	return NormalizeMatchWithRankBuckets(rawMatch, rawTimeline, platform, rankBucket, nil)
+}
+
+func NormalizeMatchWithRankBuckets(rawMatch, rawTimeline []byte, platform, rankBucket string, rankBuckets map[string]string) (NormalizedMatch, error) {
 	var payload matchPayload
 	if err := json.Unmarshal(rawMatch, &payload); err != nil {
 		return NormalizedMatch{}, err
@@ -311,6 +330,10 @@ func NormalizeMatch(rawMatch, rawTimeline []byte, platform, rankBucket string) (
 		}
 		finalSignature := FinalItemsSignature(participant)
 		core2, core3 := CoreItemSignatures(timeline, participantID, finalSignature)
+		participantRankBucket := strings.ToUpper(rankBucket)
+		if bucket := strings.TrimSpace(rankBuckets[participant.PUUID]); bucket != "" {
+			participantRankBucket = strings.ToUpper(bucket)
+		}
 		row := ParticipantRow{
 			MatchID:             matchID,
 			Platform:            strings.ToUpper(platform),
@@ -343,7 +366,7 @@ func NormalizeMatch(rawMatch, rawTimeline []byte, platform, rankBucket string) (
 			FinalItemsSignature: finalSignature,
 			Core2Signature:      core2,
 			Core3Signature:      core3,
-			RankBucket:          strings.ToUpper(rankBucket),
+			RankBucket:          participantRankBucket,
 		}
 		normalized.Participants = append(normalized.Participants, row)
 	}
@@ -353,6 +376,19 @@ func NormalizeMatch(rawMatch, rawTimeline []byte, platform, rankBucket string) (
 	normalized.TimelineCombatEvents = BuildTimelineCombatEvents(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
 	normalized.TimelineObjectiveEvents = BuildTimelineObjectiveEvents(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
 	return normalized, nil
+}
+
+func RankBucket(tier string) string {
+	switch strings.ToUpper(strings.TrimSpace(tier)) {
+	case "CHALLENGER", "GRANDMASTER", "MASTER":
+		return "MASTER+"
+	case "DIAMOND", "EMERALD", "PLATINUM", "GOLD", "SILVER", "BRONZE", "IRON":
+		return strings.ToUpper(strings.TrimSpace(tier))
+	case "UNRANKED":
+		return "UNRANKED"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 func ShouldIngest(rawMatch []byte) bool {

@@ -39,6 +39,7 @@ services:
   worker:
     profiles:
       - worker
+    restart: "no"
     build:
       context: .
       dockerfile: services/core/Dockerfile
@@ -51,7 +52,6 @@ services:
       CLICKHOUSE_DATABASE: winrift
       CLICKHOUSE_USER: winrift
       CLICKHOUSE_PASSWORD: winrift
-      COLLECTOR_INTERVAL_SECONDS: 3600
     depends_on:
       clickhouse:
         condition: service_healthy

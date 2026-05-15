@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"winrift/services/core/internal/config"
@@ -40,6 +41,22 @@ type Summoner struct {
 	AccountID     string `json:"accountId"`
 	ProfileIconID int    `json:"profileIconId"`
 	SummonerLevel int64  `json:"summonerLevel"`
+}
+
+type LeagueEntry struct {
+	LeagueID     string `json:"leagueId"`
+	SummonerID   string `json:"summonerId"`
+	PUUID        string `json:"puuid"`
+	QueueType    string `json:"queueType"`
+	Tier         string `json:"tier"`
+	Rank         string `json:"rank"`
+	LeaguePoints int    `json:"leaguePoints"`
+	Wins         int    `json:"wins"`
+	Losses       int    `json:"losses"`
+	HotStreak    bool   `json:"hotStreak"`
+	Veteran      bool   `json:"veteran"`
+	FreshBlood   bool   `json:"freshBlood"`
+	Inactive     bool   `json:"inactive"`
 }
 
 func NewClient(cfg config.Config) *Client {
@@ -78,6 +95,12 @@ func (c *Client) ActiveGameByPUUID(ctx context.Context, puuid, platform string) 
 		return nil, err
 	}
 	return game, nil
+}
+
+func (c *Client) LeagueEntriesByPUUID(ctx context.Context, puuid, platform string) ([]LeagueEntry, error) {
+	var entries []LeagueEntry
+	_, err := c.get(ctx, NormalizePlatform(platform), fmt.Sprintf("/lol/league/v4/entries/by-puuid/%s", escapePath(puuid)), nil, &entries)
+	return entries, err
 }
 
 func (c *Client) MatchIDsByPUUID(ctx context.Context, puuid, platform string, count int) ([]string, error) {
@@ -174,7 +197,7 @@ func (c *Client) getBytes(ctx context.Context, route, path string, params url.Va
 		return nil, err
 	}
 	defer resp.Body.Close()
-	log.Printf("riot request route=%s path=%s status=%d", route, path, resp.StatusCode)
+	log.Printf("riot request route=%s path=%s status=%d", route, safeLogPath(path), resp.StatusCode)
 	if resp.StatusCode == http.StatusTooManyRequests && retry429 {
 		retryAfter, _ := strconv.Atoi(resp.Header.Get("Retry-After"))
 		if retryAfter <= 0 {
@@ -205,4 +228,14 @@ func stringsLower(value string) string {
 		out[i] = ch
 	}
 	return string(out)
+}
+
+func safeLogPath(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if len(part) > 24 {
+			parts[i] = part[:8] + "..." + part[len(part)-4:]
+		}
+	}
+	return strings.Join(parts, "/")
 }

@@ -1,5 +1,45 @@
 CREATE DATABASE IF NOT EXISTS winrift;
 
+CREATE TABLE IF NOT EXISTS winrift.collector_frontier
+(
+    puuid String,
+    platform LowCardinality(String),
+    source LowCardinality(String),
+    source_detail String,
+    first_seen_at DateTime,
+    last_checked_at Nullable(DateTime),
+    next_check_at DateTime,
+    priority Int16,
+    matches_seen UInt64,
+    matches_inserted UInt64,
+    matches_skipped UInt64,
+    errors UInt64,
+    requests_used UInt64,
+    attempts UInt32,
+    status LowCardinality(String),
+    updated_at DateTime64(3) DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (platform, puuid);
+
+CREATE TABLE IF NOT EXISTS winrift.summoner_rank_snapshots
+(
+    puuid String,
+    platform LowCardinality(String),
+    queue_type LowCardinality(String),
+    tier LowCardinality(String),
+    division LowCardinality(String),
+    league_points Int16,
+    wins UInt32,
+    losses UInt32,
+    rank_bucket LowCardinality(String),
+    fetched_at DateTime,
+    expires_at DateTime,
+    updated_at DateTime64(3) DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (platform, puuid, queue_type);
+
 CREATE TABLE IF NOT EXISTS winrift.raw_matches
 (
     match_id String,

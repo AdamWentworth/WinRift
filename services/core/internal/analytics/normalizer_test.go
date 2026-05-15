@@ -124,3 +124,21 @@ func TestWilson(t *testing.T) {
 		t.Fatal("expected larger sample to have better confidence")
 	}
 }
+
+func TestRankBucket(t *testing.T) {
+	cases := map[string]string{
+		"IRON":        "IRON",
+		"gold":        "GOLD",
+		"DIAMOND":     "DIAMOND",
+		"MASTER":      "MASTER+",
+		"GRANDMASTER": "MASTER+",
+		"CHALLENGER":  "MASTER+",
+		"UNRANKED":    "UNRANKED",
+		"":            "UNKNOWN",
+	}
+	for input, want := range cases {
+		if got := RankBucket(input); got != want {
+			t.Fatalf("RankBucket(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

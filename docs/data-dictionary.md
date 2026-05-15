@@ -6,9 +6,28 @@ One row per Riot match payload. Deduped by `match_id` with `ReplacingMergeTree`.
 
 Important columns: `match_id`, `platform`, `queue_id`, `patch`, timestamps, duration, `raw_json`.
 
+## `collector_frontier`
+
+Durable collection queue keyed by `platform` and `puuid`.
+
+Important columns: source, source detail, first seen time, last checked time, next check time, priority, attempts, request/match counters, error count, and status.
+
+Statuses:
+
+- `pending`: queued and not checked yet.
+- `active`: checked successfully and scheduled for a future pass.
+- `error`: checked with non-auth errors and scheduled for retry.
+- `blocked`: auth failure; do not retry until credentials are fixed.
+
 ## `raw_timelines`
 
 One row per Riot timeline payload. Used for item purchase order and future power-spike work.
+
+## `summoner_rank_snapshots`
+
+Cached ranked metadata keyed by `platform`, `puuid`, and `queue_type`.
+
+Important columns: tier, division, league points, wins, losses, rank bucket, fetched time, and expiry time. Current ingestion uses `RANKED_SOLO_5x5` snapshots for participant `rank_bucket` when rank enrichment is enabled. Unranked players are cached as `UNRANKED` so they are not repeatedly queried.
 
 ## `patch_snapshots`
 
@@ -31,6 +50,8 @@ Compact closed-patch participant power-curve metrics at 10, 15, and 20 minutes.
 One row per player per match.
 
 Important columns: champion, role, team, win, KDA, six final item slots, trinket, summoner spells, rune trees, keystone, rune signature, spell signature, final item signature, core item signatures, rank bucket.
+
+`rank_bucket` is the player's ranked tier grouping, for example `IRON`, `GOLD`, `DIAMOND`, or `MASTER+`. Match-V5 does not include rank, so rows ingest as `UNKNOWN` unless rank enrichment is enabled and a fresh `summoner_rank_snapshots` row is available or fetched.
 
 ## `participant_matchups`
 

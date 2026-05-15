@@ -1,12 +1,13 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"winrift/services/core/internal/clickhouse"
 	"winrift/services/core/internal/collector"
@@ -52,7 +53,7 @@ func (s Server) resolveAccount(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	platform := riot.NormalizePlatform(body.Platform)
+	platform := s.defaultPlatform(body.Platform)
 	account, err := s.riot.AccountByRiotID(r.Context(), body.GameName, body.TagLine, platform)
 	if err != nil {
 		writeRiotError(w, err)
@@ -155,54 +156,200 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 			TagLine  string `json:"tagLine"`
 			Platform string `json:"platform"`
 		} `json:"riotIds"`
-		PUUIDs     []string `json:"puuids"`
-		Platform   string   `json:"platform"`
-		MatchCount int      `json:"matchCount"`
+		PUUIDs       []string `json:"puuids"`
+		Platform     string   `json:"platform"`
+		MatchCount   int      `json:"matchCount"`
+		MaxRequests  int      `json:"maxRequests"`
+		FrontierOnly bool     `json:"frontierOnly"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	platform := riot.NormalizePlatform(body.Platform)
-	if platform == "" {
-		platform = s.cfg.DefaultPlatform
+	platform := s.defaultPlatform(body.Platform)
+	log.Printf(
+		"dev collector seed start riot_ids=%d puuids=%d platform=%s match_count=%d max_requests=%d frontier_only=%t rank_enabled=%t rank_max_requests=%d",
+		len(body.RiotIDs),
+		len(body.PUUIDs),
+		platform,
+		body.MatchCount,
+		body.MaxRequests,
+		body.FrontierOnly,
+		s.cfg.RankEnrichmentEnabled,
+		s.cfg.RankEnrichmentMaxRequests,
+	)
+	type seedTarget struct {
+		puuid    string
+		platform string
 	}
-	puuids := append([]string{}, body.PUUIDs...)
+	targets := make([]seedTarget, 0, len(body.PUUIDs)+len(body.RiotIDs))
 	errorsOut := []string{}
+	frontierSeedsAdded := 0
+	now := time.Now()
+	for _, puuid := range body.PUUIDs {
+		log.Printf("dev collector seed puuid source=body puuid=%s platform=%s", shortValue(puuid), platform)
+		targets = append(targets, seedTarget{puuid: puuid, platform: platform})
+		ok, err := s.repo.InsertFrontierSeed(r.Context(), clickhouse.FrontierSeed{
+			PUUID:        puuid,
+			Platform:     platform,
+			Source:       "seed-api-puuid",
+			SourceDetail: "dev collector seed",
+			Priority:     100,
+			NextCheckAt:  now,
+			Force:        true,
+		})
+		if err != nil {
+			errorsOut = append(errorsOut, err.Error())
+			log.Printf("dev collector frontier seed failed source=puuid puuid=%s err=%v", shortValue(puuid), err)
+			continue
+		}
+		if ok {
+			frontierSeedsAdded++
+			log.Printf("dev collector frontier seed added source=puuid puuid=%s", shortValue(puuid))
+		}
+	}
 	for _, id := range body.RiotIDs {
 		idPlatform := platform
 		if id.Platform != "" {
-			idPlatform = id.Platform
+			idPlatform = riot.NormalizePlatform(id.Platform)
 		}
+		log.Printf("dev collector resolving riot_id=%s#%s platform=%s", id.GameName, id.TagLine, idPlatform)
 		account, err := s.riot.AccountByRiotID(r.Context(), id.GameName, id.TagLine, idPlatform)
 		if err != nil {
 			errorsOut = append(errorsOut, err.Error())
+			log.Printf("dev collector resolve failed riot_id=%s#%s platform=%s err=%v", id.GameName, id.TagLine, idPlatform, err)
 			continue
 		}
 		if account != nil {
-			puuids = append(puuids, account.PUUID)
+			log.Printf("dev collector resolved riot_id=%s#%s platform=%s puuid=%s", id.GameName, id.TagLine, idPlatform, shortValue(account.PUUID))
+			targets = append(targets, seedTarget{puuid: account.PUUID, platform: idPlatform})
+			ok, err := s.repo.InsertFrontierSeed(r.Context(), clickhouse.FrontierSeed{
+				PUUID:        account.PUUID,
+				Platform:     idPlatform,
+				Source:       "seed-api-riot-id",
+				SourceDetail: id.GameName + "#" + id.TagLine,
+				Priority:     100,
+				NextCheckAt:  now,
+				Force:        true,
+			})
+			if err != nil {
+				errorsOut = append(errorsOut, err.Error())
+				log.Printf("dev collector frontier seed failed source=riot_id riot_id=%s#%s err=%v", id.GameName, id.TagLine, err)
+				continue
+			}
+			if ok {
+				frontierSeedsAdded++
+				log.Printf("dev collector frontier seed added source=riot_id riot_id=%s#%s puuid=%s", id.GameName, id.TagLine, shortValue(account.PUUID))
+			}
+		} else {
+			log.Printf("dev collector riot_id not found riot_id=%s#%s platform=%s", id.GameName, id.TagLine, idPlatform)
 		}
+	}
+	if body.FrontierOnly {
+		log.Printf("dev collector seed complete mode=frontier_only frontier_seeds_added=%d errors=%d", frontierSeedsAdded, len(errorsOut))
+		writeJSON(w, http.StatusOK, map[string]any{"frontierSeedsAdded": frontierSeedsAdded, "errors": errorsOut})
+		return
 	}
 	count := body.MatchCount
 	if count <= 0 {
 		count = s.cfg.CollectorDefaultMatchCount
 	}
+	maxRequests := body.MaxRequests
+	if maxRequests <= 0 {
+		maxRequests = s.cfg.CollectorMaxRequests
+	}
 	seen := 0
 	inserted := 0
 	skipped := 0
+	frontierAdded := 0
+	requestsUsed := 0
+	rankRequestsUsed := 0
+	rankSnapshotsInserted := 0
+	rankRequestsLeft := s.cfg.RankEnrichmentMaxRequests
 	unique := map[string]bool{}
-	for _, puuid := range puuids {
-		if unique[puuid] {
+	for _, target := range targets {
+		uniqueKey := target.platform + "\x00" + target.puuid
+		if unique[uniqueKey] {
 			continue
 		}
-		unique[puuid] = true
-		result := s.collector.CollectFromPUUID(context.Background(), puuid, platform, count)
+		unique[uniqueKey] = true
+		requestsLeft := 0
+		if maxRequests > 0 {
+			requestsLeft = maxRequests - requestsUsed
+			if requestsLeft <= 0 {
+				break
+			}
+		}
+		rankEnabled := s.cfg.RankEnrichmentEnabled
+		if s.cfg.RankEnrichmentEnabled && s.cfg.RankEnrichmentMaxRequests > 0 && rankRequestsLeft <= 0 {
+			rankEnabled = false
+		}
+		log.Printf("dev collector target start puuid=%s platform=%s requests_left=%d rank_enabled=%t rank_requests_left=%d", shortValue(target.puuid), target.platform, requestsLeft, rankEnabled, rankRequestsLeft)
+		result := s.collector.CollectFromPUUIDWithOptions(r.Context(), target.puuid, target.platform, collector.CollectOptions{
+			MatchCount:            count,
+			MaxRequests:           requestsLeft,
+			DiscoveryDelay:        s.cfg.CollectorDiscoveryDelay,
+			DiscoveredPriority:    0,
+			RankEnrichmentEnabled: rankEnabled,
+			RankSnapshotTTL:       s.cfg.RankSnapshotTTL,
+			RankMaxRequests:       rankRequestsLeft,
+		})
 		seen += result.MatchIDsSeen
 		inserted += result.MatchesInserted
 		skipped += result.MatchesSkipped
+		frontierAdded += result.FrontierAdded
+		requestsUsed += result.RequestsUsed
+		rankRequestsUsed += result.RankRequestsUsed
+		if s.cfg.RankEnrichmentEnabled && s.cfg.RankEnrichmentMaxRequests > 0 {
+			rankRequestsLeft -= result.RankRequestsUsed
+		}
+		rankSnapshotsInserted += result.RankSnapshotsInserted
 		errorsOut = append(errorsOut, result.Errors...)
+		log.Printf(
+			"dev collector target complete puuid=%s platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d",
+			shortValue(target.puuid),
+			target.platform,
+			result.MatchIDsSeen,
+			result.MatchesInserted,
+			result.MatchesSkipped,
+			result.FrontierAdded,
+			result.RequestsUsed,
+			result.RankRequestsUsed,
+			result.RankSnapshotsInserted,
+			len(result.Errors),
+		)
+		if result.AuthFailed || result.RateLimited || result.BudgetExhausted {
+			break
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"seeds": len(unique), "matchIdsSeen": seen, "matchesInserted": inserted, "matchesSkipped": skipped, "errors": errorsOut})
+	log.Printf(
+		"dev collector seed complete seeds=%d frontier_seeds_added=%d match_ids_seen=%d matches_inserted=%d matches_skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d",
+		len(unique),
+		frontierSeedsAdded,
+		seen,
+		inserted,
+		skipped,
+		frontierAdded,
+		requestsUsed,
+		rankRequestsUsed,
+		rankSnapshotsInserted,
+		len(errorsOut),
+	)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"seeds": len(unique), "frontierSeedsAdded": frontierSeedsAdded,
+		"matchIdsSeen": seen, "matchesInserted": inserted, "matchesSkipped": skipped,
+		"frontierAdded": frontierAdded, "requestsUsed": requestsUsed,
+		"rankRequestsUsed": rankRequestsUsed, "rankSnapshotsInserted": rankSnapshotsInserted,
+		"rankEnrichmentEnabled": s.cfg.RankEnrichmentEnabled,
+		"errors":                errorsOut,
+	})
+}
+
+func (s Server) defaultPlatform(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return s.cfg.DefaultPlatform
+	}
+	return riot.NormalizePlatform(value)
 }
 
 func (s Server) cors(next http.Handler) http.Handler {
@@ -258,4 +405,12 @@ func queryInt(value string, fallback int) int {
 
 func round(value float64) float64 {
 	return float64(int(value*100+0.5)) / 100
+}
+
+func shortValue(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 12 {
+		return value
+	}
+	return value[:8] + "..." + value[len(value)-4:]
 }

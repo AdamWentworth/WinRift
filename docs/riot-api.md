@@ -31,6 +31,14 @@ Collector endpoints:
 - Match: `/lol/match/v5/matches/{matchId}`
 - Timeline: `/lol/match/v5/matches/{matchId}/timeline`
 
+## Rank Enrichment
+
+Match-V5 does not include ranked tier. Rank enrichment is cached separately through League-V4:
+
+- League entries: `/lol/league/v4/entries/by-puuid/{puuid}`
+
+Only `RANKED_SOLO_5x5` entries feed the MVP rank bucket. Rank enrichment has its own request budget and TTL so collection does not query rank for every player in every match.
+
 ## Live Context
 
 Live lookup uses Spectator-V5:
