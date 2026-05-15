@@ -20,11 +20,15 @@ type Config struct {
 	ClickHousePassword          string
 	CORSOrigins                 []string
 	DefaultPlatform             string
+	RiotMinRequestInterval      time.Duration
 	CollectorPlatforms          []string
 	CollectorDefaultMatchCount  int
 	CollectorInterval           time.Duration
 	CollectorFrontierBatchSize  int
 	CollectorMaxRequests        int
+	CollectorRateLimitRequests  int
+	CollectorRateLimitWindow    time.Duration
+	CollectorRateLimitReserve   int
 	CollectorRecheckInterval    time.Duration
 	CollectorDiscoveryDelay     time.Duration
 	CollectorAutoSeedChallenger bool
@@ -48,24 +52,62 @@ func Load() Config {
 		ClickHousePassword:          env("CLICKHOUSE_PASSWORD", "winrift"),
 		CORSOrigins:                 splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
 		DefaultPlatform:             defaultPlatform,
+		RiotMinRequestInterval:      time.Duration(envInt("RIOT_MIN_REQUEST_INTERVAL_MS", 75)) * time.Millisecond,
 		CollectorPlatforms:          splitList(env("COLLECTOR_PLATFORMS", defaultPlatform)),
 		CollectorDefaultMatchCount:  envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
-		CollectorInterval:           time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 300)) * time.Second,
+		CollectorInterval:           time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 120)) * time.Second,
 		CollectorFrontierBatchSize:  envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),
-		CollectorMaxRequests:        envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 60),
+		CollectorMaxRequests:        envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 0),
+		CollectorRateLimitRequests:  envInt("COLLECTOR_RATE_LIMIT_REQUESTS", 100),
+		CollectorRateLimitWindow:    time.Duration(envInt("COLLECTOR_RATE_LIMIT_WINDOW_SECONDS", 120)) * time.Second,
+		CollectorRateLimitReserve:   envInt("COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS", 10),
 		CollectorRecheckInterval:    time.Duration(envInt("COLLECTOR_RECHECK_HOURS", 24)) * time.Hour,
 		CollectorDiscoveryDelay:     time.Duration(envInt("COLLECTOR_DISCOVERY_DELAY_MINUTES", 60)) * time.Minute,
 		CollectorAutoSeedChallenger: envBool("COLLECTOR_AUTO_SEED_CHALLENGER", false),
 		CollectorAutoSeedLimit:      envInt("COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM", 3),
 		RankEnrichmentEnabled:       envBool("RANK_ENRICHMENT_ENABLED", false),
 		RankSnapshotTTL:             time.Duration(envInt("RANK_SNAPSHOT_TTL_HOURS", 24)) * time.Hour,
-		RankEnrichmentMaxRequests:   envInt("RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS", 20),
+		RankEnrichmentMaxRequests:   envInt("RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS", 5),
 	}
 }
 
 func (c Config) IsDevelopment() bool {
 	value := strings.ToLower(c.Environment)
 	return value == "development" || value == "dev" || value == "local" || value == "test"
+}
+
+func (c Config) CollectorUsableRequestsPerRegion() int {
+	requestLimit := c.CollectorRateLimitRequests
+	if requestLimit <= 0 {
+		requestLimit = 100
+	}
+	window := c.CollectorRateLimitWindow
+	if window <= 0 {
+		window = 120 * time.Second
+	}
+	interval := c.CollectorInterval
+	if interval <= 0 {
+		interval = window
+	}
+	budget := requestLimit
+	if interval < window {
+		budget = int((int64(requestLimit) * int64(interval)) / int64(window))
+	}
+	if budget < 1 {
+		budget = 1
+	}
+	budget -= c.CollectorRateLimitReserve
+	if budget < 1 {
+		return 1
+	}
+	return budget
+}
+
+func (c Config) CollectorRankRequestBudget(totalRequests int) int {
+	if !c.RankEnrichmentEnabled || c.RankEnrichmentMaxRequests <= 0 || totalRequests <= 1 {
+		return 0
+	}
+	return min(c.RankEnrichmentMaxRequests, totalRequests-1)
 }
 
 func env(key, fallback string) string {

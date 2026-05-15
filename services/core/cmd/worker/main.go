@@ -26,8 +26,19 @@ func main() {
 
 	matchCollector := collector.New(riotClient, repo)
 	platforms := collectorPlatforms(cfg)
-	log.Printf("collector platforms=%s interval=%s match_requests_per_platform=%d rank_requests_per_platform=%d", strings.Join(platforms, ","), cfg.CollectorInterval, cfg.CollectorMaxRequests, cfg.RankEnrichmentMaxRequests)
-	if err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms); err != nil {
+	log.Printf(
+		"collector platforms=%s interval=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
+		strings.Join(platforms, ","),
+		cfg.CollectorInterval,
+		cfg.CollectorUsableRequestsPerRegion(),
+		cfg.CollectorRateLimitRequests,
+		cfg.CollectorRateLimitWindow,
+		cfg.CollectorRateLimitReserve,
+		cfg.CollectorMaxRequests,
+		cfg.RankEnrichmentMaxRequests,
+	)
+	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
+	if err != nil {
 		if isRiotAuthError(err) {
 			log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
 		}
@@ -37,6 +48,9 @@ func main() {
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
+		regionBudgets := newRegionCycleBudgets(cfg, platforms)
+		debitRegionBudgets(regionBudgets, seedRequestsByRegion)
+		seedRequestsByRegion = nil
 		for _, platform := range platforms {
 			region, err := riot.RegionForPlatform(platform)
 			if err != nil {
@@ -47,7 +61,19 @@ func main() {
 				log.Printf("collector platform skipped platform=%s region=%s reason=region_rate_limited_this_pass", platform, region)
 				continue
 			}
-			result := runPlatformPass(ctx, cfg, matchCollector, repo, platform)
+			budget := allocatePlatformBudget(cfg, regionBudgets[region])
+			log.Printf(
+				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_requests=%d region_remaining=%d region_platforms_remaining=%d",
+				platform,
+				region,
+				budget.TotalRequests,
+				budget.MatchRequests,
+				budget.RankRequests,
+				regionBudgets[region].Remaining,
+				regionBudgets[region].PlatformsRemaining,
+			)
+			result := runPlatformPass(ctx, cfg, matchCollector, repo, platform, budget)
+			recordRegionBudgetUse(regionBudgets[region], result.RequestsUsed+result.RankRequestsUsed)
 			if result.AuthFailed {
 				log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
 			}
@@ -56,11 +82,12 @@ func main() {
 			}
 		}
 
+		log.Printf("collector cycle complete platforms=%d sleeping=%s", len(platforms), interval)
 		time.Sleep(interval)
 	}
 }
 
-func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string) collector.Result {
+func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, budget platformRequestBudget) collector.Result {
 	entries, err := repo.FetchDueFrontier(ctx, platform, cfg.CollectorFrontierBatchSize)
 	if err != nil {
 		log.Printf("frontier fetch platform=%s: %v", platform, err)
@@ -70,16 +97,28 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		log.Printf("collector idle platform=%s: no due frontier rows", platform)
 		return collector.Result{}
 	}
-	requestsLeft := cfg.CollectorMaxRequests
-	rankRequestsLeft := cfg.RankEnrichmentMaxRequests
+	if budget.MatchRequests <= 0 {
+		log.Printf("collector request budget exhausted before platform=%s frontier_rows=%d", platform, len(entries))
+		return collector.Result{BudgetExhausted: true}
+	}
+	log.Printf(
+		"collector platform pass start platform=%s frontier_rows=%d match_request_budget=%d rank_request_budget=%d theoretical_max_matches=%d",
+		platform,
+		len(entries),
+		budget.MatchRequests,
+		budget.RankRequests,
+		maxMatchesForBudget(len(entries), cfg.CollectorDefaultMatchCount, budget.MatchRequests),
+	)
+	requestsLeft := budget.MatchRequests
+	rankRequestsLeft := budget.RankRequests
 	var passResult collector.Result
 	for _, entry := range entries {
-		if cfg.CollectorMaxRequests > 0 && requestsLeft <= 0 {
+		if requestsLeft <= 0 {
 			log.Printf("collector request budget exhausted before platform=%s puuid=%s", platform, shortValue(entry.PUUID))
 			break
 		}
 		rankEnabled := cfg.RankEnrichmentEnabled
-		if cfg.RankEnrichmentEnabled && cfg.RankEnrichmentMaxRequests > 0 && rankRequestsLeft <= 0 {
+		if cfg.RankEnrichmentEnabled && rankRequestsLeft <= 0 {
 			log.Printf("collector rank enrichment budget exhausted platform=%s", platform)
 			rankEnabled = false
 		}
@@ -104,11 +143,15 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		passResult.RateLimited = passResult.RateLimited || result.RateLimited
 		passResult.BudgetExhausted = passResult.BudgetExhausted || result.BudgetExhausted
 		passResult.RankBudgetExhausted = passResult.RankBudgetExhausted || result.RankBudgetExhausted
-		if cfg.CollectorMaxRequests > 0 {
-			requestsLeft -= result.RequestsUsed
+		requestsLeft -= result.RequestsUsed
+		if requestsLeft < 0 {
+			requestsLeft = 0
 		}
-		if cfg.RankEnrichmentEnabled && cfg.RankEnrichmentMaxRequests > 0 {
+		if cfg.RankEnrichmentEnabled {
 			rankRequestsLeft -= result.RankRequestsUsed
+			if rankRequestsLeft < 0 {
+				rankRequestsLeft = 0
+			}
 		}
 		status := frontierStatus(result)
 		nextCheckAt := nextFrontierCheck(cfg, result)
@@ -152,7 +195,107 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 	return passResult
 }
 
-func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, platforms []string) error {
+type platformRequestBudget struct {
+	TotalRequests int
+	MatchRequests int
+	RankRequests  int
+}
+
+type regionCycleBudget struct {
+	Remaining          int
+	PlatformsRemaining int
+}
+
+func newRegionCycleBudgets(cfg config.Config, platforms []string) map[string]*regionCycleBudget {
+	counts := map[string]int{}
+	for _, platform := range platforms {
+		region, err := riot.RegionForPlatform(platform)
+		if err != nil {
+			continue
+		}
+		counts[region]++
+	}
+	budgets := make(map[string]*regionCycleBudget, len(counts))
+	for region, count := range counts {
+		budgets[region] = &regionCycleBudget{
+			Remaining:          cfg.CollectorUsableRequestsPerRegion(),
+			PlatformsRemaining: count,
+		}
+	}
+	return budgets
+}
+
+func allocatePlatformBudget(cfg config.Config, budget *regionCycleBudget) platformRequestBudget {
+	if budget == nil || budget.Remaining <= 0 || budget.PlatformsRemaining <= 0 {
+		return platformRequestBudget{}
+	}
+	total := budget.Remaining / budget.PlatformsRemaining
+	if budget.Remaining%budget.PlatformsRemaining != 0 {
+		total++
+	}
+	if total < 0 {
+		total = 0
+	}
+	rankRequests := cfg.CollectorRankRequestBudget(total)
+	matchRequests := total - rankRequests
+	if cfg.CollectorMaxRequests > 0 && matchRequests > cfg.CollectorMaxRequests {
+		matchRequests = cfg.CollectorMaxRequests
+	}
+	if matchRequests < 0 {
+		matchRequests = 0
+	}
+	return platformRequestBudget{
+		TotalRequests: matchRequests + rankRequests,
+		MatchRequests: matchRequests,
+		RankRequests:  rankRequests,
+	}
+}
+
+func recordRegionBudgetUse(budget *regionCycleBudget, requestsUsed int) {
+	if budget == nil {
+		return
+	}
+	if requestsUsed < 0 {
+		requestsUsed = 0
+	}
+	budget.Remaining -= requestsUsed
+	if budget.Remaining < 0 {
+		budget.Remaining = 0
+	}
+	budget.PlatformsRemaining--
+	if budget.PlatformsRemaining < 0 {
+		budget.PlatformsRemaining = 0
+	}
+}
+
+func debitRegionBudgets(budgets map[string]*regionCycleBudget, requestsByRegion map[string]int) {
+	for region, requestsUsed := range requestsByRegion {
+		budget := budgets[region]
+		if budget == nil || requestsUsed <= 0 {
+			continue
+		}
+		budget.Remaining -= requestsUsed
+		if budget.Remaining < 0 {
+			budget.Remaining = 0
+		}
+		log.Printf("collector first cycle budget debit region=%s seed_requests=%d remaining=%d", region, requestsUsed, budget.Remaining)
+	}
+}
+
+func maxMatchesForBudget(frontierRows, matchCount, matchRequests int) int {
+	if frontierRows <= 0 || matchCount <= 0 || matchRequests <= frontierRows {
+		return 0
+	}
+	byRequests := (matchRequests - frontierRows) / 2
+	byIDs := frontierRows * matchCount
+	if byRequests < byIDs {
+		return byRequests
+	}
+	return byIDs
+}
+
+func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, platforms []string) (map[string]int, error) {
+	requestsByRegion := map[string]int{}
 	for _, puuid := range splitCSV(os.Getenv("COLLECTOR_SEED_PUUIDS")) {
 		ok, err := repo.InsertFrontierSeed(ctx, clickhouse.FrontierSeed{
 			PUUID:        puuid,
@@ -164,7 +307,7 @@ func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Clien
 			Force:        true,
 		})
 		if err != nil {
-			return err
+			return requestsByRegion, err
 		}
 		if ok {
 			log.Printf("frontier seed added source=env-puuid platform=%s puuid=%s", cfg.DefaultPlatform, shortValue(puuid))
@@ -176,10 +319,13 @@ func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Clien
 			log.Printf("invalid riot id %q: %v", value, err)
 			continue
 		}
+		if region, err := riot.RegionForPlatform(cfg.DefaultPlatform); err == nil {
+			requestsByRegion[region]++
+		}
 		account, err := riotClient.AccountByRiotID(ctx, gameName, tagLine, cfg.DefaultPlatform)
 		if err != nil {
 			if isRiotAuthError(err) {
-				return err
+				return requestsByRegion, err
 			}
 			log.Printf("resolve seed %q: %v", value, err)
 			continue
@@ -197,7 +343,7 @@ func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Clien
 			Force:        true,
 		})
 		if err != nil {
-			return err
+			return requestsByRegion, err
 		}
 		if ok {
 			log.Printf("frontier seed added source=env-riot-id platform=%s riot_id=%s", cfg.DefaultPlatform, value)
@@ -205,28 +351,33 @@ func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Clien
 	}
 	if cfg.CollectorAutoSeedChallenger {
 		for _, platform := range platforms {
-			if err := seedChallengerFrontier(ctx, cfg, riotClient, repo, platform); err != nil {
+			requestsUsed, err := seedChallengerFrontier(ctx, cfg, riotClient, repo, platform)
+			if region, regionErr := riot.RegionForPlatform(platform); regionErr == nil {
+				requestsByRegion[region] += requestsUsed
+			}
+			if err != nil {
 				if isRiotAuthError(err) {
-					return err
+					return requestsByRegion, err
 				}
 				log.Printf("frontier auto seed platform=%s: %v", platform, err)
 			}
 		}
 	}
-	return nil
+	return requestsByRegion, nil
 }
 
-func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, platform string) error {
+func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, platform string) (int, error) {
 	limit := cfg.CollectorAutoSeedLimit
 	if limit <= 0 {
 		limit = 3
 	}
+	requestsUsed := 1
 	league, err := riotClient.ChallengerLeagueByQueue(ctx, platform, "RANKED_SOLO_5x5")
 	if err != nil {
-		return err
+		return requestsUsed, err
 	}
 	if league == nil {
-		return nil
+		return requestsUsed, nil
 	}
 	entries := append([]riot.LeagueEntry(nil), league.Entries...)
 	sort.Slice(entries, func(i, j int) bool {
@@ -241,10 +392,11 @@ func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *
 		considered++
 		puuid := strings.TrimSpace(entry.PUUID)
 		if puuid == "" && entry.SummonerID != "" {
+			requestsUsed++
 			summoner, err := riotClient.SummonerByID(ctx, entry.SummonerID, platform)
 			if err != nil {
 				if isRiotAuthError(err) {
-					return err
+					return requestsUsed, err
 				}
 				log.Printf("frontier auto seed summoner lookup failed platform=%s summoner_id=%s err=%v", platform, shortValue(entry.SummonerID), err)
 			}
@@ -264,14 +416,14 @@ func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *
 			NextCheckAt:  time.Now(),
 		})
 		if err != nil {
-			return err
+			return requestsUsed, err
 		}
 		if ok {
 			inserted++
 		}
 	}
 	log.Printf("frontier auto seed complete platform=%s considered=%d inserted=%d", platform, considered, inserted)
-	return nil
+	return requestsUsed, nil
 }
 
 func isRiotAuthError(err error) bool {

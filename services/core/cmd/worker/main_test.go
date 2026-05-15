@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"winrift/services/core/internal/config"
 	"winrift/services/core/internal/riot"
@@ -18,6 +19,48 @@ func TestIsRiotAuthError(t *testing.T) {
 	}
 	if isRiotAuthError(riot.APIError{StatusCode: http.StatusTooManyRequests}) {
 		t.Fatal("did not expect 429 to be an auth error")
+	}
+}
+
+func TestAllocatePlatformBudgetSharesRegionalBudget(t *testing.T) {
+	cfg := config.Config{
+		CollectorInterval:          120 * time.Second,
+		CollectorRateLimitRequests: 100,
+		CollectorRateLimitWindow:   120 * time.Second,
+		CollectorRateLimitReserve:  10,
+		RankEnrichmentEnabled:      true,
+		RankEnrichmentMaxRequests:  5,
+	}
+	budgets := newRegionCycleBudgets(cfg, []string{"NA1", "BR1", "LA1", "LA2"})
+	americas := budgets["AMERICAS"]
+
+	first := allocatePlatformBudget(cfg, americas)
+	if first.TotalRequests != 23 || first.MatchRequests != 18 || first.RankRequests != 5 {
+		t.Fatalf("first budget = %+v, want total=23 match=18 rank=5", first)
+	}
+	recordRegionBudgetUse(americas, first.TotalRequests)
+
+	second := allocatePlatformBudget(cfg, americas)
+	if second.TotalRequests != 23 || second.MatchRequests != 18 || second.RankRequests != 5 {
+		t.Fatalf("second budget = %+v, want total=23 match=18 rank=5", second)
+	}
+	recordRegionBudgetUse(americas, second.TotalRequests)
+
+	third := allocatePlatformBudget(cfg, americas)
+	if third.TotalRequests != 22 || third.MatchRequests != 17 || third.RankRequests != 5 {
+		t.Fatalf("third budget = %+v, want total=22 match=17 rank=5", third)
+	}
+}
+
+func TestMaxMatchesForBudget(t *testing.T) {
+	if got := maxMatchesForBudget(1, 20, 18); got != 8 {
+		t.Fatalf("max matches = %d, want 8", got)
+	}
+	if got := maxMatchesForBudget(1, 20, 40); got != 19 {
+		t.Fatalf("max matches = %d, want 19", got)
+	}
+	if got := maxMatchesForBudget(3, 20, 90); got != 43 {
+		t.Fatalf("max matches = %d, want 43", got)
 	}
 }
 

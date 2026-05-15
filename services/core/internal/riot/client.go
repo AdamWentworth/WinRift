@@ -11,14 +11,18 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"winrift/services/core/internal/config"
 )
 
 type Client struct {
-	apiKey string
-	http   *http.Client
+	apiKey      string
+	http        *http.Client
+	minInterval time.Duration
+	throttleMu  sync.Mutex
+	lastRequest time.Time
 }
 
 type APIError struct {
@@ -70,8 +74,9 @@ type LeagueEntry struct {
 
 func NewClient(cfg config.Config) *Client {
 	return &Client{
-		apiKey: cfg.RiotAPIKey,
-		http:   &http.Client{Timeout: 20 * time.Second},
+		apiKey:      cfg.RiotAPIKey,
+		http:        &http.Client{Timeout: 20 * time.Second},
+		minInterval: cfg.RiotMinRequestInterval,
 	}
 }
 
@@ -210,6 +215,9 @@ func (c *Client) getBytes(ctx context.Context, route, path string, params url.Va
 	if c.apiKey == "" {
 		return nil, APIError{StatusCode: http.StatusServiceUnavailable, Message: "RIOT_API_KEY is not configured"}
 	}
+	if err := c.waitForTurn(ctx); err != nil {
+		return nil, err
+	}
 	endpoint := fmt.Sprintf("https://%s.api.riotgames.com%s", stringsLower(route), path)
 	if len(params) > 0 {
 		endpoint += "?" + params.Encode()
@@ -243,6 +251,32 @@ func (c *Client) getBytes(ctx context.Context, route, path string, params url.Va
 		return nil, APIError{StatusCode: resp.StatusCode, Message: fmt.Sprintf("Riot API request failed with status %d", resp.StatusCode)}
 	}
 	return io.ReadAll(resp.Body)
+}
+
+func (c *Client) waitForTurn(ctx context.Context) error {
+	if c.minInterval <= 0 {
+		return nil
+	}
+	c.throttleMu.Lock()
+	now := time.Now()
+	next := c.lastRequest.Add(c.minInterval)
+	if next.Before(now) || next.Equal(now) {
+		c.lastRequest = now
+		c.throttleMu.Unlock()
+		return nil
+	}
+	wait := time.Until(next)
+	c.lastRequest = next
+	c.throttleMu.Unlock()
+
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func stringsLower(value string) string {

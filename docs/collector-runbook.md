@@ -44,16 +44,20 @@ Set one or both in `.env`:
 COLLECTOR_SEED_RIOT_IDS=Example#NA1
 COLLECTOR_SEED_PUUIDS=
 COLLECTOR_PLATFORMS=NA1
-COLLECTOR_INTERVAL_SECONDS=300
+RIOT_MIN_REQUEST_INTERVAL_MS=75
+COLLECTOR_INTERVAL_SECONDS=120
 COLLECTOR_FRONTIER_BATCH_SIZE=3
-COLLECTOR_MAX_REQUESTS_PER_PASS=60
+COLLECTOR_MAX_REQUESTS_PER_PASS=0
+COLLECTOR_RATE_LIMIT_REQUESTS=100
+COLLECTOR_RATE_LIMIT_WINDOW_SECONDS=120
+COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS=10
 COLLECTOR_RECHECK_HOURS=24
 COLLECTOR_DISCOVERY_DELAY_MINUTES=60
 COLLECTOR_AUTO_SEED_CHALLENGER=false
 COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM=3
 RANK_ENRICHMENT_ENABLED=false
 RANK_SNAPSHOT_TTL_HOURS=24
-RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=20
+RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
 ```
 
 Then run:
@@ -68,14 +72,14 @@ For a detached worker, follow progress with:
 docker compose logs -f worker
 ```
 
-At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each pass walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, updates counters/status, and sleeps using `COLLECTOR_INTERVAL_SECONDS`. The default local cadence is 300 seconds.
+At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each pass walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, updates counters/status, and sleeps using `COLLECTOR_INTERVAL_SECONDS`. The default local cadence is 120 seconds.
 
 For broad multi-platform collection, use smaller per-platform budgets. For example:
 
 ```text
 COLLECTOR_PLATFORMS=NA1,EUW1,EUN1,KR,BR1,LA1,LA2,JP1,OC1,TR1,RU,SG2,TW2,VN2
 COLLECTOR_FRONTIER_BATCH_SIZE=1
-COLLECTOR_MAX_REQUESTS_PER_PASS=12
+COLLECTOR_MAX_REQUESTS_PER_PASS=0
 RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
 COLLECTOR_AUTO_SEED_CHALLENGER=true
 ```
@@ -92,14 +96,30 @@ Safety knobs:
 
 - `COLLECTOR_FRONTIER_BATCH_SIZE`: max PUUIDs checked per worker pass.
 - `COLLECTOR_PLATFORMS`: comma-separated platform routing values to collect, such as `NA1,EUW1,KR`.
-- `COLLECTOR_INTERVAL_SECONDS`: sleep time between worker passes. Keep this at 300 seconds or higher on a development/personal key unless you also lower request budgets.
-- `COLLECTOR_MAX_REQUESTS_PER_PASS`: approximate Riot request budget per pass.
+- `RIOT_MIN_REQUEST_INTERVAL_MS`: process-local spacing between Riot requests. `75`ms stays under the `20 requests / 1 second` bucket.
+- `COLLECTOR_INTERVAL_SECONDS`: sleep time between worker cycles. `120` seconds lines up with the personal/development `100 requests / 2 minutes` bucket.
+- `COLLECTOR_RATE_LIMIT_REQUESTS`: Riot application request bucket size for one region.
+- `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS`: Riot application request bucket window.
+- `COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS`: requests held back per region as safety headroom.
+- `COLLECTOR_MAX_REQUESTS_PER_PASS`: optional manual cap on match-history/match/timeline requests per platform. `0` means auto-calculate from the regional budget.
 - `COLLECTOR_AUTO_SEED_CHALLENGER`: seed each platform from its Challenger Solo/Duo ladder on worker startup.
 - `COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM`: max Challenger ladder entries to seed per platform at startup.
 - `COLLECTOR_DISCOVERY_DELAY_MINUTES`: delay before newly discovered participants are eligible.
 - `COLLECTOR_RECHECK_HOURS`: delay before revisiting a checked PUUID.
 - `RANK_ENRICHMENT_ENABLED`: when true, rank buckets are refreshed from cached rank snapshots or Riot League-V4.
-- `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS`: separate request budget for rank refreshes.
+- `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS`: max rank refresh requests per platform. These are subtracted from the same regional Riot request budget as match collection.
 - `RANK_SNAPSHOT_TTL_HOURS`: freshness window before a rank snapshot can be refreshed.
 
 Rank enrichment is off by default. Turn it on only after basic match ingestion is working; otherwise the first crawl spends extra Riot requests on player metadata before we know the match pipeline is healthy.
+
+## Request Formula
+
+For each region, the worker computes a usable cycle budget:
+
+```text
+usable_region_requests = min(rate_limit_requests, rate_limit_requests * interval / rate_limit_window) - reserve_requests
+```
+
+With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per cycle. The worker splits that regional budget across the active platforms in the same region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for rank snapshots, and gives the remainder to match collection.
+
+Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment can cost up to 10 extra requests per match on a cold cache, so the worker caps it separately and caches snapshots for `RANK_SNAPSHOT_TTL_HOURS`.

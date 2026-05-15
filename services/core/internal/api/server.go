@@ -254,9 +254,20 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 	if count <= 0 {
 		count = s.cfg.CollectorDefaultMatchCount
 	}
+	usableRequests := s.cfg.CollectorUsableRequestsPerRegion()
 	maxRequests := body.MaxRequests
 	if maxRequests <= 0 {
 		maxRequests = s.cfg.CollectorMaxRequests
+	}
+	rankRequestsLeft := s.cfg.CollectorRankRequestBudget(usableRequests)
+	if maxRequests <= 0 {
+		maxRequests = usableRequests - rankRequestsLeft
+	}
+	if rankRequestsLeft+maxRequests > usableRequests {
+		maxRequests = usableRequests - rankRequestsLeft
+	}
+	if maxRequests < 1 {
+		maxRequests = 1
 	}
 	seen := 0
 	inserted := 0
@@ -265,7 +276,6 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 	requestsUsed := 0
 	rankRequestsUsed := 0
 	rankSnapshotsInserted := 0
-	rankRequestsLeft := s.cfg.RankEnrichmentMaxRequests
 	unique := map[string]bool{}
 	for _, target := range targets {
 		uniqueKey := target.platform + "\x00" + target.puuid
