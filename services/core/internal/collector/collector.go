@@ -325,9 +325,11 @@ func (r *Result) addRiotError(err error) {
 	if !errors.As(err, &apiErr) {
 		return
 	}
-	switch apiErr.StatusCode {
-	case http.StatusUnauthorized, http.StatusForbidden:
+	if riot.IsAuthFailure(err) {
 		r.AuthFailed = true
+		return
+	}
+	switch apiErr.StatusCode {
 	case http.StatusTooManyRequests:
 		r.RateLimited = true
 	}

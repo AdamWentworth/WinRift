@@ -17,6 +17,9 @@ func TestIsRiotAuthError(t *testing.T) {
 	if !isRiotAuthError(errors.Join(errors.New("wrapped"), riot.APIError{StatusCode: http.StatusForbidden})) {
 		t.Fatal("expected wrapped 403 to be an auth error")
 	}
+	if !isRiotAuthError(riot.APIError{StatusCode: http.StatusServiceUnavailable, Message: "RIOT_API_KEY is not configured"}) {
+		t.Fatal("expected missing key to be an auth error")
+	}
 	if isRiotAuthError(riot.APIError{StatusCode: http.StatusTooManyRequests}) {
 		t.Fatal("did not expect 429 to be an auth error")
 	}

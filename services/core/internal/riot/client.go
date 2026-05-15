@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +23,9 @@ type Client struct {
 	apiKey      string
 	http        *http.Client
 	minInterval time.Duration
+	max429Retry int
+	max429Sleep time.Duration
+	authMarker  string
 	throttleMu  sync.Mutex
 	lastRequest time.Time
 }
@@ -32,6 +37,16 @@ type APIError struct {
 
 func (e APIError) Error() string {
 	return e.Message
+}
+
+func IsAuthFailure(err error) bool {
+	var apiErr APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.StatusCode == http.StatusUnauthorized ||
+		apiErr.StatusCode == http.StatusForbidden ||
+		(apiErr.StatusCode == http.StatusServiceUnavailable && strings.Contains(apiErr.Message, "RIOT_API_KEY"))
 }
 
 type Account struct {
@@ -77,6 +92,9 @@ func NewClient(cfg config.Config) *Client {
 		apiKey:      cfg.RiotAPIKey,
 		http:        &http.Client{Timeout: 20 * time.Second},
 		minInterval: cfg.RiotMinRequestInterval,
+		max429Retry: cfg.RiotRateLimitMaxRetries,
+		max429Sleep: cfg.RiotRateLimitMaxSleep,
+		authMarker:  cfg.RiotAuthFailureMarkerPath,
 	}
 }
 
@@ -212,7 +230,16 @@ func (c *Client) get(ctx context.Context, route, path string, params url.Values,
 }
 
 func (c *Client) getBytes(ctx context.Context, route, path string, params url.Values, retry429 bool) ([]byte, error) {
+	retries := 0
+	if retry429 {
+		retries = c.max429Retry
+	}
+	return c.getBytesWithRetries(ctx, route, path, params, retries)
+}
+
+func (c *Client) getBytesWithRetries(ctx context.Context, route, path string, params url.Values, retriesLeft int) ([]byte, error) {
 	if c.apiKey == "" {
+		c.markAuthFailure(route, path, http.StatusServiceUnavailable)
 		return nil, APIError{StatusCode: http.StatusServiceUnavailable, Message: "RIOT_API_KEY is not configured"}
 	}
 	if err := c.waitForTurn(ctx); err != nil {
@@ -233,15 +260,20 @@ func (c *Client) getBytes(ctx context.Context, route, path string, params url.Va
 	}
 	defer resp.Body.Close()
 	log.Printf("riot request route=%s path=%s status=%d", route, safeLogPath(path), resp.StatusCode)
-	if resp.StatusCode == http.StatusTooManyRequests && retry429 {
-		retryAfter, _ := strconv.Atoi(resp.Header.Get("Retry-After"))
-		if retryAfter <= 0 {
-			retryAfter = 1
+	if resp.StatusCode == http.StatusTooManyRequests && retriesLeft > 0 {
+		wait := retryAfter(resp.Header.Get("Retry-After"))
+		if c.max429Sleep > 0 && wait > c.max429Sleep {
+			log.Printf("riot rate limited route=%s path=%s retry_after=%s max_sleep=%s retries_left=%d action=defer_region", route, safeLogPath(path), wait, c.max429Sleep, retriesLeft)
+			return nil, APIError{StatusCode: resp.StatusCode, Message: "Riot API rate limited"}
 		}
-		time.Sleep(time.Duration(retryAfter) * time.Second)
-		return c.getBytes(ctx, route, path, params, false)
+		log.Printf("riot rate limited route=%s path=%s retry_after=%s retries_left=%d action=sleep_then_retry", route, safeLogPath(path), wait, retriesLeft)
+		if err := sleepContext(ctx, wait); err != nil {
+			return nil, err
+		}
+		return c.getBytesWithRetries(ctx, route, path, params, retriesLeft-1)
 	}
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		c.markAuthFailure(route, path, resp.StatusCode)
 		return nil, APIError{StatusCode: resp.StatusCode, Message: "Riot API key is missing, expired, or not authorized"}
 	}
 	if resp.StatusCode == http.StatusNotFound {
@@ -251,6 +283,76 @@ func (c *Client) getBytes(ctx context.Context, route, path string, params url.Va
 		return nil, APIError{StatusCode: resp.StatusCode, Message: fmt.Sprintf("Riot API request failed with status %d", resp.StatusCode)}
 	}
 	return io.ReadAll(resp.Body)
+}
+
+func ClearAuthFailureMarker(cfg config.Config) {
+	marker := strings.TrimSpace(cfg.RiotAuthFailureMarkerPath)
+	if marker == "" {
+		return
+	}
+	if err := os.Remove(marker); err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Printf("riot auth failure marker clear failed path=%s err=%v", marker, err)
+	}
+}
+
+func StartAuthFailureMonitor(cfg config.Config, component string) {
+	if !cfg.RiotAuthFailureExit {
+		return
+	}
+	marker := strings.TrimSpace(cfg.RiotAuthFailureMarkerPath)
+	if marker == "" {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if _, err := os.Stat(marker); err == nil {
+				log.Fatalf("%s stopping: Riot API auth failure marker exists path=%s", component, marker)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				log.Printf("%s auth failure marker check failed path=%s err=%v", component, marker, err)
+			}
+		}
+	}()
+}
+
+func (c *Client) markAuthFailure(route, apiPath string, status int) {
+	marker := strings.TrimSpace(c.authMarker)
+	if marker == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(marker), 0o700); err != nil {
+		log.Printf("riot auth failure marker mkdir failed path=%s err=%v", marker, err)
+		return
+	}
+	body := fmt.Sprintf("time=%s status=%d route=%s path=%s\n", time.Now().UTC().Format(time.RFC3339), status, route, safeLogPath(apiPath))
+	if err := os.WriteFile(marker, []byte(body), 0o600); err != nil {
+		log.Printf("riot auth failure marker write failed path=%s err=%v", marker, err)
+		return
+	}
+	log.Printf("riot auth failure marker written path=%s status=%d route=%s path=%s", marker, status, route, safeLogPath(apiPath))
+}
+
+func retryAfter(value string) time.Duration {
+	seconds, _ := strconv.Atoi(strings.TrimSpace(value))
+	if seconds <= 0 {
+		seconds = 1
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func sleepContext(ctx context.Context, wait time.Duration) error {
+	if wait <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *Client) waitForTurn(ctx context.Context) error {

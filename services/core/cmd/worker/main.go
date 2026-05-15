@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -18,6 +16,8 @@ import (
 
 func main() {
 	cfg := config.Load()
+	riot.ClearAuthFailureMarker(cfg)
+	riot.StartAuthFailureMonitor(cfg, "winrift worker")
 	riotClient := riot.NewClient(cfg)
 	repo, err := clickhouse.NewRepository(cfg)
 	if err != nil {
@@ -427,8 +427,7 @@ func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *
 }
 
 func isRiotAuthError(err error) bool {
-	var apiErr riot.APIError
-	return errors.As(err, &apiErr) && (apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusForbidden)
+	return riot.IsAuthFailure(err)
 }
 
 func frontierStatus(result collector.Result) string {

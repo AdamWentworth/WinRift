@@ -45,6 +45,10 @@ COLLECTOR_SEED_RIOT_IDS=Example#NA1
 COLLECTOR_SEED_PUUIDS=
 COLLECTOR_PLATFORMS=NA1
 RIOT_MIN_REQUEST_INTERVAL_MS=75
+RIOT_RATE_LIMIT_MAX_RETRIES=3
+RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS=120
+RIOT_AUTH_FAILURE_EXIT=true
+RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
 COLLECTOR_INTERVAL_SECONDS=120
 COLLECTOR_FRONTIER_BATCH_SIZE=3
 COLLECTOR_MAX_REQUESTS_PER_PASS=0
@@ -88,15 +92,21 @@ COLLECTOR_AUTO_SEED_CHALLENGER=true
 
 ## Safety
 
-Keep match counts low on a development key. The client honors Riot 429 `Retry-After`, but large crawl seeds can still consume a daily development-key window quickly.
+Keep match counts low on a development key. The client honors Riot 429 `Retry-After` with bounded retries, but large crawl seeds can still consume a daily development-key window quickly.
 
-If Riot returns 401 or 403, the worker exits immediately. This prevents an expired or unauthorized development key from being retried every collector interval. The frontier row is marked `blocked` when the failure happens during a collection pass.
+If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MARKER_PATH`. The worker exits immediately, and the API watches the same marker and exits too. This prevents an expired or unauthorized development key from being retried every collector interval. The frontier row is marked `blocked` when the failure happens during a collection pass.
+
+If Riot returns 429, the client sleeps for `Retry-After` and retries up to `RIOT_RATE_LIMIT_MAX_RETRIES`. If Riot asks for a longer wait than `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`, the collector defers that region for the rest of the pass and resumes on the next cycle.
 
 Safety knobs:
 
 - `COLLECTOR_FRONTIER_BATCH_SIZE`: max PUUIDs checked per worker pass.
 - `COLLECTOR_PLATFORMS`: comma-separated platform routing values to collect, such as `NA1,EUW1,KR`.
 - `RIOT_MIN_REQUEST_INTERVAL_MS`: process-local spacing between Riot requests. `75`ms stays under the `20 requests / 1 second` bucket.
+- `RIOT_RATE_LIMIT_MAX_RETRIES`: max immediate sleeps/retries for Riot 429 responses.
+- `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`: longest 429 `Retry-After` sleep before deferring the region to the next collector cycle.
+- `RIOT_AUTH_FAILURE_EXIT`: when true, the API and worker stop when a Riot auth failure marker appears.
+- `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate an auth-failure stop.
 - `COLLECTOR_INTERVAL_SECONDS`: sleep time between worker cycles. `120` seconds lines up with the personal/development `100 requests / 2 minutes` bucket.
 - `COLLECTOR_RATE_LIMIT_REQUESTS`: Riot application request bucket size for one region.
 - `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS`: Riot application request bucket window.

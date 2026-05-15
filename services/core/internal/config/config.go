@@ -21,6 +21,10 @@ type Config struct {
 	CORSOrigins                 []string
 	DefaultPlatform             string
 	RiotMinRequestInterval      time.Duration
+	RiotRateLimitMaxRetries     int
+	RiotRateLimitMaxSleep       time.Duration
+	RiotAuthFailureExit         bool
+	RiotAuthFailureMarkerPath   string
 	CollectorPlatforms          []string
 	CollectorDefaultMatchCount  int
 	CollectorInterval           time.Duration
@@ -53,6 +57,10 @@ func Load() Config {
 		CORSOrigins:                 splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
 		DefaultPlatform:             defaultPlatform,
 		RiotMinRequestInterval:      time.Duration(envInt("RIOT_MIN_REQUEST_INTERVAL_MS", 75)) * time.Millisecond,
+		RiotRateLimitMaxRetries:     envInt("RIOT_RATE_LIMIT_MAX_RETRIES", 3),
+		RiotRateLimitMaxSleep:       time.Duration(envInt("RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS", 120)) * time.Second,
+		RiotAuthFailureExit:         envBool("RIOT_AUTH_FAILURE_EXIT", true),
+		RiotAuthFailureMarkerPath:   env("RIOT_AUTH_FAILURE_MARKER_PATH", "/run/winrift/riot-auth-failed"),
 		CollectorPlatforms:          splitList(env("COLLECTOR_PLATFORMS", defaultPlatform)),
 		CollectorDefaultMatchCount:  envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
 		CollectorInterval:           time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 120)) * time.Second,

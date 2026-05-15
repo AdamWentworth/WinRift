@@ -13,6 +13,8 @@ import (
 
 func main() {
 	cfg := config.Load()
+	riot.ClearAuthFailureMarker(cfg)
+	riot.StartAuthFailureMonitor(cfg, "winrift api")
 	riotClient := riot.NewClient(cfg)
 	repo, err := clickhouse.NewRepository(cfg)
 	if err != nil {
