@@ -39,8 +39,17 @@ type Account struct {
 type Summoner struct {
 	ID            string `json:"id"`
 	AccountID     string `json:"accountId"`
+	PUUID         string `json:"puuid"`
 	ProfileIconID int    `json:"profileIconId"`
 	SummonerLevel int64  `json:"summonerLevel"`
+}
+
+type LeagueList struct {
+	LeagueID string        `json:"leagueId"`
+	Tier     string        `json:"tier"`
+	Queue    string        `json:"queue"`
+	Name     string        `json:"name"`
+	Entries  []LeagueEntry `json:"entries"`
 }
 
 type LeagueEntry struct {
@@ -88,6 +97,15 @@ func (c *Client) SummonerByPUUID(ctx context.Context, puuid, platform string) (*
 	return &summoner, nil
 }
 
+func (c *Client) SummonerByID(ctx context.Context, summonerID, platform string) (*Summoner, error) {
+	var summoner Summoner
+	ok, err := c.get(ctx, NormalizePlatform(platform), fmt.Sprintf("/lol/summoner/v4/summoners/%s", escapePath(summonerID)), nil, &summoner)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &summoner, nil
+}
+
 func (c *Client) ActiveGameByPUUID(ctx context.Context, puuid, platform string) (map[string]any, error) {
 	var game map[string]any
 	ok, err := c.get(ctx, NormalizePlatform(platform), fmt.Sprintf("/lol/spectator/v5/active-games/by-summoner/%s", escapePath(puuid)), nil, &game)
@@ -101,6 +119,15 @@ func (c *Client) LeagueEntriesByPUUID(ctx context.Context, puuid, platform strin
 	var entries []LeagueEntry
 	_, err := c.get(ctx, NormalizePlatform(platform), fmt.Sprintf("/lol/league/v4/entries/by-puuid/%s", escapePath(puuid)), nil, &entries)
 	return entries, err
+}
+
+func (c *Client) ChallengerLeagueByQueue(ctx context.Context, platform, queue string) (*LeagueList, error) {
+	var league LeagueList
+	ok, err := c.get(ctx, NormalizePlatform(platform), fmt.Sprintf("/lol/league/v4/challengerleagues/by-queue/%s", escapePath(queue)), nil, &league)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &league, nil
 }
 
 func (c *Client) MatchIDsByPUUID(ctx context.Context, puuid, platform string, count int) ([]string, error) {

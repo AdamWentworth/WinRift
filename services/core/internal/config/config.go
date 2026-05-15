@@ -10,49 +10,56 @@ import (
 )
 
 type Config struct {
-	Environment                string
-	HTTPAddr                   string
-	RiotAPIKey                 string
-	ClickHouseHost             string
-	ClickHousePort             int
-	ClickHouseDatabase         string
-	ClickHouseUser             string
-	ClickHousePassword         string
-	CORSOrigins                []string
-	DefaultPlatform            string
-	CollectorDefaultMatchCount int
-	CollectorInterval          time.Duration
-	CollectorFrontierBatchSize int
-	CollectorMaxRequests       int
-	CollectorRecheckInterval   time.Duration
-	CollectorDiscoveryDelay    time.Duration
-	RankEnrichmentEnabled      bool
-	RankSnapshotTTL            time.Duration
-	RankEnrichmentMaxRequests  int
+	Environment                 string
+	HTTPAddr                    string
+	RiotAPIKey                  string
+	ClickHouseHost              string
+	ClickHousePort              int
+	ClickHouseDatabase          string
+	ClickHouseUser              string
+	ClickHousePassword          string
+	CORSOrigins                 []string
+	DefaultPlatform             string
+	CollectorPlatforms          []string
+	CollectorDefaultMatchCount  int
+	CollectorInterval           time.Duration
+	CollectorFrontierBatchSize  int
+	CollectorMaxRequests        int
+	CollectorRecheckInterval    time.Duration
+	CollectorDiscoveryDelay     time.Duration
+	CollectorAutoSeedChallenger bool
+	CollectorAutoSeedLimit      int
+	RankEnrichmentEnabled       bool
+	RankSnapshotTTL             time.Duration
+	RankEnrichmentMaxRequests   int
 }
 
 func Load() Config {
 	_ = godotenv.Load(".env", "../../.env", "../.env")
+	defaultPlatform := env("DEFAULT_PLATFORM", "NA1")
 	return Config{
-		Environment:                env("ENVIRONMENT", "development"),
-		HTTPAddr:                   env("HTTP_ADDR", ":8000"),
-		RiotAPIKey:                 os.Getenv("RIOT_API_KEY"),
-		ClickHouseHost:             env("CLICKHOUSE_HOST", "localhost"),
-		ClickHousePort:             envInt("CLICKHOUSE_PORT", 9000),
-		ClickHouseDatabase:         env("CLICKHOUSE_DATABASE", "winrift"),
-		ClickHouseUser:             env("CLICKHOUSE_USER", "winrift"),
-		ClickHousePassword:         env("CLICKHOUSE_PASSWORD", "winrift"),
-		CORSOrigins:                splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
-		DefaultPlatform:            env("DEFAULT_PLATFORM", "NA1"),
-		CollectorDefaultMatchCount: envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
-		CollectorInterval:          time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 300)) * time.Second,
-		CollectorFrontierBatchSize: envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),
-		CollectorMaxRequests:       envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 60),
-		CollectorRecheckInterval:   time.Duration(envInt("COLLECTOR_RECHECK_HOURS", 24)) * time.Hour,
-		CollectorDiscoveryDelay:    time.Duration(envInt("COLLECTOR_DISCOVERY_DELAY_MINUTES", 60)) * time.Minute,
-		RankEnrichmentEnabled:      envBool("RANK_ENRICHMENT_ENABLED", false),
-		RankSnapshotTTL:            time.Duration(envInt("RANK_SNAPSHOT_TTL_HOURS", 24)) * time.Hour,
-		RankEnrichmentMaxRequests:  envInt("RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS", 20),
+		Environment:                 env("ENVIRONMENT", "development"),
+		HTTPAddr:                    env("HTTP_ADDR", ":8000"),
+		RiotAPIKey:                  os.Getenv("RIOT_API_KEY"),
+		ClickHouseHost:              env("CLICKHOUSE_HOST", "localhost"),
+		ClickHousePort:              envInt("CLICKHOUSE_PORT", 9000),
+		ClickHouseDatabase:          env("CLICKHOUSE_DATABASE", "winrift"),
+		ClickHouseUser:              env("CLICKHOUSE_USER", "winrift"),
+		ClickHousePassword:          env("CLICKHOUSE_PASSWORD", "winrift"),
+		CORSOrigins:                 splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
+		DefaultPlatform:             defaultPlatform,
+		CollectorPlatforms:          splitList(env("COLLECTOR_PLATFORMS", defaultPlatform)),
+		CollectorDefaultMatchCount:  envInt("COLLECTOR_DEFAULT_MATCH_COUNT", 20),
+		CollectorInterval:           time.Duration(envInt("COLLECTOR_INTERVAL_SECONDS", 300)) * time.Second,
+		CollectorFrontierBatchSize:  envInt("COLLECTOR_FRONTIER_BATCH_SIZE", 3),
+		CollectorMaxRequests:        envInt("COLLECTOR_MAX_REQUESTS_PER_PASS", 60),
+		CollectorRecheckInterval:    time.Duration(envInt("COLLECTOR_RECHECK_HOURS", 24)) * time.Hour,
+		CollectorDiscoveryDelay:     time.Duration(envInt("COLLECTOR_DISCOVERY_DELAY_MINUTES", 60)) * time.Minute,
+		CollectorAutoSeedChallenger: envBool("COLLECTOR_AUTO_SEED_CHALLENGER", false),
+		CollectorAutoSeedLimit:      envInt("COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM", 3),
+		RankEnrichmentEnabled:       envBool("RANK_ENRICHMENT_ENABLED", false),
+		RankSnapshotTTL:             time.Duration(envInt("RANK_SNAPSHOT_TTL_HOURS", 24)) * time.Hour,
+		RankEnrichmentMaxRequests:   envInt("RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS", 20),
 	}
 }
 
@@ -90,6 +97,10 @@ func envBool(key string, fallback bool) bool {
 }
 
 func splitOrigins(value string) []string {
+	return splitList(value)
+}
+
+func splitList(value string) []string {
 	parts := strings.Split(value, ",")
 	out := make([]string, 0, len(parts))
 	for _, part := range parts {
