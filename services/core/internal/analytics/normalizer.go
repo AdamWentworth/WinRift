@@ -42,6 +42,13 @@ type RankSnapshot struct {
 	ExpiresAt    time.Time
 }
 
+type RankCandidate struct {
+	PUUID           string
+	Platform        string
+	ParticipantRows uint64
+	UnknownRows     uint64
+}
+
 type RawMatch struct {
 	MatchID            string
 	Platform           string

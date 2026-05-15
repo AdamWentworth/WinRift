@@ -24,6 +24,7 @@ type Repository interface {
 	MatchExists(ctx context.Context, matchID string) (bool, error)
 	InsertNormalized(ctx context.Context, normalized analytics.NormalizedMatch) error
 	InsertFrontierParticipants(ctx context.Context, participants []analytics.ParticipantRow, sourceDetail string, priority int16, nextCheckAt time.Time) (int, error)
+	FetchRankCandidates(ctx context.Context, platform string, limit int, now time.Time) ([]analytics.RankCandidate, error)
 	FreshRankBuckets(ctx context.Context, platform string, puuids []string, now time.Time) (map[string]string, error)
 	InsertRankSnapshot(ctx context.Context, snapshot analytics.RankSnapshot) error
 }
@@ -54,11 +55,18 @@ type CollectOptions struct {
 	MaxRequests           int
 	DiscoveryDelay        time.Duration
 	DiscoveredPriority    int16
+	ApplyCachedRanks      bool
 	RankEnrichmentEnabled bool
 	RankSnapshotTTL       time.Duration
 	RankMaxRequests       int
 	CurrentPatch          string
 	PatchRetentionCount   int
+}
+
+type RankCollectOptions struct {
+	MaxRequests     int
+	CandidateLimit  int
+	RankSnapshotTTL time.Duration
 }
 
 func New(riot RiotClient, repo Repository) Collector {
@@ -165,7 +173,11 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 			len(normalized.TimelineItemEvents),
 			len(normalized.TimelineParticipantFrames),
 		)
-		c.enrichRanks(ctx, &normalized, platform, options, &result)
+		if options.RankEnrichmentEnabled {
+			c.enrichRanks(ctx, &normalized, platform, options, &result)
+		} else if options.ApplyCachedRanks {
+			c.applyCachedRanks(ctx, &normalized, platform, options, &result)
+		}
 		if result.shouldStop() {
 			log.Printf("collector stopping before insert match_id=%s auth_failed=%t rate_limited=%t", matchID, result.AuthFailed, result.RateLimited)
 			break
@@ -205,6 +217,29 @@ func (c Collector) CollectFromPUUIDWithOptions(ctx context.Context, puuid, platf
 		result.RateLimited,
 	)
 	return result
+}
+
+func (c Collector) applyCachedRanks(ctx context.Context, normalized *analytics.NormalizedMatch, platform string, options CollectOptions, result *Result) {
+	if options.RankSnapshotTTL <= 0 {
+		options.RankSnapshotTTL = 24 * time.Hour
+	}
+	puuids := participantPUUIDs(normalized.Participants)
+	now := time.Now()
+	buckets, err := c.repo.FreshRankBuckets(ctx, riot.NormalizePlatform(platform), puuids, now)
+	if err != nil {
+		result.Errors = append(result.Errors, "rank cache: "+err.Error())
+		log.Printf("collector cached rank lookup failed match_id=%s err=%v", normalized.RawMatch.MatchID, err)
+		return
+	}
+	applyRankBuckets(normalized, buckets)
+	log.Printf(
+		"collector cached ranks applied match_id=%s participants=%d cache_hits=%d cache_misses=%d ttl_hours=%.1f",
+		normalized.RawMatch.MatchID,
+		len(puuids),
+		len(buckets),
+		len(puuids)-len(buckets),
+		options.RankSnapshotTTL.Hours(),
+	)
 }
 
 func (c Collector) enrichRanks(ctx context.Context, normalized *analytics.NormalizedMatch, platform string, options CollectOptions, result *Result) {
@@ -261,6 +296,84 @@ func (c Collector) enrichRanks(ctx context.Context, normalized *analytics.Normal
 	}
 	applyRankBuckets(normalized, buckets)
 	log.Printf("collector rank enrichment complete match_id=%s applied_buckets=%d rank_requests=%d rank_snapshots=%d", normalized.RawMatch.MatchID, len(buckets), result.RankRequestsUsed, result.RankSnapshotsInserted)
+}
+
+func (c Collector) CollectRanksForPlatform(ctx context.Context, platform string, options RankCollectOptions) Result {
+	result := Result{}
+	if options.MaxRequests <= 0 {
+		return result
+	}
+	if options.RankSnapshotTTL <= 0 {
+		options.RankSnapshotTTL = 24 * time.Hour
+	}
+	if options.CandidateLimit <= 0 || options.CandidateLimit > options.MaxRequests {
+		options.CandidateLimit = options.MaxRequests
+	}
+	normalizedPlatform := riot.NormalizePlatform(platform)
+	now := time.Now()
+	candidates, err := c.repo.FetchRankCandidates(ctx, normalizedPlatform, options.CandidateLimit, now)
+	if err != nil {
+		result.Errors = append(result.Errors, "rank candidates: "+err.Error())
+		log.Printf("rank lane candidates failed platform=%s err=%v", normalizedPlatform, err)
+		return result
+	}
+	log.Printf(
+		"rank lane start platform=%s candidates=%d max_requests=%d ttl_hours=%.1f",
+		normalizedPlatform,
+		len(candidates),
+		options.MaxRequests,
+		options.RankSnapshotTTL.Hours(),
+	)
+	for _, candidate := range candidates {
+		if !result.spendRankRequest(options.MaxRequests) {
+			log.Printf("rank lane budget exhausted platform=%s rank_requests=%d max_rank_requests=%d", normalizedPlatform, result.RankRequestsUsed, options.MaxRequests)
+			break
+		}
+		log.Printf(
+			"rank lane fetch start platform=%s puuid=%s participant_rows=%d unknown_rows=%d rank_requests=%d",
+			normalizedPlatform,
+			shortID(candidate.PUUID),
+			candidate.ParticipantRows,
+			candidate.UnknownRows,
+			result.RankRequestsUsed,
+		)
+		entries, err := c.riot.LeagueEntriesByPUUID(ctx, candidate.PUUID, normalizedPlatform)
+		if err != nil {
+			result.addRiotError(fmt.Errorf("rank %s: %w", candidate.PUUID, err))
+			log.Printf("rank lane fetch failed platform=%s puuid=%s err=%v", normalizedPlatform, shortID(candidate.PUUID), err)
+			if result.shouldStop() {
+				break
+			}
+			continue
+		}
+		snapshot := rankSnapshotFromEntries(candidate.PUUID, normalizedPlatform, entries, now, now.Add(options.RankSnapshotTTL))
+		if err := c.repo.InsertRankSnapshot(ctx, snapshot); err != nil {
+			result.Errors = append(result.Errors, "rank snapshot: "+err.Error())
+			log.Printf("rank lane snapshot insert failed platform=%s puuid=%s err=%v", normalizedPlatform, shortID(candidate.PUUID), err)
+			continue
+		}
+		result.RankSnapshotsInserted++
+		log.Printf(
+			"rank lane snapshot stored platform=%s puuid=%s bucket=%s tier=%s division=%s",
+			normalizedPlatform,
+			shortID(candidate.PUUID),
+			snapshot.RankBucket,
+			snapshot.Tier,
+			snapshot.Division,
+		)
+	}
+	log.Printf(
+		"rank lane complete platform=%s candidates=%d rank_requests=%d rank_snapshots=%d errors=%d auth_failed=%t rate_limited=%t rank_budget_exhausted=%t",
+		normalizedPlatform,
+		len(candidates),
+		result.RankRequestsUsed,
+		result.RankSnapshotsInserted,
+		len(result.Errors),
+		result.AuthFailed,
+		result.RateLimited,
+		result.RankBudgetExhausted,
+	)
+	return result
 }
 
 func participantPUUIDs(participants []analytics.ParticipantRow) []string {

@@ -168,7 +168,7 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 	}
 	platform := s.defaultPlatform(body.Platform)
 	log.Printf(
-		"dev collector seed start riot_ids=%d puuids=%d platform=%s match_count=%d max_requests=%d frontier_only=%t current_patch=%s patch_retention=%d rank_enabled=%t rank_max_requests=%d",
+		"dev collector seed start riot_ids=%d puuids=%d platform=%s match_count=%d max_requests=%d frontier_only=%t current_patch=%s patch_retention=%d rank_inline_enabled=%t rank_lane_enabled=%t rank_max_requests=%d",
 		len(body.RiotIDs),
 		len(body.PUUIDs),
 		platform,
@@ -177,6 +177,7 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 		body.FrontierOnly,
 		s.cfg.CollectorCurrentPatch,
 		s.cfg.CollectorPatchRetention,
+		false,
 		s.cfg.RankEnrichmentEnabled,
 		s.cfg.RankEnrichmentMaxRequests,
 	)
@@ -293,16 +294,14 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-		rankEnabled := s.cfg.RankEnrichmentEnabled
-		if s.cfg.RankEnrichmentEnabled && s.cfg.RankEnrichmentMaxRequests > 0 && rankRequestsLeft <= 0 {
-			rankEnabled = false
-		}
-		log.Printf("dev collector target start puuid=%s platform=%s requests_left=%d rank_enabled=%t rank_requests_left=%d", shortValue(target.puuid), target.platform, requestsLeft, rankEnabled, rankRequestsLeft)
+		rankEnabled := false
+		log.Printf("dev collector target start puuid=%s platform=%s requests_left=%d rank_inline_enabled=%t rank_requests_left=%d", shortValue(target.puuid), target.platform, requestsLeft, rankEnabled, rankRequestsLeft)
 		result := s.collector.CollectFromPUUIDWithOptions(r.Context(), target.puuid, target.platform, collector.CollectOptions{
 			MatchCount:            count,
 			MaxRequests:           requestsLeft,
 			DiscoveryDelay:        s.cfg.CollectorDiscoveryDelay,
 			DiscoveredPriority:    0,
+			ApplyCachedRanks:      s.cfg.RankEnrichmentEnabled,
 			RankEnrichmentEnabled: rankEnabled,
 			RankSnapshotTTL:       s.cfg.RankSnapshotTTL,
 			RankMaxRequests:       rankRequestsLeft,
@@ -361,6 +360,7 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 		"frontierAdded": frontierAdded, "requestsUsed": requestsUsed,
 		"rankRequestsUsed": rankRequestsUsed, "rankSnapshotsInserted": rankSnapshotsInserted,
 		"currentPatch": s.cfg.CollectorCurrentPatch, "patchRetentionCount": s.cfg.CollectorPatchRetention, "patchBoundaryHits": patchBoundaryHits,
+		"rankInlineEnabled":     false,
 		"rankEnrichmentEnabled": s.cfg.RankEnrichmentEnabled,
 		"errors":                errorsOut,
 	})

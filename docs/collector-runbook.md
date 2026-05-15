@@ -28,7 +28,7 @@ Watch API-triggered collection live in another terminal:
 docker compose logs -f api
 ```
 
-The logs show seed resolution, match id lookup, already-ingested skips, match/timeline fetches, normalization counts, rank cache hits/misses, rank snapshot writes, inserts, and final request counters.
+The logs show seed resolution, match id lookup, already-ingested skips, match/timeline fetches, normalization counts, inserts, and final request counters. Rank enrichment is handled by the worker's separate rank lane, not by API-triggered match insertion.
 
 Use `frontierOnly` when you want to seed without collecting immediately:
 
@@ -80,7 +80,7 @@ For a detached worker, follow progress with:
 docker compose logs -f worker
 ```
 
-At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, and records Riot requests in a rolling regional budget ledger. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
+At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, and records Riot requests in a rolling regional budget ledger. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
 
 Patch retention is intentionally tied to `COLLECTOR_CURRENT_PATCH`. For example, `COLLECTOR_CURRENT_PATCH=16.11` with `COLLECTOR_PATCH_RETENTION_COUNT=2` stores `16.11` and `16.10`; when it is bumped to `16.12`, the active window becomes `16.12` and `16.11`, so `16.10` is no longer eligible and can be pruned on startup if `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true`.
 
@@ -129,11 +129,11 @@ Safety knobs:
 - `COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM`: max Challenger ladder entries to seed per platform at startup.
 - `COLLECTOR_DISCOVERY_DELAY_MINUTES`: delay before newly discovered participants are eligible.
 - `COLLECTOR_RECHECK_HOURS`: delay before revisiting a checked PUUID.
-- `RANK_ENRICHMENT_ENABLED`: when true, rank buckets are refreshed from cached rank snapshots or Riot League-V4.
-- `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS`: max rank refresh requests per platform. These are subtracted from the same regional Riot request budget as match collection.
+- `RANK_ENRICHMENT_ENABLED`: when true, the worker runs a separate rank lane after each platform's match lane.
+- `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS`: max rank lane requests per platform. These are subtracted from the same regional Riot request budget as match collection, but they are not spent inside individual match ingestion.
 - `RANK_SNAPSHOT_TTL_HOURS`: freshness window before a rank snapshot can be refreshed.
 
-Rank enrichment is off by default. Turn it on only after basic match ingestion is working; otherwise the first crawl spends extra Riot requests on player metadata before we know the match pipeline is healthy.
+Rank enrichment is off by default. Turn it on only after basic match ingestion is working. When enabled, the rank lane chooses distinct participant PUUIDs from ClickHouse that do not already have a fresh `summoner_rank_snapshots` row, prioritizing players attached to the most `UNKNOWN` participant rows.
 
 ## Request Formula
 
@@ -143,6 +143,6 @@ For each region, the worker computes a usable cycle budget:
 usable_region_requests = min(rate_limit_requests, rate_limit_requests * interval / rate_limit_window) - reserve_requests
 ```
 
-With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per rolling two-minute window. The worker splits currently available regional budget across active platforms in that region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for rank snapshots, and gives the remainder to match collection. If a region spends all 90 requests in 30 seconds, it waits about 90 seconds for that region; if it spends them in 60 seconds, it waits about 60 seconds.
+With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per rolling two-minute window. The worker splits currently available regional budget across active platforms in that region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for the rank lane, and gives the remainder to match collection. If a region spends all 90 requests in 30 seconds, it waits about 90 seconds for that region; if it spends them in 60 seconds, it waits about 60 seconds.
 
-Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment can cost up to 10 extra requests per match on a cold cache, so the worker caps it separately and caches snapshots for `RANK_SNAPSHOT_TTL_HOURS`.
+Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment costs one request per rank candidate and is capped separately, so it can steadily improve coverage without turning every collected match into 10 extra Riot calls.

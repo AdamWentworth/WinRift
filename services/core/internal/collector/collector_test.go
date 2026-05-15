@@ -43,6 +43,7 @@ type fakeRepo struct {
 	insertedMatches  int
 	frontierInserted int
 	freshRanks       map[string]string
+	rankCandidates   []analytics.RankCandidate
 	rankSnapshots    []analytics.RankSnapshot
 	lastNormalized   analytics.NormalizedMatch
 }
@@ -60,6 +61,10 @@ func (f *fakeRepo) InsertNormalized(_ context.Context, normalized analytics.Norm
 func (f *fakeRepo) InsertFrontierParticipants(_ context.Context, participants []analytics.ParticipantRow, _ string, _ int16, _ time.Time) (int, error) {
 	f.frontierInserted += len(participants)
 	return len(participants), nil
+}
+
+func (f *fakeRepo) FetchRankCandidates(context.Context, string, int, time.Time) ([]analytics.RankCandidate, error) {
+	return f.rankCandidates, nil
 }
 
 func (f *fakeRepo) FreshRankBuckets(context.Context, string, []string, time.Time) (map[string]string, error) {
@@ -168,6 +173,71 @@ func TestCollectEnrichesRankBucketFromLeagueEntries(t *testing.T) {
 		if participant.PUUID == targetPUUID && participant.RankBucket != "GOLD" {
 			t.Fatalf("rank bucket = %q, want GOLD", participant.RankBucket)
 		}
+	}
+}
+
+func TestCollectAppliesCachedRanksWithoutRankRequests(t *testing.T) {
+	raw, err := os.ReadFile("../../../../legacy/data/match_data.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture, err := analytics.NormalizeMatch(raw, nil, "NA1", "UNKNOWN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetPUUID := fixture.Participants[0].PUUID
+	repo := &fakeRepo{freshRanks: map[string]string{targetPUUID: "DIAMOND"}}
+	collector := New(&fakeRiot{
+		matchIDs: []string{"NA1_1"},
+		match:    raw,
+		timeline: []byte(`{"info":{"frames":[]}}`),
+	}, repo)
+
+	result := collector.CollectFromPUUIDWithOptions(context.Background(), "seed-puuid", "NA1", CollectOptions{
+		MatchCount:       1,
+		MaxRequests:      3,
+		ApplyCachedRanks: true,
+		RankSnapshotTTL:  time.Hour,
+	})
+
+	if result.RankRequestsUsed != 0 {
+		t.Fatalf("rank requests used = %d, want 0", result.RankRequestsUsed)
+	}
+	for _, participant := range repo.lastNormalized.Participants {
+		if participant.PUUID == targetPUUID && participant.RankBucket != "DIAMOND" {
+			t.Fatalf("rank bucket = %q, want DIAMOND", participant.RankBucket)
+		}
+	}
+}
+
+func TestCollectRanksForPlatformFetchesCandidates(t *testing.T) {
+	repo := &fakeRepo{
+		rankCandidates: []analytics.RankCandidate{
+			{PUUID: "rank-puuid", Platform: "NA1", ParticipantRows: 3, UnknownRows: 3},
+		},
+	}
+	collector := New(&fakeRiot{
+		leagueEntries: map[string][]riot.LeagueEntry{
+			"rank-puuid": {
+				{PUUID: "rank-puuid", QueueType: "RANKED_SOLO_5x5", Tier: "PLATINUM", Rank: "IV", LeaguePoints: 12, Wins: 20, Losses: 15},
+			},
+		},
+	}, repo)
+
+	result := collector.CollectRanksForPlatform(context.Background(), "NA1", RankCollectOptions{
+		MaxRequests:     1,
+		CandidateLimit:  1,
+		RankSnapshotTTL: time.Hour,
+	})
+
+	if result.RankRequestsUsed != 1 {
+		t.Fatalf("rank requests used = %d, want 1", result.RankRequestsUsed)
+	}
+	if result.RankSnapshotsInserted != 1 {
+		t.Fatalf("rank snapshots inserted = %d, want 1", result.RankSnapshotsInserted)
+	}
+	if repo.rankSnapshots[0].RankBucket != "PLATINUM" {
+		t.Fatalf("rank bucket = %q, want PLATINUM", repo.rankSnapshots[0].RankBucket)
 	}
 }
 

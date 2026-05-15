@@ -131,16 +131,56 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 				champion_id,
 				role,
 				opponent_champion_id,
-				patch_bucket,
+				patch AS patch_bucket,
 				rank_bucket,
 				final_items_signature,
 				core2_signature,
 				core3_signature,
 				rune_signature,
 				spell_signature,
-				wins,
-				games
-			FROM build_analytics_mv
+				toUInt64(sum(win)) AS wins,
+				toUInt64(count()) AS games
+			FROM
+			(
+				SELECT
+					pm.champion_id,
+					pm.role,
+					pm.opponent_champion_id,
+					pm.patch,
+					multiIf(
+						s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+						pm.rank_bucket
+					) AS rank_bucket,
+					pm.final_items_signature,
+					pm.core2_signature,
+					pm.core3_signature,
+					pm.rune_signature,
+					pm.spell_signature,
+					pm.win
+				FROM participant_matchups AS pm FINAL
+				LEFT JOIN
+				(
+					SELECT
+						platform,
+						puuid,
+						argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+					FROM summoner_rank_snapshots FINAL
+					WHERE queue_type = 'RANKED_SOLO_5x5'
+					GROUP BY platform, puuid
+				) AS s
+					ON s.platform = pm.platform AND s.puuid = pm.puuid
+			)
+			GROUP BY
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch_bucket,
+				rank_bucket,
+				final_items_signature,
+				core2_signature,
+				core3_signature,
+				rune_signature,
+				spell_signature
 			UNION ALL
 			SELECT
 				champion_id,

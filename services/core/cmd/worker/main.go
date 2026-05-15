@@ -41,7 +41,7 @@ func main() {
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_cap=%d",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -91,7 +91,7 @@ func main() {
 			}
 			budget := allocatePlatformBudget(cfg, available, remainingPlatforms)
 			log.Printf(
-				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_requests=%d region_available=%d region_platforms_remaining=%d",
+				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_lane_requests=%d region_available=%d region_platforms_remaining=%d",
 				platform,
 				region,
 				budget.TotalRequests,
@@ -101,18 +101,33 @@ func main() {
 				remainingPlatforms,
 			)
 			result := runPlatformPass(ctx, cfg, matchCollector, repo, platform, budget)
-			requestsUsed := result.RequestsUsed + result.RankRequestsUsed
-			ledger.Record(region, requestsUsed, time.Now())
-			requestsThisSweep += requestsUsed
-			if requestsUsed > 0 || result.MatchIDsSeen > 0 || result.MatchesInserted > 0 || result.MatchesSkipped > 0 {
-				platformsWithWork++
-			}
 			if result.AuthFailed {
 				log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
 			}
+			rateLimitHit := false
 			if result.RateLimited {
 				rateLimitedRegions[region] = true
+				rateLimitHit = true
+			}
+			rankResult := collector.Result{}
+			if !result.AuthFailed && !result.RateLimited && budget.RankRequests > 0 {
+				rankResult = runRankPass(ctx, cfg, matchCollector, platform, budget.RankRequests)
+				if rankResult.AuthFailed {
+					log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+				}
+				if rankResult.RateLimited {
+					rateLimitedRegions[region] = true
+					rateLimitHit = true
+				}
+			}
+			requestsUsed := result.RequestsUsed + rankResult.RankRequestsUsed
+			ledger.Record(region, requestsUsed, time.Now())
+			if rateLimitHit {
 				ledger.MarkFull(region, time.Now())
+			}
+			requestsThisSweep += requestsUsed
+			if requestsUsed > 0 || result.MatchIDsSeen > 0 || result.MatchesInserted > 0 || result.MatchesSkipped > 0 || rankResult.RankSnapshotsInserted > 0 {
+				platformsWithWork++
 			}
 		}
 
@@ -145,69 +160,52 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		return collector.Result{BudgetExhausted: true}
 	}
 	log.Printf(
-		"collector platform pass start platform=%s current_patch=%s patch_retention=%d frontier_rows=%d match_request_budget=%d rank_request_budget=%d theoretical_max_matches=%d",
+		"collector platform pass start platform=%s current_patch=%s patch_retention=%d frontier_rows=%d match_request_budget=%d theoretical_max_matches=%d",
 		platform,
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
 		len(entries),
 		budget.MatchRequests,
-		budget.RankRequests,
 		maxMatchesForBudget(len(entries), cfg.CollectorDefaultMatchCount, budget.MatchRequests),
 	)
 	requestsLeft := budget.MatchRequests
-	rankRequestsLeft := budget.RankRequests
 	var passResult collector.Result
 	for _, entry := range entries {
 		if requestsLeft <= 0 {
 			log.Printf("collector request budget exhausted before platform=%s puuid=%s", platform, shortValue(entry.PUUID))
 			break
 		}
-		rankEnabled := cfg.RankEnrichmentEnabled
-		if cfg.RankEnrichmentEnabled && rankRequestsLeft <= 0 {
-			log.Printf("collector rank enrichment budget exhausted platform=%s", platform)
-			rankEnabled = false
-		}
 		result := matchCollector.CollectFromPUUIDWithOptions(ctx, entry.PUUID, entry.Platform, collector.CollectOptions{
-			MatchCount:            cfg.CollectorDefaultMatchCount,
-			MaxRequests:           requestsLeft,
-			DiscoveryDelay:        cfg.CollectorDiscoveryDelay,
-			DiscoveredPriority:    0,
-			RankEnrichmentEnabled: rankEnabled,
-			RankSnapshotTTL:       cfg.RankSnapshotTTL,
-			RankMaxRequests:       rankRequestsLeft,
-			CurrentPatch:          cfg.CollectorCurrentPatch,
-			PatchRetentionCount:   cfg.CollectorPatchRetention,
+			MatchCount:          cfg.CollectorDefaultMatchCount,
+			MaxRequests:         requestsLeft,
+			DiscoveryDelay:      cfg.CollectorDiscoveryDelay,
+			DiscoveredPriority:  0,
+			ApplyCachedRanks:    cfg.RankEnrichmentEnabled,
+			RankSnapshotTTL:     cfg.RankSnapshotTTL,
+			CurrentPatch:        cfg.CollectorCurrentPatch,
+			PatchRetentionCount: cfg.CollectorPatchRetention,
 		})
 		passResult.MatchIDsSeen += result.MatchIDsSeen
 		passResult.MatchesInserted += result.MatchesInserted
 		passResult.MatchesSkipped += result.MatchesSkipped
 		passResult.FrontierAdded += result.FrontierAdded
 		passResult.RequestsUsed += result.RequestsUsed
-		passResult.RankRequestsUsed += result.RankRequestsUsed
-		passResult.RankSnapshotsInserted += result.RankSnapshotsInserted
 		passResult.Errors = append(passResult.Errors, result.Errors...)
 		passResult.AuthFailed = passResult.AuthFailed || result.AuthFailed
 		passResult.RateLimited = passResult.RateLimited || result.RateLimited
 		passResult.BudgetExhausted = passResult.BudgetExhausted || result.BudgetExhausted
-		passResult.RankBudgetExhausted = passResult.RankBudgetExhausted || result.RankBudgetExhausted
 		passResult.PatchBoundaryReached = passResult.PatchBoundaryReached || result.PatchBoundaryReached
 		requestsLeft -= result.RequestsUsed
 		if requestsLeft < 0 {
 			requestsLeft = 0
 		}
-		if cfg.RankEnrichmentEnabled {
-			rankRequestsLeft -= result.RankRequestsUsed
-			if rankRequestsLeft < 0 {
-				rankRequestsLeft = 0
-			}
-		}
 		status := frontierStatus(result)
 		nextCheckAt := nextFrontierCheck(cfg, result)
-		if err := repo.MarkFrontierChecked(ctx, entry, result.MatchIDsSeen, result.MatchesInserted, result.MatchesSkipped, len(result.Errors), result.RequestsUsed+result.RankRequestsUsed, status, nextCheckAt); err != nil {
+		if err := repo.MarkFrontierChecked(ctx, entry, result.MatchIDsSeen, result.MatchesInserted, result.MatchesSkipped, len(result.Errors), result.RequestsUsed, status, nextCheckAt); err != nil {
 			log.Printf("frontier update platform=%s puuid=%s: %v", entry.Platform, shortValue(entry.PUUID), err)
 		}
 		log.Printf(
-			"collector platform=%s puuid=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d patch_boundary=%t errors=%d status=%s",
+			"collector platform=%s puuid=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d patch_boundary=%t errors=%d status=%s",
 			entry.Platform,
 			shortValue(entry.PUUID),
 			result.MatchIDsSeen,
@@ -215,8 +213,6 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 			result.MatchesSkipped,
 			result.FrontierAdded,
 			result.RequestsUsed,
-			result.RankRequestsUsed,
-			result.RankSnapshotsInserted,
 			result.PatchBoundaryReached,
 			len(result.Errors),
 			status,
@@ -226,23 +222,42 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		}
 	}
 	log.Printf(
-		"collector platform pass complete platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d rank_requests=%d rank_snapshots=%d errors=%d patch_boundary=%t budget_exhausted=%t rank_budget_exhausted=%t auth_failed=%t rate_limited=%t",
+		"collector platform pass complete platform=%s seen=%d inserted=%d skipped=%d frontier_added=%d requests=%d errors=%d patch_boundary=%t budget_exhausted=%t auth_failed=%t rate_limited=%t",
 		platform,
 		passResult.MatchIDsSeen,
 		passResult.MatchesInserted,
 		passResult.MatchesSkipped,
 		passResult.FrontierAdded,
 		passResult.RequestsUsed,
-		passResult.RankRequestsUsed,
-		passResult.RankSnapshotsInserted,
 		len(passResult.Errors),
 		passResult.PatchBoundaryReached,
 		passResult.BudgetExhausted,
-		passResult.RankBudgetExhausted,
 		passResult.AuthFailed,
 		passResult.RateLimited,
 	)
 	return passResult
+}
+
+func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, platform string, rankRequests int) collector.Result {
+	if !cfg.RankEnrichmentEnabled || rankRequests <= 0 {
+		return collector.Result{}
+	}
+	result := matchCollector.CollectRanksForPlatform(ctx, platform, collector.RankCollectOptions{
+		MaxRequests:     rankRequests,
+		CandidateLimit:  rankRequests,
+		RankSnapshotTTL: cfg.RankSnapshotTTL,
+	})
+	log.Printf(
+		"rank lane platform=%s candidates_budget=%d rank_requests=%d rank_snapshots=%d errors=%d auth_failed=%t rate_limited=%t",
+		platform,
+		rankRequests,
+		result.RankRequestsUsed,
+		result.RankSnapshotsInserted,
+		len(result.Errors),
+		result.AuthFailed,
+		result.RateLimited,
+	)
+	return result
 }
 
 type platformRequestBudget struct {

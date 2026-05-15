@@ -11,6 +11,48 @@ import (
 
 const rankedSoloQueueType = "RANKED_SOLO_5x5"
 
+func (r *Repository) FetchRankCandidates(ctx context.Context, platform string, limit int, now time.Time) ([]analytics.RankCandidate, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			puuid,
+			platform,
+			count() AS participant_rows,
+			countIf(rank_bucket = 'UNKNOWN') AS unknown_rows
+		FROM participants FINAL
+		WHERE platform = ?
+			AND puuid != ''
+			AND puuid NOT IN
+			(
+				SELECT puuid
+				FROM summoner_rank_snapshots FINAL
+				WHERE platform = ?
+					AND queue_type = ?
+					AND expires_at > ?
+			)
+		GROUP BY puuid, platform
+		ORDER BY unknown_rows DESC, participant_rows DESC
+		LIMIT ?`,
+		platform, platform, rankedSoloQueueType, now, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	candidates := []analytics.RankCandidate{}
+	for rows.Next() {
+		var candidate analytics.RankCandidate
+		if err := rows.Scan(&candidate.PUUID, &candidate.Platform, &candidate.ParticipantRows, &candidate.UnknownRows); err != nil {
+			return nil, err
+		}
+		candidates = append(candidates, candidate)
+	}
+	return candidates, rows.Err()
+}
+
 func (r *Repository) FreshRankBuckets(ctx context.Context, platform string, puuids []string, now time.Time) (map[string]string, error) {
 	out := map[string]string{}
 	seen := map[string]bool{}
