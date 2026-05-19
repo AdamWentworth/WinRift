@@ -914,7 +914,7 @@ function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData
       {imageUrl ? <img src={imageUrl} alt={name} title={name} /> : <span className="item-pill">{row.itemId}</span>}
       <div className="item-slot-stats">
         <strong>{row.winRate.toFixed(1)}%</strong>
-        <span>{row.games}g{row.games < 5 ? ' · low' : ''}</span>
+        <span>{row.games}g{row.games < 5 ? ' · thin' : ''}</span>
       </div>
     </div>
   );
