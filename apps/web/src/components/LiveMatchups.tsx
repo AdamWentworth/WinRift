@@ -705,6 +705,7 @@ function LiveChampionCard({
       {championBackdropUrl ? <img className="player-card-backdrop" src={championBackdropUrl} alt="" aria-hidden="true" /> : null}
       <div className="card-topline">
         {championUrl ? <img className="profile-picture" src={championUrl} alt={championName} /> : <div className="profile-picture profile-fallback">{participant.championId}</div>}
+        <img className="ranked-card-icon" src={rankIconUrl(participant.rank)} alt={participant.rank ? rankLabel(participant.rank) : 'Rank unavailable'} />
         <div className="player-title">
           <div className="player-role-chip">{roleLabels[roles[index]] ?? roles[index] ?? 'Role'}</div>
           <div className="summoner-name">{playerName}</div>
@@ -737,7 +738,6 @@ function RankRecord({ rank }: { rank?: RankedRecord }) {
     return (
       <div className="rank-info rank-missing">
         <div className="stat-block-title">Ranked</div>
-        <img className="ranked-icon" src={rankIconUrl()} alt="Rank unavailable" />
         <div className="tier-and-rank">Rank unavailable</div>
         <div className="winrate">Winrate: --</div>
         <div className="games-played">Games: --</div>
@@ -747,7 +747,6 @@ function RankRecord({ rank }: { rank?: RankedRecord }) {
   return (
     <div className={`rank-info${rank.rankAvailable === false ? ' rank-unranked' : ''}`}>
       <div className="stat-block-title">Ranked</div>
-      <img className="ranked-icon" src={rankIconUrl(rank)} alt={rankLabel(rank)} />
       <div className="tier-and-rank">{rankLabel(rank)}</div>
       <div className="winrate">Winrate: {rank.winRate.toFixed(1)}%</div>
       <div className="games-played">Games: {rank.totalGames}</div>

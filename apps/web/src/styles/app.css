@@ -952,6 +952,16 @@ button {
   width: 50px;
 }
 
+.ranked-card-icon {
+  filter: drop-shadow(0 2px 4px rgb(0 0 0 / 55%));
+  height: 50px;
+  object-fit: contain;
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 50px;
+}
+
 .profile-fallback {
   align-items: center;
   background: #222;
@@ -965,7 +975,7 @@ button {
 
 .player-title {
   min-width: 0;
-  padding: 1px 8px 0 58px;
+  padding: 1px 58px 0;
   text-align: center;
 }
 
@@ -1030,12 +1040,6 @@ button {
   letter-spacing: 0;
   line-height: 1;
   text-transform: uppercase;
-}
-
-.ranked-icon {
-  height: 38px;
-  object-fit: contain;
-  width: 38px;
 }
 
 .tier-and-rank {
