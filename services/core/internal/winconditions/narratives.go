@@ -13,8 +13,12 @@ type NarrativeBucket struct {
 type NarrativeMetric struct {
 	Condition         string            `json:"condition"`
 	Rating            string            `json:"rating"`
+	PlanRole          string            `json:"planRole"`
+	PlanLabel         string            `json:"planLabel"`
 	OpponentCondition string            `json:"opponentCondition"`
 	OpponentRating    string            `json:"opponentRating"`
+	OpponentPlanRole  string            `json:"opponentPlanRole"`
+	OpponentPlanLabel string            `json:"opponentPlanLabel"`
 	Primary           bool              `json:"primary"`
 	OpponentPrimary   bool              `json:"opponentPrimary"`
 	Wins              int               `json:"wins"`
@@ -26,16 +30,17 @@ type NarrativeMetric struct {
 }
 
 type NarrativeScript struct {
-	ID         string   `json:"id"`
-	Headline   string   `json:"headline"`
-	Overview   string   `json:"overview"`
-	Matchup    string   `json:"matchup"`
-	RatingRead string   `json:"ratingRead"`
-	ModeRead   string   `json:"modeRead"`
-	TimingRead string   `json:"timingRead"`
-	SampleRead string   `json:"sampleRead"`
-	PlayerRead string   `json:"playerRead"`
-	Facts      []string `json:"facts"`
+	ID          string   `json:"id"`
+	Headline    string   `json:"headline"`
+	Overview    string   `json:"overview"`
+	Matchup     string   `json:"matchup"`
+	RatingRead  string   `json:"ratingRead"`
+	ModeRead    string   `json:"modeRead"`
+	TimingRead  string   `json:"timingRead"`
+	CautionRead string   `json:"cautionRead"`
+	SampleRead  string   `json:"sampleRead"`
+	PlayerRead  string   `json:"playerRead"`
+	Facts       []string `json:"facts"`
 }
 
 var RatingLabels = []string{"D-", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+", "S-", "S", "S+"}
@@ -153,23 +158,27 @@ func BuildNarrative(metric NarrativeMetric) NarrativeScript {
 	ratingRead := buildRatingRead(metric.Rating, metric.OpponentRating)
 	modeRead := buildModeRead(metric.Primary, metric.OpponentPrimary)
 	timingRead := buildTimingRead(metric.Buckets)
+	cautionRead := buildCautionRead(metric)
 	sampleRead := buildSampleRead(metric)
 	playerRead := buildPlayerRead(metric)
 	return NarrativeScript{
-		ID:         narrativeID(metric),
-		Headline:   headline,
-		Overview:   overview,
-		Matchup:    matchup,
-		RatingRead: ratingRead,
-		ModeRead:   modeRead,
-		TimingRead: timingRead,
-		SampleRead: sampleRead,
-		PlayerRead: playerRead,
+		ID:          narrativeID(metric),
+		Headline:    headline,
+		Overview:    overview,
+		Matchup:     matchup,
+		RatingRead:  ratingRead,
+		ModeRead:    modeRead,
+		TimingRead:  timingRead,
+		CautionRead: cautionRead,
+		SampleRead:  sampleRead,
+		PlayerRead:  playerRead,
 		Facts: []string{
 			fmt.Sprintf("team_condition=%s", metric.Condition),
 			fmt.Sprintf("team_rating=%s", metric.Rating),
+			fmt.Sprintf("team_plan_role=%s", metric.PlanRole),
 			fmt.Sprintf("opponent_condition=%s", metric.OpponentCondition),
 			fmt.Sprintf("opponent_rating=%s", metric.OpponentRating),
+			fmt.Sprintf("opponent_plan_role=%s", metric.OpponentPlanRole),
 			fmt.Sprintf("team_primary=%t", metric.Primary),
 			fmt.Sprintf("opponent_primary=%t", metric.OpponentPrimary),
 			fmt.Sprintf("wins=%d", metric.Wins),
@@ -255,6 +264,49 @@ func buildSampleRead(metric NarrativeMetric) string {
 		return fmt.Sprintf("The raw sample is %d games at %.0f%%, but confidence is still low; read it as weak evidence.", metric.Games, metric.WinRate)
 	}
 	return fmt.Sprintf("The sample is %d games at %.0f%% with a %.0f%% lower-bound confidence score.", metric.Games, metric.WinRate, metric.Confidence)
+}
+
+func buildCautionRead(metric NarrativeMetric) string {
+	if !looksLikeCorrelationRisk(metric) {
+		return ""
+	}
+	return fmt.Sprintf(
+		"Caution: %s %s is labeled as %s for this composition, so the elevated %.0f%% result is more likely correlation than proof that these teams actually won by forcing %s. Treat it as a historical pattern to investigate, not a causal instruction.",
+		metric.Condition,
+		metric.Rating,
+		readablePlanRole(metric),
+		metric.WinRate,
+		metric.Condition,
+	)
+}
+
+func looksLikeCorrelationRisk(metric NarrativeMetric) bool {
+	if metric.Games < 20 || metric.WinRate < 55 {
+		return false
+	}
+	if weakPlanRole(metric.PlanRole) {
+		return true
+	}
+	return ratingIndex[metric.Rating] <= ratingIndex["C-"] && !metric.Primary
+}
+
+func weakPlanRole(role string) bool {
+	switch role {
+	case "weak-angle":
+		return true
+	default:
+		return false
+	}
+}
+
+func readablePlanRole(metric NarrativeMetric) string {
+	if metric.PlanLabel != "" {
+		return metric.PlanLabel
+	}
+	if metric.Primary {
+		return "Primary"
+	}
+	return "Alternative"
 }
 
 func buildPlayerRead(metric NarrativeMetric) string {

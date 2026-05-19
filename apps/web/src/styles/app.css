@@ -443,6 +443,10 @@ button {
   margin: 0;
 }
 
+.match-read-copy .match-read-caution {
+  color: #ffd6a0;
+}
+
 .match-read-copy em {
   color: #b7c4cb;
   font-style: normal;

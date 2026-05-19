@@ -450,8 +450,12 @@ func winConditionNarrative(metric winConditionMetricResponse) winconditions.Narr
 	return winconditions.BuildNarrative(winconditions.NarrativeMetric{
 		Condition:         metric.Condition,
 		Rating:            metric.Rating,
+		PlanRole:          metric.PlanRole,
+		PlanLabel:         metric.PlanLabel,
 		OpponentCondition: metric.OpponentCondition,
 		OpponentRating:    metric.OpponentRating,
+		OpponentPlanRole:  metric.OpponentPlanRole,
+		OpponentPlanLabel: metric.OpponentPlanLabel,
 		Primary:           metric.Primary,
 		OpponentPrimary:   metric.OpponentPrimary,
 		Wins:              metric.Wins,

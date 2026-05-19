@@ -66,3 +66,45 @@ func TestBuildNarrativeTimingHandlesNoBuckets(t *testing.T) {
 		t.Fatalf("script should explain missing data: %+v", script)
 	}
 }
+
+func TestBuildNarrativeWarnsWhenWeakPlanHasInflatedWinrate(t *testing.T) {
+	script := BuildNarrative(NarrativeMetric{
+		Condition:         "SplitPush",
+		Rating:            "C-",
+		PlanRole:          "weak-angle",
+		PlanLabel:         "Weak angle",
+		OpponentCondition: "Control",
+		OpponentRating:    "B",
+		Primary:           false,
+		OpponentPrimary:   true,
+		Wins:              37,
+		Games:             60,
+		WinRate:           61.67,
+		Confidence:        48,
+		MeetsMinGames:     true,
+	})
+	if script.CautionRead == "" {
+		t.Fatalf("expected caution read for weak inflated plan: %+v", script)
+	}
+}
+
+func TestBuildNarrativeDoesNotWarnForPrimaryPlan(t *testing.T) {
+	script := BuildNarrative(NarrativeMetric{
+		Condition:         "TeamFight",
+		Rating:            "A",
+		PlanRole:          "primary",
+		PlanLabel:         "Primary",
+		OpponentCondition: "Control",
+		OpponentRating:    "B",
+		Primary:           true,
+		OpponentPrimary:   true,
+		Wins:              37,
+		Games:             60,
+		WinRate:           61.67,
+		Confidence:        48,
+		MeetsMinGames:     true,
+	})
+	if script.CautionRead != "" {
+		t.Fatalf("unexpected caution read for primary plan: %q", script.CautionRead)
+	}
+}

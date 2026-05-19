@@ -206,6 +206,7 @@ export type WinConditionScript = {
   ratingRead: string;
   modeRead: string;
   timingRead: string;
+  cautionRead?: string;
   sampleRead: string;
   playerRead: string;
   facts: string[];

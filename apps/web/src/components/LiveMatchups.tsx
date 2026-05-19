@@ -419,6 +419,7 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
             <p>{script.matchup}</p>
             <p>{script.modeRead}</p>
             <p>{script.timingRead}</p>
+            {script.cautionRead ? <p className="match-read-caution">{script.cautionRead}</p> : null}
             {metric.evidence?.summary ? <p>{metric.evidence.summary}</p> : null}
             <em>{script.sampleRead}</em>
           </>

@@ -250,6 +250,8 @@ Team profiles also expose primary margin and identity sharpness:
 
 This does not change the underlying scores or the legacy-style primary-vs-alternative metric rows. It changes how we explain them, which is the safer first step.
 
+If a weak or low-rated angle shows a high historical winrate, the match read now warns that this is likely correlation rather than causation. For example, `SplitPush C-` with a high winrate into `Control B` should not imply those teams won by splitpushing well. More likely, those games were won through the composition's stronger plans while also matching the low SplitPush rating row.
+
 ## Building Block 7: Winrates By Game Length
 
 The legacy system uses duration buckets:
