@@ -380,17 +380,34 @@ describe('App', () => {
     await waitFor(() => expect(getWinConditionAnalysis).toHaveBeenCalled());
     expect(await screen.findByText("Your Team's Win Condition")).toBeInTheDocument();
     expect(screen.getByText('Alternatives')).toBeInTheDocument();
+    expect(screen.getByText('Match Read')).toBeInTheDocument();
     expect(screen.getByText('Winrate By Game Length')).toBeInTheDocument();
     expect(screen.getByText("Enemy Team's Win Condition")).toBeInTheDocument();
+    expect(screen.getByText('Primary pick read')).toBeInTheDocument();
     expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
     expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Show enemy Siege'));
     expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
+    expect(screen.getByText('Siege response read')).toBeInTheDocument();
     queryClient.clear();
   });
 });
 
-const winConditionFixture = vi.hoisted(() => ({
+const winConditionFixture = vi.hoisted(() => {
+  const scriptFixture = (id: string, playerRead: string) => ({
+    id,
+    headline: id,
+    overview: `${id} overview`,
+    matchup: `${id} matchup`,
+    ratingRead: `${id} rating`,
+    modeRead: `${id} mode`,
+    timingRead: `${id} timing`,
+    sampleRead: `${id} sample`,
+    playerRead,
+    facts: [],
+  });
+
+  return {
   catalogPatch: '16.10.1',
   filters: {
     queueId: 420,
@@ -440,6 +457,7 @@ const winConditionFixture = vi.hoisted(() => ({
       opponentCondition: 'Control',
       opponentRating: 'B+',
       primary: false,
+      opponentPrimary: true,
       wins: 4,
       games: 8,
       winRate: 50,
@@ -453,6 +471,7 @@ const winConditionFixture = vi.hoisted(() => ({
       opponentCondition: 'Control',
       opponentRating: 'B+',
       primary: true,
+      opponentPrimary: true,
       wins: 11,
       games: 20,
       winRate: 55,
@@ -465,6 +484,7 @@ const winConditionFixture = vi.hoisted(() => ({
         { bucket: '30-35', wins: 2, games: 3, winRate: 66.7, confidence: 21, meetsMinGames: false },
         { bucket: '35+', wins: 1, games: 3, winRate: 33.3, confidence: 6, meetsMinGames: false },
       ],
+      script: scriptFixture('pick-control', 'Primary pick read'),
     },
     {
       condition: 'Pick',
@@ -472,6 +492,7 @@ const winConditionFixture = vi.hoisted(() => ({
       opponentCondition: 'Siege',
       opponentRating: 'C+',
       primary: true,
+      opponentPrimary: false,
       wins: 14,
       games: 20,
       winRate: 70,
@@ -484,6 +505,7 @@ const winConditionFixture = vi.hoisted(() => ({
         { bucket: '30-35', wins: 2, games: 3, winRate: 66.7, confidence: 21, meetsMinGames: false },
         { bucket: '35+', wins: 2, games: 3, winRate: 66.7, confidence: 21, meetsMinGames: false },
       ],
+      script: scriptFixture('pick-siege', 'Siege response read'),
     },
   ],
   redMatchups: [
@@ -493,6 +515,7 @@ const winConditionFixture = vi.hoisted(() => ({
       opponentCondition: 'Pick',
       opponentRating: 'B+',
       primary: true,
+      opponentPrimary: true,
       wins: 9,
       games: 20,
       winRate: 45,
@@ -506,6 +529,7 @@ const winConditionFixture = vi.hoisted(() => ({
       opponentCondition: 'Pick',
       opponentRating: 'B+',
       primary: false,
+      opponentPrimary: true,
       wins: 6,
       games: 20,
       winRate: 30,
@@ -514,4 +538,5 @@ const winConditionFixture = vi.hoisted(() => ({
       buckets: [],
     },
   ],
-}));
+  };
+});

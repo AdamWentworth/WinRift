@@ -40,17 +40,19 @@ type winConditionFiltersResponse struct {
 }
 
 type winConditionMetricResponse struct {
-	Condition         string                       `json:"condition"`
-	Rating            string                       `json:"rating"`
-	OpponentCondition string                       `json:"opponentCondition"`
-	OpponentRating    string                       `json:"opponentRating"`
-	Primary           bool                         `json:"primary"`
-	Wins              int                          `json:"wins"`
-	Games             int                          `json:"games"`
-	WinRate           float64                      `json:"winRate"`
-	Confidence        float64                      `json:"confidence"`
-	MeetsMinGames     bool                         `json:"meetsMinGames"`
-	Buckets           []winConditionBucketResponse `json:"buckets"`
+	Condition         string                        `json:"condition"`
+	Rating            string                        `json:"rating"`
+	OpponentCondition string                        `json:"opponentCondition"`
+	OpponentRating    string                        `json:"opponentRating"`
+	Primary           bool                          `json:"primary"`
+	OpponentPrimary   bool                          `json:"opponentPrimary"`
+	Wins              int                           `json:"wins"`
+	Games             int                           `json:"games"`
+	WinRate           float64                       `json:"winRate"`
+	Confidence        float64                       `json:"confidence"`
+	MeetsMinGames     bool                          `json:"meetsMinGames"`
+	Buckets           []winConditionBucketResponse  `json:"buckets"`
+	Script            winconditions.NarrativeScript `json:"script"`
 }
 
 type winConditionBucketResponse struct {
@@ -189,11 +191,12 @@ func buildCompiledWinConditionMatchups(rows []clickhouse.WinConditionMetricRow, 
 			teamMode = 1
 		}
 		for _, opponentAxis := range opponent.Axes {
+			opponentPrimary := opponentAxis.Label == opponent.PrimaryCondition
 			opponentMode := uint8(2)
-			if opponentAxis.Label == opponent.PrimaryCondition {
+			if opponentPrimary {
 				opponentMode = 1
 			}
-			out = append(out, compiledWinConditionResponse(index, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, winConditionPairPrimaryMode(teamMode, opponentMode), minGames))
+			out = append(out, compiledWinConditionResponse(index, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary, winConditionPairPrimaryMode(teamMode, opponentMode), minGames))
 		}
 	}
 	return out
@@ -214,7 +217,7 @@ func indexCompiledWinConditionRows(rows []clickhouse.WinConditionMetricRow) map[
 	return out
 }
 
-func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickhouse.WinConditionMetricRow, condition, rating, opponentCondition, opponentRating string, primary bool, primaryMode uint8, minGames int) winConditionMetricResponse {
+func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickhouse.WinConditionMetricRow, condition, rating, opponentCondition, opponentRating string, primary, opponentPrimary bool, primaryMode uint8, minGames int) winConditionMetricResponse {
 	overall := index[compiledWinConditionMetricKey{
 		condition:         condition,
 		rating:            rating,
@@ -242,12 +245,13 @@ func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickh
 			MeetsMinGames: row.Games >= minGames,
 		})
 	}
-	return winConditionMetricResponse{
+	response := winConditionMetricResponse{
 		Condition:         condition,
 		Rating:            rating,
 		OpponentCondition: opponentCondition,
 		OpponentRating:    opponentRating,
 		Primary:           primary,
+		OpponentPrimary:   opponentPrimary,
 		Wins:              overall.Wins,
 		Games:             overall.Games,
 		WinRate:           overall.WinRate,
@@ -255,6 +259,8 @@ func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickh
 		MeetsMinGames:     overall.Games >= minGames,
 		Buckets:           buckets,
 	}
+	response.Script = winConditionNarrative(response)
+	return response
 }
 
 func buildWinConditionMatchups(rows []clickhouse.TeamCompositionRow, analyzer winconditions.Analyzer, team winconditions.TeamProfile, opponent winconditions.TeamProfile, minGames int) []winConditionMetricResponse {
@@ -265,7 +271,7 @@ func buildWinConditionMatchups(rows []clickhouse.TeamCompositionRow, analyzer wi
 		for _, opponentAxis := range opponent.Axes {
 			opponentPrimary := opponentAxis.Label == opponent.PrimaryCondition
 			accumulator := aggregateWinConditionAxis(matchTeams, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary)
-			out = append(out, accumulator.response(axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, minGames))
+			out = append(out, accumulator.response(axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary, minGames))
 		}
 	}
 	return out
@@ -349,7 +355,7 @@ func (a *winConditionAccumulator) addCounts(bucketName string, wins, games int) 
 	bucket.wins += wins
 }
 
-func (a winConditionAccumulator) response(condition, rating, opponentCondition, opponentRating string, primary bool, minGames int) winConditionMetricResponse {
+func (a winConditionAccumulator) response(condition, rating, opponentCondition, opponentRating string, primary, opponentPrimary bool, minGames int) winConditionMetricResponse {
 	buckets := make([]winConditionBucketResponse, 0, len(winConditionDurationBuckets))
 	for _, bucketName := range winConditionDurationBuckets {
 		bucket := a.buckets[bucketName]
@@ -362,12 +368,13 @@ func (a winConditionAccumulator) response(condition, rating, opponentCondition, 
 			MeetsMinGames: bucket.games >= minGames,
 		})
 	}
-	return winConditionMetricResponse{
+	response := winConditionMetricResponse{
 		Condition:         condition,
 		Rating:            rating,
 		OpponentCondition: opponentCondition,
 		OpponentRating:    opponentRating,
 		Primary:           primary,
+		OpponentPrimary:   opponentPrimary,
 		Wins:              a.wins,
 		Games:             a.games,
 		WinRate:           winRatePercent(a.wins, a.games),
@@ -375,6 +382,35 @@ func (a winConditionAccumulator) response(condition, rating, opponentCondition, 
 		MeetsMinGames:     a.games >= minGames,
 		Buckets:           buckets,
 	}
+	response.Script = winConditionNarrative(response)
+	return response
+}
+
+func winConditionNarrative(metric winConditionMetricResponse) winconditions.NarrativeScript {
+	buckets := make([]winconditions.NarrativeBucket, 0, len(metric.Buckets))
+	for _, bucket := range metric.Buckets {
+		buckets = append(buckets, winconditions.NarrativeBucket{
+			Bucket:        bucket.Bucket,
+			Wins:          bucket.Wins,
+			Games:         bucket.Games,
+			WinRate:       bucket.WinRate,
+			MeetsMinGames: bucket.MeetsMinGames,
+		})
+	}
+	return winconditions.BuildNarrative(winconditions.NarrativeMetric{
+		Condition:         metric.Condition,
+		Rating:            metric.Rating,
+		OpponentCondition: metric.OpponentCondition,
+		OpponentRating:    metric.OpponentRating,
+		Primary:           metric.Primary,
+		OpponentPrimary:   metric.OpponentPrimary,
+		Wins:              metric.Wins,
+		Games:             metric.Games,
+		WinRate:           metric.WinRate,
+		Confidence:        metric.Confidence,
+		MeetsMinGames:     metric.MeetsMinGames,
+		Buckets:           buckets,
+	})
 }
 
 func filterTeamRowsByRank(rows []clickhouse.TeamCompositionRow, rankBucket string) []clickhouse.TeamCompositionRow {

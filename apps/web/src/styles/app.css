@@ -362,7 +362,7 @@ button {
 }
 
 .alternatives-section,
-.profile-compare-section,
+.match-read-section,
 .chart-section {
   align-content: start;
   gap: 8px;
@@ -425,57 +425,28 @@ button {
   font-style: normal;
 }
 
-.profile-axis-list {
-  display: grid;
-  gap: 8px;
-}
-
-.profile-axis-row {
-  align-items: center;
-  display: grid;
-  gap: 7px;
-  grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
-}
-
-.axis-label {
-  align-items: center;
-  display: grid;
-  gap: 2px;
-  justify-items: center;
-}
-
-.axis-label img {
-  height: 25px;
-  object-fit: contain;
-  width: 25px;
-}
-
-.axis-label span {
+.match-read-copy {
   color: #dce5ea;
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 1;
+  display: grid;
+  font-size: 11px;
+  gap: 7px;
+  line-height: 1.25;
 }
 
-.axis-meter {
-  background: rgb(255 255 255 / 12%);
-  height: 10px;
-  min-width: 0;
-  overflow: hidden;
+.match-read-copy strong {
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.15;
 }
 
-.axis-meter i {
-  display: block;
-  height: 100%;
+.match-read-copy p {
+  margin: 0;
 }
 
-.axis-meter.blue i {
-  background: #87ceeb;
-  margin-left: auto;
-}
-
-.axis-meter.red i {
-  background: #f08080;
+.match-read-copy em {
+  color: #b7c4cb;
+  font-style: normal;
+  line-height: 1.25;
 }
 
 .chart-shell {

@@ -315,7 +315,7 @@ function WinConditionContent({ analysis, yourSide }: { analysis: WinConditionAna
         opponentCondition={selectedEnemyMetric?.condition ?? enemyTeam.primaryCondition}
         onSelect={setSelectedYourCondition}
       />
-      <WinConditionProfileComparison yourTeam={yourTeam} enemyTeam={enemyTeam} yourSide={yourSide} />
+      <WinConditionScriptPanel metric={selectedYourMetric} />
       <WinConditionLengthChart metric={selectedYourMetric} />
       <WinConditionEnemyCard
         side={enemySide}
@@ -399,37 +399,24 @@ function WinConditionAlternatives({
   );
 }
 
-function WinConditionProfileComparison({
-  yourTeam,
-  enemyTeam,
-  yourSide,
-}: {
-  yourTeam: WinConditionTeamProfile;
-  enemyTeam: WinConditionTeamProfile;
-  yourSide: TeamSide;
-}) {
-  const enemySide: TeamSide = yourSide === 'blue' ? 'red' : 'blue';
+function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
+  const script = metric?.script;
   return (
-    <div className="legacy-stats-section profile-compare-section">
-      <h2>Profile</h2>
-      <div className="profile-axis-list">
-        {yourTeam.axes.map((axis) => {
-          const enemyAxis = enemyTeam.axes.find((candidate) => candidate.key === axis.key);
-          return (
-            <div className="profile-axis-row" key={axis.key}>
-              <div className={`axis-meter ${yourSide}`}>
-                <i style={{ width: `${scoreWidth(axis.score)}%` }} />
-              </div>
-              <div className="axis-label">
-                <img src={conditionIconUrl(axis.label)} alt="" />
-                <span>{axisShortLabel(axis.label)}</span>
-              </div>
-              <div className={`axis-meter ${enemySide}`}>
-                <i style={{ width: `${scoreWidth(enemyAxis?.score ?? 0)}%` }} />
-              </div>
-            </div>
-          );
-        })}
+    <div className="legacy-stats-section match-read-section">
+      <h2>Match Read</h2>
+      <div className="match-read-copy">
+        {script ? (
+          <>
+            <strong>{script.headline}</strong>
+            <p>{script.playerRead}</p>
+            <p>{script.matchup}</p>
+            <p>{script.modeRead}</p>
+            <p>{script.timingRead}</p>
+            <em>{script.sampleRead}</em>
+          </>
+        ) : (
+          <p>Select a win condition pairing to see the match read.</p>
+        )}
       </div>
     </div>
   );
@@ -878,10 +865,6 @@ function uniqueConditionMetrics(metrics: WinConditionMetric[]) {
   });
 }
 
-function scoreWidth(score: number) {
-  return Math.max(0, Math.min(100, (score / 25) * 100));
-}
-
 function livePlayerSide(liveGame: LiveGame): TeamSide {
   const participant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
   return participant?.teamId === 200 ? 'red' : 'blue';
@@ -909,10 +892,4 @@ function conditionIconUrl(condition: string) {
 
 function ratingImageUrl(rating: string) {
   return `/images/win_condition_ratings/${rating}.png`;
-}
-
-function axisShortLabel(label: string) {
-  if (label === 'SplitPush') return 'Split';
-  if (label === 'TeamFight') return 'Fight';
-  return label;
 }

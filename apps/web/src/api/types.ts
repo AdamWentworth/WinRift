@@ -166,12 +166,27 @@ export type WinConditionMetric = {
   opponentCondition: string;
   opponentRating: string;
   primary: boolean;
+  opponentPrimary: boolean;
   wins: number;
   games: number;
   winRate: number;
   confidence: number;
   meetsMinGames: boolean;
   buckets: WinConditionBucket[];
+  script?: WinConditionScript;
+};
+
+export type WinConditionScript = {
+  id: string;
+  headline: string;
+  overview: string;
+  matchup: string;
+  ratingRead: string;
+  modeRead: string;
+  timingRead: string;
+  sampleRead: string;
+  playerRead: string;
+  facts: string[];
 };
 
 export type WinConditionAnalysisResponse = {
