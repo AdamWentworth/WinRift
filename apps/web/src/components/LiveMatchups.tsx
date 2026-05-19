@@ -833,13 +833,14 @@ function MatchupBuildCard({
   const champion = championByKey(champions, participant.championId);
   const opponentChampion = championByKey(champions, opponent.championId);
   const totalSamples = highestSlotSample(itemSlots);
+  const sample = buildSampleQuality(totalSamples);
 
   return (
     <article className={`match-build-card ${side}`}>
       <div className="build-heading">
         <span>{roleLabels[role] ?? role}</span>
         <strong>{champion?.name ?? participant.championId} vs {opponentChampion?.name ?? opponent.championId}</strong>
-        <em>{totalSamples > 0 ? `${totalSamples} max samples by slot` : 'Need more stored matches'}</em>
+        <em className={`build-sample-chip ${sample.tone}`}>{sample.label}</em>
       </div>
       <BuildSide side={side} itemSlots={itemSlots} loading={loading} items={items} />
     </article>
@@ -861,7 +862,12 @@ function BuildSide({
     return <div className={`build-side ${side} muted`}>Loading item patterns...</div>;
   }
   if (!itemSlots.length) {
-    return <div className={`build-side ${side} muted`}>Not enough matchup samples yet</div>;
+    return (
+      <div className={`build-side ${side} muted build-empty-state`}>
+        <strong>No matchup build yet</strong>
+        <span>Needs more stored games</span>
+      </div>
+    );
   }
 
   const bestBySlot = [1, 2, 3, 4, 5, 6].map((slot) => ({
@@ -960,6 +966,14 @@ function comfortFlagsForParticipant(participant: LiveParticipant) {
 
 function highestSlotSample(itemSlots: AnalyticsItemSlot[]) {
   return itemSlots.reduce((max, row) => Math.max(max, row.games), 0);
+}
+
+function buildSampleQuality(samples: number) {
+  if (samples <= 0) return { label: 'No samples', tone: 'none' };
+  if (samples < 5) return { label: `${samples} sample${samples === 1 ? '' : 's'} · thin`, tone: 'thin' };
+  if (samples < 15) return { label: `${samples} samples · early`, tone: 'early' };
+  if (samples < 50) return { label: `${samples} samples · useful`, tone: 'useful' };
+  return { label: `${samples} samples · strong`, tone: 'strong' };
 }
 
 function matchClock(gameStartTime: number, now: number) {
