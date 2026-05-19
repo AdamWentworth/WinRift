@@ -712,8 +712,8 @@ function LiveChampionCard({
         </div>
       </div>
       <div className="player-stat-columns">
-        <RankRecord rank={participant.rank} />
         <ChampionRecordBlock stats={participant.championStats} />
+        <RankRecord rank={participant.rank} />
       </div>
       <div className="card-loadout">
         <div className="summoner-spells">

@@ -965,7 +965,7 @@ button {
 
 .player-title {
   min-width: 0;
-  padding: 1px 54px 0 58px;
+  padding: 1px 8px 0 58px;
   text-align: center;
 }
 
@@ -1033,12 +1033,9 @@ button {
 }
 
 .ranked-icon {
-  height: 48px;
+  height: 38px;
   object-fit: contain;
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 48px;
+  width: 38px;
 }
 
 .tier-and-rank {
