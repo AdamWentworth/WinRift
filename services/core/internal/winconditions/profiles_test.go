@@ -124,6 +124,19 @@ func TestTeamProfileScoresAndRatings(t *testing.T) {
 	if profile.Ratings["pick"] != "B" {
 		t.Fatalf("pick rating = %s, want B", profile.Ratings["pick"])
 	}
+	if profile.PrimaryMargin != 4 || profile.Sharpness != "clear" {
+		t.Fatalf("primary margin/sharpness = %d/%s, want 4/clear", profile.PrimaryMargin, profile.Sharpness)
+	}
+	plans := map[string]AxisScore{}
+	for _, axis := range profile.Axes {
+		plans[axis.Label] = axis
+	}
+	if plans["TeamFight"].PlanRole != "primary" || plans["TeamFight"].PlanLabel != "Primary" {
+		t.Fatalf("teamfight plan = %+v, want primary", plans["TeamFight"])
+	}
+	if plans["Pick"].PlanRole != "secondary" {
+		t.Fatalf("pick plan = %+v, want secondary", plans["Pick"])
+	}
 }
 
 func TestTeamProfileTieBreakerUsesIndividualConditions(t *testing.T) {
@@ -143,6 +156,16 @@ func TestTeamProfileTieBreakerUsesIndividualConditions(t *testing.T) {
 	}
 	if profile.PrimaryRating != "B+" {
 		t.Fatalf("primary rating = %s, want B+", profile.PrimaryRating)
+	}
+	if profile.PrimaryMargin != 0 || profile.Sharpness != "tied" {
+		t.Fatalf("primary margin/sharpness = %d/%s, want 0/tied", profile.PrimaryMargin, profile.Sharpness)
+	}
+	plans := map[string]AxisScore{}
+	for _, axis := range profile.Axes {
+		plans[axis.Label] = axis
+	}
+	if plans["TeamFight"].PlanRole != "co-primary" {
+		t.Fatalf("teamfight plan = %+v, want co-primary", plans["TeamFight"])
 	}
 }
 

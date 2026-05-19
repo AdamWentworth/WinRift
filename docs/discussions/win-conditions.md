@@ -223,11 +223,32 @@ The current system treats every axis as queryable, even if the team is barely bu
 Add labels like:
 
 - Primary
+- Co-primary
 - Strong secondary
-- Weak secondary
-- Not a real plan
+- Secondary
+- Weak angle
 
 This keeps the old system but makes the UI more honest.
+
+### Current UI Pass
+
+The analyzer now annotates each axis with plan context:
+
+- `Primary`: the selected highest team identity after tie-breaks.
+- `Co-primary`: tied with the primary score, but not selected by the tie-breaker.
+- `Strong secondary`: within two points of the primary score.
+- `Secondary`: a plausible fallback based on score strength or closeness.
+- `Weak angle`: present in the profile, but not a plan the comp is strongly built around.
+
+Team profiles also expose primary margin and identity sharpness:
+
+- `Tied identity`
+- `Contested identity`
+- `Flexible identity`
+- `Clear identity`
+- `Sharp identity`
+
+This does not change the underlying scores or the legacy-style primary-vs-alternative metric rows. It changes how we explain them, which is the safer first step.
 
 ## Building Block 7: Winrates By Game Length
 

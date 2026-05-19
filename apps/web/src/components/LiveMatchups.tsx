@@ -350,9 +350,11 @@ function WinConditionSummaryCard({
         <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
       <div className="legacy-win-stat">
+        <span>{team.sharpnessLabel ?? sharpnessFallback(team.primaryMargin)}</span>
         {metric && metric.games > 0 ? (
           <>
             <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
+            <span>Plan: {metric.planLabel ?? planLabelFallback(metric)}</span>
             <span>Total Games: {metric.games}</span>
             <span>Evidence: {metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</span>
           </>
@@ -392,6 +394,7 @@ function WinConditionAlternatives({
             </span>
             <span className="alternative-text">
               <strong>{metric.games > 0 ? metric.winRate.toFixed(2) : '--'}%</strong>
+              <em>{metric.planLabel ?? planLabelFallback(metric)}</em>
               <em>{metric.games} Matches</em>
               <em>{metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</em>
             </span>
@@ -412,6 +415,7 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
           <>
             <strong>{script.headline}</strong>
             <p>{script.playerRead}</p>
+            <p>{planPairRead(metric)}</p>
             <p>{script.matchup}</p>
             <p>{script.modeRead}</p>
             <p>{script.timingRead}</p>
@@ -882,6 +886,26 @@ function evidenceLevelFallback(games: number) {
   if (games < 400) return 'Moderate';
   if (games < 1600) return 'Strong';
   return 'Very strong';
+}
+
+function planLabelFallback(metric?: WinConditionMetric) {
+  if (!metric) return 'Unknown';
+  return metric.primary ? 'Primary' : 'Alternative';
+}
+
+function sharpnessFallback(primaryMargin?: number) {
+  if (primaryMargin === undefined) return 'Team identity';
+  if (primaryMargin <= 0) return 'Tied identity';
+  if (primaryMargin === 1) return 'Contested identity';
+  if (primaryMargin <= 3) return 'Flexible identity';
+  if (primaryMargin <= 6) return 'Clear identity';
+  return 'Sharp identity';
+}
+
+function planPairRead(metric: WinConditionMetric) {
+  const ownPlan = metric.planLabel ?? planLabelFallback(metric);
+  const enemyPlan = metric.opponentPlanLabel ?? (metric.opponentPrimary ? 'Primary' : 'Alternative');
+  return `Plan context: your ${metric.condition} is a ${ownPlan.toLowerCase()} into the enemy ${metric.opponentCondition} ${enemyPlan.toLowerCase()}.`;
 }
 
 function livePlayerSide(liveGame: LiveGame): TeamSide {

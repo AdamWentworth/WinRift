@@ -12,15 +12,15 @@ func TestCompiledWinConditionMatchupsRespectPrimaryFlag(t *testing.T) {
 		PrimaryCondition: "Pick",
 		PrimaryRating:    "B",
 		Axes: []winconditions.AxisScore{
-			{Key: "pick", Label: "Pick", Score: 14, Rating: "B"},
-			{Key: "control", Label: "Control", Score: 10, Rating: "C+"},
+			{Key: "pick", Label: "Pick", Score: 14, Rating: "B", PlanRole: "primary", PlanLabel: "Primary"},
+			{Key: "control", Label: "Control", Score: 10, Rating: "C+", DeltaFromPrimary: 4, PlanRole: "secondary", PlanLabel: "Secondary"},
 		},
 	}
 	opponent := winconditions.TeamProfile{
 		PrimaryCondition: "Siege",
 		PrimaryRating:    "B",
 		Axes: []winconditions.AxisScore{
-			{Key: "siege", Label: "Siege", Score: 14, Rating: "B"},
+			{Key: "siege", Label: "Siege", Score: 14, Rating: "B", PlanRole: "primary", PlanLabel: "Primary"},
 		},
 	}
 	rows := []clickhouse.WinConditionMetricRow{
@@ -38,8 +38,14 @@ func TestCompiledWinConditionMatchupsRespectPrimaryFlag(t *testing.T) {
 	if got[0].Condition != "Pick" || !got[0].Primary || got[0].Games != 5 || got[0].Wins != 3 || got[0].WinRate != 61.23 {
 		t.Fatalf("primary matchup = %+v, want primary Pick with stored 3/5 rate", got[0])
 	}
+	if got[0].PlanRole != "primary" || got[0].OpponentPlanRole != "primary" {
+		t.Fatalf("primary matchup plan roles = %s/%s, want primary/primary", got[0].PlanRole, got[0].OpponentPlanRole)
+	}
 	if got[1].Condition != "Control" || got[1].Primary || got[1].Games != 8 || got[1].Wins != 4 || got[1].WinRate != 44.44 {
 		t.Fatalf("alternative matchup = %+v, want any-primary Control with stored 4/8 rate", got[1])
+	}
+	if got[1].PlanRole != "secondary" || got[1].DeltaFromPrimary != 4 {
+		t.Fatalf("alternative matchup plan = %s delta %d, want secondary delta 4", got[1].PlanRole, got[1].DeltaFromPrimary)
 	}
 }
 

@@ -141,6 +141,9 @@ export type WinConditionTeamProfile = {
   primaryCondition: string;
   primaryScore: number;
   primaryRating: string;
+  primaryMargin?: number;
+  sharpness?: string;
+  sharpnessLabel?: string;
   missingChampionIds: number[];
 };
 
@@ -149,6 +152,9 @@ export type WinConditionAxisScore = {
   label: string;
   score: number;
   rating: string;
+  deltaFromPrimary?: number;
+  planRole?: string;
+  planLabel?: string;
 };
 
 export type WinConditionBucket = {
@@ -163,8 +169,13 @@ export type WinConditionBucket = {
 export type WinConditionMetric = {
   condition: string;
   rating: string;
+  planRole?: string;
+  planLabel?: string;
+  deltaFromPrimary?: number;
   opponentCondition: string;
   opponentRating: string;
+  opponentPlanRole?: string;
+  opponentPlanLabel?: string;
   primary: boolean;
   opponentPrimary: boolean;
   wins: number;

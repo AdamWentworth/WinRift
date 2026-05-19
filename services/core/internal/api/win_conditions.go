@@ -44,8 +44,13 @@ type winConditionFiltersResponse struct {
 type winConditionMetricResponse struct {
 	Condition         string                        `json:"condition"`
 	Rating            string                        `json:"rating"`
+	PlanRole          string                        `json:"planRole"`
+	PlanLabel         string                        `json:"planLabel"`
+	DeltaFromPrimary  int                           `json:"deltaFromPrimary"`
 	OpponentCondition string                        `json:"opponentCondition"`
 	OpponentRating    string                        `json:"opponentRating"`
+	OpponentPlanRole  string                        `json:"opponentPlanRole"`
+	OpponentPlanLabel string                        `json:"opponentPlanLabel"`
 	Primary           bool                          `json:"primary"`
 	OpponentPrimary   bool                          `json:"opponentPrimary"`
 	Wins              int                           `json:"wins"`
@@ -229,7 +234,7 @@ func buildCompiledWinConditionMatchups(rows []clickhouse.WinConditionMetricRow, 
 			if opponentPrimary {
 				opponentMode = 1
 			}
-			out = append(out, compiledWinConditionResponse(index, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary, winConditionPairPrimaryMode(teamMode, opponentMode), minGames))
+			out = append(out, compiledWinConditionResponse(index, axis, opponentAxis, primary, opponentPrimary, winConditionPairPrimaryMode(teamMode, opponentMode), minGames))
 		}
 	}
 	return out
@@ -250,22 +255,22 @@ func indexCompiledWinConditionRows(rows []clickhouse.WinConditionMetricRow) map[
 	return out
 }
 
-func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickhouse.WinConditionMetricRow, condition, rating, opponentCondition, opponentRating string, primary, opponentPrimary bool, primaryMode uint8, minGames int) winConditionMetricResponse {
+func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickhouse.WinConditionMetricRow, axis, opponentAxis winconditions.AxisScore, primary, opponentPrimary bool, primaryMode uint8, minGames int) winConditionMetricResponse {
 	overall := index[compiledWinConditionMetricKey{
-		condition:         condition,
-		rating:            rating,
-		opponentCondition: opponentCondition,
-		opponentRating:    opponentRating,
+		condition:         axis.Label,
+		rating:            axis.Rating,
+		opponentCondition: opponentAxis.Label,
+		opponentRating:    opponentAxis.Rating,
 		teamPrimary:       primaryMode,
 		bucket:            "ALL",
 	}]
 	buckets := make([]winConditionBucketResponse, 0, len(winConditionDurationBuckets))
 	for _, bucketName := range winConditionDurationBuckets {
 		row := index[compiledWinConditionMetricKey{
-			condition:         condition,
-			rating:            rating,
-			opponentCondition: opponentCondition,
-			opponentRating:    opponentRating,
+			condition:         axis.Label,
+			rating:            axis.Rating,
+			opponentCondition: opponentAxis.Label,
+			opponentRating:    opponentAxis.Rating,
 			teamPrimary:       primaryMode,
 			bucket:            bucketName,
 		}]
@@ -279,10 +284,15 @@ func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickh
 		})
 	}
 	response := winConditionMetricResponse{
-		Condition:         condition,
-		Rating:            rating,
-		OpponentCondition: opponentCondition,
-		OpponentRating:    opponentRating,
+		Condition:         axis.Label,
+		Rating:            axis.Rating,
+		PlanRole:          axis.PlanRole,
+		PlanLabel:         axis.PlanLabel,
+		DeltaFromPrimary:  axis.DeltaFromPrimary,
+		OpponentCondition: opponentAxis.Label,
+		OpponentRating:    opponentAxis.Rating,
+		OpponentPlanRole:  opponentAxis.PlanRole,
+		OpponentPlanLabel: opponentAxis.PlanLabel,
 		Primary:           primary,
 		OpponentPrimary:   opponentPrimary,
 		Wins:              overall.Wins,
@@ -305,7 +315,7 @@ func buildWinConditionMatchups(rows []clickhouse.TeamCompositionRow, analyzer wi
 		for _, opponentAxis := range opponent.Axes {
 			opponentPrimary := opponentAxis.Label == opponent.PrimaryCondition
 			accumulator := aggregateWinConditionAxis(matchTeams, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary)
-			out = append(out, accumulator.response(axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary, minGames))
+			out = append(out, accumulator.response(axis, opponentAxis, primary, opponentPrimary, minGames))
 		}
 	}
 	return out
@@ -389,7 +399,7 @@ func (a *winConditionAccumulator) addCounts(bucketName string, wins, games int) 
 	bucket.wins += wins
 }
 
-func (a winConditionAccumulator) response(condition, rating, opponentCondition, opponentRating string, primary, opponentPrimary bool, minGames int) winConditionMetricResponse {
+func (a winConditionAccumulator) response(axis, opponentAxis winconditions.AxisScore, primary, opponentPrimary bool, minGames int) winConditionMetricResponse {
 	buckets := make([]winConditionBucketResponse, 0, len(winConditionDurationBuckets))
 	for _, bucketName := range winConditionDurationBuckets {
 		bucket := a.buckets[bucketName]
@@ -403,10 +413,15 @@ func (a winConditionAccumulator) response(condition, rating, opponentCondition, 
 		})
 	}
 	response := winConditionMetricResponse{
-		Condition:         condition,
-		Rating:            rating,
-		OpponentCondition: opponentCondition,
-		OpponentRating:    opponentRating,
+		Condition:         axis.Label,
+		Rating:            axis.Rating,
+		PlanRole:          axis.PlanRole,
+		PlanLabel:         axis.PlanLabel,
+		DeltaFromPrimary:  axis.DeltaFromPrimary,
+		OpponentCondition: opponentAxis.Label,
+		OpponentRating:    opponentAxis.Rating,
+		OpponentPlanRole:  opponentAxis.PlanRole,
+		OpponentPlanLabel: opponentAxis.PlanLabel,
 		Primary:           primary,
 		OpponentPrimary:   opponentPrimary,
 		Wins:              a.wins,

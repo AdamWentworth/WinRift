@@ -38,10 +38,13 @@ type Axis struct {
 }
 
 type AxisScore struct {
-	Key    string `json:"key"`
-	Label  string `json:"label"`
-	Score  int    `json:"score"`
-	Rating string `json:"rating"`
+	Key              string `json:"key"`
+	Label            string `json:"label"`
+	Score            int    `json:"score"`
+	Rating           string `json:"rating"`
+	DeltaFromPrimary int    `json:"deltaFromPrimary"`
+	PlanRole         string `json:"planRole"`
+	PlanLabel        string `json:"planLabel"`
 }
 
 type TeamProfile struct {
@@ -52,6 +55,9 @@ type TeamProfile struct {
 	PrimaryCondition   string            `json:"primaryCondition"`
 	PrimaryScore       int               `json:"primaryScore"`
 	PrimaryRating      string            `json:"primaryRating"`
+	PrimaryMargin      int               `json:"primaryMargin"`
+	Sharpness          string            `json:"sharpness"`
+	SharpnessLabel     string            `json:"sharpnessLabel"`
 	MissingChampionIDs []uint16          `json:"missingChampionIds"`
 }
 
@@ -111,14 +117,18 @@ func (a Analyzer) TeamProfile(championIDs []uint16) TeamProfile {
 	if primaryCondition != "Unknown" {
 		primaryRating = ratings[keyForLabel(primaryCondition)]
 	}
+	primaryMargin := primaryMargin(scores)
 	return TeamProfile{
 		ChampionIDs:        append([]uint16(nil), championIDs...),
 		Scores:             scores,
 		Ratings:            ratings,
-		Axes:               axisScores(scores),
+		Axes:               axisScores(scores, primaryCondition, primaryScore),
 		PrimaryCondition:   primaryCondition,
 		PrimaryScore:       primaryScore,
 		PrimaryRating:      primaryRating,
+		PrimaryMargin:      primaryMargin,
+		Sharpness:          sharpness(primaryMargin),
+		SharpnessLabel:     sharpnessLabel(primaryMargin),
 		MissingChampionIDs: missing,
 	}
 }
@@ -189,13 +199,99 @@ func scoreRatings(scores Scores) map[string]string {
 	}
 }
 
-func axisScores(scores Scores) []AxisScore {
+func axisScores(scores Scores, primaryCondition string, primaryScore int) []AxisScore {
 	out := make([]AxisScore, 0, len(Axes))
 	for _, axis := range Axes {
 		score := scores.Value(axis.Label)
-		out = append(out, AxisScore{Key: axis.Key, Label: axis.Label, Score: score, Rating: Rating(score)})
+		delta := primaryScore - score
+		if delta < 0 {
+			delta = 0
+		}
+		role, label := planRole(axis.Label, score, primaryCondition, primaryScore)
+		out = append(out, AxisScore{
+			Key:              axis.Key,
+			Label:            axis.Label,
+			Score:            score,
+			Rating:           Rating(score),
+			DeltaFromPrimary: delta,
+			PlanRole:         role,
+			PlanLabel:        label,
+		})
 	}
 	return out
+}
+
+func planRole(label string, score int, primaryCondition string, primaryScore int) (string, string) {
+	if primaryCondition == "Unknown" {
+		return "unknown", "Unknown"
+	}
+	if label == primaryCondition {
+		return "primary", "Primary"
+	}
+	delta := primaryScore - score
+	switch {
+	case delta <= 0:
+		return "co-primary", "Co-primary"
+	case delta <= 2:
+		return "strong-secondary", "Strong secondary"
+	case delta <= 5 || score >= 12:
+		return "secondary", "Secondary"
+	default:
+		return "weak-angle", "Weak angle"
+	}
+}
+
+func primaryMargin(scores Scores) int {
+	values := []int{scores.SplitPush, scores.Pick, scores.Siege, scores.Control, scores.TeamFight}
+	best := -1
+	second := -1
+	for _, value := range values {
+		if value > best {
+			second = best
+			best = value
+			continue
+		}
+		if value > second {
+			second = value
+		}
+	}
+	if best < 0 {
+		return 0
+	}
+	if second < 0 {
+		return best
+	}
+	return best - second
+}
+
+func sharpness(margin int) string {
+	switch {
+	case margin <= 0:
+		return "tied"
+	case margin == 1:
+		return "contested"
+	case margin <= 3:
+		return "flexible"
+	case margin <= 6:
+		return "clear"
+	default:
+		return "sharp"
+	}
+}
+
+func sharpnessLabel(margin int) string {
+	switch sharpness(margin) {
+	case "tied":
+		return "Tied identity"
+	case "contested":
+		return "Contested identity"
+	case "flexible":
+		return "Flexible identity"
+	case "clear":
+		return "Clear identity"
+	default:
+		return "Sharp identity"
+	}
 }
 
 func primaryCondition(scores Scores, profiles []Profile) (string, int) {
