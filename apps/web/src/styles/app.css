@@ -497,6 +497,153 @@ button {
   border-radius: 50%;
 }
 
+.rune-popover-trigger {
+  border: 1px solid transparent;
+  border-radius: 2px;
+  padding: 2px;
+}
+
+.rune-popover-trigger:focus-visible {
+  border-color: #fff;
+  outline: none;
+}
+
+.rune-popover {
+  background: #181818;
+  border: 1px solid #6d6d6d;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  color: #f5f5f5;
+  display: grid;
+  gap: 10px;
+  max-height: min(360px, calc(100vh - 24px));
+  overflow-y: auto;
+  padding: 10px;
+  pointer-events: none;
+  position: fixed;
+  text-align: left;
+  z-index: 40;
+}
+
+.rune-popover::before {
+  background: #181818;
+  border-left: 1px solid #6d6d6d;
+  border-top: 1px solid #6d6d6d;
+  content: "";
+  height: 10px;
+  left: 50%;
+  position: absolute;
+  top: -6px;
+  transform: rotate(45deg);
+  width: 10px;
+}
+
+.rune-popover-left::before {
+  left: 32px;
+}
+
+.rune-popover-right::before {
+  left: auto;
+  right: 32px;
+}
+
+.rune-tree-block {
+  background: #222;
+  border: 1px solid #383838;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.rune-tree-heading {
+  align-items: center;
+  color: #fff;
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 8px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.rune-tree-heading img,
+.rune-tree-style-fallback {
+  height: 24px;
+  width: 24px;
+}
+
+.rune-tree-style-fallback {
+  align-items: center;
+  background: #111;
+  border: 1px solid #444;
+  display: inline-flex;
+  font-size: 10px;
+  justify-content: center;
+}
+
+.rune-tree-list {
+  display: grid;
+  gap: 5px;
+  position: relative;
+}
+
+.rune-tree-list::before {
+  background: #3e3e3e;
+  bottom: 12px;
+  content: "";
+  left: 11px;
+  position: absolute;
+  top: 12px;
+  width: 1px;
+}
+
+.rune-tree-row {
+  align-items: center;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 22px 28px minmax(0, 1fr);
+  min-width: 0;
+  position: relative;
+}
+
+.rune-tree-row img,
+.rune-tree-row .rune-fallback {
+  background: #111;
+  border: 1px solid #454545;
+  border-radius: 50%;
+  height: 26px;
+  width: 26px;
+}
+
+.rune-tree-slot {
+  align-items: center;
+  background: #303030;
+  border: 1px solid #555;
+  color: #e6e6e6;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  height: 20px;
+  justify-content: center;
+  width: 20px;
+  z-index: 1;
+}
+
+.rune-tree-name {
+  color: #e7e7e7;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rune-tree-empty {
+  color: #aaa;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .spell-pill,
 .rune-fallback,
 .item-pill {

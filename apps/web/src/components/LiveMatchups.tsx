@@ -1,5 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { createPortal } from 'react-dom';
 import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData } from '../api/types';
 import { getItemSlots } from '../api/client';
 import {
@@ -11,6 +12,8 @@ import {
   rankLabel,
   runeImageUrl,
   runeName,
+  runeStyleById,
+  runeStyleImageUrl,
   runeStyleName,
   summonerSpellImageUrl,
   summonerSpellName,
@@ -233,8 +236,6 @@ function LiveChampionCard({
   const champion = championByKey(champions, participant.championId);
   const championName = champion?.name ?? String(participant.championId);
   const championUrl = championImageUrl(champions, participant.championId);
-  const keystoneId = participant.perks?.perkIds?.[0];
-  const secondaryStyleId = participant.perks?.perkSubStyle;
   const playerName = participant.riotId || participant.summonerName || 'Unknown player';
 
   return (
@@ -270,10 +271,7 @@ function LiveChampionCard({
             return imageUrl ? <img key={spellId} src={imageUrl} alt={name} title={name} /> : <span className="spell-pill" key={spellId}>{spellId}</span>;
           })}
         </div>
-        <div className="runes">
-          <RuneIcon runes={runes} runeId={keystoneId} />
-          <RuneStyleIcon runes={runes} styleId={secondaryStyleId} />
-        </div>
+        <RuneLoadout runes={runes} participant={participant} />
       </div>
     </article>
   );
@@ -422,6 +420,152 @@ function MissingItemSlotLine({ slot }: { slot: number }) {
       </div>
     </div>
   );
+}
+
+function RuneLoadout({ runes, participant }: { runes?: RuneData; participant: LiveParticipant }) {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ left: 0, top: 0, align: 'center' as 'left' | 'center' | 'right' });
+  const keystoneId = participant.perks?.perkIds?.[0];
+  const secondaryStyleId = participant.perks?.perkSubStyle;
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return undefined;
+    const updatePosition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(340, window.innerWidth - 24);
+      const height = Math.min(360, window.innerHeight - 24);
+      const centeredLeft = rect.left + rect.width / 2 - width / 2;
+      const left = Math.max(12, Math.min(centeredLeft, window.innerWidth - width - 12));
+      const belowTop = rect.bottom + 10;
+      const aboveTop = rect.top - height - 10;
+      const top = belowTop + height <= window.innerHeight - 12 ? belowTop : Math.max(12, aboveTop);
+      let align: 'left' | 'center' | 'right' = 'center';
+      if (left <= 12) align = 'left';
+      if (left >= window.innerWidth - width - 12) align = 'right';
+      setPosition({ left, top, align });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={triggerRef}
+      className="runes rune-popover-trigger"
+      tabIndex={0}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      aria-label="Rune selections"
+    >
+      <RuneIcon runes={runes} runeId={keystoneId} />
+      <RuneStyleIcon runes={runes} styleId={secondaryStyleId} />
+      {open ? <RunePopover runes={runes} participant={participant} position={position} /> : null}
+    </div>
+  );
+}
+
+function RunePopover({
+  runes,
+  participant,
+  position,
+}: {
+  runes?: RuneData;
+  participant: LiveParticipant;
+  position: { left: number; top: number; align: 'left' | 'center' | 'right' };
+}) {
+  const perkIds = participant.perks?.perkIds ?? [];
+  const primaryStyleId = participant.perks?.perkStyle;
+  const secondaryStyleId = participant.perks?.perkSubStyle;
+  const primaryStyle = runeStyleById(runes, primaryStyleId);
+  const secondaryStyle = runeStyleById(runes, secondaryStyleId);
+  const primarySelections = selectedRunesForStyle(runes, primaryStyleId, perkIds);
+  const secondarySelections = selectedRunesForStyle(runes, secondaryStyleId, perkIds);
+
+  return createPortal(
+    <div
+      className={`rune-popover rune-popover-${position.align}`}
+      style={{
+        left: `${position.left}px`,
+        top: `${position.top}px`,
+        width: `min(340px, calc(100vw - 24px))`,
+      }}
+    >
+      <RuneTreeBlock
+        runes={runes}
+        title={primaryStyle?.name ?? runeStyleName(runes, primaryStyleId)}
+        styleId={primaryStyleId}
+        selections={primarySelections}
+        fallbackIds={perkIds.slice(0, 4)}
+      />
+      <RuneTreeBlock
+        runes={runes}
+        title={secondaryStyle?.name ?? runeStyleName(runes, secondaryStyleId)}
+        styleId={secondaryStyleId}
+        selections={secondarySelections}
+        fallbackIds={perkIds.slice(4, 6)}
+      />
+    </div>,
+    document.body,
+  );
+}
+
+function RuneTreeBlock({
+  runes,
+  title,
+  styleId,
+  selections,
+  fallbackIds,
+}: {
+  runes?: RuneData;
+  title: string;
+  styleId?: number;
+  selections: RuneSelection[];
+  fallbackIds: number[];
+}) {
+  const visibleSelections = selections.length ? selections : fallbackIds.map((runeId, index) => ({ runeId, slotIndex: index, runeName: runeName(runes, runeId) }));
+  const styleImageUrl = runeStyleImageUrl(runes, styleId);
+  return (
+    <section className="rune-tree-block">
+      <div className="rune-tree-heading">
+        {styleImageUrl ? <img src={styleImageUrl} alt="" /> : <span className="rune-tree-style-fallback">{styleId ?? '?'}</span>}
+        <span>{title}</span>
+      </div>
+      <div className="rune-tree-list">
+        {visibleSelections.length ? visibleSelections.map((selection) => (
+          <div className="rune-tree-row" key={`${selection.slotIndex}-${selection.runeId}`}>
+            <span className="rune-tree-slot">{selection.slotIndex + 1}</span>
+            <RuneIcon runes={runes} runeId={selection.runeId} />
+            <span className="rune-tree-name">{selection.runeName}</span>
+          </div>
+        )) : <div className="rune-tree-empty">No rune data</div>}
+      </div>
+    </section>
+  );
+}
+
+type RuneSelection = {
+  runeId: number;
+  slotIndex: number;
+  runeName: string;
+};
+
+function selectedRunesForStyle(runes: RuneData | undefined, styleId: number | undefined, perkIds: number[]): RuneSelection[] {
+  const style = runeStyleById(runes, styleId);
+  if (!style) return [];
+  const selected = new Set(perkIds);
+  return style.slots.flatMap((slot, slotIndex) => {
+    const rune = slot.runes.find((candidate) => selected.has(candidate.id));
+    return rune ? [{ runeId: rune.id, slotIndex, runeName: rune.name }] : [];
+  });
 }
 
 function RuneIcon({ runes, runeId }: { runes?: RuneData; runeId?: number }) {
