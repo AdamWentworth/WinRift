@@ -518,6 +518,13 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
             <div className="match-read-headline">
               <strong>{script.headline}</strong>
               <span>{planPairRead(metric)}</span>
+              <div className="match-read-evidence-row" aria-label="Evidence summary">
+                <EvidencePill metric={metric} />
+                <span>{metric?.games.toLocaleString() ?? 0} games</span>
+                {metric?.evidence?.wilsonLow || metric?.evidence?.wilsonHigh ? (
+                  <span>{metric.evidence.wilsonLow.toFixed(1)}-{metric.evidence.wilsonHigh.toFixed(1)} likely range</span>
+                ) : null}
+              </div>
             </div>
             <p className="match-read-primary">{script.playerRead}</p>
             <div className="match-read-grid">
@@ -534,6 +541,17 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
         )}
       </div>
     </div>
+  );
+}
+
+function EvidencePill({ metric }: { metric?: WinConditionMetric }) {
+  const direction = metric?.evidence?.direction ?? 'unknown';
+  const score = metric?.evidence?.score ?? 0;
+  const level = metric?.evidence?.level ?? 'No sample';
+  return (
+    <span className={`evidence-pill ${direction}`}>
+      {level} {score > 0 ? `${score.toFixed(0)}/100` : ''}
+    </span>
   );
 }
 

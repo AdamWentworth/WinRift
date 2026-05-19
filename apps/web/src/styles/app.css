@@ -642,6 +642,51 @@ button {
   font-weight: 800;
 }
 
+.match-read-evidence-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.match-read-evidence-row span {
+  align-items: center;
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  color: #c5d2d8;
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  min-height: 20px;
+  padding: 4px 6px;
+  text-transform: uppercase;
+}
+
+.match-read-evidence-row .evidence-pill.favorable {
+  background: rgb(111 207 151 / 16%);
+  border-color: rgb(111 207 151 / 36%);
+  color: #cbffdf;
+}
+
+.match-read-evidence-row .evidence-pill.unfavorable {
+  background: rgb(240 128 128 / 16%);
+  border-color: rgb(240 128 128 / 36%);
+  color: #ffd0d0;
+}
+
+.match-read-evidence-row .evidence-pill.neutral {
+  background: rgb(244 214 113 / 15%);
+  border-color: rgb(244 214 113 / 32%);
+  color: #ffe9a4;
+}
+
+.match-read-evidence-row .evidence-pill.mixed,
+.match-read-evidence-row .evidence-pill.unknown {
+  background: rgb(135 206 235 / 12%);
+  border-color: rgb(135 206 235 / 28%);
+  color: #d4f2ff;
+}
+
 .match-read-copy p {
   margin: 0;
 }
