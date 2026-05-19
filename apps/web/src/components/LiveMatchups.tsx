@@ -464,12 +464,14 @@ function WinConditionLengthChart({ metric }: { metric?: WinConditionMetric }) {
             <line className="chart-gridline" x1="10" y1={chartY(65)} x2="92" y2={chartY(65)} />
             <line className="chart-gridline chart-baseline" x1="10" y1={chartY(50)} x2="92" y2={chartY(50)} />
             <line className="chart-gridline" x1="10" y1={chartY(35)} x2="92" y2={chartY(35)} />
-            <text className="chart-y-label" x="3.5" y={chartY(65) + 1.8}>65%</text>
-            <text className="chart-y-label chart-y-label-baseline" x="3.5" y={chartY(50) + 1.8}>50%</text>
-            <text className="chart-y-label" x="3.5" y={chartY(35) + 1.8}>35%</text>
             {areaPath ? <path className="chart-area" d={areaPath} /> : null}
             {pointString ? <polyline className="chart-line" points={pointString} /> : null}
           </svg>
+          <div className="chart-y-axis" aria-hidden="true">
+            <span style={{ top: `${chartY(65)}%` }}>65%</span>
+            <span className="chart-y-axis-baseline" style={{ top: `${chartY(50)}%` }}>50%</span>
+            <span style={{ top: `${chartY(35)}%` }}>35%</span>
+          </div>
           {points.map((point) => (
             <span
               className={`chart-marker ${chartPointClass(point.bucket.winRate)}`}
