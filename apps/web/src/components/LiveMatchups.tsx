@@ -542,7 +542,7 @@ function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData
   const imageUrl = itemImageUrl(items, itemId);
   const name = itemName(items, itemId);
   return (
-    <div className="item-slot-line">
+    <div className="item-slot-column">
       <span className="item-slot-number">{ordinal(row.itemSlot)}</span>
       {imageUrl ? <img src={imageUrl} alt={name} title={name} /> : <span className="item-pill">{row.itemId}</span>}
       <div className="item-slot-stats">
@@ -555,7 +555,7 @@ function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData
 
 function MissingItemSlotLine({ slot }: { slot: number }) {
   return (
-    <div className="item-slot-line missing-item-slot">
+    <div className="item-slot-column missing-item-slot">
       <span className="item-slot-number">{ordinal(slot)}</span>
       <span className="item-slot-empty">--</span>
       <div className="item-slot-stats">

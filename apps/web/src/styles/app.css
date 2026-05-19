@@ -752,10 +752,11 @@ button {
   align-content: start;
   border: 1px solid #ccc;
   display: grid;
-  gap: 5px;
-  min-height: 148px;
+  gap: 4px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  min-height: 86px;
   min-width: 0;
-  padding: 6px;
+  padding: 6px 5px;
   text-align: center;
 }
 
@@ -792,23 +793,24 @@ button {
   width: 24px;
 }
 
-.item-slot-line {
+.item-slot-column {
   align-items: center;
   background: rgb(0 0 0 / 12%);
   border: 1px solid rgb(0 0 0 / 16%);
   display: grid;
-  gap: 5px;
-  grid-template-columns: 24px 26px minmax(0, 1fr);
+  gap: 3px;
+  grid-template-rows: 14px 28px auto;
+  justify-items: center;
   min-width: 0;
-  padding: 4px;
-  text-align: left;
+  padding: 4px 2px;
+  text-align: center;
 }
 
-.item-slot-line img,
-.item-slot-line .item-pill,
+.item-slot-column img,
+.item-slot-column .item-pill,
 .item-slot-empty {
-  height: 24px;
-  width: 24px;
+  height: 28px;
+  width: 28px;
 }
 
 .item-slot-empty {
@@ -828,26 +830,33 @@ button {
 
 .item-slot-number {
   color: #111;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
+  line-height: 1;
 }
 
 .item-slot-stats {
   display: grid;
   gap: 1px;
+  justify-items: center;
   min-width: 0;
+  width: 100%;
 }
 
 .item-slot-stats strong {
   color: #111;
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1;
 }
 
 .item-slot-stats span {
   color: #111;
-  font-size: 10px;
+  font-size: 9px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
 }
 
 .mini-spells img {
