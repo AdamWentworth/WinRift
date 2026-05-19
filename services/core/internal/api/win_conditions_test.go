@@ -16,12 +16,18 @@ func TestCompiledWinConditionMatchupsRespectPrimaryFlag(t *testing.T) {
 			{Key: "control", Label: "Control", Score: 10, Rating: "C+"},
 		},
 	}
-	opponent := winconditions.TeamProfile{PrimaryCondition: "Siege", PrimaryRating: "B"}
+	opponent := winconditions.TeamProfile{
+		PrimaryCondition: "Siege",
+		PrimaryRating:    "B",
+		Axes: []winconditions.AxisScore{
+			{Key: "siege", Label: "Siege", Score: 14, Rating: "B"},
+		},
+	}
 	rows := []clickhouse.WinConditionMetricRow{
-		{TeamCondition: "Pick", TeamRating: "B", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 1, GameLengthBucket: "ALL", Wins: 3, Games: 5, WinRate: 61.23, Confidence: 24.56},
-		{TeamCondition: "Pick", TeamRating: "B", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 2, GameLengthBucket: "ALL", Wins: 10, Games: 20, WinRate: 50, Confidence: 29.93},
-		{TeamCondition: "Control", TeamRating: "C+", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 2, GameLengthBucket: "ALL", Wins: 4, Games: 8, WinRate: 44.44, Confidence: 19.31},
-		{TeamCondition: "Control", TeamRating: "C+", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 1, GameLengthBucket: "ALL", Wins: 99, Games: 100, WinRate: 99, Confidence: 94.55},
+		{TeamCondition: "Pick", TeamRating: "B", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 11, GameLengthBucket: "ALL", Wins: 3, Games: 5, WinRate: 61.23, Confidence: 24.56},
+		{TeamCondition: "Pick", TeamRating: "B", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 21, GameLengthBucket: "ALL", Wins: 10, Games: 20, WinRate: 50, Confidence: 29.93},
+		{TeamCondition: "Control", TeamRating: "C+", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 21, GameLengthBucket: "ALL", Wins: 4, Games: 8, WinRate: 44.44, Confidence: 19.31},
+		{TeamCondition: "Control", TeamRating: "C+", OpponentCondition: "Siege", OpponentRating: "B", TeamPrimary: 11, GameLengthBucket: "ALL", Wins: 99, Games: 100, WinRate: 99, Confidence: 94.55},
 	}
 
 	got := buildCompiledWinConditionMatchups(rows, team, opponent, 5)

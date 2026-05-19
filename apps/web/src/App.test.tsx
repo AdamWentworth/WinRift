@@ -384,6 +384,8 @@ describe('App', () => {
     expect(screen.getByText("Enemy Team's Win Condition")).toBeInTheDocument();
     expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
     expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Show enemy Siege'));
+    expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
     queryClient.clear();
   });
 });
@@ -464,6 +466,25 @@ const winConditionFixture = vi.hoisted(() => ({
         { bucket: '35+', wins: 1, games: 3, winRate: 33.3, confidence: 6, meetsMinGames: false },
       ],
     },
+    {
+      condition: 'Pick',
+      rating: 'B+',
+      opponentCondition: 'Siege',
+      opponentRating: 'C+',
+      primary: true,
+      wins: 14,
+      games: 20,
+      winRate: 70,
+      confidence: 49,
+      meetsMinGames: true,
+      buckets: [
+        { bucket: '0-20', wins: 4, games: 5, winRate: 80, confidence: 38, meetsMinGames: true },
+        { bucket: '20-25', wins: 3, games: 5, winRate: 60, confidence: 23, meetsMinGames: true },
+        { bucket: '25-30', wins: 3, games: 4, winRate: 75, confidence: 30, meetsMinGames: false },
+        { bucket: '30-35', wins: 2, games: 3, winRate: 66.7, confidence: 21, meetsMinGames: false },
+        { bucket: '35+', wins: 2, games: 3, winRate: 66.7, confidence: 21, meetsMinGames: false },
+      ],
+    },
   ],
   redMatchups: [
     {
@@ -476,6 +497,19 @@ const winConditionFixture = vi.hoisted(() => ({
       games: 20,
       winRate: 45,
       confidence: 26,
+      meetsMinGames: true,
+      buckets: [],
+    },
+    {
+      condition: 'Siege',
+      rating: 'C+',
+      opponentCondition: 'Pick',
+      opponentRating: 'B+',
+      primary: false,
+      wins: 6,
+      games: 20,
+      winRate: 30,
+      confidence: 15,
       meetsMinGames: true,
       buckets: [],
     },

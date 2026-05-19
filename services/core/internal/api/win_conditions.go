@@ -181,14 +181,20 @@ func (s Server) analyticsWinConditions(w http.ResponseWriter, r *http.Request) {
 
 func buildCompiledWinConditionMatchups(rows []clickhouse.WinConditionMetricRow, team winconditions.TeamProfile, opponent winconditions.TeamProfile, minGames int) []winConditionMetricResponse {
 	index := indexCompiledWinConditionRows(rows)
-	out := make([]winConditionMetricResponse, 0, len(team.Axes))
+	out := make([]winConditionMetricResponse, 0, len(team.Axes)*len(opponent.Axes))
 	for _, axis := range team.Axes {
 		primary := axis.Label == team.PrimaryCondition
-		primaryMode := uint8(2)
+		teamMode := uint8(2)
 		if primary {
-			primaryMode = 1
+			teamMode = 1
 		}
-		out = append(out, compiledWinConditionResponse(index, axis.Label, axis.Rating, opponent.PrimaryCondition, opponent.PrimaryRating, primary, primaryMode, minGames))
+		for _, opponentAxis := range opponent.Axes {
+			opponentMode := uint8(2)
+			if opponentAxis.Label == opponent.PrimaryCondition {
+				opponentMode = 1
+			}
+			out = append(out, compiledWinConditionResponse(index, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, winConditionPairPrimaryMode(teamMode, opponentMode), minGames))
+		}
 	}
 	return out
 }
@@ -253,11 +259,14 @@ func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickh
 
 func buildWinConditionMatchups(rows []clickhouse.TeamCompositionRow, analyzer winconditions.Analyzer, team winconditions.TeamProfile, opponent winconditions.TeamProfile, minGames int) []winConditionMetricResponse {
 	matchTeams := historicalTeamsByMatch(rows, analyzer)
-	out := make([]winConditionMetricResponse, 0, len(team.Axes))
+	out := make([]winConditionMetricResponse, 0, len(team.Axes)*len(opponent.Axes))
 	for _, axis := range team.Axes {
 		primary := axis.Label == team.PrimaryCondition
-		accumulator := aggregateWinConditionAxis(matchTeams, axis.Label, axis.Rating, opponent.PrimaryCondition, opponent.PrimaryRating, primary)
-		out = append(out, accumulator.response(axis.Label, axis.Rating, opponent.PrimaryCondition, opponent.PrimaryRating, primary, minGames))
+		for _, opponentAxis := range opponent.Axes {
+			opponentPrimary := opponentAxis.Label == opponent.PrimaryCondition
+			accumulator := aggregateWinConditionAxis(matchTeams, axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, opponentPrimary)
+			out = append(out, accumulator.response(axis.Label, axis.Rating, opponentAxis.Label, opponentAxis.Rating, primary, minGames))
+		}
 	}
 	return out
 }
@@ -273,23 +282,23 @@ func historicalTeamsByMatch(rows []clickhouse.TeamCompositionRow, analyzer winco
 	return out
 }
 
-func aggregateWinConditionAxis(matchTeams map[string][]historicalTeamProfile, condition, rating, opponentCondition, opponentRating string, primaryOnly bool) winConditionAccumulator {
+func aggregateWinConditionAxis(matchTeams map[string][]historicalTeamProfile, condition, rating, opponentCondition, opponentRating string, primaryOnly, opponentPrimaryOnly bool) winConditionAccumulator {
 	accumulator := newWinConditionAccumulator()
 	for _, teams := range matchTeams {
 		if len(teams) != 2 {
 			continue
 		}
-		addWinConditionSample(&accumulator, teams[0], teams[1], condition, rating, opponentCondition, opponentRating, primaryOnly)
-		addWinConditionSample(&accumulator, teams[1], teams[0], condition, rating, opponentCondition, opponentRating, primaryOnly)
+		addWinConditionSample(&accumulator, teams[0], teams[1], condition, rating, opponentCondition, opponentRating, primaryOnly, opponentPrimaryOnly)
+		addWinConditionSample(&accumulator, teams[1], teams[0], condition, rating, opponentCondition, opponentRating, primaryOnly, opponentPrimaryOnly)
 	}
 	return accumulator
 }
 
-func addWinConditionSample(accumulator *winConditionAccumulator, team historicalTeamProfile, opponent historicalTeamProfile, condition, rating, opponentCondition, opponentRating string, primaryOnly bool) {
+func addWinConditionSample(accumulator *winConditionAccumulator, team historicalTeamProfile, opponent historicalTeamProfile, condition, rating, opponentCondition, opponentRating string, primaryOnly, opponentPrimaryOnly bool) {
 	if !profileMatchesCondition(team.profile, condition, rating, primaryOnly) {
 		return
 	}
-	if !profileMatchesCondition(opponent.profile, opponentCondition, opponentRating, true) {
+	if !profileMatchesCondition(opponent.profile, opponentCondition, opponentRating, opponentPrimaryOnly) {
 		return
 	}
 	accumulator.add(team.row.Win, team.row.DurationSeconds)
@@ -439,6 +448,10 @@ func winRatePercent(wins, games int) float64 {
 		return 0
 	}
 	return round(float64(wins) / float64(games) * 100)
+}
+
+func winConditionPairPrimaryMode(teamMode, opponentMode uint8) uint8 {
+	return teamMode*10 + opponentMode
 }
 
 func keyForWinCondition(condition string) string {

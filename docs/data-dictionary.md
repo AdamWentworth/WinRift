@@ -57,11 +57,13 @@ This table is generated from raw participant rows plus `services/core/internal/w
 
 Compiled win-condition matchup metrics used by the live UI.
 
-Dimensions: patch, platform, queue, rank bucket, team condition, team rating, opponent primary condition, opponent primary rating, whether the team condition was the team's primary identity, and game-length bucket.
+Dimensions: patch, platform, queue, rank bucket, team condition, team rating, opponent condition, opponent rating, primary-mode pairing, and game-length bucket.
 
 Measures: wins, games, precomputed winrate percentage, and precomputed Wilson lower-bound confidence percentage.
 
-Rollups are stored as normal rows: `platform = ALL`, `rank_bucket = ALL`, and `game_length_bucket = ALL`. `team_primary = 1` means primary-only, `0` means non-primary-only, and `2` means any primary state. Live UI requests should read these compiled rows directly instead of recomputing percentages from raw team rows.
+Rollups are stored as normal rows: `platform = ALL`, `rank_bucket = ALL`, and `game_length_bucket = ALL`.
+
+`team_primary` stores the team/opponent primary-mode pair as two digits. The first digit is the team's mode and the second is the opponent's mode: `1` means primary-only and `2` means any primary state. For example, `11` means team primary vs opponent primary, `21` means team any-state alternative vs opponent primary, and `22` means alternative-vs-alternative. Live UI requests should read these compiled rows directly instead of recomputing percentages from raw team rows.
 
 ## `participants`
 

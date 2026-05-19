@@ -298,8 +298,8 @@ function WinConditionContent({ analysis, yourSide }: { analysis: WinConditionAna
     setSelectedEnemyCondition(enemyTeam.primaryCondition);
   }, [analysis, yourTeam.primaryCondition, enemyTeam.primaryCondition]);
 
-  const selectedYourMetric = metricForCondition(yourMetrics, selectedYourCondition) ?? primaryMetric(yourMetrics);
-  const selectedEnemyMetric = metricForCondition(enemyMetrics, selectedEnemyCondition) ?? primaryMetric(enemyMetrics);
+  const selectedYourMetric = metricForPair(yourMetrics, selectedYourCondition, selectedEnemyCondition) ?? metricForCondition(yourMetrics, selectedYourCondition) ?? primaryMetric(yourMetrics);
+  const selectedEnemyMetric = metricForPair(enemyMetrics, selectedEnemyCondition, selectedYourCondition) ?? metricForCondition(enemyMetrics, selectedEnemyCondition) ?? primaryMetric(enemyMetrics);
 
   return (
     <section className="win-condition-panel" aria-label="Win condition stats">
@@ -312,6 +312,7 @@ function WinConditionContent({ analysis, yourSide }: { analysis: WinConditionAna
       <WinConditionAlternatives
         metrics={yourMetrics}
         selectedCondition={selectedYourMetric?.condition ?? yourTeam.primaryCondition}
+        opponentCondition={selectedEnemyMetric?.condition ?? enemyTeam.primaryCondition}
         onSelect={setSelectedYourCondition}
       />
       <WinConditionProfileComparison yourTeam={yourTeam} enemyTeam={enemyTeam} yourSide={yourSide} />
@@ -321,6 +322,7 @@ function WinConditionContent({ analysis, yourSide }: { analysis: WinConditionAna
         team={enemyTeam}
         metric={selectedEnemyMetric}
         metrics={enemyMetrics}
+        opponentCondition={selectedYourMetric?.condition ?? yourTeam.primaryCondition}
         onSelect={setSelectedEnemyCondition}
       />
     </section>
@@ -367,19 +369,21 @@ function WinConditionSummaryCard({
 function WinConditionAlternatives({
   metrics,
   selectedCondition,
+  opponentCondition,
   onSelect,
 }: {
   metrics: WinConditionMetric[];
   selectedCondition: string;
+  opponentCondition: string;
   onSelect: (condition: string) => void;
 }) {
-  const alternatives = sortedAlternativeMetrics(metrics).filter((metric) => metric.condition !== selectedCondition);
+  const alternatives = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((metric) => metric.opponentCondition === opponentCondition && metric.condition !== selectedCondition));
   return (
     <div className="legacy-stats-section alternatives-section">
       <h2>Alternatives</h2>
       <div className="alternative-list">
         {alternatives.map((metric) => (
-          <button className="alternative-item" key={metric.condition} type="button" onClick={() => onSelect(metric.condition)}>
+          <button className="alternative-item" key={`${metric.condition}-${metric.opponentCondition}`} type="button" onClick={() => onSelect(metric.condition)}>
             <span className="alternative-images">
               <img src={conditionIconUrl(metric.condition)} alt="" />
               <img src={ratingImageUrl(metric.rating)} alt={metric.rating} />
@@ -470,17 +474,19 @@ function WinConditionEnemyCard({
   team,
   metric,
   metrics,
+  opponentCondition,
   onSelect,
 }: {
   side: TeamSide;
   team: WinConditionTeamProfile;
   metric?: WinConditionMetric;
   metrics: WinConditionMetric[];
+  opponentCondition: string;
   onSelect: (condition: string) => void;
 }) {
   const condition = metric?.condition ?? team.primaryCondition;
   const rating = metric?.rating ?? team.primaryRating;
-  const otherMetrics = metrics.filter((candidate) => candidate.condition !== condition);
+  const otherMetrics = uniqueConditionMetrics(metrics.filter((candidate) => candidate.opponentCondition === opponentCondition && candidate.condition !== condition));
   return (
     <div className={`legacy-win-card enemy ${side}`}>
       <h2>Enemy Team's Win Condition</h2>
@@ -844,6 +850,10 @@ function buildRoleRateMap(rows: ChampionRoleRate[] = []): RoleRateMap {
   return map;
 }
 
+function metricForPair(metrics: WinConditionMetric[], condition: string, opponentCondition: string) {
+  return metrics.find((metric) => metric.condition === condition && metric.opponentCondition === opponentCondition);
+}
+
 function metricForCondition(metrics: WinConditionMetric[], condition: string) {
   return metrics.find((metric) => metric.condition === condition);
 }
@@ -856,6 +866,15 @@ function sortedAlternativeMetrics(metrics: WinConditionMetric[]) {
   return [...metrics].sort((a, b) => {
     if (b.winRate !== a.winRate) return b.winRate - a.winRate;
     return b.games - a.games;
+  });
+}
+
+function uniqueConditionMetrics(metrics: WinConditionMetric[]) {
+  const seen = new Set<string>();
+  return metrics.filter((metric) => {
+    if (seen.has(metric.condition)) return false;
+    seen.add(metric.condition);
+    return true;
   });
 }
 

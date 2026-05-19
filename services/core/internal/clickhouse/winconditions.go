@@ -347,31 +347,37 @@ func addWinConditionRecordMetrics(metrics map[winConditionMetricKey]winCondition
 	rankBuckets := []string{teamRankBucket(team.row.RankBuckets), "ALL"}
 	gameLengthBuckets := []string{winConditionGameLengthBucket(team.row.DurationSeconds), "ALL"}
 	for _, axis := range team.profile.Axes {
-		primaryModes := []uint8{2}
+		teamModes := []uint8{2}
 		if axis.Label == team.profile.PrimaryCondition {
-			primaryModes = append(primaryModes, 1)
-		} else {
-			primaryModes = append(primaryModes, 0)
+			teamModes = append(teamModes, 1)
 		}
-		for _, rankBucket := range rankBuckets {
-			for _, gameLengthBucket := range gameLengthBuckets {
-				for _, primaryMode := range primaryModes {
-					key := winConditionMetricKey{
-						patch:             team.row.Patch,
-						platform:          team.row.Platform,
-						queueID:           team.row.QueueID,
-						rankBucket:        rankBucket,
-						teamCondition:     axis.Label,
-						teamRating:        axis.Rating,
-						opponentCondition: opponent.profile.PrimaryCondition,
-						opponentRating:    opponent.profile.PrimaryRating,
-						teamPrimary:       primaryMode,
-						gameLengthBucket:  gameLengthBucket,
+		for _, opponentAxis := range opponent.profile.Axes {
+			opponentModes := []uint8{2}
+			if opponentAxis.Label == opponent.profile.PrimaryCondition {
+				opponentModes = append(opponentModes, 1)
+			}
+			for _, rankBucket := range rankBuckets {
+				for _, gameLengthBucket := range gameLengthBuckets {
+					for _, teamMode := range teamModes {
+						for _, opponentMode := range opponentModes {
+							key := winConditionMetricKey{
+								patch:             team.row.Patch,
+								platform:          team.row.Platform,
+								queueID:           team.row.QueueID,
+								rankBucket:        rankBucket,
+								teamCondition:     axis.Label,
+								teamRating:        axis.Rating,
+								opponentCondition: opponentAxis.Label,
+								opponentRating:    opponentAxis.Rating,
+								teamPrimary:       winConditionPairPrimaryMode(teamMode, opponentMode),
+								gameLengthBucket:  gameLengthBucket,
+							}
+							counts := metrics[key]
+							counts.games++
+							counts.wins += win
+							metrics[key] = counts
+						}
 					}
-					counts := metrics[key]
-					counts.games++
-					counts.wins += win
-					metrics[key] = counts
 				}
 			}
 		}
@@ -609,6 +615,10 @@ func winConditionGameLengthBucket(durationSeconds uint32) string {
 	default:
 		return "35+"
 	}
+}
+
+func winConditionPairPrimaryMode(teamMode, opponentMode uint8) uint8 {
+	return teamMode*10 + opponentMode
 }
 
 func winConditionWinRatePercent(wins, games uint64) float64 {
