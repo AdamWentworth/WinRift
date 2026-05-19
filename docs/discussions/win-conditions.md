@@ -177,6 +177,23 @@ We can still display familiar letters, but define them by observed patch distrib
 
 The simplest near-term improvement is to keep raw score plus letter grade visible in debugging docs and add distribution checks.
 
+### Current Diagnostic Hook
+
+The API exposes a diagnostics report so this can be checked against collected data:
+
+```bash
+curl 'http://localhost:8000/api/analytics/win-conditions/diagnostics?queueId=420&patch=16.10' | jq
+```
+
+The report includes:
+
+- axis/rating distributions,
+- primary condition distributions,
+- primary margin buckets,
+- total teams and matches included.
+
+This should be the first place to look before changing the grading scale.
+
 ## Building Block 6: Primary And Alternative Conditions
 
 The primary condition is the highest-rated axis. Alternative conditions are the other axes.
@@ -291,3 +308,38 @@ The concept is sound. The murky parts are not the five axes or sum-to-10 champio
 - duration buckets being adjacent to, but not yet equal to, power-spike modeling.
 
 The next best work is not to tear it down. It is to instrument it, document the assumptions, and test each layer.
+
+## Evidence Score
+
+Winrate alone is not persuasive enough.
+
+A `53%` result over thousands of games is often more meaningful than a `68%` result over 19 games. The UI now separates:
+
+- raw winrate,
+- games,
+- Wilson confidence interval,
+- evidence level,
+- evidence direction.
+
+Evidence direction can be:
+
+- `favorable`,
+- `unfavorable`,
+- `neutral`,
+- `mixed`,
+- `unknown`.
+
+Evidence level can be:
+
+- `No sample`,
+- `Thin`,
+- `Early`,
+- `Moderate`,
+- `Strong`,
+- `Very strong`.
+
+This is intentionally not the same as advantage. A stable `47%` can be strong evidence too; it is just strong unfavorable evidence. A tiny `70%` can still be thin evidence.
+
+The score is currently based on sample size plus Wilson interval stability. If the interval still overlaps even outcomes, the score is capped so the UI cannot over-sell noisy data.
+
+This is the right direction, but it should be revisited after we inspect real diagnostics output.

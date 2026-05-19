@@ -42,3 +42,21 @@ func TestCompiledWinConditionMatchupsRespectPrimaryFlag(t *testing.T) {
 		t.Fatalf("alternative matchup = %+v, want any-primary Control with stored 4/8 rate", got[1])
 	}
 }
+
+func TestWinConditionEvidenceSeparatesSampleSizeFromWinRate(t *testing.T) {
+	largeSample := winConditionEvidence(5300, 10000)
+	if largeSample.Direction != "favorable" {
+		t.Fatalf("large sample direction = %q, want favorable", largeSample.Direction)
+	}
+	if largeSample.Score < 85 {
+		t.Fatalf("large sample score = %.2f, want very strong evidence", largeSample.Score)
+	}
+
+	tinyHotSample := winConditionEvidence(13, 19)
+	if tinyHotSample.Score >= largeSample.Score {
+		t.Fatalf("tiny hot sample score = %.2f should be below large sample %.2f", tinyHotSample.Score, largeSample.Score)
+	}
+	if tinyHotSample.Level == "Strong" || tinyHotSample.Level == "Very strong" {
+		t.Fatalf("tiny hot sample level = %q, want not strong", tinyHotSample.Level)
+	}
+}

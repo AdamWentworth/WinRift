@@ -81,3 +81,25 @@ The live match screen should combine:
 - deterministic match reads that explain the stats in plain language.
 
 This combination is the point of differentiation. Many tools can show generic champion builds. WinRift should make composition identity and opponent-specific build context feel understandable in one glance.
+
+## Evidence Over Naked Winrate
+
+The app should avoid treating every percentage equally.
+
+Examples:
+
+```text
+53% over 9,000 games -> potentially strong signal
+68% over 19 games   -> interesting, but thin
+50% over 12,000 games with a narrow interval -> stable neutral signal
+47% over 8,000 games -> potentially strong unfavorable signal
+```
+
+The user-facing idea is evidence strength:
+
+- How large is the sample?
+- How narrow is the likely range?
+- Does the range clearly sit above or below 50%?
+- Is the result stable enough to be worth mentioning?
+
+This keeps the product from sounding more certain than the data allows.

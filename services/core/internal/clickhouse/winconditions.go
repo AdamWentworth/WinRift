@@ -54,6 +54,46 @@ type WinConditionMetricRow struct {
 	Confidence        float64
 }
 
+type WinConditionDiagnosticsFilters struct {
+	QueueID    uint16
+	Patch      string
+	Platform   string
+	RankBucket string
+}
+
+type WinConditionDiagnostics struct {
+	Patch                string                             `json:"patch"`
+	Platform             string                             `json:"platform"`
+	QueueID              uint16                             `json:"queueId"`
+	RankBucket           string                             `json:"rankBucket"`
+	Teams                int                                `json:"teams"`
+	Matches              int                                `json:"matches"`
+	AxisRatings          []WinConditionAxisRatingDiagnostic `json:"axisRatings"`
+	PrimaryConditions    []WinConditionPrimaryDiagnostic    `json:"primaryConditions"`
+	PrimaryMarginBuckets []WinConditionMarginDiagnostic     `json:"primaryMarginBuckets"`
+}
+
+type WinConditionAxisRatingDiagnostic struct {
+	Axis     string  `json:"axis"`
+	Rating   string  `json:"rating"`
+	Teams    int     `json:"teams"`
+	AvgScore float64 `json:"avgScore"`
+	MinScore int     `json:"minScore"`
+	MaxScore int     `json:"maxScore"`
+}
+
+type WinConditionPrimaryDiagnostic struct {
+	Condition string  `json:"condition"`
+	Rating    string  `json:"rating"`
+	Teams     int     `json:"teams"`
+	AvgMargin float64 `json:"avgMargin"`
+}
+
+type WinConditionMarginDiagnostic struct {
+	Bucket string `json:"bucket"`
+	Teams  int    `json:"teams"`
+}
+
 type winConditionTeamRecord struct {
 	row     TeamCompositionRow
 	profile winconditions.TeamProfile
@@ -265,6 +305,220 @@ func (r *Repository) QueryWinConditionMetrics(ctx context.Context, filters WinCo
 		out = append(out, row)
 	}
 	return out, rows.Err()
+}
+
+func (r *Repository) QueryWinConditionDiagnostics(ctx context.Context, filters WinConditionDiagnosticsFilters) (WinConditionDiagnostics, error) {
+	queueID := filters.QueueID
+	if queueID == 0 {
+		queueID = 420
+	}
+	platform := strings.ToUpper(strings.TrimSpace(filters.Platform))
+	rankBucket := strings.ToUpper(strings.TrimSpace(filters.RankBucket))
+	if rankBucket == "ALL" {
+		rankBucket = ""
+	}
+	where, args := winConditionDiagnosticsWhere(queueID, filters.Patch, platform, rankBucket)
+	diagnostics := WinConditionDiagnostics{
+		Platform:   "ALL",
+		QueueID:    queueID,
+		RankBucket: "ALL",
+	}
+	if platform != "" {
+		diagnostics.Platform = platform
+	}
+	if rankBucket != "" {
+		diagnostics.RankBucket = rankBucket
+	}
+	if err := r.queryWinConditionDiagnosticsSummary(ctx, where, args, &diagnostics); err != nil {
+		return WinConditionDiagnostics{}, err
+	}
+	axisRatings, err := r.queryWinConditionAxisRatings(ctx, where, args)
+	if err != nil {
+		return WinConditionDiagnostics{}, err
+	}
+	diagnostics.AxisRatings = axisRatings
+	primaryConditions, err := r.queryWinConditionPrimaryConditions(ctx, where, args)
+	if err != nil {
+		return WinConditionDiagnostics{}, err
+	}
+	diagnostics.PrimaryConditions = primaryConditions
+	marginBuckets, err := r.queryWinConditionPrimaryMargins(ctx, where, args)
+	if err != nil {
+		return WinConditionDiagnostics{}, err
+	}
+	diagnostics.PrimaryMarginBuckets = marginBuckets
+	return diagnostics, nil
+}
+
+func winConditionDiagnosticsWhere(queueID uint16, patch, platform, rankBucket string) (string, []any) {
+	where := "WHERE queue_id = ?"
+	args := []any{queueID}
+	patch = strings.TrimSpace(patch)
+	if patch != "" {
+		where += " AND patch = ?"
+		args = append(args, patch)
+	} else {
+		where += `
+			AND patch =
+			(
+				SELECT patch
+				FROM match_team_win_conditions FINAL
+				WHERE queue_id = ?
+				GROUP BY patch
+				ORDER BY
+					toUInt16OrZero(arrayElement(splitByChar('.', patch), 1)) DESC,
+					toUInt16OrZero(arrayElement(splitByChar('.', patch), 2)) DESC
+				LIMIT 1
+			)`
+		args = append(args, queueID)
+	}
+	if platform != "" {
+		where += " AND platform = ?"
+		args = append(args, platform)
+	}
+	if rankBucket != "" {
+		where += " AND rank_bucket = ?"
+		args = append(args, rankBucket)
+	}
+	return where, args
+}
+
+func (r *Repository) queryWinConditionDiagnosticsSummary(ctx context.Context, where string, args []any, diagnostics *WinConditionDiagnostics) error {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT
+			any(patch) AS resolved_patch,
+			toUInt64(count()) AS teams,
+			toUInt64(uniqExact(match_id)) AS matches
+		FROM match_team_win_conditions FINAL
+		`+where, args...)
+	var teams, matches uint64
+	if err := row.Scan(&diagnostics.Patch, &teams, &matches); err != nil {
+		return fmt.Errorf("query win condition diagnostics summary: %w", err)
+	}
+	diagnostics.Teams = int(teams)
+	diagnostics.Matches = int(matches)
+	return nil
+}
+
+func (r *Repository) queryWinConditionAxisRatings(ctx context.Context, where string, args []any) ([]WinConditionAxisRatingDiagnostic, error) {
+	selects := []string{
+		"SELECT 'SplitPush' AS axis, splitpush_rating AS rating, toUInt8(splitpush_score) AS score FROM match_team_win_conditions FINAL " + where,
+		"SELECT 'Pick' AS axis, pick_rating AS rating, toUInt8(pick_score) AS score FROM match_team_win_conditions FINAL " + where,
+		"SELECT 'Siege' AS axis, siege_rating AS rating, toUInt8(siege_score) AS score FROM match_team_win_conditions FINAL " + where,
+		"SELECT 'Control' AS axis, control_rating AS rating, toUInt8(control_score) AS score FROM match_team_win_conditions FINAL " + where,
+		"SELECT 'TeamFight' AS axis, teamfight_rating AS rating, toUInt8(teamfight_score) AS score FROM match_team_win_conditions FINAL " + where,
+	}
+	query := `
+		SELECT
+			axis,
+			rating,
+			toUInt64(count()) AS teams,
+			avg(score) AS avg_score,
+			toUInt8(min(score)) AS min_score,
+			toUInt8(max(score)) AS max_score
+		FROM (` + strings.Join(selects, " UNION ALL ") + `)
+		GROUP BY axis, rating
+		ORDER BY axis, avg_score DESC, teams DESC`
+	rows, err := r.db.QueryContext(ctx, query, repeatArgs(args, len(selects))...)
+	if err != nil {
+		return nil, fmt.Errorf("query win condition axis ratings: %w", err)
+	}
+	defer rows.Close()
+	out := []WinConditionAxisRatingDiagnostic{}
+	for rows.Next() {
+		var row WinConditionAxisRatingDiagnostic
+		var teams uint64
+		var minScore, maxScore uint8
+		if err := rows.Scan(&row.Axis, &row.Rating, &teams, &row.AvgScore, &minScore, &maxScore); err != nil {
+			return nil, fmt.Errorf("scan win condition axis rating: %w", err)
+		}
+		row.Teams = int(teams)
+		row.AvgScore = winConditionRoundPercent(row.AvgScore)
+		row.MinScore = int(minScore)
+		row.MaxScore = int(maxScore)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) queryWinConditionPrimaryConditions(ctx context.Context, where string, args []any) ([]WinConditionPrimaryDiagnostic, error) {
+	query := `
+		SELECT
+			primary_condition,
+			primary_rating,
+			toUInt64(count()) AS teams,
+			avg(primary_margin) AS avg_margin
+		FROM
+		(
+			SELECT
+				primary_condition,
+				primary_rating,
+				arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 1)
+					- arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 2) AS primary_margin
+			FROM match_team_win_conditions FINAL
+			` + where + `
+		)
+		GROUP BY primary_condition, primary_rating
+		ORDER BY teams DESC, avg_margin DESC`
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query win condition primary diagnostics: %w", err)
+	}
+	defer rows.Close()
+	out := []WinConditionPrimaryDiagnostic{}
+	for rows.Next() {
+		var row WinConditionPrimaryDiagnostic
+		var teams uint64
+		if err := rows.Scan(&row.Condition, &row.Rating, &teams, &row.AvgMargin); err != nil {
+			return nil, fmt.Errorf("scan win condition primary diagnostic: %w", err)
+		}
+		row.Teams = int(teams)
+		row.AvgMargin = winConditionRoundPercent(row.AvgMargin)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) queryWinConditionPrimaryMargins(ctx context.Context, where string, args []any) ([]WinConditionMarginDiagnostic, error) {
+	query := `
+		SELECT
+			multiIf(primary_margin = 0, 'TIE', primary_margin = 1, '1', primary_margin <= 3, '2-3', primary_margin <= 6, '4-6', '7+') AS margin_bucket,
+			toUInt64(count()) AS teams
+		FROM
+		(
+			SELECT
+				arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 1)
+					- arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 2) AS primary_margin
+			FROM match_team_win_conditions FINAL
+			` + where + `
+		)
+		GROUP BY margin_bucket
+		ORDER BY
+			multiIf(margin_bucket = 'TIE', 0, margin_bucket = '1', 1, margin_bucket = '2-3', 2, margin_bucket = '4-6', 3, 4)`
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query win condition primary margin diagnostics: %w", err)
+	}
+	defer rows.Close()
+	out := []WinConditionMarginDiagnostic{}
+	for rows.Next() {
+		var row WinConditionMarginDiagnostic
+		var teams uint64
+		if err := rows.Scan(&row.Bucket, &teams); err != nil {
+			return nil, fmt.Errorf("scan win condition primary margin diagnostic: %w", err)
+		}
+		row.Teams = int(teams)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func repeatArgs(args []any, count int) []any {
+	out := make([]any, 0, len(args)*count)
+	for i := 0; i < count; i++ {
+		out = append(out, args...)
+	}
+	return out
 }
 
 func (r *Repository) deleteWinConditionMetrics(ctx context.Context, patch, platform string, queueID uint16) error {

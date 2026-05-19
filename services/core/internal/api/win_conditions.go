@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"winrift/services/core/internal/analytics"
@@ -50,9 +52,20 @@ type winConditionMetricResponse struct {
 	Games             int                           `json:"games"`
 	WinRate           float64                       `json:"winRate"`
 	Confidence        float64                       `json:"confidence"`
+	Evidence          winConditionEvidenceResponse  `json:"evidence"`
 	MeetsMinGames     bool                          `json:"meetsMinGames"`
 	Buckets           []winConditionBucketResponse  `json:"buckets"`
 	Script            winconditions.NarrativeScript `json:"script"`
+}
+
+type winConditionEvidenceResponse struct {
+	Score       float64 `json:"score"`
+	Level       string  `json:"level"`
+	Direction   string  `json:"direction"`
+	Summary     string  `json:"summary"`
+	WilsonLow   float64 `json:"wilsonLow"`
+	WilsonHigh  float64 `json:"wilsonHigh"`
+	SampleLevel string  `json:"sampleLevel"`
 }
 
 type winConditionBucketResponse struct {
@@ -181,6 +194,26 @@ func (s Server) analyticsWinConditions(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s Server) analyticsWinConditionDiagnostics(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	queueID := uint16(queryInt(query.Get("queueId"), 420))
+	rankBucket := strings.ToUpper(strings.TrimSpace(query.Get("rankBucket")))
+	if rankBucket == "ALL" {
+		rankBucket = ""
+	}
+	diagnostics, err := s.repo.QueryWinConditionDiagnostics(r.Context(), clickhouse.WinConditionDiagnosticsFilters{
+		QueueID:    queueID,
+		Patch:      strings.TrimSpace(query.Get("patch")),
+		Platform:   strings.ToUpper(strings.TrimSpace(query.Get("platform"))),
+		RankBucket: rankBucket,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, diagnostics)
+}
+
 func buildCompiledWinConditionMatchups(rows []clickhouse.WinConditionMetricRow, team winconditions.TeamProfile, opponent winconditions.TeamProfile, minGames int) []winConditionMetricResponse {
 	index := indexCompiledWinConditionRows(rows)
 	out := make([]winConditionMetricResponse, 0, len(team.Axes)*len(opponent.Axes))
@@ -256,6 +289,7 @@ func compiledWinConditionResponse(index map[compiledWinConditionMetricKey]clickh
 		Games:             overall.Games,
 		WinRate:           overall.WinRate,
 		Confidence:        overall.Confidence,
+		Evidence:          winConditionEvidence(overall.Wins, overall.Games),
 		MeetsMinGames:     overall.Games >= minGames,
 		Buckets:           buckets,
 	}
@@ -379,6 +413,7 @@ func (a winConditionAccumulator) response(condition, rating, opponentCondition, 
 		Games:             a.games,
 		WinRate:           winRatePercent(a.wins, a.games),
 		Confidence:        round(analytics.WilsonLowerBound(a.wins, a.games, 1.96) * 100),
+		Evidence:          winConditionEvidence(a.wins, a.games),
 		MeetsMinGames:     a.games >= minGames,
 		Buckets:           buckets,
 	}
@@ -484,6 +519,161 @@ func winRatePercent(wins, games int) float64 {
 		return 0
 	}
 	return round(float64(wins) / float64(games) * 100)
+}
+
+func winConditionEvidence(wins, games int) winConditionEvidenceResponse {
+	if games <= 0 {
+		return winConditionEvidenceResponse{
+			Level:       "No sample",
+			Direction:   "unknown",
+			Summary:     "No historical samples matched this exact read yet.",
+			SampleLevel: "none",
+		}
+	}
+	winRate := winRatePercent(wins, games)
+	low, high := wilsonIntervalPercent(wins, games, 1.96)
+	sampleScore := evidenceSampleScore(games)
+	stabilityScore := evidenceStabilityScore(low, high)
+	score := sampleScore*0.6 + stabilityScore*0.4
+	direction := "mixed"
+	switch {
+	case low > 50:
+		direction = "favorable"
+	case high < 50:
+		direction = "unfavorable"
+	case math.Abs(winRate-50) < 1.25 && high-low <= 5:
+		direction = "neutral"
+	default:
+		score = math.Min(score, 60)
+	}
+	score = round(score)
+	level := evidenceLevel(score)
+	sampleLevel := evidenceSampleLevel(games)
+	return winConditionEvidenceResponse{
+		Score:       score,
+		Level:       level,
+		Direction:   direction,
+		Summary:     evidenceSummary(level, direction, games, winRate, low, high),
+		WilsonLow:   round(low),
+		WilsonHigh:  round(high),
+		SampleLevel: sampleLevel,
+	}
+}
+
+func wilsonIntervalPercent(wins, games int, z float64) (float64, float64) {
+	if games <= 0 {
+		return 0, 0
+	}
+	n := float64(games)
+	p := float64(wins) / n
+	z2 := z * z
+	denominator := 1 + z2/n
+	center := (p + z2/(2*n)) / denominator
+	margin := (z / denominator) * math.Sqrt((p*(1-p)+z2/(4*n))/n)
+	low := math.Max(0, center-margin) * 100
+	high := math.Min(1, center+margin) * 100
+	return low, high
+}
+
+func evidenceSampleScore(games int) float64 {
+	switch {
+	case games < 5:
+		return 8
+	case games < 25:
+		return 22
+	case games < 100:
+		return 42
+	case games < 400:
+		return 62
+	case games < 1600:
+		return 80
+	case games < 6400:
+		return 92
+	default:
+		return 100
+	}
+}
+
+func evidenceSampleLevel(games int) string {
+	switch {
+	case games < 5:
+		return "tiny"
+	case games < 25:
+		return "thin"
+	case games < 100:
+		return "early"
+	case games < 400:
+		return "moderate"
+	case games < 1600:
+		return "solid"
+	default:
+		return "large"
+	}
+}
+
+func evidenceStabilityScore(low, high float64) float64 {
+	width := high - low
+	switch {
+	case width <= 3:
+		return 100
+	case width <= 5:
+		return 92
+	case width <= 8:
+		return 82
+	case width <= 12:
+		return 68
+	case width <= 18:
+		return 50
+	case width <= 28:
+		return 30
+	default:
+		return 12
+	}
+}
+
+func evidenceLevel(score float64) string {
+	switch {
+	case score >= 85:
+		return "Very strong"
+	case score >= 70:
+		return "Strong"
+	case score >= 50:
+		return "Moderate"
+	case score >= 25:
+		return "Early"
+	default:
+		return "Thin"
+	}
+}
+
+func evidenceSummary(level, direction string, games int, winRate, low, high float64) string {
+	switch direction {
+	case "favorable":
+		return level + " favorable signal: " + evidenceRangeSummary(games, winRate, low, high)
+	case "unfavorable":
+		return level + " unfavorable signal: " + evidenceRangeSummary(games, winRate, low, high)
+	case "neutral":
+		return level + " neutral signal: the sample is stable and close to even."
+	default:
+		return level + " but mixed signal: the sample still overlaps even outcomes."
+	}
+}
+
+func evidenceRangeSummary(games int, winRate, low, high float64) string {
+	return strings.TrimSpace(
+		strings.Join([]string{
+			formatInt(games), "games at", formatPercent(winRate) + "%",
+			"(likely range", formatPercent(low) + "%-" + formatPercent(high) + "%).",
+		}, " "),
+	)
+}
+
+func formatInt(value int) string {
+	return strconv.Itoa(value)
+}
+
+func formatPercent(value float64) string {
+	return strconv.FormatFloat(round(value), 'f', 1, 64)
 }
 
 func winConditionPairPrimaryMode(teamMode, opponentMode uint8) uint8 {

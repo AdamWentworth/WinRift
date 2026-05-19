@@ -354,11 +354,13 @@ function WinConditionSummaryCard({
           <>
             <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
             <span>Total Games: {metric.games}</span>
+            <span>Evidence: {metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</span>
           </>
         ) : (
           <>
             <strong>Win Rate: --</strong>
             <span>Total Games: 0</span>
+            <span>Evidence: No sample</span>
           </>
         )}
       </div>
@@ -391,6 +393,7 @@ function WinConditionAlternatives({
             <span className="alternative-text">
               <strong>{metric.games > 0 ? metric.winRate.toFixed(2) : '--'}%</strong>
               <em>{metric.games} Matches</em>
+              <em>{metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</em>
             </span>
           </button>
         ))}
@@ -412,6 +415,7 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
             <p>{script.matchup}</p>
             <p>{script.modeRead}</p>
             <p>{script.timingRead}</p>
+            {metric.evidence?.summary ? <p>{metric.evidence.summary}</p> : null}
             <em>{script.sampleRead}</em>
           </>
         ) : (
@@ -869,6 +873,15 @@ function uniqueConditionMetrics(metrics: WinConditionMetric[]) {
     seen.add(metric.condition);
     return true;
   });
+}
+
+function evidenceLevelFallback(games: number) {
+  if (games <= 0) return 'No sample';
+  if (games < 25) return 'Thin';
+  if (games < 100) return 'Early';
+  if (games < 400) return 'Moderate';
+  if (games < 1600) return 'Strong';
+  return 'Very strong';
 }
 
 function livePlayerSide(liveGame: LiveGame): TeamSide {

@@ -406,6 +406,15 @@ const winConditionFixture = vi.hoisted(() => {
     playerRead,
     facts: [],
   });
+  const evidenceFixture = (level = 'Early', direction = 'mixed') => ({
+    score: 42,
+    level,
+    direction,
+    summary: `${level} ${direction} evidence`,
+    wilsonLow: 30,
+    wilsonHigh: 70,
+    sampleLevel: 'early',
+  });
 
   return {
   catalogPatch: '16.10.1',
@@ -462,6 +471,7 @@ const winConditionFixture = vi.hoisted(() => {
       games: 8,
       winRate: 50,
       confidence: 22,
+      evidence: evidenceFixture(),
       meetsMinGames: true,
       buckets: [],
     },
@@ -476,6 +486,7 @@ const winConditionFixture = vi.hoisted(() => {
       games: 20,
       winRate: 55,
       confidence: 34,
+      evidence: evidenceFixture('Moderate', 'favorable'),
       meetsMinGames: true,
       buckets: [
         { bucket: '0-20', wins: 2, games: 4, winRate: 50, confidence: 15, meetsMinGames: false },
@@ -497,6 +508,7 @@ const winConditionFixture = vi.hoisted(() => {
       games: 20,
       winRate: 70,
       confidence: 49,
+      evidence: evidenceFixture('Strong', 'favorable'),
       meetsMinGames: true,
       buckets: [
         { bucket: '0-20', wins: 4, games: 5, winRate: 80, confidence: 38, meetsMinGames: true },
@@ -520,6 +532,7 @@ const winConditionFixture = vi.hoisted(() => {
       games: 20,
       winRate: 45,
       confidence: 26,
+      evidence: evidenceFixture('Moderate', 'unfavorable'),
       meetsMinGames: true,
       buckets: [],
     },
@@ -534,6 +547,7 @@ const winConditionFixture = vi.hoisted(() => {
       games: 20,
       winRate: 30,
       confidence: 15,
+      evidence: evidenceFixture('Early', 'unfavorable'),
       meetsMinGames: true,
       buckets: [],
     },

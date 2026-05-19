@@ -78,6 +78,54 @@ ORDER BY rows DESC
 LIMIT 50;
 ```
 
+## Win-Condition Grade Distribution
+
+Use this to pressure-test whether the current letter grades are balanced or whether most real teams cluster into a narrow band.
+
+```sql
+SELECT
+  axis,
+  rating,
+  count() AS teams,
+  round(avg(score), 2) AS avg_score,
+  min(score) AS min_score,
+  max(score) AS max_score
+FROM
+(
+  SELECT 'SplitPush' AS axis, splitpush_rating AS rating, splitpush_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  UNION ALL
+  SELECT 'Pick' AS axis, pick_rating AS rating, pick_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  UNION ALL
+  SELECT 'Siege' AS axis, siege_rating AS rating, siege_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  UNION ALL
+  SELECT 'Control' AS axis, control_rating AS rating, control_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  UNION ALL
+  SELECT 'TeamFight' AS axis, teamfight_rating AS rating, teamfight_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+)
+GROUP BY axis, rating
+ORDER BY axis, avg_score DESC;
+```
+
+## Win-Condition Primary Margins
+
+Use this to see whether teams usually have a clear primary condition or whether primary labels are often near ties.
+
+```sql
+SELECT
+  multiIf(primary_margin = 0, 'TIE', primary_margin = 1, '1', primary_margin <= 3, '2-3', primary_margin <= 6, '4-6', '7+') AS margin_bucket,
+  count() AS teams
+FROM
+(
+  SELECT
+    arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 1)
+      - arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 2) AS primary_margin
+  FROM match_team_win_conditions FINAL
+  WHERE patch = '16.10'
+)
+GROUP BY margin_bucket
+ORDER BY multiIf(margin_bucket = 'TIE', 0, margin_bucket = '1', 1, margin_bucket = '2-3', 2, margin_bucket = '4-6', 3, 4);
+```
+
 ## Item Spike Timings
 
 ```sql

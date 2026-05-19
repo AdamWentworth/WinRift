@@ -171,9 +171,20 @@ export type WinConditionMetric = {
   games: number;
   winRate: number;
   confidence: number;
+  evidence: WinConditionEvidence;
   meetsMinGames: boolean;
   buckets: WinConditionBucket[];
   script?: WinConditionScript;
+};
+
+export type WinConditionEvidence = {
+  score: number;
+  level: string;
+  direction: string;
+  summary: string;
+  wilsonLow: number;
+  wilsonHigh: number;
+  sampleLevel: string;
 };
 
 export type WinConditionScript = {
