@@ -82,6 +82,63 @@ func (r *Repository) FreshRankBuckets(ctx context.Context, platform string, puui
 	return out, nil
 }
 
+func (r *Repository) FreshRankSnapshots(ctx context.Context, platform string, puuids []string, now time.Time) (map[string]analytics.RankSnapshot, error) {
+	out := map[string]analytics.RankSnapshot{}
+	seen := map[string]bool{}
+	for _, puuid := range puuids {
+		if puuid == "" || seen[puuid] {
+			continue
+		}
+		seen[puuid] = true
+		var snapshot analytics.RankSnapshot
+		var leaguePoints int16
+		var wins, losses uint32
+		err := r.db.QueryRowContext(
+			ctx,
+			`SELECT
+				puuid,
+				platform,
+				queue_type,
+				tier,
+				division,
+				league_points,
+				wins,
+				losses,
+				rank_bucket,
+				fetched_at,
+				expires_at
+			FROM summoner_rank_snapshots FINAL
+			WHERE platform = ? AND puuid = ? AND queue_type = ? AND expires_at > ?
+			ORDER BY fetched_at DESC
+			LIMIT 1`,
+			platform, puuid, rankedSoloQueueType, now,
+		).Scan(
+			&snapshot.PUUID,
+			&snapshot.Platform,
+			&snapshot.QueueType,
+			&snapshot.Tier,
+			&snapshot.Division,
+			&leaguePoints,
+			&wins,
+			&losses,
+			&snapshot.RankBucket,
+			&snapshot.FetchedAt,
+			&snapshot.ExpiresAt,
+		)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return nil, err
+		}
+		snapshot.LeaguePoints = int(leaguePoints)
+		snapshot.Wins = int(wins)
+		snapshot.Losses = int(losses)
+		out[puuid] = snapshot
+	}
+	return out, nil
+}
+
 func (r *Repository) InsertRankSnapshot(ctx context.Context, snapshot analytics.RankSnapshot) error {
 	_, err := r.db.ExecContext(
 		ctx,

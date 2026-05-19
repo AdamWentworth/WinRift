@@ -99,12 +99,25 @@ func NewClient(cfg config.Config) *Client {
 }
 
 func (c *Client) AccountByRiotID(ctx context.Context, gameName, tagLine, platform string) (*Account, error) {
-	region, err := RegionForPlatform(platform)
+	region, err := AccountRegionForPlatform(platform)
 	if err != nil {
 		return nil, err
 	}
 	var account Account
 	ok, err := c.get(ctx, region, fmt.Sprintf("/riot/account/v1/accounts/by-riot-id/%s/%s", escapePath(gameName), escapePath(tagLine)), nil, &account)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &account, nil
+}
+
+func (c *Client) AccountByPUUID(ctx context.Context, puuid, platform string) (*Account, error) {
+	region, err := AccountRegionForPlatform(platform)
+	if err != nil {
+		return nil, err
+	}
+	var account Account
+	ok, err := c.get(ctx, region, fmt.Sprintf("/riot/account/v1/accounts/by-puuid/%s", escapePath(puuid)), nil, &account)
 	if err != nil || !ok {
 		return nil, err
 	}

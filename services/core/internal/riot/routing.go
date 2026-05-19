@@ -40,6 +40,17 @@ func RegionForPlatform(platform string) (string, error) {
 	return region, nil
 }
 
+func AccountRegionForPlatform(platform string) (string, error) {
+	region, err := RegionForPlatform(platform)
+	if err != nil {
+		return "", err
+	}
+	if region == "SEA" {
+		return "ASIA", nil
+	}
+	return region, nil
+}
+
 func ParseRiotID(value string) (string, string, error) {
 	parts := strings.Split(value, "#")
 	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {

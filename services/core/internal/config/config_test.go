@@ -40,6 +40,24 @@ func TestCollectorRankRequestBudget(t *testing.T) {
 	}
 }
 
+func TestCollectorAccountAliasRequestBudget(t *testing.T) {
+	cfg := Config{
+		AccountAliasEnrichmentEnabled: true,
+		AccountAliasMaxRequests:       3,
+	}
+	if got := cfg.CollectorAccountAliasRequestBudget(23); got != 3 {
+		t.Fatalf("alias budget = %d, want 3", got)
+	}
+	if got := cfg.CollectorAccountAliasRequestBudget(2); got != 1 {
+		t.Fatalf("small alias budget = %d, want 1", got)
+	}
+
+	cfg.AccountAliasEnrichmentEnabled = false
+	if got := cfg.CollectorAccountAliasRequestBudget(23); got != 0 {
+		t.Fatalf("disabled alias budget = %d, want 0", got)
+	}
+}
+
 func TestLoadPatchRetentionConfig(t *testing.T) {
 	t.Setenv("COLLECTOR_CURRENT_PATCH", "16.10")
 	t.Setenv("COLLECTOR_PATCH_RETENTION_COUNT", "2")

@@ -25,6 +25,15 @@ func TestIsRiotAuthError(t *testing.T) {
 	}
 }
 
+func TestIsRiotRateLimitError(t *testing.T) {
+	if !isRiotRateLimitError(riot.APIError{StatusCode: http.StatusTooManyRequests}) {
+		t.Fatal("expected 429 to be a rate-limit error")
+	}
+	if isRiotRateLimitError(riot.APIError{StatusCode: http.StatusForbidden}) {
+		t.Fatal("did not expect 403 to be a rate-limit error")
+	}
+}
+
 func TestAllocatePlatformBudgetSharesAvailableBudget(t *testing.T) {
 	cfg := config.Config{
 		CollectorInterval:          120 * time.Second,
@@ -48,6 +57,24 @@ func TestAllocatePlatformBudgetSharesAvailableBudget(t *testing.T) {
 	third := allocatePlatformBudget(cfg, 44, 2)
 	if third.TotalRequests != 22 || third.MatchRequests != 17 || third.RankRequests != 5 {
 		t.Fatalf("third budget = %+v, want total=22 match=17 rank=5", third)
+	}
+}
+
+func TestAllocatePlatformBudgetReservesAliasLane(t *testing.T) {
+	cfg := config.Config{
+		CollectorInterval:             120 * time.Second,
+		CollectorRateLimitRequests:    100,
+		CollectorRateLimitWindow:      120 * time.Second,
+		CollectorRateLimitReserve:     10,
+		RankEnrichmentEnabled:         true,
+		RankEnrichmentMaxRequests:     5,
+		AccountAliasEnrichmentEnabled: true,
+		AccountAliasMaxRequests:       3,
+	}
+
+	budget := allocatePlatformBudget(cfg, 90, 4)
+	if budget.TotalRequests != 23 || budget.MatchRequests != 15 || budget.RankRequests != 5 || budget.AliasRequests != 3 {
+		t.Fatalf("budget = %+v, want total=23 match=15 rank=5 alias=3", budget)
 	}
 }
 

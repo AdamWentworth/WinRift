@@ -40,6 +40,31 @@ CREATE TABLE IF NOT EXISTS winrift.summoner_rank_snapshots
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (platform, puuid, queue_type);
 
+CREATE TABLE IF NOT EXISTS winrift.riot_account_aliases
+(
+    puuid String,
+    platform LowCardinality(String),
+    game_name String,
+    game_name_normalized String,
+    tag_line String,
+    last_seen_at DateTime,
+    updated_at DateTime64(3) DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (platform, game_name_normalized, tag_line, puuid);
+
+CREATE TABLE IF NOT EXISTS winrift.riot_request_events
+(
+    route LowCardinality(String),
+    source LowCardinality(String),
+    request_count UInt16,
+    happened_at DateTime64(3),
+    inserted_at DateTime64(3) DEFAULT now64(3)
+)
+ENGINE = MergeTree
+ORDER BY (route, happened_at, source)
+TTL toDateTime(happened_at) + INTERVAL 1 DAY DELETE;
+
 CREATE TABLE IF NOT EXISTS winrift.raw_matches
 (
     match_id String,

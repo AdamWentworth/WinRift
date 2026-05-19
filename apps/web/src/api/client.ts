@@ -1,4 +1,4 @@
-import type { AnalyticsBuildResponse, BuildFilters, ChampionData, ItemData, LiveGame } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -19,6 +19,14 @@ export function getItems() {
   return request<ItemData>('/api/static/items');
 }
 
+export function getSummonerSpells() {
+  return request<SummonerSpellData>('/api/static/summoner-spells');
+}
+
+export function getRunes() {
+  return request<RuneData>('/api/static/runes');
+}
+
 export function getBuilds(filters: BuildFilters) {
   const params = new URLSearchParams();
   if (filters.championId) params.set('championId', String(filters.championId));
@@ -27,7 +35,30 @@ export function getBuilds(filters: BuildFilters) {
   if (filters.patch) params.set('patch', filters.patch);
   if (filters.rankBucket) params.set('rankBucket', filters.rankBucket);
   params.set('minGames', String(filters.minGames));
+  if (filters.limit) params.set('limit', String(filters.limit));
   return request<AnalyticsBuildResponse>(`/api/analytics/builds?${params.toString()}`);
+}
+
+export function getItemSlots(filters: BuildFilters) {
+  const params = new URLSearchParams();
+  if (filters.championId) params.set('championId', String(filters.championId));
+  if (filters.role) params.set('role', filters.role);
+  if (filters.opponentChampionId) params.set('opponentChampionId', String(filters.opponentChampionId));
+  if (filters.patch) params.set('patch', filters.patch);
+  if (filters.rankBucket) params.set('rankBucket', filters.rankBucket);
+  params.set('minGames', String(filters.minGames));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  return request<AnalyticsItemSlotResponse>(`/api/analytics/item-slots?${params.toString()}`);
+}
+
+export function resolveAccountAlias(gameName: string, platform: string) {
+  const params = new URLSearchParams({ gameName, platform });
+  return request<AccountAliasResolution>(`/api/account/alias?${params.toString()}`);
+}
+
+export function searchAccountAliases(gameName: string, platform: string, limit = 6) {
+  const params = new URLSearchParams({ gameName, platform, limit: String(limit) });
+  return request<AccountAliasSearchResponse>(`/api/account/aliases?${params.toString()}`);
 }
 
 export function getLiveGame(gameName: string, tagLine: string, platform: string) {

@@ -66,6 +66,8 @@ COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM=3
 RANK_ENRICHMENT_ENABLED=false
 RANK_SNAPSHOT_TTL_HOURS=24
 RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
+ACCOUNT_ALIAS_ENRICHMENT_ENABLED=true
+ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS=3
 ```
 
 Then run:
@@ -112,7 +114,7 @@ Do not use profile-less stop/down commands as the canonical shutdown path when t
 make status
 ```
 
-At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, and records Riot requests in a rolling regional budget ledger. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
+At startup, the worker resolves env seeds into `collector_frontier` and stores their Riot ID aliases. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, runs an account-alias lane for stored participant PUUIDs that do not yet have a saved `gameName#tagLine`, and records Riot requests in a rolling regional budget ledger. Live lookups can also nudge low-sample live participants into `collector_frontier` with `source='live-backfill'`, letting champion-specific card stats improve in the background without blocking the lookup. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
 
 Patch retention is intentionally tied to `COLLECTOR_CURRENT_PATCH`. For example, `COLLECTOR_CURRENT_PATCH=16.11` with `COLLECTOR_PATCH_RETENTION_COUNT=2` stores `16.11` and `16.10`; when it is bumped to `16.12`, the active window becomes `16.12` and `16.11`, so `16.10` is no longer eligible and can be pruned on startup if `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true`.
 
@@ -126,6 +128,8 @@ COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true
 COLLECTOR_FRONTIER_BATCH_SIZE=1
 COLLECTOR_MAX_REQUESTS_PER_PASS=0
 RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
+ACCOUNT_ALIAS_ENRICHMENT_ENABLED=true
+ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS=3
 COLLECTOR_AUTO_SEED_CHALLENGER=true
 ```
 
@@ -164,8 +168,10 @@ Safety knobs:
 - `RANK_ENRICHMENT_ENABLED`: when true, the worker runs a separate rank lane after each platform's match lane.
 - `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS`: max rank lane requests per platform. These are subtracted from the same regional Riot request budget as match collection, but they are not spent inside individual match ingestion.
 - `RANK_SNAPSHOT_TTL_HOURS`: freshness window before a rank snapshot can be refreshed.
+- `ACCOUNT_ALIAS_ENRICHMENT_ENABLED`: when true, the worker runs a separate account-alias lane after the match/rank lanes. It resolves stored participant PUUIDs into Riot ID aliases and saves them in `riot_account_aliases` for tagless frontend lookup.
+- `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS`: max account-alias requests per platform. These are subtracted from the same regional Riot request budget as match collection.
 
-Rank enrichment is off by default. Turn it on only after basic match ingestion is working. When enabled, the rank lane chooses distinct participant PUUIDs from ClickHouse that do not already have a fresh `summoner_rank_snapshots` row, prioritizing players attached to the most `UNKNOWN` participant rows.
+Rank enrichment is off by default. Turn it on only after basic match ingestion is working. When enabled, the rank lane chooses distinct participant PUUIDs from ClickHouse that do not already have a fresh `summoner_rank_snapshots` row, prioritizing players attached to the most `UNKNOWN` participant rows. Account-alias enrichment is on by default with a small cap because it improves the lookup UX and does not need to be refreshed often.
 
 ## Request Formula
 
@@ -175,6 +181,14 @@ For each region, the worker computes a usable cycle budget:
 usable_region_requests = min(rate_limit_requests, rate_limit_requests * interval / rate_limit_window) - reserve_requests
 ```
 
-With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per rolling two-minute window. The worker splits currently available regional budget across active platforms in that region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for the rank lane, and gives the remainder to match collection. If a region spends all 90 requests in 30 seconds, it waits about 90 seconds for that region; if it spends them in 60 seconds, it waits about 60 seconds.
+With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per rolling two-minute window. The worker splits currently available regional budget across active platforms in that region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for the rank lane, then up to `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS` for the alias lane, and gives the remainder to match collection. If a region spends all 90 requests in 30 seconds, it waits about 90 seconds for that region; if it spends them in 60 seconds, it waits about 60 seconds.
 
-Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment costs one request per rank candidate and is capped separately, so it can steadily improve coverage without turning every collected match into 10 extra Riot calls.
+Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment costs one request per rank candidate and account-alias enrichment costs one request per PUUID alias candidate. Both are capped separately and subtracted from the same regional request budget, so they can steadily improve metadata coverage without turning every collected match into a burst of extra Riot calls.
+
+Live champion stat backfill is controlled by:
+
+- `LIVE_BACKFILL_ENABLED`: enables queueing low-sample live participants into the collector frontier.
+- `LIVE_BACKFILL_MIN_CHAMPION_GAMES`: minimum collected games on the current champion before no backfill is queued.
+- `LIVE_BACKFILL_MAX_SEEDS`: max frontier nudges per live lookup.
+- `LIVE_BACKFILL_PRIORITY`: frontier priority for live backfill nudges.
+- `LIVE_BACKFILL_DELAY_SECONDS`: optional delay before the backfill row is due.

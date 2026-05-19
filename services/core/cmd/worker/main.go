@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -41,7 +43,7 @@ func main() {
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -52,6 +54,8 @@ func main() {
 		cfg.CollectorRateLimitReserve,
 		cfg.CollectorMaxRequests,
 		cfg.RankEnrichmentMaxRequests,
+		cfg.AccountAliasEnrichmentEnabled,
+		cfg.AccountAliasMaxRequests,
 	)
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {
@@ -91,12 +95,13 @@ func main() {
 			}
 			budget := allocatePlatformBudget(cfg, available, remainingPlatforms)
 			log.Printf(
-				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_lane_requests=%d region_available=%d region_platforms_remaining=%d",
+				"collector platform budget platform=%s region=%s total_requests=%d match_requests=%d rank_lane_requests=%d alias_lane_requests=%d region_available=%d region_platforms_remaining=%d",
 				platform,
 				region,
 				budget.TotalRequests,
 				budget.MatchRequests,
 				budget.RankRequests,
+				budget.AliasRequests,
 				available,
 				remainingPlatforms,
 			)
@@ -111,7 +116,7 @@ func main() {
 			}
 			rankResult := collector.Result{}
 			if !result.AuthFailed && !result.RateLimited && budget.RankRequests > 0 {
-				rankResult = runRankPass(ctx, cfg, matchCollector, platform, budget.RankRequests)
+				rankResult = runRankPass(ctx, cfg, matchCollector, repo, platform, budget.RankRequests)
 				if rankResult.AuthFailed {
 					log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
 				}
@@ -120,13 +125,39 @@ func main() {
 					rateLimitHit = true
 				}
 			}
-			requestsUsed := result.RequestsUsed + rankResult.RankRequestsUsed
-			ledger.Record(region, requestsUsed, time.Now())
+			matchAndRankRequestsUsed := result.RequestsUsed + rankResult.RankRequestsUsed
+			ledger.Record(region, result.RequestsUsed, time.Now())
+			aliasResult := accountAliasPassResult{}
+			if !result.AuthFailed && !result.RateLimited && !rankResult.AuthFailed && !rankResult.RateLimited && budget.AliasRequests > 0 {
+				accountRegion, accountRegionErr := riot.AccountRegionForPlatform(platform)
+				if accountRegionErr != nil {
+					log.Printf("account alias lane skipped platform=%s err=%v", platform, accountRegionErr)
+				} else if rateLimitedRegions[accountRegion] {
+					log.Printf("account alias lane skipped platform=%s account_region=%s reason=account_region_rate_limited_this_pass", platform, accountRegion)
+				} else {
+					accountAvailable := ledger.Available(accountRegion, time.Now())
+					aliasRequests := min(budget.AliasRequests, accountAvailable)
+					if aliasRequests <= 0 {
+						log.Printf("account alias lane deferred platform=%s account_region=%s reason=account_region_budget_wait wait=%s", platform, accountRegion, ledger.Wait(accountRegion, time.Now()).Round(time.Second))
+					} else {
+						aliasResult = runAccountAliasPass(ctx, cfg, riotClient, repo, platform, aliasRequests)
+						if aliasResult.AuthFailed {
+							log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+						}
+						if aliasResult.RateLimited {
+							rateLimitedRegions[accountRegion] = true
+							ledger.MarkFull(accountRegion, time.Now())
+						}
+						ledger.Record(accountRegion, aliasResult.RequestsUsed, time.Now())
+					}
+				}
+			}
+			requestsUsed := matchAndRankRequestsUsed + aliasResult.RequestsUsed
 			if rateLimitHit {
 				ledger.MarkFull(region, time.Now())
 			}
 			requestsThisSweep += requestsUsed
-			if requestsUsed > 0 || result.MatchIDsSeen > 0 || result.MatchesInserted > 0 || result.MatchesSkipped > 0 || rankResult.RankSnapshotsInserted > 0 {
+			if requestsUsed > 0 || result.MatchIDsSeen > 0 || result.MatchesInserted > 0 || result.MatchesSkipped > 0 || rankResult.RankSnapshotsInserted > 0 || aliasResult.AliasesInserted > 0 {
 				platformsWithWork++
 			}
 		}
@@ -157,6 +188,16 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 	}
 	if budget.MatchRequests <= 0 {
 		log.Printf("collector request budget exhausted before platform=%s frontier_rows=%d", platform, len(entries))
+		return collector.Result{BudgetExhausted: true}
+	}
+	route, err := riot.RegionForPlatform(platform)
+	if err != nil {
+		log.Printf("collector route lookup failed platform=%s err=%v", platform, err)
+		return collector.Result{Errors: []string{err.Error()}}
+	}
+	budget.MatchRequests = reserveSharedRequests(ctx, cfg, repo, route, "worker:matches", budget.MatchRequests)
+	if budget.MatchRequests <= 0 {
+		log.Printf("collector shared request budget exhausted before platform=%s route=%s frontier_rows=%d", platform, route, len(entries))
 		return collector.Result{BudgetExhausted: true}
 	}
 	log.Printf(
@@ -238,9 +279,15 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 	return passResult
 }
 
-func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, platform string, rankRequests int) collector.Result {
+func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, rankRequests int) collector.Result {
 	if !cfg.RankEnrichmentEnabled || rankRequests <= 0 {
 		return collector.Result{}
+	}
+	route := riot.NormalizePlatform(platform)
+	rankRequests = reserveSharedRequests(ctx, cfg, repo, route, "worker:ranks", rankRequests)
+	if rankRequests <= 0 {
+		log.Printf("rank lane deferred platform=%s route=%s reason=shared_budget_exhausted", platform, route)
+		return collector.Result{RankBudgetExhausted: true}
 	}
 	result := matchCollector.CollectRanksForPlatform(ctx, platform, collector.RankCollectOptions{
 		MaxRequests:     rankRequests,
@@ -260,10 +307,110 @@ func runRankPass(ctx context.Context, cfg config.Config, matchCollector collecto
 	return result
 }
 
+type accountAliasPassResult struct {
+	RequestsUsed    int
+	AliasesInserted int
+	Errors          []string
+	AuthFailed      bool
+	RateLimited     bool
+}
+
+func runAccountAliasPass(ctx context.Context, cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, platform string, maxRequests int) accountAliasPassResult {
+	result := accountAliasPassResult{}
+	if !cfg.AccountAliasEnrichmentEnabled || maxRequests <= 0 {
+		return result
+	}
+	normalizedPlatform := riot.NormalizePlatform(platform)
+	candidates, err := repo.FetchAccountAliasCandidates(ctx, normalizedPlatform, maxRequests)
+	if err != nil {
+		result.Errors = append(result.Errors, "account alias candidates: "+err.Error())
+		log.Printf("account alias lane candidates failed platform=%s err=%v", normalizedPlatform, err)
+		return result
+	}
+	if len(candidates) == 0 {
+		log.Printf("account alias lane complete platform=%s candidates=0 requests=0 aliases=0 errors=0 auth_failed=false rate_limited=false", normalizedPlatform)
+		return result
+	}
+	accountRegion, err := riot.AccountRegionForPlatform(normalizedPlatform)
+	if err != nil {
+		result.Errors = append(result.Errors, "account alias route: "+err.Error())
+		log.Printf("account alias lane route failed platform=%s err=%v", normalizedPlatform, err)
+		return result
+	}
+	maxRequests = reserveSharedRequests(ctx, cfg, repo, accountRegion, "worker:aliases", min(maxRequests, len(candidates)))
+	if maxRequests <= 0 {
+		log.Printf("account alias lane deferred platform=%s account_region=%s reason=shared_budget_exhausted", normalizedPlatform, accountRegion)
+		return result
+	}
+	log.Printf(
+		"account alias lane start platform=%s candidates=%d max_requests=%d",
+		normalizedPlatform,
+		len(candidates),
+		maxRequests,
+	)
+	for _, candidate := range candidates {
+		if result.RequestsUsed >= maxRequests {
+			log.Printf("account alias lane budget exhausted platform=%s requests=%d max_requests=%d", normalizedPlatform, result.RequestsUsed, maxRequests)
+			break
+		}
+		result.RequestsUsed++
+		log.Printf("account alias fetch start platform=%s puuid=%s requests=%d", normalizedPlatform, shortValue(candidate.PUUID), result.RequestsUsed)
+		account, err := riotClient.AccountByPUUID(ctx, candidate.PUUID, normalizedPlatform)
+		if err != nil {
+			if isRiotAuthError(err) {
+				result.AuthFailed = true
+			}
+			if isRiotRateLimitError(err) {
+				result.RateLimited = true
+			}
+			result.Errors = append(result.Errors, "account alias "+candidate.PUUID+": "+err.Error())
+			log.Printf("account alias fetch failed platform=%s puuid=%s err=%v", normalizedPlatform, shortValue(candidate.PUUID), err)
+			if result.AuthFailed || result.RateLimited {
+				break
+			}
+			continue
+		}
+		if account == nil {
+			continue
+		}
+		if err := repo.UpsertAccountAlias(ctx, clickhouse.AccountAlias{
+			PUUID:    account.PUUID,
+			Platform: normalizedPlatform,
+			GameName: account.GameName,
+			TagLine:  account.TagLine,
+			LastSeen: time.Now(),
+		}); err != nil {
+			result.Errors = append(result.Errors, "account alias insert: "+err.Error())
+			log.Printf("account alias insert failed platform=%s puuid=%s err=%v", normalizedPlatform, shortValue(candidate.PUUID), err)
+			continue
+		}
+		result.AliasesInserted++
+		log.Printf(
+			"account alias stored platform=%s puuid=%s riot_id=%s#%s",
+			normalizedPlatform,
+			shortValue(account.PUUID),
+			account.GameName,
+			account.TagLine,
+		)
+	}
+	log.Printf(
+		"account alias lane complete platform=%s candidates=%d requests=%d aliases=%d errors=%d auth_failed=%t rate_limited=%t",
+		normalizedPlatform,
+		len(candidates),
+		result.RequestsUsed,
+		result.AliasesInserted,
+		len(result.Errors),
+		result.AuthFailed,
+		result.RateLimited,
+	)
+	return result
+}
+
 type platformRequestBudget struct {
 	TotalRequests int
 	MatchRequests int
 	RankRequests  int
+	AliasRequests int
 }
 
 func allocatePlatformBudget(cfg config.Config, available, platformsRemaining int) platformRequestBudget {
@@ -278,7 +425,8 @@ func allocatePlatformBudget(cfg config.Config, available, platformsRemaining int
 		total = 0
 	}
 	rankRequests := cfg.CollectorRankRequestBudget(total)
-	matchRequests := total - rankRequests
+	aliasRequests := cfg.CollectorAccountAliasRequestBudget(total - rankRequests)
+	matchRequests := total - rankRequests - aliasRequests
 	if cfg.CollectorMaxRequests > 0 && matchRequests > cfg.CollectorMaxRequests {
 		matchRequests = cfg.CollectorMaxRequests
 	}
@@ -286,10 +434,35 @@ func allocatePlatformBudget(cfg config.Config, available, platformsRemaining int
 		matchRequests = 0
 	}
 	return platformRequestBudget{
-		TotalRequests: matchRequests + rankRequests,
+		TotalRequests: matchRequests + rankRequests + aliasRequests,
 		MatchRequests: matchRequests,
 		RankRequests:  rankRequests,
+		AliasRequests: aliasRequests,
 	}
+}
+
+func reserveSharedRequests(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, route, source string, desired int) int {
+	if desired <= 0 {
+		return 0
+	}
+	reservation, err := repo.ReserveRiotRequests(ctx, route, source, desired, cfg.CollectorUsableRequestsPerRegion(), cfg.CollectorRateLimitWindow, time.Now())
+	if err != nil {
+		log.Printf("shared riot budget failed route=%s source=%s desired=%d err=%v", route, source, desired, err)
+		return 0
+	}
+	if reservation.Granted < reservation.Desired {
+		log.Printf(
+			"shared riot budget limited route=%s source=%s desired=%d granted=%d wait=%s used=%d limit=%d",
+			route,
+			source,
+			reservation.Desired,
+			reservation.Granted,
+			reservation.Wait.Round(time.Second),
+			reservation.Used,
+			reservation.Limit,
+		)
+	}
+	return reservation.Granted
 }
 
 type regionRequestLedger struct {
@@ -460,9 +633,16 @@ func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Clien
 			log.Printf("invalid riot id %q: %v", value, err)
 			continue
 		}
-		if region, err := riot.RegionForPlatform(cfg.DefaultPlatform); err == nil {
-			requestsByRegion[region]++
+		region, err := riot.AccountRegionForPlatform(cfg.DefaultPlatform)
+		if err != nil {
+			log.Printf("resolve seed %q route failed: %v", value, err)
+			continue
 		}
+		if reserveSharedRequests(ctx, cfg, repo, region, "worker:seed-account", 1) < 1 {
+			log.Printf("resolve seed deferred riot_id=%s route=%s reason=shared_budget_exhausted", value, region)
+			continue
+		}
+		requestsByRegion[region]++
 		account, err := riotClient.AccountByRiotID(ctx, gameName, tagLine, cfg.DefaultPlatform)
 		if err != nil {
 			if isRiotAuthError(err) {
@@ -473,6 +653,15 @@ func seedFrontier(ctx context.Context, cfg config.Config, riotClient *riot.Clien
 		}
 		if account == nil {
 			continue
+		}
+		if err := repo.UpsertAccountAlias(ctx, clickhouse.AccountAlias{
+			PUUID:    account.PUUID,
+			Platform: cfg.DefaultPlatform,
+			GameName: account.GameName,
+			TagLine:  account.TagLine,
+			LastSeen: time.Now(),
+		}); err != nil {
+			log.Printf("frontier seed alias store failed platform=%s riot_id=%s err=%v", cfg.DefaultPlatform, value, err)
 		}
 		ok, err := repo.InsertFrontierSeed(ctx, clickhouse.FrontierSeed{
 			PUUID:        account.PUUID,
@@ -512,6 +701,11 @@ func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *
 	if limit <= 0 {
 		limit = 3
 	}
+	route := riot.NormalizePlatform(platform)
+	if reserveSharedRequests(ctx, cfg, repo, route, "worker:seed-challenger", 1) < 1 {
+		log.Printf("frontier auto seed deferred platform=%s route=%s reason=shared_budget_exhausted", platform, route)
+		return 0, nil
+	}
 	requestsUsed := 1
 	league, err := riotClient.ChallengerLeagueByQueue(ctx, platform, "RANKED_SOLO_5x5")
 	if err != nil {
@@ -533,6 +727,10 @@ func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *
 		considered++
 		puuid := strings.TrimSpace(entry.PUUID)
 		if puuid == "" && entry.SummonerID != "" {
+			if reserveSharedRequests(ctx, cfg, repo, route, "worker:seed-summoner", 1) < 1 {
+				log.Printf("frontier auto seed summoner lookup deferred platform=%s summoner_id=%s reason=shared_budget_exhausted", platform, shortValue(entry.SummonerID))
+				break
+			}
 			requestsUsed++
 			summoner, err := riotClient.SummonerByID(ctx, entry.SummonerID, platform)
 			if err != nil {
@@ -569,6 +767,11 @@ func seedChallengerFrontier(ctx context.Context, cfg config.Config, riotClient *
 
 func isRiotAuthError(err error) bool {
 	return riot.IsAuthFailure(err)
+}
+
+func isRiotRateLimitError(err error) bool {
+	var apiErr riot.APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusTooManyRequests
 }
 
 func frontierStatus(result collector.Result) string {

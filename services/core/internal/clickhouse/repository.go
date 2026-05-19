@@ -36,6 +36,20 @@ type BuildRow struct {
 	Confidence          float64
 }
 
+type ItemSlotRow struct {
+	ChampionID         uint16
+	Role               string
+	OpponentChampionID uint16
+	PatchBucket        string
+	RankBucket         string
+	ItemSlot           uint8
+	ItemID             uint32
+	Wins               int
+	Games              int
+	WinRate            float64
+	Confidence         float64
+}
+
 type PatchSnapshot struct {
 	Patch            string
 	Platform         string
@@ -60,7 +74,12 @@ func NewRepository(cfg config.Config) (*Repository, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
-	return &Repository{db: db}, nil
+	repo := &Repository{db: db}
+	if err := repo.EnsureRuntimeSchema(ctx); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return repo, nil
 }
 
 func (r *Repository) MatchExists(ctx context.Context, matchID string) (bool, error) {
@@ -237,6 +256,177 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 		out = append(out, row)
 	}
 	return out, rows.Err()
+}
+
+func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
+	if minGames <= 0 {
+		minGames = 1
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	if len(allowedItemIDs) == 0 {
+		return nil, nil
+	}
+	itemList := uint32ListSQL(allowedItemIDs)
+	patchBucketExpr := "'ALL'"
+	rankBucketExpr := "'ALL'"
+	if filters["patch"] != "" {
+		patchBucketExpr = "patch_value"
+	}
+	if filters["rank_bucket"] != "" {
+		rankBucketExpr = "rank_value"
+	}
+	query := fmt.Sprintf(`
+		WITH raw_item_purchases AS
+		(
+			SELECT
+				pm.match_id AS match_id,
+				pm.participant_id AS participant_id,
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				pm.opponent_champion_id AS opponent_champion_id,
+				pm.patch AS patch_value,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_value,
+				pm.win AS win,
+				tie.item_id AS item_id,
+				min(tie.timestamp_ms) AS first_purchase_ms
+			FROM participant_matchups AS pm FINAL
+			INNER JOIN timeline_item_events AS tie FINAL
+				ON pm.match_id = tie.match_id
+				AND pm.participant_id = tie.participant_id
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE tie.event_type = 'ITEM_PURCHASED'
+				AND tie.item_id IN (%s)
+			GROUP BY
+				pm.match_id,
+				pm.participant_id,
+				pm.champion_id,
+				pm.role,
+				pm.opponent_champion_id,
+				pm.patch,
+				rank_value,
+				pm.win,
+				tie.item_id
+		),
+		raw_item_slots AS
+		(
+			SELECT
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch_value,
+				rank_value,
+				toUInt8(row_number() OVER (PARTITION BY match_id, participant_id ORDER BY first_purchase_ms, item_id)) AS item_slot,
+				item_id,
+				toUInt64(win) AS wins,
+				toUInt64(1) AS games
+			FROM raw_item_purchases
+		),
+		compiled_builds AS
+		(
+			SELECT
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch AS patch_value,
+				rank_bucket AS rank_value,
+				arrayFilter(item -> toUInt32OrZero(item) IN (%s), splitByChar('-', multiIf(core3_signature != '', core3_signature, core2_signature != '', core2_signature, final_items_signature))) AS items,
+				wins,
+				games
+			FROM patch_build_metrics FINAL
+		),
+		compiled_item_slots AS
+		(
+			SELECT
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch_value,
+				rank_value,
+				toUInt8(tupleElement(item_tuple, 1)) AS item_slot,
+				toUInt32OrZero(tupleElement(item_tuple, 2)) AS item_id,
+				wins,
+				games
+			FROM compiled_builds
+			ARRAY JOIN arrayZip(arrayEnumerate(items), items) AS item_tuple
+		)
+		SELECT
+			champion_id,
+			role,
+			opponent_champion_id,
+			%s AS patch_bucket,
+			%s AS rank_bucket,
+			item_slot,
+			item_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM
+		(
+			SELECT * FROM raw_item_slots WHERE item_slot <= 3
+			UNION ALL
+			SELECT * FROM compiled_item_slots WHERE item_slot <= 3
+		)
+		WHERE item_id > 0`, itemList, itemList, patchBucketExpr, rankBucketExpr)
+	args := []any{}
+	if filters["champion_id"] != "" {
+		query += " AND champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if filters["role"] != "" {
+		query += " AND role = ?"
+		args = append(args, filters["role"])
+	}
+	if filters["opponent_champion_id"] != "" {
+		query += " AND opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		query += " AND patch_value = ?"
+		args = append(args, filters["patch"])
+	}
+	if filters["rank_bucket"] != "" {
+		query += " AND rank_value = ?"
+		args = append(args, filters["rank_bucket"])
+	}
+	query += `
+		GROUP BY champion_id, role, opponent_champion_id, patch_bucket, rank_bucket, item_slot, item_id
+		HAVING games >= ?
+		ORDER BY item_slot ASC, win_rate DESC, games DESC`
+	args = append(args, minGames)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ItemSlotRow
+	for rows.Next() {
+		var row ItemSlotRow
+		if err := rows.Scan(&row.ChampionID, &row.Role, &row.OpponentChampionID, &row.PatchBucket, &row.RankBucket, &row.ItemSlot, &row.ItemID, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return trimItemSlotRows(out, limit), nil
 }
 
 func (r *Repository) MarkPatchCollecting(ctx context.Context, patch, platform string, queueID uint16) error {
@@ -669,6 +859,53 @@ const matchupInsertSQL = `INSERT INTO participant_matchups (` + participantColum
 
 func participantArgs(row analytics.ParticipantRow) []any {
 	return []any{row.MatchID, row.Platform, row.Patch, row.QueueID, row.ParticipantID, row.PUUID, row.TeamID, row.ChampionID, row.ChampionName, row.Role, row.Win, row.Kills, row.Deaths, row.Assists, row.Item0, row.Item1, row.Item2, row.Item3, row.Item4, row.Item5, row.TrinketItem, row.SummonerSpell1, row.SummonerSpell2, row.PrimaryRuneTree, row.SecondaryRuneTree, row.Keystone, row.RuneSignature, row.SpellSignature, row.FinalItemsSignature, row.Core2Signature, row.Core3Signature, row.RankBucket}
+}
+
+func uint32ListSQL(values []uint32) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == 0 {
+			continue
+		}
+		parts = append(parts, strconv.FormatUint(uint64(value), 10))
+	}
+	if len(parts) == 0 {
+		return "0"
+	}
+	return strings.Join(parts, ",")
+}
+
+func trimItemSlotRows(rows []ItemSlotRow, limit int) []ItemSlotRow {
+	if limit <= 0 || len(rows) == 0 {
+		return rows
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		left := rows[i]
+		right := rows[j]
+		if left.ItemSlot != right.ItemSlot {
+			return left.ItemSlot < right.ItemSlot
+		}
+		if left.Confidence != right.Confidence {
+			return left.Confidence > right.Confidence
+		}
+		if left.WinRate != right.WinRate {
+			return left.WinRate > right.WinRate
+		}
+		if left.Games != right.Games {
+			return left.Games > right.Games
+		}
+		return left.ItemID < right.ItemID
+	})
+	countsBySlot := map[uint8]int{}
+	out := make([]ItemSlotRow, 0, len(rows))
+	for _, row := range rows {
+		if countsBySlot[row.ItemSlot] >= limit {
+			continue
+		}
+		countsBySlot[row.ItemSlot]++
+		out = append(out, row)
+	}
+	return out
 }
 
 func patchLess(left, right string) bool {

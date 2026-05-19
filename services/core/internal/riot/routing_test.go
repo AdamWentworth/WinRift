@@ -25,6 +25,23 @@ func TestRouting(t *testing.T) {
 	}
 }
 
+func TestAccountRoutingUsesSupportedRegionalRoutes(t *testing.T) {
+	region, err := AccountRegionForPlatform("OC1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if region != "ASIA" {
+		t.Fatalf("account region = %s, want ASIA", region)
+	}
+	region, err = AccountRegionForPlatform("NA1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if region != "AMERICAS" {
+		t.Fatalf("account region = %s, want AMERICAS", region)
+	}
+}
+
 func TestParseRiotID(t *testing.T) {
 	gameName, tagLine, err := ParseRiotID("Some Name#NA1")
 	if err != nil {
