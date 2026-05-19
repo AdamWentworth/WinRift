@@ -803,7 +803,7 @@ function MatchupBuildCard({
     <article className={`match-build-card ${side}`}>
       <div className="build-heading">
         <span>{roleLabels[role] ?? role}</span>
-        <strong>{champion?.name ?? participant.championId} into {opponentChampion?.name ?? opponent.championId}</strong>
+        <strong>{champion?.name ?? participant.championId} vs {opponentChampion?.name ?? opponent.championId}</strong>
         <em>{totalSamples > 0 ? `${totalSamples} max samples by slot` : 'Need more stored matches'}</em>
       </div>
       <BuildSide side={side} itemSlots={itemSlots} loading={loading} items={items} />
