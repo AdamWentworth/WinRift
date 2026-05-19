@@ -172,18 +172,6 @@ export type LiveParticipant = {
     perkIds?: number[];
     perkStyle?: number;
     perkSubStyle?: number;
-    statPerks?: {
-      offense?: number;
-      flex?: number;
-      defense?: number;
-    };
-    styles?: {
-      description?: string;
-      style?: number;
-      selections?: {
-        perk: number;
-      }[];
-    }[];
   };
   bot: boolean;
 };
