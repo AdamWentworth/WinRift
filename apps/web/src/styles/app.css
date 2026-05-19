@@ -368,6 +368,11 @@ button {
   gap: 8px;
 }
 
+.chart-section {
+  align-content: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
 .alternative-list {
   display: grid;
   gap: 6px;
@@ -466,13 +471,16 @@ button {
 .chart-shell {
   display: grid;
   gap: 7px;
+  grid-template-rows: minmax(220px, 1fr) auto;
+  height: 100%;
   min-height: 0;
 }
 
 .winrate-chart {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 10%);
-  height: 170px;
+  height: 100%;
+  min-height: 220px;
   width: 100%;
 }
 
@@ -516,14 +524,6 @@ button {
   fill: #aeb8bf;
   font-size: 6px;
   font-weight: 900;
-}
-
-.chart-range-note {
-  color: #aeb8bf;
-  font-size: 10px;
-  font-weight: 800;
-  margin-top: -3px;
-  text-align: center;
 }
 
 .chart-labels {

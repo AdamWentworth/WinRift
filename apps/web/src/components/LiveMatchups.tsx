@@ -469,7 +469,6 @@ function WinConditionLengthChart({ metric }: { metric?: WinConditionMetric }) {
             />
           ))}
         </svg>
-        <div className="chart-range-note">35-65% view, centered on 50%</div>
         <div className="chart-labels">
           {buckets.map((bucket) => (
             <span className={bucket.meetsMinGames ? '' : 'thin-sample'} key={bucket.bucket}>
