@@ -441,25 +441,35 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
 
 function WinConditionLengthChart({ metric }: { metric?: WinConditionMetric }) {
   const buckets = metric?.buckets ?? [];
-  const points = buckets.map((bucket, index) => {
-    const x = buckets.length <= 1 ? 50 : 8 + (index * 84) / (buckets.length - 1);
-    const y = 56 - (Math.max(0, Math.min(100, bucket.winRate)) / 100) * 46;
-    return { x, y, bucket };
-  });
+  const points = buckets.map((bucket, index) => ({
+    x: buckets.length <= 1 ? 50 : 12 + (index * 76) / (buckets.length - 1),
+    y: chartY(bucket.winRate),
+    bucket,
+  })).filter((point) => point.bucket.games > 0);
   const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
   return (
     <div className="legacy-stats-section chart-section">
       <h2>Winrate By Game Length</h2>
       <div className="chart-shell">
-        <svg className="winrate-chart" viewBox="0 0 100 64" role="img" aria-label="Winrate by game length">
-          <line x1="6" y1="10" x2="96" y2="10" />
-          <line x1="6" y1="33" x2="96" y2="33" />
-          <line x1="6" y1="56" x2="96" y2="56" />
+        <svg className="winrate-chart" viewBox="0 0 100 88" role="img" aria-label="Winrate by game length from 35% to 65%">
+          <line className="chart-gridline" x1="10" y1={chartY(65)} x2="92" y2={chartY(65)} />
+          <line className="chart-gridline chart-baseline" x1="10" y1={chartY(50)} x2="92" y2={chartY(50)} />
+          <line className="chart-gridline" x1="10" y1={chartY(35)} x2="92" y2={chartY(35)} />
+          <text x="4" y={chartY(65) + 1.5}>65</text>
+          <text x="4" y={chartY(50) + 1.5}>50</text>
+          <text x="4" y={chartY(35) + 1.5}>35</text>
           {pointString ? <polyline points={pointString} /> : null}
           {points.map((point) => (
-            <circle key={point.bucket.bucket} cx={point.x} cy={point.y} r="2.2" />
+            <circle
+              className={chartPointClass(point.bucket.winRate)}
+              key={point.bucket.bucket}
+              cx={point.x}
+              cy={point.y}
+              r="2.8"
+            />
           ))}
         </svg>
+        <div className="chart-range-note">35-65% view, centered on 50%</div>
         <div className="chart-labels">
           {buckets.map((bucket) => (
             <span className={bucket.meetsMinGames ? '' : 'thin-sample'} key={bucket.bucket}>
@@ -471,6 +481,23 @@ function WinConditionLengthChart({ metric }: { metric?: WinConditionMetric }) {
       </div>
     </div>
   );
+}
+
+const chartMinWinRate = 35;
+const chartMaxWinRate = 65;
+const chartTop = 10;
+const chartBottom = 76;
+
+function chartY(winRate: number) {
+  const clamped = Math.max(chartMinWinRate, Math.min(chartMaxWinRate, winRate));
+  const progress = (clamped - chartMinWinRate) / (chartMaxWinRate - chartMinWinRate);
+  return chartBottom - progress * (chartBottom - chartTop);
+}
+
+function chartPointClass(winRate: number) {
+  if (winRate > 50) return 'chart-point-favorable';
+  if (winRate < 50) return 'chart-point-unfavorable';
+  return 'chart-point-even';
 }
 
 function WinConditionEnemyCard({

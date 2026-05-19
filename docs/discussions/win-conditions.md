@@ -299,6 +299,8 @@ Keep the current chart labeled as "Winrate By Game Length." Later add true timel
 - level curves,
 - win probability from game state snapshots.
 
+The live UI chart uses a focused 35-65% y-axis centered on 50%. This makes practical edges easier to see while still labeling the panel as duration-bucket results, not true minute-by-minute power-spike prediction.
+
 ## Building Block 8: ML And Statistical Refinement
 
 ML could help, but only after the simple model is well-instrumented.

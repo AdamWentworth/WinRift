@@ -472,13 +472,19 @@ button {
 .winrate-chart {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 10%);
-  height: 130px;
+  height: 170px;
   width: 100%;
 }
 
-.winrate-chart line {
+.winrate-chart .chart-gridline {
   stroke: rgb(255 255 255 / 16%);
   stroke-width: 0.8;
+}
+
+.winrate-chart .chart-baseline {
+  stroke: rgb(255 255 255 / 48%);
+  stroke-dasharray: 3 2;
+  stroke-width: 1.2;
 }
 
 .winrate-chart polyline {
@@ -490,9 +496,34 @@ button {
 }
 
 .winrate-chart circle {
-  fill: #4bc0c0;
   stroke: #fff;
   stroke-width: 0.8;
+}
+
+.winrate-chart .chart-point-favorable {
+  fill: #6bd66b;
+}
+
+.winrate-chart .chart-point-unfavorable {
+  fill: #ff7979;
+}
+
+.winrate-chart .chart-point-even {
+  fill: #f3d671;
+}
+
+.winrate-chart text {
+  fill: #aeb8bf;
+  font-size: 6px;
+  font-weight: 900;
+}
+
+.chart-range-note {
+  color: #aeb8bf;
+  font-size: 10px;
+  font-weight: 800;
+  margin-top: -3px;
+  text-align: center;
 }
 
 .chart-labels {
