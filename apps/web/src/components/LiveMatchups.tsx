@@ -385,8 +385,6 @@ function WinConditionContent({ analysis, yourSide }: { analysis: WinConditionAna
         side={yourSide}
         team={yourTeam}
         metric={selectedYourMetric}
-      />
-      <WinConditionAlternatives
         metrics={yourMetrics}
         selectedCondition={selectedYourMetric?.condition ?? yourTeam.primaryCondition}
         opponentCondition={selectedEnemyMetric?.condition ?? enemyTeam.primaryCondition}
@@ -411,11 +409,19 @@ function WinConditionSummaryCard({
   side,
   team,
   metric,
+  metrics,
+  selectedCondition,
+  opponentCondition,
+  onSelect,
 }: {
   title: string;
   side: TeamSide;
   team: WinConditionTeamProfile;
   metric?: WinConditionMetric;
+  metrics?: WinConditionMetric[];
+  selectedCondition?: string;
+  opponentCondition?: string;
+  onSelect?: (condition: string) => void;
 }) {
   const condition = metric?.condition ?? team.primaryCondition;
   const rating = metric?.rating ?? team.primaryRating;
@@ -444,6 +450,15 @@ function WinConditionSummaryCard({
         )}
       </div>
       <WinConditionProfileBars team={team} selectedCondition={condition} />
+      {metrics && opponentCondition && onSelect ? (
+        <WinConditionPlanSwitches
+          label="Other Plans"
+          metrics={metrics}
+          selectedCondition={selectedCondition ?? condition}
+          opponentCondition={opponentCondition}
+          onSelect={onSelect}
+        />
+      ) : null}
     </div>
   );
 }
@@ -464,12 +479,14 @@ function WinConditionProfileBars({ team, selectedCondition }: { team: WinConditi
   );
 }
 
-function WinConditionAlternatives({
+function WinConditionPlanSwitches({
+  label,
   metrics,
   selectedCondition,
   opponentCondition,
   onSelect,
 }: {
+  label: string;
   metrics: WinConditionMetric[];
   selectedCondition: string;
   opponentCondition: string;
@@ -481,26 +498,27 @@ function WinConditionAlternatives({
     && isPlayerFacingPlan(metric)
   )));
   return (
-    <div className="legacy-stats-section alternatives-section">
-      <h2>Alternatives</h2>
-      <div className="alternative-list">
+    <div className="strategy-switcher">
+      <span className="strategy-switcher-title">{label}</span>
+      <div className="strategy-switch-list">
         {alternatives.length > 0 ? (
-          alternatives.map((metric) => (
-            <button className="alternative-item" key={`${metric.condition}-${metric.opponentCondition}`} type="button" onClick={() => onSelect(metric.condition)}>
-              <span className="alternative-images">
-                <img src={conditionIconUrl(metric.condition)} alt="" />
-                <img src={ratingImageUrl(metric.rating)} alt={metric.rating} />
-              </span>
-              <span className="alternative-text">
-                <strong>{metric.games > 0 ? metric.winRate.toFixed(2) : '--'}%</strong>
-                <em>{metric.planLabel ?? planLabelFallback(metric)}</em>
-                <em>{metric.games} Matches</em>
-                <em>{metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</em>
+          alternatives.slice(0, 3).map((metric) => (
+            <button
+              className="strategy-switch"
+              key={`${metric.condition}-${metric.opponentCondition}`}
+              type="button"
+              onClick={() => onSelect(metric.condition)}
+              aria-label={`Show ${label} ${metric.condition}`}
+            >
+              <img src={conditionIconUrl(metric.condition)} alt="" />
+              <span>
+                <strong>{metric.condition} {metric.rating}</strong>
+                <em>{metric.games > 0 ? `${metric.winRate.toFixed(0)}% · ${metric.games}g` : 'No sample'}</em>
               </span>
             </button>
           ))
         ) : (
-          <div className="alternative-empty">No other strong plans</div>
+          <span className="strategy-switch-empty">No other strong plans</span>
         )}
       </div>
     </div>
@@ -684,11 +702,6 @@ function WinConditionEnemyCard({
 }) {
   const condition = metric?.condition ?? team.primaryCondition;
   const rating = metric?.rating ?? team.primaryRating;
-  const otherMetrics = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((candidate) => (
-    candidate.opponentCondition === opponentCondition
-    && candidate.condition !== condition
-    && isPlayerFacingPlan(candidate)
-  )));
   return (
     <div className={`legacy-win-card enemy ${side}`}>
       <h2>Enemy Team's Win Condition</h2>
@@ -697,13 +710,13 @@ function WinConditionEnemyCard({
         <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
       <WinConditionProfileBars team={team} selectedCondition={condition} />
-      <div className="enemy-other-conditions">
-        {otherMetrics.map((candidate) => (
-          <button key={candidate.condition} type="button" onClick={() => onSelect(candidate.condition)} aria-label={`Show enemy ${candidate.condition}`}>
-            <img src={conditionIconUrl(candidate.condition)} alt="" />
-          </button>
-        ))}
-      </div>
+      <WinConditionPlanSwitches
+        label="Enemy Plans"
+        metrics={metrics}
+        selectedCondition={condition}
+        opponentCondition={opponentCondition}
+        onSelect={onSelect}
+      />
     </div>
   );
 }

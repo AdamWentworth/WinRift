@@ -379,7 +379,8 @@ describe('App', () => {
 
     await waitFor(() => expect(getWinConditionAnalysis).toHaveBeenCalled());
     expect(await screen.findByText("Your Team's Win Condition")).toBeInTheDocument();
-    expect(screen.getByText('Alternatives')).toBeInTheDocument();
+    expect(screen.getByText('Other Plans')).toBeInTheDocument();
+    expect(screen.getByText('Enemy Plans')).toBeInTheDocument();
     expect(screen.getByText('Match Read')).toBeInTheDocument();
     expect(screen.getByText('Winrate By Game Length')).toBeInTheDocument();
     expect(screen.getByText("Enemy Team's Win Condition")).toBeInTheDocument();
@@ -388,8 +389,8 @@ describe('App', () => {
     expect(screen.getByText('Primary pick read')).toBeInTheDocument();
     expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
     expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Show enemy SplitPush')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('Show enemy Siege'));
+    expect(screen.queryByLabelText('Show Enemy Plans SplitPush')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Show Enemy Plans Siege'));
     expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
     expect(screen.getByText('Enemy Siege B')).toBeInTheDocument();
     expect(screen.getByText('Siege response read')).toBeInTheDocument();
