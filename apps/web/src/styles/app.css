@@ -802,7 +802,9 @@ button {
 }
 
 .player-card {
-  background: #222;
+  background:
+    linear-gradient(180deg, rgb(25 28 30 / 92%), rgb(21 21 21 / 96%)),
+    #222;
   border: 1px solid #2c2c2c;
   color: #fff;
   cursor: grab;
@@ -814,6 +816,31 @@ button {
   position: relative;
   transition: opacity 120ms ease, box-shadow 120ms ease, transform 120ms ease;
   user-select: none;
+}
+
+.player-card::after {
+  background: linear-gradient(180deg, rgb(0 0 0 / 8%), rgb(0 0 0 / 48%));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.player-card > *:not(.player-card-backdrop) {
+  position: relative;
+  z-index: 1;
+}
+
+.player-card-backdrop {
+  filter: saturate(1.1) contrast(1.08);
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  opacity: 0.13;
+  position: absolute;
+  width: 100%;
+  z-index: 0;
 }
 
 .player-card:active {
@@ -838,11 +865,13 @@ button {
 }
 
 .blue-style {
-  box-shadow: 0 0 10px 4px #87ceeb;
+  border-color: rgb(135 206 235 / 72%);
+  box-shadow: 0 0 10px 4px rgb(135 206 235 / 62%);
 }
 
 .red-style {
-  box-shadow: 0 0 10px 4px #f08080;
+  border-color: rgb(240 128 128 / 72%);
+  box-shadow: 0 0 10px 4px rgb(240 128 128 / 62%);
 }
 
 .card-topline {
@@ -878,6 +907,19 @@ button {
   text-align: center;
 }
 
+.player-role-chip {
+  background: rgb(0 0 0 / 38%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #dce5ea;
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 4px;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+
 .summoner-name,
 .champion-name {
   font-weight: 700;
@@ -907,8 +949,8 @@ button {
 .rank-info,
 .champion-performance {
   align-content: start;
-  background: #1b1b1b;
-  border: 1px solid #363636;
+  background: rgb(12 14 15 / 72%);
+  border: 1px solid rgb(255 255 255 / 9%);
   color: #f2f2f2;
   display: grid;
   font-weight: 700;
@@ -1025,7 +1067,9 @@ button {
 }
 
 .match-build-card {
-  background: #222;
+  background:
+    linear-gradient(180deg, rgb(36 38 39 / 96%), rgb(27 29 30 / 98%)),
+    #222;
   border: 1px solid #ccc;
   color: #f6f7f8;
   display: grid;
@@ -1036,10 +1080,12 @@ button {
 }
 
 .match-build-card.blue {
+  border-color: rgb(135 206 235 / 64%);
   box-shadow: 0 0 7px 2px rgb(135 206 235 / 42%);
 }
 
 .match-build-card.red {
+  border-color: rgb(240 128 128 / 64%);
   box-shadow: 0 0 7px 2px rgb(240 128 128 / 42%);
 }
 
@@ -1050,9 +1096,9 @@ button {
 }
 
 .build-heading span {
-  color: #ffffff;
+  color: #b7c4cb;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 900;
   text-transform: uppercase;
 }
 
@@ -1063,9 +1109,16 @@ button {
   white-space: nowrap;
 }
 
+.build-heading em {
+  color: #aeb8bf;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .build-side {
   align-content: start;
-  border: 1px solid #ccc;
+  border: 1px solid rgb(255 255 255 / 12%);
   display: grid;
   gap: 4px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1119,6 +1172,10 @@ button {
   min-width: 0;
   padding: 4px 2px;
   text-align: center;
+}
+
+.item-slot-column.low-sample-item {
+  opacity: 0.74;
 }
 
 .item-slot-column img,

@@ -687,9 +687,11 @@ function LiveChampionCard({
       onDragEnd={onDragEnd}
       title="Drag to reorder matchup slots"
     >
+      {championUrl ? <img className="player-card-backdrop" src={championUrl} alt="" aria-hidden="true" /> : null}
       <div className="card-topline">
         {championUrl ? <img className="profile-picture" src={championUrl} alt={championName} /> : <div className="profile-picture profile-fallback">{participant.championId}</div>}
         <div className="player-title">
+          <div className="player-role-chip">{roleLabels[roles[index]] ?? roles[index] ?? 'Role'}</div>
           <div className="summoner-name">{playerName}</div>
           <div className="champion-name">{championName}</div>
         </div>
@@ -782,12 +784,14 @@ function MatchupBuildCard({
 }) {
   const champion = championByKey(champions, participant.championId);
   const opponentChampion = championByKey(champions, opponent.championId);
+  const totalSamples = highestSlotSample(itemSlots);
 
   return (
     <article className={`match-build-card ${side}`}>
       <div className="build-heading">
         <span>{roleLabels[role] ?? role}</span>
         <strong>{champion?.name ?? participant.championId} into {opponentChampion?.name ?? opponent.championId}</strong>
+        <em>{totalSamples > 0 ? `${totalSamples} max samples by slot` : 'Need more stored matches'}</em>
       </div>
       <BuildSide side={side} itemSlots={itemSlots} loading={loading} items={items} />
     </article>
@@ -806,10 +810,10 @@ function BuildSide({
   items?: ItemData;
 }) {
   if (loading) {
-    return <div className={`build-side ${side} muted`}>Loading...</div>;
+    return <div className={`build-side ${side} muted`}>Loading item patterns...</div>;
   }
   if (!itemSlots.length) {
-    return <div className={`build-side ${side} muted`}>No item samples</div>;
+    return <div className={`build-side ${side} muted`}>Not enough matchup samples yet</div>;
   }
 
   const bestBySlot = [1, 2, 3, 4, 5, 6].map((slot) => ({
@@ -831,12 +835,12 @@ function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData
   const imageUrl = itemImageUrl(items, itemId);
   const name = itemName(items, itemId);
   return (
-    <div className="item-slot-column">
+    <div className={`item-slot-column${row.games < 5 ? ' low-sample-item' : ''}`} title={`${ordinal(row.itemSlot)} item: ${name}. ${row.winRate.toFixed(1)}% over ${row.games} games.`}>
       <span className="item-slot-number">{ordinal(row.itemSlot)}</span>
       {imageUrl ? <img src={imageUrl} alt={name} title={name} /> : <span className="item-pill">{row.itemId}</span>}
       <div className="item-slot-stats">
         <strong>{row.winRate.toFixed(1)}%</strong>
-        <span>{row.games} games</span>
+        <span>{row.games}g{row.games < 5 ? ' · low' : ''}</span>
       </div>
     </div>
   );
@@ -881,6 +885,10 @@ function itemContextForParticipant(participant: LiveParticipant, role: string): 
   if (hasSmite(participant)) return 'JUNGLE';
   if (role === 'UTILITY') return 'SUPPORT';
   return undefined;
+}
+
+function highestSlotSample(itemSlots: AnalyticsItemSlot[]) {
+  return itemSlots.reduce((max, row) => Math.max(max, row.games), 0);
 }
 
 function matchClock(gameStartTime: number, now: number) {
