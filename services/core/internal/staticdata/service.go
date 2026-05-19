@@ -80,7 +80,7 @@ func (s *Service) LatestVersion(ctx context.Context) (string, error) {
 	return versions[0], nil
 }
 
-func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle bool) ([]uint32, error) {
+func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle, includeSupport bool) ([]uint32, error) {
 	payload, err := s.Get(ctx, "items", patch)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle 
 			continue
 		}
 		id := uint32(id64)
-		if isBuildItem(id, item, includeJungle) {
+		if isBuildItem(id, item, includeJungle, includeSupport) {
 			ids = append(ids, id)
 		}
 	}
@@ -114,7 +114,7 @@ func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle 
 	return ids, nil
 }
 
-func isBuildItem(id uint32, item map[string]any, includeJungle bool) bool {
+func isBuildItem(id uint32, item map[string]any, includeJungle, includeSupport bool) bool {
 	if excludedBuildItems[id] {
 		return false
 	}
@@ -133,6 +133,9 @@ func isBuildItem(id uint32, item map[string]any, includeJungle bool) bool {
 	if tags["Jungle"] {
 		return includeJungle
 	}
+	if isSupportBuildItem(tags) {
+		return includeSupport
+	}
 	totalGold, purchasable := itemGold(item)
 	if !purchasable || totalGold < 700 {
 		return false
@@ -148,6 +151,10 @@ func isBuildItem(id uint32, item map[string]any, includeJungle bool) bool {
 		return true
 	}
 	return false
+}
+
+func isSupportBuildItem(tags map[string]bool) bool {
+	return tags["GoldPer"] && tags["Vision"] && tags["Lane"]
 }
 
 func itemTags(item map[string]any) map[string]bool {

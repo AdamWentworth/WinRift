@@ -292,6 +292,7 @@ export type LiveGame = {
 export type BuildFilters = {
   championId?: number;
   role?: string;
+  itemContext?: 'JUNGLE' | 'SUPPORT';
   opponentChampionId?: number;
   patch?: string;
   rankBucket?: string;

@@ -56,6 +56,7 @@ export function getItemSlots(filters: BuildFilters) {
   const params = new URLSearchParams();
   if (filters.championId) params.set('championId', String(filters.championId));
   if (filters.role) params.set('role', filters.role);
+  if (filters.itemContext) params.set('itemContext', filters.itemContext);
   if (filters.opponentChampionId) params.set('opponentChampionId', String(filters.opponentChampionId));
   if (filters.patch) params.set('patch', filters.patch);
   if (filters.rankBucket) params.set('rankBucket', filters.rankBucket);

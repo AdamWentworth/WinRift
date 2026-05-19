@@ -114,11 +114,11 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
       if (!pair.blue || !pair.red) return;
       requests.push({
         key: statKey(index, 'blue'),
-        filters: buildFilters(pair.blue.championId, pair.red.championId, pair.role),
+        filters: buildFilters(pair.blue, pair.red, pair.role),
       });
       requests.push({
         key: statKey(index, 'red'),
-        filters: buildFilters(pair.red.championId, pair.blue.championId, pair.role),
+        filters: buildFilters(pair.red, pair.blue, pair.role),
       });
     });
     return requests;
@@ -720,14 +720,20 @@ function RuneStyleIcon({ runes, styleId }: { runes?: RuneData; styleId?: number 
   return style?.icon ? <img src={`https://ddragon.leagueoflegends.com/cdn/img/${style.icon}`} alt={styleName} title={styleName} /> : <span className="rune-fallback">{styleId ?? '?'}</span>;
 }
 
-function buildFilters(championId: number, opponentChampionId: number, role: string): BuildFilters {
+function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, role: string): BuildFilters {
   return {
-    championId,
-    opponentChampionId,
-    role,
+    championId: participant.championId,
+    opponentChampionId: opponent.championId,
+    itemContext: itemContextForParticipant(participant, role),
     minGames: 1,
     limit: 6,
   };
+}
+
+function itemContextForParticipant(participant: LiveParticipant, role: string): BuildFilters['itemContext'] {
+  if (hasSmite(participant)) return 'JUNGLE';
+  if (role === 'UTILITY') return 'SUPPORT';
+  return undefined;
 }
 
 function ordinal(value: number) {

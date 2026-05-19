@@ -79,7 +79,7 @@ func analyticsRoleScope(role string) roleAnalyticsScope {
 	case "UTILITY":
 		return roleAnalyticsScope{selectExpr: "role", whereSQL: "role = ?", args: []any{"UTILITY"}}
 	default:
-		return roleAnalyticsScope{selectExpr: "role"}
+		return roleAnalyticsScope{selectExpr: "'ALL'"}
 	}
 }
 

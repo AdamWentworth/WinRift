@@ -218,6 +218,7 @@ func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 
 func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
+	itemContext := strings.ToUpper(query.Get("itemContext"))
 	filters := map[string]string{
 		"champion_id":          query.Get("championId"),
 		"role":                 strings.ToUpper(query.Get("role")),
@@ -227,7 +228,9 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 	}
 	minGames := queryInt(query.Get("minGames"), 1)
 	limit := queryInt(query.Get("limit"), 6)
-	buildItemIDs, err := s.static.BuildItemIDs(r.Context(), "", filters["role"] == "JUNGLE")
+	includeJungle := itemContext == "JUNGLE" || filters["role"] == "JUNGLE"
+	includeSupport := itemContext == "SUPPORT" || filters["role"] == "UTILITY"
+	buildItemIDs, err := s.static.BuildItemIDs(r.Context(), "", includeJungle, includeSupport)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
