@@ -229,6 +229,7 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 	}
 	minGames := queryInt(query.Get("minGames"), 1)
 	limit := queryInt(query.Get("limit"), 6)
+	useFallback := queryBool(query.Get("fallback"))
 	includeJungle := itemContext == "JUNGLE" || filters["role"] == "JUNGLE"
 	includeSupport := itemContext == "SUPPORT" || filters["role"] == "UTILITY"
 	buildItemIDs, err := s.static.BuildItemIDs(r.Context(), "", includeJungle, includeSupport)
@@ -236,21 +237,148 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	rows, err := s.repo.QueryItemSlots(r.Context(), filters, buildItemIDs, minGames, limit)
+	scopedRows := []scopedItemSlotRow{}
+	if useFallback {
+		scopedRows, err = s.queryItemSlotFallbacks(r.Context(), filters, buildItemIDs, minGames, limit)
+	} else {
+		rows, queryErr := s.repo.QueryItemSlots(r.Context(), filters, buildItemIDs, minGames, limit)
+		if queryErr != nil {
+			err = queryErr
+		} else {
+			scopedRows = scopedItemSlotRows(rows, itemSlotScope{Key: "requested", Label: "Requested sample"})
+		}
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	results := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
+	results := make([]map[string]any, 0, len(scopedRows))
+	for _, scoped := range scopedRows {
+		row := scoped.Row
 		results = append(results, map[string]any{
 			"championId": row.ChampionID, "role": row.Role, "opponentChampionId": row.OpponentChampionID,
 			"patchBucket": row.PatchBucket, "rankBucket": row.RankBucket,
 			"itemSlot": row.ItemSlot, "itemId": row.ItemID,
 			"wins": row.Wins, "games": row.Games, "winRate": round(row.WinRate * 100), "confidence": round(row.Confidence * 100),
+			"sampleScope": scoped.Scope.Key, "sampleScopeLabel": scoped.Scope.Label, "fallback": scoped.Scope.Fallback,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+type itemSlotScope struct {
+	Key      string
+	Label    string
+	Fallback bool
+	Filters  map[string]string
+}
+
+type scopedItemSlotRow struct {
+	Row   clickhouse.ItemSlotRow
+	Scope itemSlotScope
+}
+
+func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, buildItemIDs []uint32, minGames, limit int) ([]scopedItemSlotRow, error) {
+	scopes := itemSlotFallbackScopes(filters)
+	out := []scopedItemSlotRow{}
+	coveredSlots := map[uint8]bool{}
+	for _, scope := range scopes {
+		rows, err := s.repo.QueryItemSlots(ctx, scope.Filters, buildItemIDs, minGames, limit)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			if coveredSlots[row.ItemSlot] {
+				continue
+			}
+			out = append(out, scopedItemSlotRow{Row: row, Scope: scope})
+			coveredSlots[row.ItemSlot] = true
+			if len(coveredSlots) >= 6 {
+				return out, nil
+			}
+		}
+	}
+	return out, nil
+}
+
+func itemSlotFallbackScopes(filters map[string]string) []itemSlotScope {
+	patch := strings.TrimSpace(filters["patch"])
+	opponent := strings.TrimSpace(filters["opponent_champion_id"])
+	scopes := []itemSlotScope{
+		{Key: "exact_patch_matchup", Label: itemSlotScopeLabel(patch != "", opponent != ""), Filters: cloneStringMap(filters)},
+	}
+	seen := map[string]bool{itemSlotScopeSignature(filters): true}
+	addScope := func(key, label string, fallbackFilters map[string]string) {
+		signature := itemSlotScopeSignature(fallbackFilters)
+		if seen[signature] {
+			return
+		}
+		seen[signature] = true
+		scopes = append(scopes, itemSlotScope{Key: key, Label: label, Fallback: true, Filters: fallbackFilters})
+	}
+	if patch != "" {
+		allPatchMatchup := cloneStringMap(filters)
+		allPatchMatchup["patch"] = ""
+		addScope("all_patch_matchup", "Exact matchup, all stored patches", allPatchMatchup)
+	}
+	if opponent != "" {
+		championPatch := cloneStringMap(filters)
+		championPatch["opponent_champion_id"] = ""
+		addScope("patch_champion", itemSlotChampionScopeLabel(patch != ""), championPatch)
+	}
+	if patch != "" || opponent != "" {
+		championAll := cloneStringMap(filters)
+		championAll["patch"] = ""
+		championAll["opponent_champion_id"] = ""
+		addScope("all_champion", "Champion overall, all stored patches", championAll)
+	}
+	return scopes
+}
+
+func scopedItemSlotRows(rows []clickhouse.ItemSlotRow, scope itemSlotScope) []scopedItemSlotRow {
+	out := make([]scopedItemSlotRow, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, scopedItemSlotRow{Row: row, Scope: scope})
+	}
+	return out
+}
+
+func itemSlotScopeLabel(hasPatch, hasOpponent bool) string {
+	switch {
+	case hasPatch && hasOpponent:
+		return "Current patch exact matchup"
+	case hasOpponent:
+		return "Exact matchup"
+	case hasPatch:
+		return "Current patch champion overall"
+	default:
+		return "Champion overall"
+	}
+}
+
+func itemSlotChampionScopeLabel(hasPatch bool) string {
+	if hasPatch {
+		return "Current patch champion overall"
+	}
+	return "Champion overall"
+}
+
+func itemSlotScopeSignature(filters map[string]string) string {
+	return strings.Join([]string{
+		filters["champion_id"],
+		filters["role"],
+		filters["opponent_champion_id"],
+		filters["patch"],
+		filters["rank_bucket"],
+	}, "|")
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	out := make(map[string]string, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
 
 func (s Server) analyticsChampionRoles(w http.ResponseWriter, r *http.Request) {
@@ -955,6 +1083,15 @@ func queryInt(value string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func queryBool(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func queryUint16List(value string) []uint16 {

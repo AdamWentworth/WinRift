@@ -99,6 +99,9 @@ export type AnalyticsItemSlot = {
   games: number;
   winRate: number;
   confidence: number;
+  sampleScope?: string;
+  sampleScopeLabel?: string;
+  fallback?: boolean;
 };
 
 export type AnalyticsItemSlotResponse = {
@@ -321,4 +324,5 @@ export type BuildFilters = {
   rankBucket?: string;
   minGames: number;
   limit?: number;
+  fallback?: boolean;
 };

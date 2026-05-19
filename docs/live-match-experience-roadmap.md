@@ -162,5 +162,6 @@ Recent refinements:
 - Ranked tier icon lives above the ranked record area so it mirrors the champion portrait/champion-stats relationship.
 - Role confidence is used behind the scenes for ordering but is hidden from the default card UI.
 - Build cards now show six item slots, clear sample-size language, and a better no-data state.
+- Build cards use a labeled fallback ladder so sparse exact matchups can still show champion-wide context without hiding the source.
 - Live lookup loading and miss states are presented as status plates instead of loose text.
-- Win-condition match reads surface evidence strength, game count, and likely winrate range near the headline.
+- Win-condition match reads surface the selected `Your condition vs Enemy condition` pairing, evidence strength, game count, and likely winrate range near the headline.

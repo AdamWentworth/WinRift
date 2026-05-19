@@ -630,6 +630,57 @@ button {
   padding: 8px;
 }
 
+.match-read-pair-strip {
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgb(135 206 235 / 18%), transparent 45%, rgb(240 128 128 / 17%)),
+    rgb(0 0 0 / 30%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  padding: 7px;
+}
+
+.match-read-pair-strip em {
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  padding: 4px 6px;
+  text-transform: uppercase;
+}
+
+.pair-side {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pair-side.enemy {
+  justify-content: end;
+}
+
+.pair-side img {
+  height: 28px;
+  object-fit: contain;
+  width: 28px;
+}
+
+.pair-side strong {
+  color: #f4f6f8;
+  font-size: 11px;
+  line-height: 1.05;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .match-read-headline strong {
   color: #fff;
   font-size: 14px;
@@ -1357,6 +1408,17 @@ button {
   font-size: 10px;
   font-style: normal;
   font-weight: 800;
+}
+
+.build-scope-label {
+  color: #9faeb5;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .build-sample-chip {

@@ -383,12 +383,15 @@ describe('App', () => {
     expect(screen.getByText('Match Read')).toBeInTheDocument();
     expect(screen.getByText('Winrate By Game Length')).toBeInTheDocument();
     expect(screen.getByText("Enemy Team's Win Condition")).toBeInTheDocument();
+    expect(screen.getByText('Your Pick B+')).toBeInTheDocument();
+    expect(screen.getByText('Enemy Control B+')).toBeInTheDocument();
     expect(screen.getByText('Primary pick read')).toBeInTheDocument();
     expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
     expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
     expect(screen.queryByLabelText('Show enemy SplitPush')).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Show enemy Siege'));
     expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
+    expect(screen.getByText('Enemy Siege B')).toBeInTheDocument();
     expect(screen.getByText('Siege response read')).toBeInTheDocument();
     queryClient.clear();
   });

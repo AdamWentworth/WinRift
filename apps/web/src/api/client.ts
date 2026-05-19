@@ -62,6 +62,7 @@ export function getItemSlots(filters: BuildFilters) {
   if (filters.rankBucket) params.set('rankBucket', filters.rankBucket);
   params.set('minGames', String(filters.minGames));
   if (filters.limit) params.set('limit', String(filters.limit));
+  if (filters.fallback) params.set('fallback', 'true');
   return request<AnalyticsItemSlotResponse>(`/api/analytics/item-slots?${params.toString()}`);
 }
 

@@ -104,6 +104,17 @@ The live build row currently treats the largest populated item-slot sample as th
 
 This is deliberately simple and player-facing. The deeper Wilson-style confidence math still belongs in diagnostics and backend ranking, but the live card should not make players parse statistical language while loading into a match.
 
+### Live Fallback Ladder
+
+For live matchup cards, the item-slot endpoint now fills missing slots through a labeled fallback ladder:
+
+1. Current patch exact champion matchup.
+2. Exact champion matchup across all stored patches.
+3. Current patch champion-wide item slot.
+4. Champion-wide item slot across all stored patches.
+
+The fallback is slot-by-slot. If slot one has exact matchup data but slot five does not, slot one stays exact while slot five can fall back. The UI labels mixed fallback samples instead of pretending the whole row came from one exact matchup.
+
 ### Causal Guardrails
 
 Eventually use timing-aware features:

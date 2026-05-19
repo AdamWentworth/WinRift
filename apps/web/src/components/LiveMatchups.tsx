@@ -124,15 +124,15 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
       if (!pair.blue || !pair.red) return;
       requests.push({
         key: statKey(index, 'blue'),
-        filters: buildFilters(pair.blue, pair.red, pair.role),
+        filters: buildFilters(pair.blue, pair.red, pair.role, patchBucket),
       });
       requests.push({
         key: statKey(index, 'red'),
-        filters: buildFilters(pair.red, pair.blue, pair.role),
+        filters: buildFilters(pair.red, pair.blue, pair.role, patchBucket),
       });
     });
     return requests;
-  }, [pairs]);
+  }, [pairs, patchBucket]);
 
   const statQueries = useQueries({
     queries: statRequests.map((request) => ({
@@ -515,6 +515,7 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
       <div className="match-read-copy">
         {script ? (
           <>
+            <WinConditionPairStrip metric={metric} />
             <div className="match-read-headline">
               <strong>{script.headline}</strong>
               <span>{planPairRead(metric)}</span>
@@ -540,6 +541,22 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
           <p>Select a win condition pairing to see the match read.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function WinConditionPairStrip({ metric }: { metric: WinConditionMetric }) {
+  return (
+    <div className="match-read-pair-strip" aria-label="Selected win condition pairing">
+      <span className="pair-side your">
+        <img src={conditionIconUrl(metric.condition)} alt="" />
+        <strong>Your {metric.condition} {metric.rating}</strong>
+      </span>
+      <em>vs</em>
+      <span className="pair-side enemy">
+        <img src={conditionIconUrl(metric.opponentCondition)} alt="" />
+        <strong>Enemy {metric.opponentCondition} {metric.opponentRating}</strong>
+      </span>
     </div>
   );
 }
@@ -854,6 +871,7 @@ function MatchupBuildCard({
   const opponentChampion = championByKey(champions, opponent.championId);
   const totalSamples = highestSlotSample(itemSlots);
   const sample = buildSampleQuality(totalSamples);
+  const scopeLabel = buildScopeLabel(itemSlots);
 
   return (
     <article className={`match-build-card ${side}`}>
@@ -861,6 +879,7 @@ function MatchupBuildCard({
         <span>{roleLabels[role] ?? role}</span>
         <strong>{champion?.name ?? participant.championId} vs {opponentChampion?.name ?? opponent.championId}</strong>
         <em className={`build-sample-chip ${sample.tone}`}>{sample.label}</em>
+        {scopeLabel ? <small className="build-scope-label">{scopeLabel}</small> : null}
       </div>
       <BuildSide side={side} itemSlots={itemSlots} loading={loading} items={items} />
     </article>
@@ -945,13 +964,15 @@ function RuneStyleIcon({ runes, styleId }: { runes?: RuneData; styleId?: number 
   return style?.icon ? <img src={`https://ddragon.leagueoflegends.com/cdn/img/${style.icon}`} alt={styleName} title={styleName} /> : <span className="rune-fallback">{styleId ?? '?'}</span>;
 }
 
-function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, role: string): BuildFilters {
+function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, role: string, patch?: string): BuildFilters {
   return {
     championId: participant.championId,
     opponentChampionId: opponent.championId,
     itemContext: itemContextForParticipant(participant, role),
+    patch,
     minGames: 1,
     limit: 6,
+    fallback: Boolean(patch),
   };
 }
 
@@ -994,6 +1015,13 @@ function buildSampleQuality(samples: number) {
   if (samples < 15) return { label: `${samples} samples · early`, tone: 'early' };
   if (samples < 50) return { label: `${samples} samples · useful`, tone: 'useful' };
   return { label: `${samples} samples · strong`, tone: 'strong' };
+}
+
+function buildScopeLabel(itemSlots: AnalyticsItemSlot[]) {
+  const labels = [...new Set(itemSlots.map((row) => row.sampleScopeLabel).filter(Boolean))];
+  if (!labels.length) return '';
+  if (labels.length === 1) return labels[0];
+  return 'Mixed fallback samples';
 }
 
 function matchClock(gameStartTime: number, now: number) {

@@ -66,3 +66,46 @@ func TestWinConditionEvidenceSeparatesSampleSizeFromWinRate(t *testing.T) {
 		t.Fatalf("tiny hot sample level = %q, want not strong", tinyHotSample.Level)
 	}
 }
+
+func TestItemSlotFallbackScopesExpandWithoutDuplicates(t *testing.T) {
+	filters := map[string]string{
+		"champion_id":          "64",
+		"role":                 "",
+		"opponent_champion_id": "154",
+		"patch":                "16.10",
+		"rank_bucket":          "",
+	}
+
+	got := itemSlotFallbackScopes(filters)
+	wantKeys := []string{
+		"exact_patch_matchup",
+		"all_patch_matchup",
+		"patch_champion",
+		"all_champion",
+	}
+	if len(got) != len(wantKeys) {
+		t.Fatalf("scopes = %d, want %d: %+v", len(got), len(wantKeys), got)
+	}
+	for index, want := range wantKeys {
+		if got[index].Key != want {
+			t.Fatalf("scope[%d] = %q, want %q", index, got[index].Key, want)
+		}
+	}
+	if got[0].Fallback {
+		t.Fatalf("first scope should be exact, got fallback")
+	}
+	for _, scope := range got[1:] {
+		if !scope.Fallback {
+			t.Fatalf("scope %q should be marked fallback", scope.Key)
+		}
+	}
+	if got[1].Filters["patch"] != "" || got[1].Filters["opponent_champion_id"] != "154" {
+		t.Fatalf("all-patch matchup filters = %+v, want opponent retained and patch dropped", got[1].Filters)
+	}
+	if got[2].Filters["patch"] != "16.10" || got[2].Filters["opponent_champion_id"] != "" {
+		t.Fatalf("patch champion filters = %+v, want patch retained and opponent dropped", got[2].Filters)
+	}
+	if got[3].Filters["patch"] != "" || got[3].Filters["opponent_champion_id"] != "" {
+		t.Fatalf("all champion filters = %+v, want patch and opponent dropped", got[3].Filters)
+	}
+}
