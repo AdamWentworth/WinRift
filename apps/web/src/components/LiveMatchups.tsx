@@ -200,6 +200,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
         {blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
           <WinConditionPanel
             analysis={winConditionQuery.data}
+            yourSide={livePlayerSide(liveGame)}
             loading={winConditionQuery.isLoading}
             error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
           />
@@ -261,10 +262,12 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
 
 function WinConditionPanel({
   analysis,
+  yourSide,
   loading,
   error,
 }: {
   analysis?: WinConditionAnalysisResponse;
+  yourSide: TeamSide;
   loading: boolean;
   error?: string;
 }) {
@@ -276,74 +279,218 @@ function WinConditionPanel({
   }
   if (!analysis) return null;
 
-  const bluePrimary = analysis.blueMatchups.find((metric) => metric.primary);
-  const redPrimary = analysis.redMatchups.find((metric) => metric.primary);
+  return <WinConditionContent analysis={analysis} yourSide={yourSide} />;
+}
+
+function WinConditionContent({ analysis, yourSide }: { analysis: WinConditionAnalysisResponse; yourSide: TeamSide }) {
+  const enemySide: TeamSide = yourSide === 'blue' ? 'red' : 'blue';
+  const yourTeam = yourSide === 'blue' ? analysis.blue : analysis.red;
+  const enemyTeam = enemySide === 'blue' ? analysis.blue : analysis.red;
+  const yourMetrics = yourSide === 'blue' ? analysis.blueMatchups : analysis.redMatchups;
+  const enemyMetrics = enemySide === 'blue' ? analysis.blueMatchups : analysis.redMatchups;
+  const [selectedYourCondition, setSelectedYourCondition] = useState(yourTeam.primaryCondition);
+  const [selectedEnemyCondition, setSelectedEnemyCondition] = useState(enemyTeam.primaryCondition);
+
+  useEffect(() => {
+    setSelectedYourCondition(yourTeam.primaryCondition);
+    setSelectedEnemyCondition(enemyTeam.primaryCondition);
+  }, [analysis, yourTeam.primaryCondition, enemyTeam.primaryCondition]);
+
+  const selectedYourMetric = metricForCondition(yourMetrics, selectedYourCondition) ?? primaryMetric(yourMetrics);
+  const selectedEnemyMetric = metricForCondition(enemyMetrics, selectedEnemyCondition) ?? primaryMetric(enemyMetrics);
 
   return (
     <section className="win-condition-panel" aria-label="Win condition stats">
-      <WinConditionTeam side="blue" team={analysis.blue} primaryMetric={bluePrimary} metrics={analysis.blueMatchups} />
-      <div className="win-condition-versus">vs</div>
-      <WinConditionTeam side="red" team={analysis.red} primaryMetric={redPrimary} metrics={analysis.redMatchups} />
+      <WinConditionSummaryCard
+        title="Your Team's Win Condition"
+        side={yourSide}
+        team={yourTeam}
+        metric={selectedYourMetric}
+      />
+      <WinConditionAlternatives
+        metrics={yourMetrics}
+        selectedCondition={selectedYourMetric?.condition ?? yourTeam.primaryCondition}
+        onSelect={setSelectedYourCondition}
+      />
+      <WinConditionProfileComparison yourTeam={yourTeam} enemyTeam={enemyTeam} yourSide={yourSide} />
+      <WinConditionLengthChart metric={selectedYourMetric} />
+      <WinConditionEnemyCard
+        side={enemySide}
+        team={enemyTeam}
+        metric={selectedEnemyMetric}
+        metrics={enemyMetrics}
+        onSelect={setSelectedEnemyCondition}
+      />
     </section>
   );
 }
 
-function WinConditionTeam({
+function WinConditionSummaryCard({
+  title,
   side,
   team,
-  primaryMetric,
-  metrics,
+  metric,
 }: {
+  title: string;
   side: TeamSide;
   team: WinConditionTeamProfile;
-  primaryMetric?: WinConditionMetric;
-  metrics: WinConditionMetric[];
+  metric?: WinConditionMetric;
 }) {
+  const condition = metric?.condition ?? team.primaryCondition;
+  const rating = metric?.rating ?? team.primaryRating;
   return (
-    <div className={`win-condition-team ${side}`}>
-      <div className="win-condition-primary">
-        <img className="win-condition-icon" src={conditionIconUrl(team.primaryCondition)} alt="" />
-        <div className="win-condition-title">
-          <span>{side === 'blue' ? 'Blue' : 'Red'} win condition</span>
-          <strong>{team.primaryCondition} {team.primaryRating}</strong>
-        </div>
-        <img className="win-condition-rating" src={ratingImageUrl(team.primaryRating)} alt={team.primaryRating} />
+    <div className={`legacy-win-card ${side}`}>
+      <h2>{title}</h2>
+      <div className="legacy-win-images">
+        <img className="legacy-condition-icon" src={conditionIconUrl(condition)} alt="" />
+        <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
-      <div className="win-condition-summary">
-        {primaryMetric && primaryMetric.games > 0 ? (
+      <div className="legacy-win-stat">
+        {metric && metric.games > 0 ? (
           <>
-            <strong>{primaryMetric.winRate.toFixed(1)}%</strong>
-            <span>{primaryMetric.wins}-{primaryMetric.games - primaryMetric.wins} over {primaryMetric.games} similar comps</span>
+            <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
+            <span>Total Games: {metric.games}</span>
           </>
         ) : (
           <>
-            <strong>--</strong>
-            <span>No similar comp sample yet</span>
+            <strong>Win Rate: --</strong>
+            <span>Total Games: 0</span>
           </>
         )}
       </div>
-      <div className="win-condition-axes">
-        {team.axes.map((axis) => {
-          const metric = metrics.find((candidate) => candidate.condition === axis.label);
+    </div>
+  );
+}
+
+function WinConditionAlternatives({
+  metrics,
+  selectedCondition,
+  onSelect,
+}: {
+  metrics: WinConditionMetric[];
+  selectedCondition: string;
+  onSelect: (condition: string) => void;
+}) {
+  const alternatives = sortedAlternativeMetrics(metrics).filter((metric) => metric.condition !== selectedCondition);
+  return (
+    <div className="legacy-stats-section alternatives-section">
+      <h2>Alternatives</h2>
+      <div className="alternative-list">
+        {alternatives.map((metric) => (
+          <button className="alternative-item" key={metric.condition} type="button" onClick={() => onSelect(metric.condition)}>
+            <span className="alternative-images">
+              <img src={conditionIconUrl(metric.condition)} alt="" />
+              <img src={ratingImageUrl(metric.rating)} alt={metric.rating} />
+            </span>
+            <span className="alternative-text">
+              <strong>{metric.games > 0 ? metric.winRate.toFixed(2) : '--'}%</strong>
+              <em>{metric.games} Matches</em>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WinConditionProfileComparison({
+  yourTeam,
+  enemyTeam,
+  yourSide,
+}: {
+  yourTeam: WinConditionTeamProfile;
+  enemyTeam: WinConditionTeamProfile;
+  yourSide: TeamSide;
+}) {
+  const enemySide: TeamSide = yourSide === 'blue' ? 'red' : 'blue';
+  return (
+    <div className="legacy-stats-section profile-compare-section">
+      <h2>Profile</h2>
+      <div className="profile-axis-list">
+        {yourTeam.axes.map((axis) => {
+          const enemyAxis = enemyTeam.axes.find((candidate) => candidate.key === axis.key);
           return (
-            <div className={`win-condition-axis${axis.label === team.primaryCondition ? ' primary' : ''}`} key={axis.key}>
-              <img src={conditionIconUrl(axis.label)} alt="" />
-              <span>{axisShortLabel(axis.label)}</span>
-              <div className="win-condition-bar" aria-label={`${axis.label} score ${axis.score}`}>
-                <i style={{ width: `${Math.min(100, (axis.score / 25) * 100)}%` }} />
+            <div className="profile-axis-row" key={axis.key}>
+              <div className={`axis-meter ${yourSide}`}>
+                <i style={{ width: `${scoreWidth(axis.score)}%` }} />
               </div>
-              <strong>{axis.rating}</strong>
-              <em>{metric && metric.games > 0 ? `${metric.winRate.toFixed(0)}%` : '--'}</em>
+              <div className="axis-label">
+                <img src={conditionIconUrl(axis.label)} alt="" />
+                <span>{axisShortLabel(axis.label)}</span>
+              </div>
+              <div className={`axis-meter ${enemySide}`}>
+                <i style={{ width: `${scoreWidth(enemyAxis?.score ?? 0)}%` }} />
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="win-condition-buckets">
-        {(primaryMetric?.buckets ?? []).map((bucket) => (
-          <span className={bucket.meetsMinGames ? '' : 'thin-sample'} key={bucket.bucket}>
-            <b>{bucket.bucket}</b>
-            {bucket.games > 0 ? `${bucket.winRate.toFixed(0)}%` : '--'}
-          </span>
+    </div>
+  );
+}
+
+function WinConditionLengthChart({ metric }: { metric?: WinConditionMetric }) {
+  const buckets = metric?.buckets ?? [];
+  const points = buckets.map((bucket, index) => {
+    const x = buckets.length <= 1 ? 50 : 8 + (index * 84) / (buckets.length - 1);
+    const y = 56 - (Math.max(0, Math.min(100, bucket.winRate)) / 100) * 46;
+    return { x, y, bucket };
+  });
+  const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
+  return (
+    <div className="legacy-stats-section chart-section">
+      <h2>Winrate By Game Length</h2>
+      <div className="chart-shell">
+        <svg className="winrate-chart" viewBox="0 0 100 64" role="img" aria-label="Winrate by game length">
+          <line x1="6" y1="10" x2="96" y2="10" />
+          <line x1="6" y1="33" x2="96" y2="33" />
+          <line x1="6" y1="56" x2="96" y2="56" />
+          {pointString ? <polyline points={pointString} /> : null}
+          {points.map((point) => (
+            <circle key={point.bucket.bucket} cx={point.x} cy={point.y} r="2.2" />
+          ))}
+        </svg>
+        <div className="chart-labels">
+          {buckets.map((bucket) => (
+            <span className={bucket.meetsMinGames ? '' : 'thin-sample'} key={bucket.bucket}>
+              <b>{bucket.bucket}</b>
+              {bucket.games > 0 ? `${bucket.winRate.toFixed(0)}%` : '--'}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WinConditionEnemyCard({
+  side,
+  team,
+  metric,
+  metrics,
+  onSelect,
+}: {
+  side: TeamSide;
+  team: WinConditionTeamProfile;
+  metric?: WinConditionMetric;
+  metrics: WinConditionMetric[];
+  onSelect: (condition: string) => void;
+}) {
+  const condition = metric?.condition ?? team.primaryCondition;
+  const rating = metric?.rating ?? team.primaryRating;
+  const otherMetrics = metrics.filter((candidate) => candidate.condition !== condition);
+  return (
+    <div className={`legacy-win-card enemy ${side}`}>
+      <h2>Enemy Team's Win Condition</h2>
+      <div className="legacy-win-images">
+        <img className="legacy-condition-icon" src={conditionIconUrl(condition)} alt="" />
+        <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
+      </div>
+      <div className="enemy-other-conditions">
+        {otherMetrics.map((candidate) => (
+          <button key={candidate.condition} type="button" onClick={() => onSelect(candidate.condition)} aria-label={`Show enemy ${candidate.condition}`}>
+            <img src={conditionIconUrl(candidate.condition)} alt="" />
+          </button>
         ))}
       </div>
     </div>
@@ -688,6 +835,30 @@ function buildRoleRateMap(rows: ChampionRoleRate[] = []): RoleRateMap {
     map.set(row.championId, championRates);
   });
   return map;
+}
+
+function metricForCondition(metrics: WinConditionMetric[], condition: string) {
+  return metrics.find((metric) => metric.condition === condition);
+}
+
+function primaryMetric(metrics: WinConditionMetric[]) {
+  return metrics.find((metric) => metric.primary) ?? metrics[0];
+}
+
+function sortedAlternativeMetrics(metrics: WinConditionMetric[]) {
+  return [...metrics].sort((a, b) => {
+    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+    return b.games - a.games;
+  });
+}
+
+function scoreWidth(score: number) {
+  return Math.max(0, Math.min(100, (score / 25) * 100));
+}
+
+function livePlayerSide(liveGame: LiveGame): TeamSide {
+  const participant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
+  return participant?.teamId === 200 ? 'red' : 'blue';
 }
 
 function statKey(index: number, side: 'blue' | 'red') {

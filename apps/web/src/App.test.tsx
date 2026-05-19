@@ -378,10 +378,12 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Find live game'));
 
     await waitFor(() => expect(getWinConditionAnalysis).toHaveBeenCalled());
-    expect(await screen.findByText('Blue win condition')).toBeInTheDocument();
-    expect(screen.getByText('Pick B+')).toBeInTheDocument();
-    expect(screen.getByText('55.0%')).toBeInTheDocument();
-    expect(screen.getByText('11-9 over 20 similar comps')).toBeInTheDocument();
+    expect(await screen.findByText("Your Team's Win Condition")).toBeInTheDocument();
+    expect(screen.getByText('Alternatives')).toBeInTheDocument();
+    expect(screen.getByText('Winrate By Game Length')).toBeInTheDocument();
+    expect(screen.getByText("Enemy Team's Win Condition")).toBeInTheDocument();
+    expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
+    expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
     queryClient.clear();
   });
 });

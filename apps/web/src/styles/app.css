@@ -278,9 +278,10 @@ button {
   color: #f4f6f8;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: 1fr 1fr 1fr 1.18fr 1fr;
   margin: 0 auto 10px;
   max-width: 1500px;
+  min-height: 260px;
 }
 
 .win-condition-state {
@@ -293,177 +294,269 @@ button {
   text-align: center;
 }
 
-.win-condition-team {
+.legacy-win-card,
+.legacy-stats-section {
   background: #222;
-  border: 1px solid #2c2c2c;
+  border: 1px solid #ccc;
+  color: #fff;
   display: grid;
-  gap: 8px;
+  min-height: 0;
   min-width: 0;
   padding: 10px;
 }
 
-.win-condition-team.blue {
-  box-shadow: 0 0 10px 3px rgb(135 206 235 / 60%);
+.legacy-win-card {
+  align-content: start;
+  color: #000;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
 }
 
-.win-condition-team.red {
-  box-shadow: 0 0 10px 3px rgb(240 128 128 / 60%);
+.legacy-win-card.blue {
+  background: skyblue;
+  border-color: #87ceeb;
 }
 
-.win-condition-primary {
+.legacy-win-card.red {
+  background: lightcoral;
+  border-color: #f08080;
+}
+
+.legacy-win-card h2,
+.legacy-stats-section h2 {
+  font-size: 14px;
+  line-height: 1.1;
+  margin: 0;
+  text-align: center;
+}
+
+.legacy-stats-section h2 {
+  color: #fff;
+}
+
+.legacy-win-images {
   align-items: center;
-  display: grid;
-  gap: 9px;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
 }
 
-.win-condition-icon,
-.win-condition-rating {
-  height: 40px;
+.legacy-condition-icon,
+.legacy-rating-icon {
+  height: clamp(52px, 5vw, 92px);
   object-fit: contain;
-  width: 40px;
+  width: clamp(52px, 5vw, 92px);
 }
 
-.win-condition-title {
+.legacy-win-stat {
+  display: grid;
+  gap: 4px;
+  font-weight: 900;
+}
+
+.legacy-win-stat strong,
+.legacy-win-stat span {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.alternatives-section,
+.profile-compare-section,
+.chart-section {
+  align-content: start;
+  gap: 8px;
+}
+
+.alternative-list {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+}
+
+.alternative-item {
+  align-items: center;
+  background: #333;
+  border: 1px solid #ccc;
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 6px;
+  text-align: left;
+}
+
+.alternative-item:hover,
+.enemy-other-conditions button:hover {
+  border-color: #fff;
+}
+
+.alternative-images {
+  align-items: center;
+  display: flex;
+  gap: 0;
+}
+
+.alternative-images img {
+  height: 34px;
+  object-fit: contain;
+  width: 34px;
+}
+
+.alternative-images img + img {
+  margin-left: -6px;
+}
+
+.alternative-text {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.win-condition-title span {
-  color: #aeb8bf;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.win-condition-title strong {
-  color: #fff;
-  font-size: 18px;
-  line-height: 1.1;
-}
-
-.win-condition-summary {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px 8px;
-}
-
-.win-condition-summary strong {
-  font-size: 18px;
-}
-
-.win-condition-summary span {
-  color: #c9d1d6;
+.alternative-text strong {
   font-size: 12px;
-  font-weight: 700;
 }
 
-.win-condition-axes {
-  display: grid;
-  gap: 5px;
-}
-
-.win-condition-axis {
-  align-items: center;
-  background: rgb(0 0 0 / 20%);
-  border: 1px solid rgb(255 255 255 / 7%);
-  display: grid;
-  gap: 6px;
-  grid-template-columns: 22px 45px minmax(48px, 1fr) 30px 34px;
-  min-width: 0;
-  padding: 4px 6px;
-}
-
-.win-condition-axis.primary {
-  border-color: rgb(255 255 255 / 28%);
-}
-
-.win-condition-axis img {
-  height: 22px;
-  object-fit: contain;
-  width: 22px;
-}
-
-.win-condition-axis span,
-.win-condition-axis strong,
-.win-condition-axis em {
+.alternative-text em {
+  color: #c9d1d6;
   font-size: 11px;
   font-style: normal;
+}
+
+.profile-axis-list {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-axis-row {
+  align-items: center;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+}
+
+.axis-label {
+  align-items: center;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.axis-label img {
+  height: 25px;
+  object-fit: contain;
+  width: 25px;
+}
+
+.axis-label span {
+  color: #dce5ea;
+  font-size: 10px;
   font-weight: 900;
   line-height: 1;
 }
 
-.win-condition-axis span {
-  color: #dce5ea;
-}
-
-.win-condition-axis strong {
-  color: #fff;
-  text-align: right;
-}
-
-.win-condition-axis em {
-  color: #aeb8bf;
-  text-align: right;
-}
-
-.win-condition-bar {
+.axis-meter {
   background: rgb(255 255 255 / 12%);
-  height: 7px;
+  height: 10px;
   min-width: 0;
   overflow: hidden;
 }
 
-.win-condition-bar i {
-  background: #f3d478;
+.axis-meter i {
   display: block;
   height: 100%;
 }
 
-.win-condition-team.blue .win-condition-bar i {
+.axis-meter.blue i {
   background: #87ceeb;
+  margin-left: auto;
 }
 
-.win-condition-team.red .win-condition-bar i {
+.axis-meter.red i {
   background: #f08080;
 }
 
-.win-condition-buckets {
+.chart-shell {
   display: grid;
-  gap: 5px;
+  gap: 7px;
+  min-height: 0;
+}
+
+.winrate-chart {
+  background: rgb(0 0 0 / 18%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  height: 130px;
+  width: 100%;
+}
+
+.winrate-chart line {
+  stroke: rgb(255 255 255 / 16%);
+  stroke-width: 0.8;
+}
+
+.winrate-chart polyline {
+  fill: none;
+  stroke: #4bc0c0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.winrate-chart circle {
+  fill: #4bc0c0;
+  stroke: #fff;
+  stroke-width: 0.8;
+}
+
+.chart-labels {
+  display: grid;
+  gap: 4px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.win-condition-buckets span {
+.chart-labels span {
   background: rgb(0 0 0 / 20%);
   border: 1px solid rgb(255 255 255 / 7%);
   color: #f4f6f8;
   display: grid;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   gap: 2px;
   min-width: 0;
-  padding: 5px;
+  padding: 4px 2px;
   text-align: center;
 }
 
-.win-condition-buckets .thin-sample {
+.chart-labels .thin-sample {
   color: #aeb8bf;
 }
 
-.win-condition-buckets b {
+.chart-labels b {
   color: #aeb8bf;
-  font-size: 10px;
+  font-size: 9px;
 }
 
-.win-condition-versus {
-  align-self: center;
-  color: #d7dde1;
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
+.enemy-other-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.enemy-other-conditions button {
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 3px;
+}
+
+.enemy-other-conditions img {
+  height: 30px;
+  object-fit: contain;
+  width: 30px;
 }
 
 .cards-container {
@@ -883,10 +976,6 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .win-condition-versus {
-    display: none;
-  }
-
   .player-card,
   .match-build-card {
     min-width: 160px;
@@ -922,20 +1011,6 @@ button {
   .win-condition-panel {
     gap: 8px;
     margin-bottom: 8px;
-  }
-
-  .win-condition-primary {
-    grid-template-columns: 34px minmax(0, 1fr) 34px;
-  }
-
-  .win-condition-icon,
-  .win-condition-rating {
-    height: 34px;
-    width: 34px;
-  }
-
-  .win-condition-title strong {
-    font-size: 16px;
   }
 
   .champion-row,
