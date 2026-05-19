@@ -252,11 +252,11 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Find live game'));
 
     await waitFor(() => expect(screen.getByText('DIAMOND II')).toBeInTheDocument());
-    expect(screen.getByText('Winrate: 60.0%')).toBeInTheDocument();
-    expect(screen.getByText('Games: 50')).toBeInTheDocument();
-    expect(screen.getByText('Champ WR: 66.7%')).toBeInTheDocument();
-    expect(screen.getByText('KDA: 4.50')).toBeInTheDocument();
-    expect(screen.getByText('Avg: 7.0 / 3.0 / 6.5')).toBeInTheDocument();
+    expect(screen.getByText('60.0%')).toBeInTheDocument();
+    expect(screen.getByText('50')).toBeInTheDocument();
+    expect(screen.getByText('66.7%')).toBeInTheDocument();
+    expect(screen.getByText('4.50')).toBeInTheDocument();
+    expect(screen.getByText('7.0 / 3.0 / 6.5')).toBeInTheDocument();
     queryClient.clear();
   });
 

@@ -122,7 +122,13 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
 
   return (
     <section className={showLiveGame ? 'live-panel has-game' : 'live-panel search-only'}>
-      <div className="search-section">
+      <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
+        {!showLiveGame ? (
+          <div className="lookup-console-header">
+            <span>Summoner Search</span>
+            <strong>Live Match Lookup</strong>
+          </div>
+        ) : null}
         <div className={validationError ? 'search-bar invalid' : 'search-bar'}>
           <RadioTower className="search-mark" size={22} />
           <input
@@ -145,6 +151,7 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
           </button>
           <button className="search-button" onClick={search} title="Find live game" aria-label="Find live game">
             <Search size={19} />
+            <span>{showLiveGame ? 'Find' : 'Search'}</span>
           </button>
         </div>
         {showPlatforms && (

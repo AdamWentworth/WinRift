@@ -27,14 +27,19 @@ button {
 }
 
 .app-shell {
-  background: #333;
+  background:
+    radial-gradient(ellipse at 50% -20%, rgb(121 197 207 / 12%), transparent 46%),
+    linear-gradient(180deg, #303234 0%, #242628 72%, #101112 100%);
   min-height: 100vh;
 }
 
 .topbar {
   align-items: center;
-  background: #202020;
-  border-bottom: 1px solid #202020;
+  background:
+    linear-gradient(180deg, rgb(35 38 40 / 98%), rgb(26 28 30 / 98%)),
+    #202020;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
   display: flex;
   height: 77px;
   justify-content: space-between;
@@ -55,14 +60,18 @@ button {
 
 .search-only {
   align-items: center;
-  background: #333;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgb(116 202 214 / 10%), transparent 38%),
+    linear-gradient(180deg, #303234 0%, #2c2e30 72%, #111 100%);
   display: flex;
   justify-content: center;
 }
 
 .has-game .search-section {
-  background: #202020;
-  border-bottom: 1px solid #202020;
+  background:
+    linear-gradient(180deg, rgb(31 34 36 / 98%), rgb(24 26 28 / 98%)),
+    #202020;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
   padding: 8px 18px 14px;
 }
 
@@ -74,13 +83,53 @@ button {
   position: relative;
 }
 
+.lookup-console {
+  background:
+    radial-gradient(ellipse at 28% 0, rgb(130 215 255 / 13%), transparent 48%),
+    radial-gradient(ellipse at 78% 100%, rgb(240 128 128 / 10%), transparent 46%),
+    linear-gradient(180deg, rgb(35 38 40 / 96%), rgb(20 22 24 / 98%)),
+    #202020;
+  border: 1px solid rgb(255 255 255 / 10%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 8%),
+    0 18px 36px rgb(0 0 0 / 30%);
+  padding: 18px;
+}
+
+.lookup-console-header {
+  display: grid;
+  gap: 3px;
+  margin: 0 auto 12px;
+  text-align: center;
+}
+
+.lookup-console-header span {
+  color: #90a3ad;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.lookup-console-header strong {
+  color: #fff;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .search-bar {
   align-items: center;
-  background: #222;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 2%)),
+    #181a1b;
+  border: 1px solid rgb(255 255 255 / 9%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 24%);
   display: grid;
   gap: 8px;
-  grid-template-columns: 30px minmax(0, 1fr) 116px 46px;
+  grid-template-columns: 30px minmax(0, 1fr) 104px 104px;
   margin: 0 auto;
   padding: 10px;
   width: min(760px, 100%);
@@ -88,8 +137,10 @@ button {
 
 .has-game .search-bar {
   background: transparent;
+  border-color: transparent;
   box-shadow: none;
-  width: min(520px, 100%);
+  grid-template-columns: 30px minmax(0, 1fr) 86px 88px;
+  width: min(620px, 100%);
 }
 
 .search-mark {
@@ -125,20 +176,35 @@ button {
 }
 
 .server-button {
-  width: 116px;
+  width: 104px;
+}
+
+.has-game .server-button {
+  width: 86px;
+}
+
+.has-game .search-button {
+  width: 88px;
 }
 
 .server-options-row {
   align-items: center;
-  display: flex;
-  gap: 12px;
+  background:
+    linear-gradient(180deg, rgb(35 38 40 / 98%), rgb(18 20 22 / 98%)),
+    #202020;
+  border: 1px solid rgb(255 255 255 / 12%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 36%);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(58px, 1fr));
   justify-content: center;
   left: 50%;
-  margin-top: 20px;
+  margin-top: 8px;
+  padding: 10px;
   position: absolute;
   top: 100%;
   transform: translateX(-50%);
-  width: min(900px, calc(100vw - 24px));
+  width: min(390px, calc(100vw - 24px));
   z-index: 4;
 }
 
@@ -222,13 +288,22 @@ button {
   border: 0;
   color: #fff;
   display: inline-flex;
+  gap: 7px;
   height: 44px;
   justify-content: center;
-  width: 46px;
+  padding: 0 14px;
+  width: 104px;
 }
 
 .search-button:hover {
   background: #858585;
+}
+
+.search-button span {
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .search-message-card {
@@ -274,11 +349,38 @@ button {
 }
 
 .game-board {
-  background: #333;
+  background:
+    radial-gradient(ellipse at 50% 0, rgb(125 244 221 / 6%), transparent 30%),
+    #303234;
   min-height: calc(100vh - 120px);
   overflow-x: hidden;
   overflow-y: auto;
   padding: 10px 18px 24px;
+}
+
+.board-actions {
+  display: flex;
+  justify-content: center;
+  margin: -2px auto 10px;
+  max-width: 1500px;
+}
+
+.board-actions button {
+  background: rgb(0 0 0 / 28%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  color: #dce5ea;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 10px;
+  text-transform: uppercase;
+}
+
+.board-actions button:hover,
+.board-actions button:focus-visible {
+  border-color: #64efe8;
+  color: #fff;
+  outline: none;
 }
 
 .match-header {
@@ -1189,6 +1291,7 @@ button {
   gap: 10px;
   margin: 0 auto;
   max-width: 1500px;
+  position: relative;
 }
 
 .cards-container > .win-condition-panel {
@@ -1205,13 +1308,20 @@ button {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.mobile-lane-tabs {
+  display: none;
+}
+
 .lane-header-row {
   margin-bottom: -3px;
 }
 
 .lane-header-cell {
-  background: #202020;
-  border: 1px solid #474747;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
+    #202020;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-top: 2px solid rgb(100 239 232 / 34%);
   color: #dce5ea;
   font-size: 12px;
   font-weight: 900;
@@ -1236,6 +1346,19 @@ button {
   position: relative;
   transition: opacity 120ms ease, box-shadow 120ms ease, transform 120ms ease;
   user-select: none;
+}
+
+.card-drag-handle {
+  color: rgb(255 255 255 / 42%);
+  position: absolute;
+  right: 5px;
+  top: 70px;
+  z-index: 2;
+}
+
+.player-card:hover .card-drag-handle,
+.player-card:focus-within .card-drag-handle {
+  color: #fff;
 }
 
 .player-card::after {
@@ -1410,72 +1533,84 @@ button {
 
 .player-stat-columns {
   display: grid;
-  gap: 10px;
+  gap: 7px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  margin: 4px 0 12px;
+  margin: 5px 0 10px;
   min-width: 0;
 }
 
 .rank-info,
 .champion-performance {
   align-content: start;
-  background: rgb(12 14 15 / 72%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
+    rgb(12 14 15 / 72%);
   border: 1px solid rgb(255 255 255 / 9%);
   color: #f2f2f2;
   display: grid;
-  font-weight: 700;
-  gap: 2px;
+  gap: 6px;
   justify-items: center;
-  min-height: 76px;
+  min-height: 82px;
   min-width: 0;
-  padding: 7px 5px;
+  padding: 7px;
   text-align: center;
 }
 
 .stat-block-title {
   color: #8fa0aa;
   font-size: 9px;
+  font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
   text-transform: uppercase;
 }
 
-.tier-and-rank {
+.stat-chip-grid {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
+.stat-chip {
+  background: rgb(0 0 0 / 28%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 4px 3px;
+}
+
+.stat-chip.primary,
+.stat-chip.wide {
+  grid-column: 1 / -1;
+}
+
+.stat-chip strong {
   color: #fff;
-  font-size: 12px;
-  line-height: 1.1;
-  max-width: 100%;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.05;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-.winrate,
-.games-played,
-.champion-stat-line {
-  color: #d3d3d3;
-  font-size: 11px;
-  line-height: 1.15;
+.stat-chip em {
+  color: #8fa0aa;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
-.rank-missing .tier-and-rank,
-.rank-missing .winrate,
-.rank-missing .games-played,
-.stats-missing .champion-stat-main,
-.stats-missing .champion-stat-line {
-  color: #aaa;
-}
-
-.rank-unranked .winrate,
-.rank-unranked .games-played {
-  color: #b8b8b8;
-}
-
-.champion-stat-main {
-  color: #fff;
-  font-size: 12px;
-  line-height: 1.1;
+.rank-missing .stat-chip strong,
+.stats-missing .stat-chip strong,
+.rank-unranked .stat-chip strong {
+  color: #aeb8bf;
 }
 
 .card-loadout {
@@ -1543,25 +1678,25 @@ button {
 
 .match-build-card {
   background:
-    linear-gradient(180deg, rgb(36 38 39 / 96%), rgb(27 29 30 / 98%)),
+    linear-gradient(180deg, rgb(34 38 40 / 96%), rgb(23 26 28 / 98%)),
     #222;
-  border: 1px solid #ccc;
+  border: 1px solid rgb(255 255 255 / 10%);
   color: #f6f7f8;
   display: grid;
   gap: 6px;
-  min-height: 196px;
+  min-height: 168px;
   min-width: 0;
   padding: 8px;
 }
 
 .match-build-card.blue {
-  border-color: rgb(135 206 235 / 64%);
-  box-shadow: 0 0 7px 2px rgb(135 206 235 / 42%);
+  border-color: rgb(135 206 235 / 44%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%), 0 0 7px 1px rgb(135 206 235 / 24%);
 }
 
 .match-build-card.red {
-  border-color: rgb(240 128 128 / 64%);
-  box-shadow: 0 0 7px 2px rgb(240 128 128 / 42%);
+  border-color: rgb(240 128 128 / 44%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%), 0 0 7px 1px rgb(240 128 128 / 24%);
 }
 
 .build-heading {
@@ -1646,22 +1781,26 @@ button {
   display: grid;
   gap: 4px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  min-height: 86px;
+  min-height: 80px;
   min-width: 0;
   padding: 6px 5px;
   text-align: center;
 }
 
 .build-side.blue {
-  background: skyblue;
-  border-color: #87ceeb;
-  color: #000;
+  background:
+    linear-gradient(180deg, rgb(135 206 235 / 26%), rgb(135 206 235 / 14%)),
+    rgb(0 0 0 / 22%);
+  border-color: rgb(135 206 235 / 38%);
+  color: #f6fbff;
 }
 
 .build-side.red {
-  background: lightcoral;
-  border-color: #f08080;
-  color: #000;
+  background:
+    linear-gradient(180deg, rgb(240 128 128 / 27%), rgb(240 128 128 / 14%)),
+    rgb(0 0 0 / 22%);
+  border-color: rgb(240 128 128 / 38%);
+  color: #fff6f6;
 }
 
 .build-empty-state {
@@ -1675,13 +1814,13 @@ button {
 }
 
 .build-empty-state strong {
-  color: #111;
+  color: #f4f6f8;
   font-size: 12px;
   font-weight: 900;
 }
 
 .build-empty-state span {
-  color: rgb(0 0 0 / 66%);
+  color: #aeb8bf;
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
@@ -1710,8 +1849,8 @@ button {
 
 .item-slot-column {
   align-items: center;
-  background: rgb(0 0 0 / 12%);
-  border: 1px solid rgb(0 0 0 / 16%);
+  background: rgb(0 0 0 / 22%);
+  border: 1px solid rgb(255 255 255 / 8%);
   display: grid;
   gap: 3px;
   grid-template-rows: 14px 28px auto;
@@ -1734,9 +1873,9 @@ button {
 
 .item-slot-empty {
   align-items: center;
-  background: rgb(0 0 0 / 18%);
-  border: 1px solid rgb(0 0 0 / 18%);
-  color: #333;
+  background: rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  color: #aeb8bf;
   display: inline-flex;
   font-size: 10px;
   font-weight: 800;
@@ -1748,7 +1887,7 @@ button {
 }
 
 .item-slot-number {
-  color: #111;
+  color: #dce5ea;
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
@@ -1763,13 +1902,13 @@ button {
 }
 
 .item-slot-stats strong {
-  color: #111;
+  color: #fff;
   font-size: 11px;
   line-height: 1;
 }
 
 .item-slot-stats span {
-  color: #111;
+  color: #dce5ea;
   font-size: 9px;
   line-height: 1;
   overflow: hidden;
@@ -1836,7 +1975,7 @@ button {
   }
 
   .search-bar {
-    grid-template-columns: 1fr 92px 44px;
+    grid-template-columns: 1fr 92px 94px;
   }
 
   .search-mark {
@@ -1852,9 +1991,42 @@ button {
     margin-bottom: 8px;
   }
 
-  .champion-row,
-  .build-row,
+  .mobile-lane-tabs {
+    display: grid;
+    gap: 5px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mobile-lane-tabs button {
+    background: rgb(0 0 0 / 26%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    color: #b7c4cb;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1;
+    min-height: 32px;
+    padding: 0 3px;
+    text-transform: uppercase;
+  }
+
+  .mobile-lane-tabs button.selected {
+    background:
+      linear-gradient(180deg, rgb(100 239 232 / 18%), rgb(100 239 232 / 8%)),
+      rgb(0 0 0 / 30%);
+    border-color: #64efe8;
+    color: #fff;
+  }
+
   .lane-header-row {
+    display: none;
+  }
+
+  .mobile-hidden {
+    display: none;
+  }
+
+  .champion-row,
+  .build-row {
     grid-template-columns: 1fr;
     overflow-x: visible;
     padding: 0;
@@ -1906,7 +2078,7 @@ button {
     padding: 6px 4px;
   }
 
-  .ranked-icon {
+  .ranked-card-icon {
     height: 34px;
     right: 7px;
     top: 7px;
@@ -1919,11 +2091,8 @@ button {
     font-size: 10px;
   }
 
-  .tier-and-rank,
-  .winrate,
-  .games-played,
-  .champion-stat-line,
-  .champion-stat-main {
+  .stat-chip strong,
+  .stat-chip em {
     font-size: 9px;
   }
 
@@ -1949,11 +2118,20 @@ button {
     width: calc(100vw - 20px);
   }
 
-  .search-bar {
-    grid-template-columns: 1fr;
+  .lookup-console {
+    padding: 14px 10px;
   }
 
-  .server-button {
+  .search-bar {
+    grid-template-columns: 1fr;
+    padding: 9px;
+    width: 100%;
+  }
+
+  .server-button,
+  .has-game .server-button,
+  .search-button,
+  .has-game .search-button {
     width: 100%;
   }
 

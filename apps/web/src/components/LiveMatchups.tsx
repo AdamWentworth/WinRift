@@ -1,4 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
+import { GripVertical } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData, WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../api/types';
 import { getChampionRoleRates, getItemSlots, getWinConditionAnalysis } from '../api/client';
@@ -66,6 +67,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const [draggedCard, setDraggedCard] = useState<DraggedCard | null>(null);
   const [dragTarget, setDragTarget] = useState<DraggedCard | null>(null);
   const [manualOrder, setManualOrder] = useState(false);
+  const [selectedLaneIndex, setSelectedLaneIndex] = useState(0);
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
   const yourSide = livePlayerSide(liveGame);
@@ -87,6 +89,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     setManualOrder(false);
     setDraggedCard(null);
     setDragTarget(null);
+    setSelectedLaneIndex(0);
   }, [liveGame.gameId]);
 
   useEffect(() => {
@@ -162,7 +165,24 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
         blueTeam={blueTeam}
         redTeam={redTeam}
       />
+      {manualOrder ? (
+        <div className="board-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setManualOrder(false);
+              setBlueTeam(initialBlue);
+              setRedTeam(initialRed);
+              setDraggedCard(null);
+              setDragTarget(null);
+            }}
+          >
+            Reset Lane Order
+          </button>
+        </div>
+      ) : null}
       <div className="cards-container">
+        <LaneTabs selectedIndex={selectedLaneIndex} onSelect={setSelectedLaneIndex} />
         <LaneHeader />
         <div className="build-row blue-build-row">
           {pairs.map((pair, index) => {
@@ -178,6 +198,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
                 items={items}
                 itemSlots={statsByKey.get(statKey(index, 'blue'))?.itemSlots ?? []}
                 loading={statsByKey.get(statKey(index, 'blue'))?.loading ?? false}
+                mobileActive={index === selectedLaneIndex}
               />
             );
           })}
@@ -196,6 +217,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
               dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
               onDragStart={() => setDraggedCard({ side: 'blue', index })}
+              mobileActive={index === selectedLaneIndex}
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragTarget({ side: 'blue', index });
@@ -237,6 +259,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               dragging={draggedCard?.side === 'red' && draggedCard.index === index}
               dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
               onDragStart={() => setDraggedCard({ side: 'red', index })}
+              mobileActive={index === selectedLaneIndex}
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragTarget({ side: 'red', index });
@@ -270,6 +293,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
                 items={items}
                 itemSlots={statsByKey.get(statKey(index, 'red'))?.itemSlots ?? []}
                 loading={statsByKey.get(statKey(index, 'red'))?.loading ?? false}
+                mobileActive={index === selectedLaneIndex}
               />
             );
           })}
@@ -334,6 +358,23 @@ function LaneHeader() {
     <div className="lane-header-row" aria-label="Matchup lanes">
       {roles.map((role) => (
         <div className="lane-header-cell" key={role}>{roleLabels[role] ?? role}</div>
+      ))}
+    </div>
+  );
+}
+
+function LaneTabs({ selectedIndex, onSelect }: { selectedIndex: number; onSelect: (index: number) => void }) {
+  return (
+    <div className="mobile-lane-tabs" aria-label="Mobile lane selector">
+      {roles.map((role, index) => (
+        <button
+          className={index === selectedIndex ? 'selected' : ''}
+          key={role}
+          onClick={() => onSelect(index)}
+          type="button"
+        >
+          {roleLabels[role] ?? role}
+        </button>
       ))}
     </div>
   );
@@ -759,6 +800,7 @@ function LiveChampionCard({
   onDragOver,
   onDrop,
   onDragEnd,
+  mobileActive,
 }: {
   participant: LiveParticipant;
   index: number;
@@ -773,6 +815,7 @@ function LiveChampionCard({
   onDragOver: (event: DragEvent<HTMLElement>) => void;
   onDrop: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
+  mobileActive: boolean;
 }) {
   const champion = championByKey(champions, participant.championId);
   const championName = champion?.name ?? String(participant.championId);
@@ -785,7 +828,7 @@ function LiveChampionCard({
 
   return (
     <article
-      className={`player-card ${side}-style${dragging ? ' dragging' : ''}${dropTarget ? ' drop-target' : ''}`}
+      className={`player-card ${side}-style${dragging ? ' dragging' : ''}${dropTarget ? ' drop-target' : ''}${mobileActive ? ' mobile-active' : ' mobile-hidden'}`}
       draggable
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move';
@@ -798,6 +841,7 @@ function LiveChampionCard({
       title="Drag to reorder matchup slots"
     >
       {championBackdropUrl ? <img className="player-card-backdrop" src={championBackdropUrl} alt="" aria-hidden="true" /> : null}
+      <GripVertical className="card-drag-handle" size={16} aria-hidden="true" />
       <div className="card-topline">
         {championUrl ? <img className="profile-picture" src={championUrl} alt={championName} /> : <div className="profile-picture profile-fallback">{participant.championId}</div>}
         <img className="ranked-card-icon" src={rankIconUrl(participant.rank)} alt={participant.rank ? rankLabel(participant.rank) : 'Rank unavailable'} />
@@ -846,18 +890,22 @@ function RankRecord({ rank }: { rank?: RankedRecord }) {
     return (
       <div className="rank-info rank-missing">
         <div className="stat-block-title">Ranked</div>
-        <div className="tier-and-rank">Rank unavailable</div>
-        <div className="winrate">Winrate: --</div>
-        <div className="games-played">Games: --</div>
+        <div className="stat-chip-grid">
+          <StatChip label="Rank" value="Unavailable" primary />
+          <StatChip label="Winrate" value="--" />
+          <StatChip label="Games" value="--" />
+        </div>
       </div>
     );
   }
   return (
     <div className={`rank-info${rank.rankAvailable === false ? ' rank-unranked' : ''}`}>
       <div className="stat-block-title">Ranked</div>
-      <div className="tier-and-rank">{rankLabel(rank)}</div>
-      <div className="winrate">Winrate: {rank.winRate.toFixed(1)}%</div>
-      <div className="games-played">Games: {rank.totalGames}</div>
+      <div className="stat-chip-grid">
+        <StatChip label="Rank" value={rankLabel(rank)} primary />
+        <StatChip label="Winrate" value={`${rank.winRate.toFixed(1)}%`} />
+        <StatChip label="Games" value={String(rank.totalGames)} />
+      </div>
     </div>
   );
 }
@@ -867,21 +915,33 @@ function ChampionRecordBlock({ stats }: { stats?: ChampionRecord }) {
     return (
       <div className="champion-performance stats-missing">
         <div className="stat-block-title">Champion</div>
-        <div className="champion-stat-main">No stored games</div>
-        <div className="champion-stat-line">Champ WR: --</div>
-        <div className="champion-stat-line">KDA: --</div>
-        <div className="champion-stat-line">Avg: -- / -- / --</div>
+        <div className="stat-chip-grid">
+          <StatChip label="Games" value="0" primary />
+          <StatChip label="Champ WR" value="--" />
+          <StatChip label="KDA" value="--" />
+        </div>
       </div>
     );
   }
   return (
     <div className="champion-performance">
       <div className="stat-block-title">Champion</div>
-      <div className="champion-stat-main">{stats.games} games</div>
-      <div className="champion-stat-line">Champ WR: {stats.winRate.toFixed(1)}%</div>
-      <div className="champion-stat-line">KDA: {stats.kda.toFixed(2)}</div>
-      <div className="champion-stat-line">Avg: {stats.avgKills.toFixed(1)} / {stats.avgDeaths.toFixed(1)} / {stats.avgAssists.toFixed(1)}</div>
+      <div className="stat-chip-grid">
+        <StatChip label="Games" value={String(stats.games)} primary />
+        <StatChip label="Champ WR" value={`${stats.winRate.toFixed(1)}%`} />
+        <StatChip label="KDA" value={stats.kda.toFixed(2)} />
+        <StatChip label="Avg K/D/A" value={`${stats.avgKills.toFixed(1)} / ${stats.avgDeaths.toFixed(1)} / ${stats.avgAssists.toFixed(1)}`} wide />
+      </div>
     </div>
+  );
+}
+
+function StatChip({ label, value, primary, wide }: { label: string; value: string; primary?: boolean; wide?: boolean }) {
+  return (
+    <span className={`stat-chip${primary ? ' primary' : ''}${wide ? ' wide' : ''}`}>
+      <strong>{value}</strong>
+      <em>{label}</em>
+    </span>
   );
 }
 
@@ -894,6 +954,7 @@ function MatchupBuildCard({
   items,
   itemSlots,
   loading,
+  mobileActive,
 }: {
   role: string;
   side: TeamSide;
@@ -903,6 +964,7 @@ function MatchupBuildCard({
   items?: ItemData;
   itemSlots: AnalyticsItemSlot[];
   loading: boolean;
+  mobileActive: boolean;
 }) {
   const champion = championByKey(champions, participant.championId);
   const opponentChampion = championByKey(champions, opponent.championId);
@@ -911,7 +973,7 @@ function MatchupBuildCard({
   const scopeLabel = buildScopeLabel(itemSlots);
 
   return (
-    <article className={`match-build-card ${side}`}>
+    <article className={`match-build-card ${side}${mobileActive ? ' mobile-active' : ' mobile-hidden'}`}>
       <div className="build-heading">
         <span>{roleLabels[role] ?? role}</span>
         <strong>{champion?.name ?? participant.championId} vs {opponentChampion?.name ?? opponent.championId}</strong>
