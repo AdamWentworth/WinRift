@@ -90,10 +90,19 @@ The UI should disclose the fallback scope.
 
 Avoid over-selling math terms. "Confidence floor" is accurate but not friendly. Better UI language:
 
-- "Small sample"
-- "Early signal"
-- "Solid sample"
-- "Strong sample"
+- "Thin"
+- "Early"
+- "Useful"
+- "Strong"
+
+The live build row currently treats the largest populated item-slot sample as the quick-read signal:
+
+- `<5` games: thin
+- `<15` games: early
+- `<50` games: useful
+- `50+` games: strong
+
+This is deliberately simple and player-facing. The deeper Wilson-style confidence math still belongs in diagnostics and backend ranking, but the live card should not make players parse statistical language while loading into a match.
 
 ### Causal Guardrails
 

@@ -376,4 +376,6 @@ This is intentionally not the same as advantage. A stable `47%` can be strong ev
 
 The score is currently based on sample size plus Wilson interval stability. If the interval still overlaps even outcomes, the score is capped so the UI cannot over-sell noisy data.
 
+The live match read now shows the evidence level, a 0-100 evidence score, games, and likely winrate range next to the headline. This keeps the prose grounded: a good-sounding read with thin samples should feel tentative, while a modest edge with thousands of games can feel more credible.
+
 This is the right direction, but it should be revisited after we inspect real diagnostics output.

@@ -138,7 +138,7 @@ See [Legacy Win Condition Audit](legacy-win-condition-audit.md).
 ## MVP Order
 
 1. Team average rank and live clock.
-2. Role confidence labels.
+2. Role-aware card ordering using smite and collected champion role rates.
 3. Recent champion/role history panel.
 4. Comfort flags.
 5. Combined build plus team-strategy analytics.
@@ -155,3 +155,12 @@ The live match screen should feel like one cohesive match dashboard, not separat
 - Make alternatives feel like lightweight strategy chips instead of another large card competing with the primary read.
 - Keep the duration chart visually strong, but keep its language honest: these are game-length outcome buckets, not live minute-by-minute win probability.
 - Split the large live component into smaller components once the visual direction settles, so future changes are easier to reason about.
+
+Recent refinements:
+
+- Champion cards use splash art backdrops, with champion stats paired against ranked record in separate columns.
+- Ranked tier icon lives above the ranked record area so it mirrors the champion portrait/champion-stats relationship.
+- Role confidence is used behind the scenes for ordering but is hidden from the default card UI.
+- Build cards now show six item slots, clear sample-size language, and a better no-data state.
+- Live lookup loading and miss states are presented as status plates instead of loose text.
+- Win-condition match reads surface evidence strength, game count, and likely winrate range near the headline.
