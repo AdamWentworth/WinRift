@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
@@ -389,7 +389,10 @@ describe('App', () => {
     expect(screen.getByText('Primary pick read')).toBeInTheDocument();
     expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
     expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Show Enemy Plans SplitPush')).not.toBeInTheDocument();
+    const enemySplitPush = screen.getByLabelText('Show Enemy Plans SplitPush');
+    expect(within(enemySplitPush).getByText('SplitPush C-')).toBeInTheDocument();
+    expect(enemySplitPush).not.toHaveTextContent('80%');
+    expect(enemySplitPush).not.toHaveTextContent('20g');
     fireEvent.click(screen.getByLabelText('Show Enemy Plans Siege'));
     expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
     expect(screen.getByText('Enemy Siege B')).toBeInTheDocument();

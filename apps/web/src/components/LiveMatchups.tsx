@@ -486,6 +486,10 @@ function WinConditionPlanSwitches({
   selectedCondition,
   opponentCondition,
   primaryCondition,
+  axisOrder,
+  includeSelected = false,
+  maxItems = 3,
+  showStats = true,
   onSelect,
 }: {
   label: string;
@@ -493,31 +497,40 @@ function WinConditionPlanSwitches({
   selectedCondition: string;
   opponentCondition: string;
   primaryCondition: string;
+  axisOrder?: string[];
+  includeSelected?: boolean;
+  maxItems?: number;
+  showStats?: boolean;
   onSelect: (condition: string) => void;
 }) {
-  const alternatives = planSwitchMetrics(metrics, selectedCondition, opponentCondition, primaryCondition);
+  const alternatives = includeSelected
+    ? allPlanSwitchMetrics(metrics, opponentCondition, axisOrder)
+    : planSwitchMetrics(metrics, selectedCondition, opponentCondition, primaryCondition);
   return (
     <div className="strategy-switcher">
       <span className="strategy-switcher-title">{label}</span>
       <div className="strategy-switch-list">
         {alternatives.length > 0 ? (
-          alternatives.slice(0, 3).map((metric) => (
+          alternatives.slice(0, maxItems).map((metric) => (
             <button
-              className="strategy-switch"
+              className={`strategy-switch${metric.condition === selectedCondition ? ' selected' : ''}`}
               key={`${metric.condition}-${metric.opponentCondition}`}
               type="button"
               onClick={() => onSelect(metric.condition)}
+              aria-current={metric.condition === selectedCondition ? 'true' : undefined}
               aria-label={`Show ${label} ${metric.condition}`}
             >
               <img src={conditionIconUrl(metric.condition)} alt="" />
               <span>
                 <strong>{metric.condition} {metric.rating}</strong>
-                <em>{metric.condition === primaryCondition ? 'Primary · ' : ''}{metric.games > 0 ? `${metric.winRate.toFixed(0)}% · ${metric.games}g` : 'No sample'}</em>
+                {showStats ? (
+                  <em>{metric.condition === primaryCondition ? 'Primary · ' : ''}{metric.games > 0 ? `${metric.winRate.toFixed(0)}% · ${metric.games}g` : 'No sample'}</em>
+                ) : null}
               </span>
             </button>
           ))
         ) : (
-          <span className="strategy-switch-empty">No other strong plans</span>
+          <span className="strategy-switch-empty">{includeSelected ? 'No plans available' : 'No other strong plans'}</span>
         )}
       </div>
     </div>
@@ -719,6 +732,10 @@ function WinConditionEnemyCard({
         selectedCondition={condition}
         opponentCondition={opponentCondition}
         primaryCondition={team.primaryCondition}
+        axisOrder={team.axes.map((axis) => axis.label)}
+        includeSelected
+        maxItems={5}
+        showStats={false}
         onSelect={onSelect}
       />
     </div>
@@ -1262,6 +1279,25 @@ function planSwitchMetrics(metrics: WinConditionMetric[], selectedCondition: str
 
   const withoutPrimary = exactAlternatives.filter((metric) => metric.condition !== primaryCondition);
   return [primaryReturn, ...withoutPrimary].slice(0, 3);
+}
+
+function allPlanSwitchMetrics(metrics: WinConditionMetric[], opponentCondition: string, axisOrder: string[] = []) {
+  const byCondition = new Map<string, WinConditionMetric>();
+  metrics
+    .filter((metric) => metric.opponentCondition === opponentCondition)
+    .forEach((metric) => {
+      if (!byCondition.has(metric.condition)) {
+        byCondition.set(metric.condition, metric);
+      }
+    });
+
+  const ordered = axisOrder
+    .map((condition) => byCondition.get(condition))
+    .filter((metric): metric is WinConditionMetric => Boolean(metric));
+  const remaining = [...byCondition.values()]
+    .filter((metric) => !axisOrder.includes(metric.condition))
+    .sort((a, b) => ratingRank(b.rating) - ratingRank(a.rating));
+  return [...ordered, ...remaining];
 }
 
 function isPlayerFacingPlan(metric: WinConditionMetric) {
