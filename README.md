@@ -83,3 +83,5 @@ cd apps/web && npm test && npm run build
 - [Patch Lifecycle](docs/patch-lifecycle.md)
 - [ClickHouse Queries](docs/clickhouse-queries.md)
 - [Policy-Safe Live UX](docs/policy-safe-live-ux.md)
+- [Live Match Experience Roadmap](docs/live-match-experience-roadmap.md)
+- [Legacy Win Condition Audit](docs/legacy-win-condition-audit.md)
