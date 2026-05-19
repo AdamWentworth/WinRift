@@ -80,6 +80,18 @@ For a detached worker, follow progress with:
 make logs-worker
 ```
 
+To pause only the collector and leave ClickHouse/API running:
+
+```bash
+make stop-worker
+```
+
+That is just a wrapper for:
+
+```bash
+docker compose --profile worker stop worker
+```
+
 ## Full Shutdown
 
 Use this when putting the project down, especially before leaving the laptop unattended:

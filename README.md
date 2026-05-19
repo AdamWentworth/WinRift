@@ -36,6 +36,12 @@ http://localhost:8000/api/health
 
 The collector worker is behind the `worker` Compose profile so normal local startup will not spend Riot API budget. Run it explicitly with `make up-worker`, or call `POST /api/dev/collector/seed` in development. The worker can collect multiple Riot platforms via `COLLECTOR_PLATFORMS`, with per-platform budgets and optional Challenger-ladder auto-seeding.
 
+To pause collection while leaving ClickHouse/API up:
+
+```bash
+make stop-worker
+```
+
 To fully stop the project, including the profiled worker, use:
 
 ```bash
