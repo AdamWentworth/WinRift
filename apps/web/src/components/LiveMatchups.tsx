@@ -753,11 +753,13 @@ function LiveChampionCard({
           <div className="champion-name">{championName}</div>
         </div>
       </div>
-      <div className="card-context-row">
-        {comfortFlags.map((flag) => (
-          <span className={`comfort-flag ${flag.tone}`} key={flag.label}>{flag.label}</span>
-        ))}
-      </div>
+      {comfortFlags.length > 0 ? (
+        <div className="card-context-row">
+          {comfortFlags.map((flag) => (
+            <span className={`comfort-flag ${flag.tone}`} key={flag.label}>{flag.label}</span>
+          ))}
+        </div>
+      ) : null}
       <div className="player-stat-columns">
         <ChampionRecordBlock stats={participant.championStats} />
         <RankRecord rank={participant.rank} />
