@@ -210,6 +210,66 @@ ORDER BY
     minute_mark
 );
 
+CREATE TABLE IF NOT EXISTS winrift.match_team_win_conditions
+(
+    patch LowCardinality(String),
+    platform LowCardinality(String),
+    queue_id UInt16,
+    match_id String,
+    team_id UInt16,
+    win UInt8,
+    duration_seconds UInt32,
+    champion_ids Array(UInt16),
+    rank_bucket LowCardinality(String),
+    splitpush_score UInt8,
+    pick_score UInt8,
+    siege_score UInt8,
+    control_score UInt8,
+    teamfight_score UInt8,
+    splitpush_rating LowCardinality(String),
+    pick_rating LowCardinality(String),
+    siege_rating LowCardinality(String),
+    control_rating LowCardinality(String),
+    teamfight_rating LowCardinality(String),
+    primary_condition LowCardinality(String),
+    primary_rating LowCardinality(String),
+    profile_patch LowCardinality(String),
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY (patch, platform, queue_id, match_id, team_id);
+
+CREATE TABLE IF NOT EXISTS winrift.patch_win_condition_metrics
+(
+    patch LowCardinality(String),
+    platform LowCardinality(String),
+    queue_id UInt16,
+    rank_bucket LowCardinality(String),
+    team_condition LowCardinality(String),
+    team_rating LowCardinality(String),
+    opponent_condition LowCardinality(String),
+    opponent_rating LowCardinality(String),
+    team_primary UInt8,
+    game_length_bucket LowCardinality(String),
+    wins UInt64,
+    games UInt64,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY
+(
+    patch,
+    platform,
+    queue_id,
+    rank_bucket,
+    team_condition,
+    team_rating,
+    opponent_condition,
+    opponent_rating,
+    team_primary,
+    game_length_bucket
+);
+
 CREATE TABLE IF NOT EXISTS winrift.timeline_participant_frames
 (
     match_id String,

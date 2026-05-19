@@ -180,6 +180,8 @@ export type WinConditionAnalysisResponse = {
     queueId: number;
     patch: string;
     rankBucket: string;
+    metricSource: string;
+    compiledMetricRows: number;
     rawTeamRows: number;
     filteredTeamRows: number;
   };

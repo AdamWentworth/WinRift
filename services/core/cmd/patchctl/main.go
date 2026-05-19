@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	action := flag.String("action", "", "one of: collecting, compile, delete-raw")
+	action := flag.String("action", "", "one of: collecting, compile, win-conditions, delete-raw")
 	patch := flag.String("patch", "", "patch bucket, for example 16.10")
 	platform := flag.String("platform", "NA1", "platform route")
 	queueID := flag.Int("queue", 420, "queue id")
@@ -22,7 +22,7 @@ func main() {
 	flag.Parse()
 
 	if *action == "" || *patch == "" {
-		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|delete-raw -patch 16.10 [-platform NA1] [-queue 420] [-retain-days 30]")
+		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|win-conditions|delete-raw -patch 16.10 [-platform NA1] [-queue 420] [-retain-days 30]")
 		os.Exit(2)
 	}
 
@@ -40,6 +40,8 @@ func main() {
 	case "compile":
 		retainedUntil := time.Now().Add(time.Duration(*retainDays) * 24 * time.Hour)
 		err = repo.CompilePatchMetrics(ctx, *patch, normalizedPlatform, uint16(*queueID), retainedUntil)
+	case "win-conditions":
+		err = repo.RefreshWinConditionMetrics(ctx, *patch, normalizedPlatform, uint16(*queueID))
 	case "delete-raw":
 		err = repo.DeleteRawPatchData(ctx, *patch, normalizedPlatform, uint16(*queueID))
 	default:

@@ -45,6 +45,22 @@ Compact closed-patch item timing metrics for first, second, and third non-trinke
 
 Compact closed-patch participant power-curve metrics at 10, 15, and 20 minutes.
 
+## `match_team_win_conditions`
+
+Derived one-row-per-team match strategy profile.
+
+Important columns: match, platform, patch, queue, team id, win/loss, duration, champion ids, team rank bucket, five win-condition scores, five letter ratings, primary condition, primary rating, and profile patch.
+
+This table is generated from raw participant rows plus `services/core/internal/winconditions/champion_profiles.json`; it does not come from Riot directly.
+
+## `patch_win_condition_metrics`
+
+Compiled win-condition matchup metrics used by the live UI.
+
+Dimensions: patch, platform, queue, rank bucket, team condition, team rating, opponent primary condition, opponent primary rating, whether the team condition was the team's primary identity, and game-length bucket.
+
+Measures: wins and games. The API computes winrate and Wilson lower-bound confidence.
+
 ## `participants`
 
 One row per player per match.

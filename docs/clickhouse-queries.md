@@ -159,3 +159,44 @@ WHERE patch = '16.10'
 ORDER BY win_rate DESC, games DESC
 LIMIT 25;
 ```
+
+## Win-Condition Team Rows
+
+```sql
+SELECT
+  patch,
+  platform,
+  count() AS team_rows,
+  uniqExact(match_id) AS matches
+FROM match_team_win_conditions FINAL
+GROUP BY patch, platform
+ORDER BY patch DESC, platform;
+```
+
+## Win-Condition Matchup Metrics
+
+```sql
+SELECT
+  team_condition,
+  team_rating,
+  opponent_condition,
+  opponent_rating,
+  game_length_bucket,
+  sum(wins) AS wins,
+  sum(games) AS games,
+  wins / games AS win_rate
+FROM patch_win_condition_metrics FINAL
+WHERE patch = '16.10'
+  AND queue_id = 420
+  AND team_condition = 'Pick'
+  AND team_rating = 'B'
+  AND opponent_condition = 'Siege'
+  AND opponent_rating = 'B'
+GROUP BY
+  team_condition,
+  team_rating,
+  opponent_condition,
+  opponent_rating,
+  game_length_bucket
+ORDER BY game_length_bucket;
+```

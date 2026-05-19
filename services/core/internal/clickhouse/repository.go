@@ -451,6 +451,9 @@ func (r *Repository) CompilePatchMetrics(ctx context.Context, patch, platform st
 	if err := r.compilePatchPowerCurveMetrics(ctx, patch, platform, queueID); err != nil {
 		return err
 	}
+	if err := r.RefreshWinConditionMetrics(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
 	if err := r.deleteLiveBuildAggregate(ctx, patch, platform, queueID); err != nil {
 		return err
 	}
@@ -520,6 +523,8 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch FROM patch_build_metrics
 			UNION ALL SELECT patch FROM patch_item_timing_metrics
 			UNION ALL SELECT patch FROM patch_power_curve_metrics
+			UNION ALL SELECT patch FROM match_team_win_conditions
+			UNION ALL SELECT patch FROM patch_win_condition_metrics
 			UNION ALL SELECT patch FROM patch_snapshots
 		)
 		WHERE patch != ''
@@ -559,6 +564,8 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "patch_build_metrics", column: "patch"},
 		{table: "patch_item_timing_metrics", column: "patch"},
 		{table: "patch_power_curve_metrics", column: "patch"},
+		{table: "match_team_win_conditions", column: "patch"},
+		{table: "patch_win_condition_metrics", column: "patch"},
 		{table: "patch_snapshots", column: "patch"},
 	}
 	for _, patch := range patches {

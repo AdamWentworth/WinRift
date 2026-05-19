@@ -394,6 +394,8 @@ const winConditionFixture = vi.hoisted(() => ({
     queueId: 420,
     patch: '',
     rankBucket: '',
+    metricSource: 'raw',
+    compiledMetricRows: 0,
     rawTeamRows: 20,
     filteredTeamRows: 20,
   },

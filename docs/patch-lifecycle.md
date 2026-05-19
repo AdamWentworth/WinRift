@@ -30,9 +30,21 @@ Compile writes:
 - `patch_build_metrics`
 - `patch_item_timing_metrics`
 - `patch_power_curve_metrics`
+- `match_team_win_conditions`
+- `patch_win_condition_metrics`
 - `patch_snapshots`
 
 It also clears that patch from the live `build_analytics_mv` so closed patch results come from compact metrics and do not double-count.
+
+## Refresh Win-Condition Metrics Only
+
+Win-condition metrics can be refreshed without closing a patch or touching build metrics:
+
+```bash
+docker compose run --rm api /winrift-patchctl -action win-conditions -patch 16.10 -platform NA1 -queue 420
+```
+
+This is useful during active collection because the live UI can read fast compiled strategy metrics while raw match rows continue to grow.
 
 ## Delete Raw Closed-Patch Data
 
@@ -51,6 +63,11 @@ This removes raw/detailed rows for the patch:
 - live build aggregate rows
 
 Compact patch metrics remain.
+
+Derived win-condition rows and metrics also remain:
+
+- `match_team_win_conditions`
+- `patch_win_condition_metrics`
 
 ## Start A Patch
 
