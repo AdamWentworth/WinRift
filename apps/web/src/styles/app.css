@@ -683,6 +683,16 @@ button {
   gap: 5px;
 }
 
+.strategy-switcher.compact {
+  gap: 5px;
+  padding: 6px;
+}
+
+.strategy-switcher.compact .strategy-switch-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
 .strategy-switch {
   align-items: center;
   background:
@@ -696,6 +706,12 @@ button {
   min-width: 0;
   padding: 5px;
   text-align: left;
+}
+
+.strategy-switcher.compact .strategy-switch {
+  gap: 4px;
+  grid-template-columns: 19px minmax(0, 1fr);
+  padding: 4px;
 }
 
 .strategy-switch:hover,
@@ -722,6 +738,11 @@ button {
   width: 24px;
 }
 
+.strategy-switcher.compact .strategy-switch img {
+  height: 19px;
+  width: 19px;
+}
+
 .strategy-switch span {
   display: grid;
   gap: 1px;
@@ -740,6 +761,10 @@ button {
   font-size: 10px;
   font-weight: 900;
   line-height: 1.05;
+}
+
+.strategy-switcher.compact .strategy-switch strong {
+  font-size: 9px;
 }
 
 .strategy-switch em {

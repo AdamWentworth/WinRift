@@ -437,7 +437,7 @@ function WinConditionSummaryCard({
         {metric && metric.games > 0 ? (
           <>
             <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
-            <span>Plan: {metric.planLabel ?? planLabelFallback(metric)}</span>
+            <span>Strategy: {metric.planLabel ?? planLabelFallback(metric)}</span>
             <span>Total Games: {metric.games}</span>
             <span>Confidence: {metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</span>
           </>
@@ -445,14 +445,14 @@ function WinConditionSummaryCard({
           <>
             <strong>Win Rate: --</strong>
             <span>Total Games: 0</span>
-            <span>Evidence: No sample</span>
+            <span>Confidence: No sample</span>
           </>
         )}
       </div>
       <WinConditionProfileBars team={team} selectedCondition={condition} />
       {metrics && opponentCondition && onSelect ? (
         <WinConditionPlanSwitches
-          label="Other Plans"
+          label="Other Strategies"
           metrics={metrics}
           selectedCondition={selectedCondition ?? condition}
           opponentCondition={opponentCondition}
@@ -487,7 +487,8 @@ function WinConditionPlanSwitches({
   opponentCondition,
   primaryCondition,
   axisOrder,
-  includeSelected = false,
+  allStrategies = false,
+  compact = false,
   maxItems = 3,
   showStats = true,
   onSelect,
@@ -498,16 +499,17 @@ function WinConditionPlanSwitches({
   opponentCondition: string;
   primaryCondition: string;
   axisOrder?: string[];
-  includeSelected?: boolean;
+  allStrategies?: boolean;
+  compact?: boolean;
   maxItems?: number;
   showStats?: boolean;
   onSelect: (condition: string) => void;
 }) {
-  const alternatives = includeSelected
-    ? allPlanSwitchMetrics(metrics, opponentCondition, axisOrder)
+  const alternatives = allStrategies
+    ? allPlanSwitchMetrics(metrics, opponentCondition, axisOrder, selectedCondition)
     : planSwitchMetrics(metrics, selectedCondition, opponentCondition, primaryCondition);
   return (
-    <div className="strategy-switcher">
+    <div className={`strategy-switcher${compact ? ' compact' : ''}`}>
       <span className="strategy-switcher-title">{label}</span>
       <div className="strategy-switch-list">
         {alternatives.length > 0 ? (
@@ -530,7 +532,7 @@ function WinConditionPlanSwitches({
             </button>
           ))
         ) : (
-          <span className="strategy-switch-empty">{includeSelected ? 'No plans available' : 'No other strong plans'}</span>
+          <span className="strategy-switch-empty">{allStrategies ? 'No strategies available' : 'No other strong strategies'}</span>
         )}
       </div>
     </div>
@@ -724,17 +726,18 @@ function WinConditionEnemyCard({
       <WinConditionProfileBars team={team} selectedCondition={condition} />
       <div className="enemy-strategy-note">
         <strong>Adjust The Read</strong>
-        <span>If the enemy is clearly playing through another plan, select that strategy below to update the matchup context.</span>
+        <span>If the enemy is clearly playing through another strategy, select it below to update the matchup context.</span>
       </div>
       <WinConditionPlanSwitches
-        label="Enemy Plans"
+        label="Enemy Strategies"
         metrics={metrics}
         selectedCondition={condition}
         opponentCondition={opponentCondition}
         primaryCondition={team.primaryCondition}
         axisOrder={team.axes.map((axis) => axis.label)}
-        includeSelected
-        maxItems={5}
+        allStrategies
+        compact
+        maxItems={4}
         showStats={false}
         onSelect={onSelect}
       />
@@ -1281,10 +1284,10 @@ function planSwitchMetrics(metrics: WinConditionMetric[], selectedCondition: str
   return [primaryReturn, ...withoutPrimary].slice(0, 3);
 }
 
-function allPlanSwitchMetrics(metrics: WinConditionMetric[], opponentCondition: string, axisOrder: string[] = []) {
+function allPlanSwitchMetrics(metrics: WinConditionMetric[], opponentCondition: string, axisOrder: string[] = [], excludedCondition?: string) {
   const byCondition = new Map<string, WinConditionMetric>();
   metrics
-    .filter((metric) => metric.opponentCondition === opponentCondition)
+    .filter((metric) => metric.opponentCondition === opponentCondition && metric.condition !== excludedCondition)
     .forEach((metric) => {
       if (!byCondition.has(metric.condition)) {
         byCondition.set(metric.condition, metric);
@@ -1341,7 +1344,7 @@ function planLabelFallback(metric?: WinConditionMetric) {
 function planPairRead(metric: WinConditionMetric) {
   const ownPlan = metric.planLabel ?? planLabelFallback(metric);
   const enemyPlan = metric.opponentPlanLabel ?? (metric.opponentPrimary ? 'Primary' : 'Alternative');
-  return `Plan context: your ${metric.condition} is a ${ownPlan.toLowerCase()} into the enemy ${metric.opponentCondition} ${enemyPlan.toLowerCase()}.`;
+  return `Strategy context: your ${metric.condition} is ${ownPlan.toLowerCase()} into the enemy ${metric.opponentCondition} ${enemyPlan.toLowerCase()}.`;
 }
 
 function livePlayerSide(liveGame: LiveGame): TeamSide {

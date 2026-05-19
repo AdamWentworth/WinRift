@@ -379,8 +379,8 @@ describe('App', () => {
 
     await waitFor(() => expect(getWinConditionAnalysis).toHaveBeenCalled());
     expect(await screen.findByText("Your Team's Win Condition")).toBeInTheDocument();
-    expect(screen.getByText('Other Plans')).toBeInTheDocument();
-    expect(screen.getByText('Enemy Plans')).toBeInTheDocument();
+    expect(screen.getByText('Other Strategies')).toBeInTheDocument();
+    expect(screen.getByText('Enemy Strategies')).toBeInTheDocument();
     expect(screen.getByText('Match Read')).toBeInTheDocument();
     expect(screen.getByText('Winrate By Game Length')).toBeInTheDocument();
     expect(screen.getByText("Enemy Team's Win Condition")).toBeInTheDocument();
@@ -389,14 +389,16 @@ describe('App', () => {
     expect(screen.getByText('Primary pick read')).toBeInTheDocument();
     expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
     expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
-    const enemySplitPush = screen.getByLabelText('Show Enemy Plans SplitPush');
+    const enemySplitPush = screen.getByLabelText('Show Enemy Strategies SplitPush');
     expect(within(enemySplitPush).getByText('SplitPush C-')).toBeInTheDocument();
     expect(enemySplitPush).not.toHaveTextContent('80%');
     expect(enemySplitPush).not.toHaveTextContent('20g');
-    fireEvent.click(screen.getByLabelText('Show Enemy Plans Siege'));
+    expect(screen.queryByLabelText('Show Enemy Strategies Control')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Show Enemy Strategies Siege'));
     expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
     expect(screen.getByText('Enemy Siege B')).toBeInTheDocument();
-    expect(screen.getByLabelText('Show Enemy Plans Control')).toBeInTheDocument();
+    expect(screen.getByLabelText('Show Enemy Strategies Control')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Show Enemy Strategies Siege')).not.toBeInTheDocument();
     expect(screen.getByText('Siege response read')).toBeInTheDocument();
     queryClient.clear();
   });
