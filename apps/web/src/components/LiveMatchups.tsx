@@ -743,16 +743,22 @@ function LiveChampionCard({
         <RankRecord rank={participant.rank} />
       </div>
       <div className="card-loadout">
-        <div className="summoner-spells">
-          {[participant.spell1Id, participant.spell2Id].map((spellId) => {
-            const imageUrl = summonerSpellImageUrl(spells, spellId);
-            const name = summonerSpellName(spells, spellId);
-            return imageUrl ? <img key={spellId} src={imageUrl} alt={name} title={name} /> : <span className="spell-pill" key={spellId}>{spellId}</span>;
-          })}
+        <div className="loadout-group">
+          <span>Spells</span>
+          <div className="summoner-spells">
+            {[participant.spell1Id, participant.spell2Id].map((spellId) => {
+              const imageUrl = summonerSpellImageUrl(spells, spellId);
+              const name = summonerSpellName(spells, spellId);
+              return imageUrl ? <img key={spellId} src={imageUrl} alt={name} title={name} /> : <span className="spell-pill" key={spellId}>{spellId}</span>;
+            })}
+          </div>
         </div>
-        <div className="runes">
-          <RuneIcon runes={runes} runeId={keystoneId} />
-          <RuneStyleIcon runes={runes} styleId={secondaryStyleId} />
+        <div className="loadout-group">
+          <span>Runes</span>
+          <div className="runes">
+            <RuneIcon runes={runes} runeId={keystoneId} />
+            <RuneStyleIcon runes={runes} styleId={secondaryStyleId} />
+          </div>
         </div>
       </div>
     </article>
@@ -785,7 +791,7 @@ function ChampionRecordBlock({ stats }: { stats?: ChampionRecord }) {
     return (
       <div className="champion-performance stats-missing">
         <div className="stat-block-title">Champion</div>
-        <div className="champion-stat-main">No samples</div>
+        <div className="champion-stat-main">No stored games</div>
         <div className="champion-stat-line">Champ WR: --</div>
         <div className="champion-stat-line">KDA: --</div>
         <div className="champion-stat-line">Avg: -- / -- / --</div>

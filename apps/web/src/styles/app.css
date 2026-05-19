@@ -1130,9 +1130,23 @@ button {
 .card-loadout {
   align-items: center;
   display: grid;
-  gap: 12px;
+  gap: 8px;
   grid-template-columns: 1fr 1fr;
   justify-items: center;
+}
+
+.loadout-group {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+}
+
+.loadout-group > span {
+  color: #8fa0aa;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .summoner-spells,
