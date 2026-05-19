@@ -1,7 +1,7 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData } from '../api/types';
-import { getItemSlots } from '../api/client';
+import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData } from '../api/types';
+import { getChampionRoleRates, getItemSlots } from '../api/client';
 import {
   championByKey,
   championImageUrl,
@@ -45,22 +45,41 @@ type DraggedCard = {
   index: number;
 };
 
+type RoleRateMap = Map<number, Map<string, ChampionRoleRate>>;
+
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
-  const initialBlue = useMemo(() => orderTeam(liveGame.participants.filter((participant) => participant.teamId === 100)), [liveGame.participants]);
-  const initialRed = useMemo(() => orderTeam(liveGame.participants.filter((participant) => participant.teamId === 200)), [liveGame.participants]);
+  const liveChampionIds = useMemo(() => uniqueChampionIds(liveGame.participants), [liveGame.participants]);
+  const roleRatesQuery = useQuery({
+    queryKey: ['champion-role-rates', liveGame.gameQueueConfigId, liveChampionIds],
+    queryFn: () => getChampionRoleRates(liveChampionIds, liveGame.gameQueueConfigId),
+    enabled: liveChampionIds.length > 0,
+    staleTime: 5 * 60_000,
+  });
+  const roleRates = useMemo(() => buildRoleRateMap(roleRatesQuery.data?.results), [roleRatesQuery.data?.results]);
+  const initialBlue = useMemo(() => orderTeam(liveGame.participants.filter((participant) => participant.teamId === 100), roleRates), [liveGame.participants, roleRates]);
+  const initialRed = useMemo(() => orderTeam(liveGame.participants.filter((participant) => participant.teamId === 200), roleRates), [liveGame.participants, roleRates]);
   const [blueTeam, setBlueTeam] = useState(initialBlue);
   const [redTeam, setRedTeam] = useState(initialRed);
   const [draggedCard, setDraggedCard] = useState<DraggedCard | null>(null);
   const [dragTarget, setDragTarget] = useState<DraggedCard | null>(null);
+  const [manualOrder, setManualOrder] = useState(false);
 
   useEffect(() => {
+    setManualOrder(false);
+    setDraggedCard(null);
+    setDragTarget(null);
+  }, [liveGame.gameId]);
+
+  useEffect(() => {
+    if (manualOrder) return;
     setBlueTeam(initialBlue);
     setRedTeam(initialRed);
     setDraggedCard(null);
     setDragTarget(null);
-  }, [initialBlue, initialRed, liveGame.gameId]);
+  }, [initialBlue, initialRed, manualOrder]);
 
   const moveCardToIndex = (side: TeamSide, fromIndex: number, toIndex: number) => {
+    setManualOrder(true);
     if (side === 'blue') {
       setBlueTeam((team) => moveParticipantToIndex(team, fromIndex, toIndex));
       return;
@@ -463,14 +482,85 @@ function moveParticipantToIndex(team: LiveParticipant[], fromIndex: number, toIn
   return next;
 }
 
-function orderTeam(team: LiveParticipant[]) {
+function orderTeam(team: LiveParticipant[], roleRates: RoleRateMap = new Map()) {
   if (team.length !== 5) return team;
-  const smiteIndex = team.findIndex((participant) => participant.spell1Id === 11 || participant.spell2Id === 11);
-  if (smiteIndex <= -1 || smiteIndex === 1) return team;
-  const next = [...team];
-  const [jungler] = next.splice(smiteIndex, 1);
-  next.splice(1, 0, jungler);
-  return next;
+  const roleAssignments = new Map<string, LiveParticipant>();
+  const lockedParticipants = new Set<LiveParticipant>();
+  const smiters = team.filter(hasSmite);
+  if (smiters.length === 1) {
+    roleAssignments.set('JUNGLE', smiters[0]);
+    lockedParticipants.add(smiters[0]);
+  }
+
+  const openRoles = roles.filter((role) => !roleAssignments.has(role));
+  const openParticipants = team.filter((participant) => !lockedParticipants.has(participant));
+  const best = bestRoleAssignment(openParticipants, openRoles, team, roleRates);
+  best.forEach((participant, role) => roleAssignments.set(role, participant));
+
+  return roles.map((role) => roleAssignments.get(role)).filter((participant): participant is LiveParticipant => Boolean(participant));
+}
+
+function bestRoleAssignment(participants: LiveParticipant[], openRoles: string[], originalTeam: LiveParticipant[], roleRates: RoleRateMap) {
+  const best = {
+    score: Number.NEGATIVE_INFINITY,
+    assignments: new Map<string, LiveParticipant>(),
+  };
+  const used = new Set<number>();
+  const current = new Map<string, LiveParticipant>();
+
+  function visit(roleIndex: number, score: number) {
+    if (roleIndex >= openRoles.length) {
+      if (score > best.score) {
+        best.score = score;
+        best.assignments = new Map(current);
+      }
+      return;
+    }
+    const role = openRoles[roleIndex];
+    for (let index = 0; index < participants.length; index++) {
+      if (used.has(index)) continue;
+      const participant = participants[index];
+      used.add(index);
+      current.set(role, participant);
+      visit(roleIndex + 1, score + roleScore(participant, role, originalTeam, roleRates));
+      current.delete(role);
+      used.delete(index);
+    }
+  }
+
+  visit(0, 0);
+  return best.assignments;
+}
+
+function roleScore(participant: LiveParticipant, role: string, originalTeam: LiveParticipant[], roleRates: RoleRateMap) {
+  const ratesForChampion = roleRates.get(participant.championId);
+  const rate = ratesForChampion?.get(role);
+  const sampleWeight = rate ? Math.min(1, Math.sqrt(rate.totalGames) / 5) : 0;
+  const popularityScore = rate ? rate.pickRate * sampleWeight : 0;
+  const originalIndex = originalTeam.indexOf(participant);
+  const targetIndex = roles.indexOf(role);
+  const orderTiebreaker = Math.max(0, 5 - Math.abs(originalIndex - targetIndex)) / 1000;
+  const smiteScore = hasSmite(participant) && role === 'JUNGLE' ? 500 : 0;
+  const smitePenalty = hasSmite(participant) && role !== 'JUNGLE' ? -500 : 0;
+  return popularityScore + smiteScore + smitePenalty + orderTiebreaker;
+}
+
+function hasSmite(participant: LiveParticipant) {
+  return participant.spell1Id === 11 || participant.spell2Id === 11;
+}
+
+function uniqueChampionIds(participants: LiveParticipant[]) {
+  return [...new Set(participants.map((participant) => participant.championId).filter(Boolean))].sort((a, b) => a - b);
+}
+
+function buildRoleRateMap(rows: ChampionRoleRate[] = []): RoleRateMap {
+  const map: RoleRateMap = new Map();
+  rows.forEach((row) => {
+    const championRates = map.get(row.championId) ?? new Map<string, ChampionRoleRate>();
+    championRates.set(row.role, row);
+    map.set(row.championId, championRates);
+  });
+  return map;
 }
 
 function statKey(index: number, side: 'blue' | 'red') {

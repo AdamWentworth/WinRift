@@ -39,6 +39,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
+	mux.HandleFunc("GET /api/analytics/champion-roles", s.analyticsChampionRoles)
 	mux.HandleFunc("GET /api/static/{kind}", s.staticData)
 	mux.HandleFunc("POST /api/dev/collector/seed", s.seedCollector)
 	return s.cors(mux)
@@ -236,6 +237,28 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 			"patchBucket": row.PatchBucket, "rankBucket": row.RankBucket,
 			"itemSlot": row.ItemSlot, "itemId": row.ItemID,
 			"wins": row.Wins, "games": row.Games, "winRate": round(row.WinRate * 100), "confidence": round(row.Confidence * 100),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+func (s Server) analyticsChampionRoles(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	championIDs := queryUint16List(query.Get("championIds"))
+	queueID := uint16(queryInt(query.Get("queueId"), 420))
+	rows, err := s.repo.ChampionRoleRates(r.Context(), championIDs, queueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"championId": row.ChampionID,
+			"role":       row.Role,
+			"games":      row.Games,
+			"totalGames": row.TotalGames,
+			"pickRate":   round(row.PickRate * 100),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
@@ -921,6 +944,25 @@ func queryInt(value string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func queryUint16List(value string) []uint16 {
+	parts := strings.Split(value, ",")
+	out := make([]uint16, 0, len(parts))
+	seen := map[uint16]bool{}
+	for _, part := range parts {
+		parsed, err := strconv.ParseUint(strings.TrimSpace(part), 10, 16)
+		if err != nil || parsed == 0 {
+			continue
+		}
+		value := uint16(parsed)
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func uint16FromAny(value any) uint16 {

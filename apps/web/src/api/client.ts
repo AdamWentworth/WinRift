@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ItemData, LiveGame, RuneData, SummonerSpellData } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -49,6 +49,14 @@ export function getItemSlots(filters: BuildFilters) {
   params.set('minGames', String(filters.minGames));
   if (filters.limit) params.set('limit', String(filters.limit));
   return request<AnalyticsItemSlotResponse>(`/api/analytics/item-slots?${params.toString()}`);
+}
+
+export function getChampionRoleRates(championIds: number[], queueId: number) {
+  const params = new URLSearchParams({
+    championIds: championIds.join(','),
+    queueId: String(queueId),
+  });
+  return request<ChampionRoleRatesResponse>(`/api/analytics/champion-roles?${params.toString()}`);
 }
 
 export function resolveAccountAlias(gameName: string, platform: string) {

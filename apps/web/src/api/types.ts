@@ -105,6 +105,18 @@ export type AnalyticsItemSlotResponse = {
   results: AnalyticsItemSlot[];
 };
 
+export type ChampionRoleRate = {
+  championId: number;
+  role: string;
+  games: number;
+  totalGames: number;
+  pickRate: number;
+};
+
+export type ChampionRoleRatesResponse = {
+  results: ChampionRoleRate[];
+};
+
 export type AccountAliasResolution = {
   status: 'found' | 'ambiguous' | 'not_found';
   puuid?: string;
