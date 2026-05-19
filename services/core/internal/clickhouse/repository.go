@@ -60,6 +60,29 @@ type PatchSnapshot struct {
 	RawRetainedUntil time.Time
 }
 
+type roleAnalyticsScope struct {
+	selectExpr string
+	whereSQL   string
+	args       []any
+}
+
+func analyticsRoleScope(role string) roleAnalyticsScope {
+	switch strings.ToUpper(strings.TrimSpace(role)) {
+	case "TOP":
+		return roleAnalyticsScope{selectExpr: "'TOP'", whereSQL: "role IN ('TOP', 'MIDDLE')"}
+	case "MIDDLE":
+		return roleAnalyticsScope{selectExpr: "'MIDDLE'", whereSQL: "role IN ('TOP', 'MIDDLE')"}
+	case "JUNGLE":
+		return roleAnalyticsScope{selectExpr: "role", whereSQL: "role = ?", args: []any{"JUNGLE"}}
+	case "BOTTOM":
+		return roleAnalyticsScope{selectExpr: "role", whereSQL: "role = ?", args: []any{"BOTTOM"}}
+	case "UTILITY":
+		return roleAnalyticsScope{selectExpr: "role", whereSQL: "role = ?", args: []any{"UTILITY"}}
+	default:
+		return roleAnalyticsScope{selectExpr: "role"}
+	}
+}
+
 func NewRepository(cfg config.Config) (*Repository, error) {
 	dsn := fmt.Sprintf("clickhouse://%s:%d/%s?username=%s&password=%s", cfg.ClickHouseHost, cfg.ClickHousePort, cfg.ClickHouseDatabase, cfg.ClickHouseUser, cfg.ClickHousePassword)
 	db, err := sql.Open("clickhouse", dsn)
@@ -129,10 +152,11 @@ func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.
 }
 
 func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, error) {
-	query := `
+	roleScope := analyticsRoleScope(filters["role"])
+	query := fmt.Sprintf(`
 		SELECT
 			champion_id,
-			role,
+			%s AS role_bucket,
 			opponent_champion_id,
 			patch_bucket,
 			rank_bucket,
@@ -216,15 +240,15 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 				games
 			FROM patch_build_metrics FINAL
 		)
-		WHERE 1 = 1`
+		WHERE 1 = 1`, roleScope.selectExpr)
 	args := []any{}
 	if filters["champion_id"] != "" {
 		query += " AND champion_id = ?"
 		args = append(args, filters["champion_id"])
 	}
-	if filters["role"] != "" {
-		query += " AND role = ?"
-		args = append(args, filters["role"])
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
 	}
 	if filters["opponent_champion_id"] != "" {
 		query += " AND opponent_champion_id = ?"
@@ -238,7 +262,7 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 		query += " AND rank_bucket = ?"
 		args = append(args, filters["rank_bucket"])
 	}
-	query += ` GROUP BY champion_id, role, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature HAVING games >= ? ORDER BY win_rate DESC, games DESC LIMIT ?`
+	query += ` GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature HAVING games >= ? ORDER BY win_rate DESC, games DESC LIMIT ?`
 	args = append(args, minGames, limit)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -277,6 +301,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 	if filters["rank_bucket"] != "" {
 		rankBucketExpr = "rank_value"
 	}
+	roleScope := analyticsRoleScope(filters["role"])
 	query := fmt.Sprintf(`
 		WITH raw_item_purchases AS
 		(
@@ -366,7 +391,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 		)
 		SELECT
 			champion_id,
-			role,
+			%s AS role_bucket,
 			opponent_champion_id,
 			%s AS patch_bucket,
 			%s AS rank_bucket,
@@ -381,15 +406,15 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 			UNION ALL
 			SELECT * FROM compiled_item_slots WHERE item_slot <= 6
 		)
-		WHERE item_id > 0`, itemList, itemList, patchBucketExpr, rankBucketExpr)
+		WHERE item_id > 0`, itemList, itemList, roleScope.selectExpr, patchBucketExpr, rankBucketExpr)
 	args := []any{}
 	if filters["champion_id"] != "" {
 		query += " AND champion_id = ?"
 		args = append(args, filters["champion_id"])
 	}
-	if filters["role"] != "" {
-		query += " AND role = ?"
-		args = append(args, filters["role"])
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
 	}
 	if filters["opponent_champion_id"] != "" {
 		query += " AND opponent_champion_id = ?"
@@ -404,7 +429,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 		args = append(args, filters["rank_bucket"])
 	}
 	query += `
-		GROUP BY champion_id, role, opponent_champion_id, patch_bucket, rank_bucket, item_slot, item_id
+		GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, item_slot, item_id
 		HAVING games >= ?
 		ORDER BY item_slot ASC, win_rate DESC, games DESC`
 	args = append(args, minGames)
