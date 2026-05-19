@@ -80,6 +80,14 @@ Visual assets:
 
 ## Data Health Findings
 
+Current rebuilt artifact:
+
+- `services/core/internal/winconditions/champion_profiles.json`
+- `services/core/internal/winconditions/profiles.go`
+- `services/core/internal/winconditions/profiles_test.go`
+
+This current artifact keeps `legacy/` untouched, removes the duplicate Blitzcrank row, and adds provisional `16.10.1` profiles for Ambessa, Aurora, Mel, Smolder, Yunara, and Zaahen.
+
 The legacy champion profile file has 167 rows but 166 unique champion names.
 
 Known issue:

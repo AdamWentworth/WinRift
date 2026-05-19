@@ -1,0 +1,2249 @@
+{
+  "schemaVersion": 1,
+  "patch": "16.10.1",
+  "axes": [
+    "SplitPush",
+    "Pick",
+    "Siege",
+    "Control",
+    "TeamFight"
+  ],
+  "profiles": [
+    {
+      "champion": "Aatrox",
+      "championId": 266,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Ahri",
+      "championId": 103,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 4,
+        "siege": 2,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Akali",
+      "championId": 84,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 5,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Akshan",
+      "championId": 166,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 3,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Alistar",
+      "championId": 12,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Ambessa",
+      "championId": 799,
+      "individualWinCondition": "SplitPush",
+      "source": "proposed-16.10.1",
+      "scores": {
+        "splitpush": 4,
+        "pick": 3,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Amumu",
+      "championId": 32,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Anivia",
+      "championId": 34,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 7,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Annie",
+      "championId": 1,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Aphelios",
+      "championId": 523,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 3,
+        "control": 3,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Ashe",
+      "championId": 22,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 5,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Aurelion Sol",
+      "championId": 136,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 1,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Aurora",
+      "championId": 893,
+      "individualWinCondition": "Flex",
+      "source": "proposed-16.10.1",
+      "scores": {
+        "splitpush": 2,
+        "pick": 3,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Azir",
+      "championId": 268,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 6,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Bard",
+      "championId": 432,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 4,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Bel'Veth",
+      "championId": 200,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 4,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Blitzcrank",
+      "championId": 53,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Brand",
+      "championId": 63,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Braum",
+      "championId": 201,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Briar",
+      "championId": 233,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Caitlyn",
+      "championId": 51,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 8,
+        "control": 1,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Camille",
+      "championId": 164,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 2,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Cassiopeia",
+      "championId": 69,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Cho'Gath",
+      "championId": 31,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Corki",
+      "championId": 42,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 0,
+        "siege": 8,
+        "control": 0,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Darius",
+      "championId": 122,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Diana",
+      "championId": 131,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 4,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Dr. Mundo",
+      "championId": 36,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 0,
+        "siege": 1,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Draven",
+      "championId": 119,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 2,
+        "control": 3,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Ekko",
+      "championId": 245,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 3,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Elise",
+      "championId": 60,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 4,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Evelynn",
+      "championId": 28,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 5,
+        "siege": 1,
+        "control": 1,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Ezreal",
+      "championId": 81,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 3,
+        "control": 3,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Fiddlesticks",
+      "championId": 9,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Fiora",
+      "championId": 114,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Fizz",
+      "championId": 105,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 4,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Galio",
+      "championId": 3,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Gangplank",
+      "championId": 41,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 1,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Garen",
+      "championId": 86,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 2,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Gnar",
+      "championId": 150,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 0,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Gragas",
+      "championId": 79,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Graves",
+      "championId": 104,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Gwen",
+      "championId": 887,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 6,
+        "pick": 1,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Hecarim",
+      "championId": 120,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 2,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Heimerdinger",
+      "championId": 74,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 0,
+        "siege": 7,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Hwei",
+      "championId": 910,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Illaoi",
+      "championId": 420,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 0,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Irelia",
+      "championId": 39,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 4,
+        "pick": 2,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Ivern",
+      "championId": 427,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Janna",
+      "championId": 40,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 3,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Jarvan IV",
+      "championId": 59,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Jax",
+      "championId": 24,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 1,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Jayce",
+      "championId": 126,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 4,
+        "pick": 0,
+        "siege": 6,
+        "control": 0,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Jhin",
+      "championId": 202,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 6,
+        "control": 2,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Jinx",
+      "championId": 222,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "K'Sante",
+      "championId": 897,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 3,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Kai'Sa",
+      "championId": 145,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 1,
+        "control": 5,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Kalista",
+      "championId": 429,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Karma",
+      "championId": 43,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 3,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Karthus",
+      "championId": 30,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 1,
+        "control": 5,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Kassadin",
+      "championId": 38,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 4,
+        "pick": 3,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Katarina",
+      "championId": 55,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Kayle",
+      "championId": 10,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 0,
+        "siege": 2,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Kayn",
+      "championId": 141,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 3,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Kennen",
+      "championId": 85,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 1,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Kha'Zix",
+      "championId": 121,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 5,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Kindred",
+      "championId": 203,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Kled",
+      "championId": 240,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 2,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Kog'Maw",
+      "championId": 96,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 0,
+        "siege": 2,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "LeBlanc",
+      "championId": 7,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 5,
+        "siege": 2,
+        "control": 0,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Lee Sin",
+      "championId": 64,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Leona",
+      "championId": 89,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 3,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Lillia",
+      "championId": 876,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 1,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Lissandra",
+      "championId": 127,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Lucian",
+      "championId": 236,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Lulu",
+      "championId": 117,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 3,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Lux",
+      "championId": 99,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 3,
+        "siege": 6,
+        "control": 0,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Malphite",
+      "championId": 54,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 3,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Malzahar",
+      "championId": 90,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 6,
+        "control": 1,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Maokai",
+      "championId": 57,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Master Yi",
+      "championId": 11,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Mel",
+      "championId": 800,
+      "individualWinCondition": "Siege",
+      "source": "proposed-16.10.1",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 4,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Milio",
+      "championId": 902,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 6,
+        "control": 3,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Miss Fortune",
+      "championId": 21,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Mordekaiser",
+      "championId": 82,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 5,
+        "pick": 2,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Morgana",
+      "championId": 25,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Naafiri",
+      "championId": 950,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 5,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Nami",
+      "championId": 267,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Nasus",
+      "championId": 75,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Nautilus",
+      "championId": 111,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Neeko",
+      "championId": 518,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Nidalee",
+      "championId": 76,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 4,
+        "siege": 3,
+        "control": 1,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Nilah",
+      "championId": 895,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 0,
+        "control": 5,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Nocturne",
+      "championId": 56,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 5,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Nunu & Willump",
+      "championId": 20,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 0,
+        "control": 5,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Olaf",
+      "championId": 2,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Orianna",
+      "championId": 61,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Ornn",
+      "championId": 516,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Pantheon",
+      "championId": 80,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 4,
+        "siege": 1,
+        "control": 0,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Poppy",
+      "championId": 78,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 0,
+        "control": 5,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Pyke",
+      "championId": 555,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Qiyana",
+      "championId": 246,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 4,
+        "siege": 1,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Quinn",
+      "championId": 133,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 6,
+        "pick": 2,
+        "siege": 2,
+        "control": 0,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Rakan",
+      "championId": 497,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Rammus",
+      "championId": 33,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Rek'Sai",
+      "championId": 421,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 4,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Rell",
+      "championId": 526,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 3,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Renata Glasc",
+      "championId": 888,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 3,
+        "siege": 0,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Renekton",
+      "championId": 58,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 6,
+        "pick": 2,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Rengar",
+      "championId": 107,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 5,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Riven",
+      "championId": 92,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 6,
+        "pick": 2,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Rumble",
+      "championId": 68,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Ryze",
+      "championId": 13,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 3,
+        "control": 3,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Samira",
+      "championId": 360,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Sejuani",
+      "championId": 113,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Senna",
+      "championId": 235,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 3,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Seraphine",
+      "championId": 147,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 5,
+        "control": 1,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Sett",
+      "championId": 875,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 4,
+        "pick": 4,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Shaco",
+      "championId": 35,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 5,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Shen",
+      "championId": 98,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Shyvana",
+      "championId": 102,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 0,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Singed",
+      "championId": 27,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Sion",
+      "championId": 14,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 1,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Sivir",
+      "championId": 15,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 7,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Skarner",
+      "championId": 72,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 5,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Smolder",
+      "championId": 901,
+      "individualWinCondition": "TeamFight",
+      "source": "proposed-16.10.1",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 3,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Sona",
+      "championId": 37,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 6,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Soraka",
+      "championId": 16,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 4,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Swain",
+      "championId": 50,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 2,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Sylas",
+      "championId": 517,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 4,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Syndra",
+      "championId": 134,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 6,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Tahm Kench",
+      "championId": 223,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 3,
+        "siege": 0,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Taliyah",
+      "championId": 163,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 3,
+        "siege": 2,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Talon",
+      "championId": 91,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 5,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Taric",
+      "championId": 44,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 4,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Teemo",
+      "championId": 17,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 0,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Thresh",
+      "championId": 412,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 5,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Tristana",
+      "championId": 18,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 2,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Trundle",
+      "championId": 48,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 1,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Tryndamere",
+      "championId": 23,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 8,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Twisted Fate",
+      "championId": 4,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 4,
+        "siege": 2,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Twitch",
+      "championId": 29,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 1,
+        "control": 4,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Udyr",
+      "championId": 77,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 4,
+        "pick": 2,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Urgot",
+      "championId": 6,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 7,
+        "pick": 1,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Varus",
+      "championId": 110,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 5,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Vayne",
+      "championId": 67,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 1,
+        "siege": 1,
+        "control": 5,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Veigar",
+      "championId": 45,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 6,
+        "control": 2,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Vel'Koz",
+      "championId": 161,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 8,
+        "control": 0,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Vex",
+      "championId": 711,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Vi",
+      "championId": 254,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 4,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Viego",
+      "championId": 234,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 4,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Viktor",
+      "championId": 112,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 2,
+        "siege": 2,
+        "control": 3,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Vladimir",
+      "championId": 8,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 1,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Volibear",
+      "championId": 106,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Warwick",
+      "championId": 19,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 4,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Wukong",
+      "championId": 62,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 2,
+        "pick": 2,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Xayah",
+      "championId": 498,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 2,
+        "control": 3,
+        "teamfight": 4
+      }
+    },
+    {
+      "champion": "Xerath",
+      "championId": 101,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 8,
+        "control": 1,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Xin Zhao",
+      "championId": 5,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 4,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Yasuo",
+      "championId": 157,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 2,
+        "siege": 1,
+        "control": 2,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Yone",
+      "championId": 777,
+      "individualWinCondition": "Flex",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 3,
+        "siege": 0,
+        "control": 1,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Yorick",
+      "championId": 83,
+      "individualWinCondition": "SplitPush",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 10,
+        "pick": 0,
+        "siege": 0,
+        "control": 0,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Yunara",
+      "championId": 804,
+      "individualWinCondition": "Flex",
+      "source": "proposed-16.10.1",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 3,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Yuumi",
+      "championId": 350,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 3,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Zaahen",
+      "championId": 904,
+      "individualWinCondition": "Flex",
+      "source": "proposed-16.10.1",
+      "scores": {
+        "splitpush": 3,
+        "pick": 2,
+        "siege": 0,
+        "control": 2,
+        "teamfight": 3
+      }
+    },
+    {
+      "champion": "Zac",
+      "championId": 154,
+      "individualWinCondition": "TeamFight",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 2,
+        "siege": 0,
+        "control": 3,
+        "teamfight": 5
+      }
+    },
+    {
+      "champion": "Zed",
+      "championId": 238,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 3,
+        "pick": 4,
+        "siege": 1,
+        "control": 1,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Zeri",
+      "championId": 221,
+      "individualWinCondition": "Control",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 1,
+        "pick": 1,
+        "siege": 1,
+        "control": 5,
+        "teamfight": 2
+      }
+    },
+    {
+      "champion": "Ziggs",
+      "championId": 115,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 0,
+        "siege": 10,
+        "control": 0,
+        "teamfight": 0
+      }
+    },
+    {
+      "champion": "Zilean",
+      "championId": 26,
+      "individualWinCondition": "Siege",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 1,
+        "siege": 6,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Zoe",
+      "championId": 142,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 4,
+        "siege": 3,
+        "control": 2,
+        "teamfight": 1
+      }
+    },
+    {
+      "champion": "Zyra",
+      "championId": 143,
+      "individualWinCondition": "Pick",
+      "source": "legacy",
+      "scores": {
+        "splitpush": 0,
+        "pick": 3,
+        "siege": 3,
+        "control": 2,
+        "teamfight": 2
+      }
+    }
+  ]
+}
