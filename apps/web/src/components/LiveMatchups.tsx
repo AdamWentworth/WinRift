@@ -407,7 +407,6 @@ function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData
         <strong>{row.winRate.toFixed(1)}%</strong>
         <span>{row.games} games</span>
       </div>
-      <span className={row.games < 20 ? 'sample-warning' : 'sample-note'} title="Wilson confidence floor">{row.confidence.toFixed(1)}% floor</span>
     </div>
   );
 }
@@ -421,7 +420,6 @@ function MissingItemSlotLine({ slot }: { slot: number }) {
         <strong>--</strong>
         <span>No sample</span>
       </div>
-      <span className="sample-note">--</span>
     </div>
   );
 }

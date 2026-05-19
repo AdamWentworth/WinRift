@@ -581,15 +581,9 @@ button {
   line-height: 1;
 }
 
-.build-rate span,
-.sample-note,
-.sample-warning {
+.build-rate span {
   color: #111;
   font-size: 11px;
-}
-
-.sample-warning {
-  color: #5d3100;
 }
 
 .build-items img {
@@ -603,8 +597,8 @@ button {
   background: rgb(0 0 0 / 12%);
   border: 1px solid rgb(0 0 0 / 16%);
   display: grid;
-  gap: 4px;
-  grid-template-columns: 24px 26px minmax(0, 1fr) auto;
+  gap: 5px;
+  grid-template-columns: 24px 26px minmax(0, 1fr);
   min-width: 0;
   padding: 4px;
   text-align: left;
@@ -653,13 +647,6 @@ button {
 .item-slot-stats span {
   color: #111;
   font-size: 10px;
-  white-space: nowrap;
-}
-
-.item-slot-line .sample-note,
-.item-slot-line .sample-warning {
-  font-size: 10px;
-  text-align: right;
   white-space: nowrap;
 }
 
