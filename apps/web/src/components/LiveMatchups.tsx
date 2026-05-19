@@ -439,7 +439,7 @@ function WinConditionSummaryCard({
             <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
             <span>Plan: {metric.planLabel ?? planLabelFallback(metric)}</span>
             <span>Total Games: {metric.games}</span>
-            <span>Evidence: {metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</span>
+            <span>Confidence: {metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</span>
           </>
         ) : (
           <>
@@ -584,7 +584,7 @@ function EvidencePill({ metric }: { metric?: WinConditionMetric }) {
   const level = metric?.evidence?.level ?? 'No sample';
   return (
     <span className={`evidence-pill ${direction}`}>
-      {level} {score > 0 ? `${score.toFixed(0)}/100` : ''}
+      Confidence: {level}{score > 0 ? ` ${score.toFixed(0)}/100` : ''}
     </span>
   );
 }
