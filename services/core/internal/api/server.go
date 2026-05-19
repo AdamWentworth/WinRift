@@ -16,6 +16,7 @@ import (
 	"winrift/services/core/internal/config"
 	"winrift/services/core/internal/riot"
 	"winrift/services/core/internal/staticdata"
+	"winrift/services/core/internal/winconditions"
 )
 
 type Server struct {
@@ -24,10 +25,15 @@ type Server struct {
 	repo      *clickhouse.Repository
 	static    *staticdata.Service
 	collector collector.Collector
+	winConds  winconditions.Analyzer
 }
 
 func NewServer(cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, staticService *staticdata.Service) Server {
-	return Server{cfg: cfg, riot: riotClient, repo: repo, static: staticService, collector: collector.New(riotClient, repo)}
+	catalog, err := winconditions.LoadCatalog()
+	if err != nil {
+		log.Printf("win condition catalog load failed err=%v", err)
+	}
+	return Server{cfg: cfg, riot: riotClient, repo: repo, static: staticService, collector: collector.New(riotClient, repo), winConds: winconditions.NewAnalyzer(catalog)}
 }
 
 func (s Server) Routes() http.Handler {
@@ -40,6 +46,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
 	mux.HandleFunc("GET /api/analytics/champion-roles", s.analyticsChampionRoles)
+	mux.HandleFunc("POST /api/analytics/win-conditions", s.analyticsWinConditions)
 	mux.HandleFunc("GET /api/static/{kind}", s.staticData)
 	mux.HandleFunc("POST /api/dev/collector/seed", s.seedCollector)
 	return s.cors(mux)

@@ -1,7 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData } from '../api/types';
-import { getChampionRoleRates, getItemSlots } from '../api/client';
+import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData, WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../api/types';
+import { getChampionRoleRates, getItemSlots, getWinConditionAnalysis } from '../api/client';
 import {
   championByKey,
   championImageUrl,
@@ -63,6 +63,19 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const [draggedCard, setDraggedCard] = useState<DraggedCard | null>(null);
   const [dragTarget, setDragTarget] = useState<DraggedCard | null>(null);
   const [manualOrder, setManualOrder] = useState(false);
+  const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
+  const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
+  const winConditionQuery = useQuery({
+    queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, blueChampionIds, redChampionIds],
+    queryFn: () => getWinConditionAnalysis({
+      blueChampionIds,
+      redChampionIds,
+      queueId: liveGame.gameQueueConfigId,
+      minGames: 5,
+    }),
+    enabled: blueChampionIds.length === 5 && redChampionIds.length === 5,
+    staleTime: 60_000,
+  });
 
   useEffect(() => {
     setManualOrder(false);
@@ -133,6 +146,13 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
         <span>{liveGame.platform}</span>
         <span>{liveGame.gameMode}</span>
       </div>
+      {blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
+        <WinConditionPanel
+          analysis={winConditionQuery.data}
+          loading={winConditionQuery.isLoading}
+          error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
+        />
+      ) : null}
       <div className="cards-container">
         <div className="champion-row blue-row">
           {blueTeam.map((participant, index) => (
@@ -217,6 +237,97 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
             />
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WinConditionPanel({
+  analysis,
+  loading,
+  error,
+}: {
+  analysis?: WinConditionAnalysisResponse;
+  loading: boolean;
+  error?: string;
+}) {
+  if (loading) {
+    return <section className="win-condition-panel win-condition-state">Win condition metrics loading...</section>;
+  }
+  if (error) {
+    return <section className="win-condition-panel win-condition-state">Win condition metrics unavailable</section>;
+  }
+  if (!analysis) return null;
+
+  const bluePrimary = analysis.blueMatchups.find((metric) => metric.primary);
+  const redPrimary = analysis.redMatchups.find((metric) => metric.primary);
+
+  return (
+    <section className="win-condition-panel" aria-label="Win condition stats">
+      <WinConditionTeam side="blue" team={analysis.blue} primaryMetric={bluePrimary} metrics={analysis.blueMatchups} />
+      <div className="win-condition-versus">vs</div>
+      <WinConditionTeam side="red" team={analysis.red} primaryMetric={redPrimary} metrics={analysis.redMatchups} />
+    </section>
+  );
+}
+
+function WinConditionTeam({
+  side,
+  team,
+  primaryMetric,
+  metrics,
+}: {
+  side: TeamSide;
+  team: WinConditionTeamProfile;
+  primaryMetric?: WinConditionMetric;
+  metrics: WinConditionMetric[];
+}) {
+  return (
+    <div className={`win-condition-team ${side}`}>
+      <div className="win-condition-primary">
+        <img className="win-condition-icon" src={conditionIconUrl(team.primaryCondition)} alt="" />
+        <div className="win-condition-title">
+          <span>{side === 'blue' ? 'Blue' : 'Red'} win condition</span>
+          <strong>{team.primaryCondition} {team.primaryRating}</strong>
+        </div>
+        <img className="win-condition-rating" src={ratingImageUrl(team.primaryRating)} alt={team.primaryRating} />
+      </div>
+      <div className="win-condition-summary">
+        {primaryMetric && primaryMetric.games > 0 ? (
+          <>
+            <strong>{primaryMetric.winRate.toFixed(1)}%</strong>
+            <span>{primaryMetric.wins}-{primaryMetric.games - primaryMetric.wins} over {primaryMetric.games} similar comps</span>
+          </>
+        ) : (
+          <>
+            <strong>--</strong>
+            <span>No similar comp sample yet</span>
+          </>
+        )}
+      </div>
+      <div className="win-condition-axes">
+        {team.axes.map((axis) => {
+          const metric = metrics.find((candidate) => candidate.condition === axis.label);
+          return (
+            <div className={`win-condition-axis${axis.label === team.primaryCondition ? ' primary' : ''}`} key={axis.key}>
+              <img src={conditionIconUrl(axis.label)} alt="" />
+              <span>{axisShortLabel(axis.label)}</span>
+              <div className="win-condition-bar" aria-label={`${axis.label} score ${axis.score}`}>
+                <i style={{ width: `${Math.min(100, (axis.score / 25) * 100)}%` }} />
+              </div>
+              <strong>{axis.rating}</strong>
+              <em>{metric && metric.games > 0 ? `${metric.winRate.toFixed(0)}%` : '--'}</em>
+            </div>
+          );
+        })}
+      </div>
+      <div className="win-condition-buckets">
+        {(primaryMetric?.buckets ?? []).map((bucket) => (
+          <span className={bucket.meetsMinGames ? '' : 'thin-sample'} key={bucket.bucket}>
+            <b>{bucket.bucket}</b>
+            {bucket.games > 0 ? `${bucket.winRate.toFixed(0)}%` : '--'}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -553,6 +664,10 @@ function uniqueChampionIds(participants: LiveParticipant[]) {
   return [...new Set(participants.map((participant) => participant.championId).filter(Boolean))].sort((a, b) => a - b);
 }
 
+function teamChampionIds(participants: LiveParticipant[]) {
+  return participants.map((participant) => participant.championId).filter(Boolean);
+}
+
 function buildRoleRateMap(rows: ChampionRoleRate[] = []): RoleRateMap {
   const map: RoleRateMap = new Map();
   rows.forEach((row) => {
@@ -577,4 +692,18 @@ function queueLabel(queueId: number) {
   if (queueId === 400) return 'Normal Draft';
   if (queueId === 430) return 'Normal Blind';
   return `Queue ${queueId}`;
+}
+
+function conditionIconUrl(condition: string) {
+  return `/images/win_condition_icons/${condition}.png`;
+}
+
+function ratingImageUrl(rating: string) {
+  return `/images/win_condition_ratings/${rating}.png`;
+}
+
+function axisShortLabel(label: string) {
+  if (label === 'SplitPush') return 'Split';
+  if (label === 'TeamFight') return 'Fight';
+  return label;
 }

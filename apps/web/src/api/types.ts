@@ -117,6 +117,78 @@ export type ChampionRoleRatesResponse = {
   results: ChampionRoleRate[];
 };
 
+export type WinConditionAnalysisRequest = {
+  blueChampionIds: number[];
+  redChampionIds: number[];
+  queueId: number;
+  patch?: string;
+  rankBucket?: string;
+  minGames?: number;
+  maxRows?: number;
+};
+
+export type WinConditionTeamProfile = {
+  championIds: number[];
+  scores: {
+    splitpush: number;
+    pick: number;
+    siege: number;
+    control: number;
+    teamfight: number;
+  };
+  ratings: Record<string, string>;
+  axes: WinConditionAxisScore[];
+  primaryCondition: string;
+  primaryScore: number;
+  primaryRating: string;
+  missingChampionIds: number[];
+};
+
+export type WinConditionAxisScore = {
+  key: string;
+  label: string;
+  score: number;
+  rating: string;
+};
+
+export type WinConditionBucket = {
+  bucket: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+  meetsMinGames: boolean;
+};
+
+export type WinConditionMetric = {
+  condition: string;
+  rating: string;
+  opponentCondition: string;
+  opponentRating: string;
+  primary: boolean;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+  meetsMinGames: boolean;
+  buckets: WinConditionBucket[];
+};
+
+export type WinConditionAnalysisResponse = {
+  catalogPatch: string;
+  filters: {
+    queueId: number;
+    patch: string;
+    rankBucket: string;
+    rawTeamRows: number;
+    filteredTeamRows: number;
+  };
+  blue: WinConditionTeamProfile;
+  red: WinConditionTeamProfile;
+  blueMatchups: WinConditionMetric[];
+  redMatchups: WinConditionMetric[];
+};
+
 export type AccountAliasResolution = {
   status: 'found' | 'ambiguous' | 'not_found';
   puuid?: string;

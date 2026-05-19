@@ -15,6 +15,7 @@ Current live-game constraints:
 - Live board with champion cards, ranks, champion performance, spells, compact rune icons, drag reorder, and matchup item-slot stats.
 - Role correction using one-Smite jungle detection plus champion role-rate data from ClickHouse.
 - Live backfill seeding for players with low champion samples.
+- Win-condition panel backed by the validated champion profile fixture and read-time ClickHouse composition aggregates.
 
 ## High-Value Additions
 
@@ -98,6 +99,13 @@ Bring back the legacy team strategy idea as a live-match layer:
 - Opposing strategic matchup history by duration bucket.
 - Later, combine team strategy with build stats so item patterns can be viewed in context of the whole composition.
 
+Current implementation notes:
+
+- `POST /api/analytics/win-conditions` accepts the two live five-champion compositions and returns team profiles plus matchup stats.
+- Raw match and participant rows are not tainted with hand-authored scores. The API scores compositions at read time from `services/core/internal/winconditions/champion_profiles.json`.
+- Historical stats are currently derived from retained `participants` + `raw_matches` rows. Once old raw patches are compacted, this should move into patch-compiled win-condition metric tables.
+- Duration buckets are labeled as game-length outcomes, not true minute-by-minute win probability.
+
 See [Legacy Win Condition Audit](legacy-win-condition-audit.md).
 
 ## Nice-To-Have
@@ -118,5 +126,4 @@ See [Legacy Win Condition Audit](legacy-win-condition-audit.md).
 2. Role confidence labels.
 3. Recent champion/role history panel.
 4. Comfort flags.
-5. Win condition profile panel.
-6. Combined build plus team-strategy analytics.
+5. Combined build plus team-strategy analytics.

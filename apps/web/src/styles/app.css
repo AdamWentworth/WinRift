@@ -273,6 +273,199 @@ button {
   padding: 0;
 }
 
+.win-condition-panel {
+  align-items: stretch;
+  color: #f4f6f8;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  margin: 0 auto 10px;
+  max-width: 1500px;
+}
+
+.win-condition-state {
+  background: #222;
+  border: 1px solid #464646;
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 12px;
+  text-align: center;
+}
+
+.win-condition-team {
+  background: #222;
+  border: 1px solid #2c2c2c;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.win-condition-team.blue {
+  box-shadow: 0 0 10px 3px rgb(135 206 235 / 60%);
+}
+
+.win-condition-team.red {
+  box-shadow: 0 0 10px 3px rgb(240 128 128 / 60%);
+}
+
+.win-condition-primary {
+  align-items: center;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+}
+
+.win-condition-icon,
+.win-condition-rating {
+  height: 40px;
+  object-fit: contain;
+  width: 40px;
+}
+
+.win-condition-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.win-condition-title span {
+  color: #aeb8bf;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.win-condition-title strong {
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.win-condition-summary {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+}
+
+.win-condition-summary strong {
+  font-size: 18px;
+}
+
+.win-condition-summary span {
+  color: #c9d1d6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.win-condition-axes {
+  display: grid;
+  gap: 5px;
+}
+
+.win-condition-axis {
+  align-items: center;
+  background: rgb(0 0 0 / 20%);
+  border: 1px solid rgb(255 255 255 / 7%);
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 22px 45px minmax(48px, 1fr) 30px 34px;
+  min-width: 0;
+  padding: 4px 6px;
+}
+
+.win-condition-axis.primary {
+  border-color: rgb(255 255 255 / 28%);
+}
+
+.win-condition-axis img {
+  height: 22px;
+  object-fit: contain;
+  width: 22px;
+}
+
+.win-condition-axis span,
+.win-condition-axis strong,
+.win-condition-axis em {
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.win-condition-axis span {
+  color: #dce5ea;
+}
+
+.win-condition-axis strong {
+  color: #fff;
+  text-align: right;
+}
+
+.win-condition-axis em {
+  color: #aeb8bf;
+  text-align: right;
+}
+
+.win-condition-bar {
+  background: rgb(255 255 255 / 12%);
+  height: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.win-condition-bar i {
+  background: #f3d478;
+  display: block;
+  height: 100%;
+}
+
+.win-condition-team.blue .win-condition-bar i {
+  background: #87ceeb;
+}
+
+.win-condition-team.red .win-condition-bar i {
+  background: #f08080;
+}
+
+.win-condition-buckets {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.win-condition-buckets span {
+  background: rgb(0 0 0 / 20%);
+  border: 1px solid rgb(255 255 255 / 7%);
+  color: #f4f6f8;
+  display: grid;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 2px;
+  min-width: 0;
+  padding: 5px;
+  text-align: center;
+}
+
+.win-condition-buckets .thin-sample {
+  color: #aeb8bf;
+}
+
+.win-condition-buckets b {
+  color: #aeb8bf;
+  font-size: 10px;
+}
+
+.win-condition-versus {
+  align-self: center;
+  color: #d7dde1;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .cards-container {
   display: grid;
   gap: 10px;
@@ -670,6 +863,14 @@ button {
     padding: 6px;
   }
 
+  .win-condition-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .win-condition-versus {
+    display: none;
+  }
+
   .player-card,
   .match-stat-card {
     min-width: 160px;
@@ -700,6 +901,25 @@ button {
 
   .game-board {
     padding: 8px;
+  }
+
+  .win-condition-panel {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .win-condition-primary {
+    grid-template-columns: 34px minmax(0, 1fr) 34px;
+  }
+
+  .win-condition-icon,
+  .win-condition-rating {
+    height: 34px;
+    width: 34px;
+  }
+
+  .win-condition-title strong {
+    font-size: 16px;
   }
 
   .champion-row,

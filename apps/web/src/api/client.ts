@@ -1,9 +1,22 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ItemData, LiveGame, RuneData, SummonerSpellData } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`);
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}));
+    throw new Error(detail.detail ?? `Request failed with status ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}));
     throw new Error(detail.detail ?? `Request failed with status ${response.status}`);
@@ -57,6 +70,10 @@ export function getChampionRoleRates(championIds: number[], queueId: number) {
     queueId: String(queueId),
   });
   return request<ChampionRoleRatesResponse>(`/api/analytics/champion-roles?${params.toString()}`);
+}
+
+export function getWinConditionAnalysis(body: WinConditionAnalysisRequest) {
+  return post<WinConditionAnalysisResponse>('/api/analytics/win-conditions', body);
 }
 
 export function resolveAccountAlias(gameName: string, platform: string) {

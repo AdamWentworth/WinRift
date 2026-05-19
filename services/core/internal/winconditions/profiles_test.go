@@ -97,3 +97,57 @@ func TestProposedChampionProfiles(t *testing.T) {
 		}
 	}
 }
+
+func TestTeamProfileScoresAndRatings(t *testing.T) {
+	catalog := Catalog{
+		Patch: "test",
+		Profiles: []Profile{
+			{Champion: "One", ChampionID: 1, IndividualWinCondition: "Pick", Scores: Scores{SplitPush: 1, Pick: 4, Siege: 1, Control: 1, TeamFight: 3}},
+			{Champion: "Two", ChampionID: 2, IndividualWinCondition: "TeamFight", Scores: Scores{SplitPush: 1, Pick: 2, Siege: 1, Control: 2, TeamFight: 4}},
+			{Champion: "Three", ChampionID: 3, IndividualWinCondition: "Pick", Scores: Scores{SplitPush: 1, Pick: 4, Siege: 0, Control: 2, TeamFight: 3}},
+			{Champion: "Four", ChampionID: 4, IndividualWinCondition: "TeamFight", Scores: Scores{SplitPush: 0, Pick: 1, Siege: 1, Control: 4, TeamFight: 4}},
+			{Champion: "Five", ChampionID: 5, IndividualWinCondition: "Pick", Scores: Scores{SplitPush: 1, Pick: 3, Siege: 0, Control: 2, TeamFight: 4}},
+		},
+	}
+
+	profile := NewAnalyzer(catalog).TeamProfile([]uint16{1, 2, 3, 4, 5})
+
+	if profile.Scores.Pick != 14 || profile.Scores.TeamFight != 18 {
+		t.Fatalf("scores = %+v, want pick 14 and teamfight 18", profile.Scores)
+	}
+	if profile.PrimaryCondition != "TeamFight" {
+		t.Fatalf("primary condition = %s, want TeamFight", profile.PrimaryCondition)
+	}
+	if profile.PrimaryRating != "A-" {
+		t.Fatalf("primary rating = %s, want A-", profile.PrimaryRating)
+	}
+	if profile.Ratings["pick"] != "B" {
+		t.Fatalf("pick rating = %s, want B", profile.Ratings["pick"])
+	}
+}
+
+func TestTeamProfileTieBreakerUsesIndividualConditions(t *testing.T) {
+	catalog := Catalog{
+		Patch: "test",
+		Profiles: []Profile{
+			{ChampionID: 1, IndividualWinCondition: "Pick", Scores: Scores{Pick: 5, TeamFight: 5}},
+			{ChampionID: 2, IndividualWinCondition: "Pick", Scores: Scores{Pick: 5, TeamFight: 5}},
+			{ChampionID: 3, IndividualWinCondition: "TeamFight", Scores: Scores{Pick: 5, TeamFight: 5}},
+		},
+	}
+
+	profile := NewAnalyzer(catalog).TeamProfile([]uint16{1, 2, 3})
+
+	if profile.PrimaryCondition != "Pick" {
+		t.Fatalf("primary condition = %s, want Pick", profile.PrimaryCondition)
+	}
+	if profile.PrimaryRating != "B+" {
+		t.Fatalf("primary rating = %s, want B+", profile.PrimaryRating)
+	}
+}
+
+func TestRatingClampsAboveLegacyScale(t *testing.T) {
+	if got := Rating(31); got != "S+" {
+		t.Fatalf("Rating(31) = %s, want S+", got)
+	}
+}

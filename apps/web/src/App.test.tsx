@@ -2,13 +2,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getChampionRoleRates, getLiveGame, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getChampionRoleRates, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 vi.mock('./api/client', () => ({
   getBuilds: vi.fn(async () => ({ results: [] })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
+  getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
   getChampions: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
   getItems: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
   getRunes: vi.fn(async () => ({ version: 'test', data: [] })),
@@ -23,9 +24,11 @@ describe('App', () => {
     cleanup();
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
+    vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
+    vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
     vi.mocked(resolveAccountAlias).mockResolvedValue({ status: 'not_found' });
     vi.mocked(searchAccountAliases).mockResolvedValue({ matches: [] });
   });
@@ -332,4 +335,145 @@ describe('App', () => {
     });
     queryClient.clear();
   });
+
+  it('shows live win condition stats', async () => {
+    vi.mocked(getLiveGame).mockResolvedValueOnce({
+      platform: 'NA1',
+      puuid: 'blue-1',
+      gameId: 654,
+      mapId: 11,
+      gameMode: 'CLASSIC',
+      gameType: 'MATCHED_GAME',
+      gameQueueConfigId: 420,
+      gameStartTime: Date.now(),
+      participants: [
+        { teamId: 100, championId: 1, spell1Id: 4, spell2Id: 12, puuid: 'blue-1', summonerName: 'Blue 1', perks: {}, bot: false },
+        { teamId: 100, championId: 2, spell1Id: 11, spell2Id: 4, puuid: 'blue-2', summonerName: 'Blue 2', perks: {}, bot: false },
+        { teamId: 100, championId: 3, spell1Id: 4, spell2Id: 12, puuid: 'blue-3', summonerName: 'Blue 3', perks: {}, bot: false },
+        { teamId: 100, championId: 4, spell1Id: 4, spell2Id: 7, puuid: 'blue-4', summonerName: 'Blue 4', perks: {}, bot: false },
+        { teamId: 100, championId: 5, spell1Id: 4, spell2Id: 14, puuid: 'blue-5', summonerName: 'Blue 5', perks: {}, bot: false },
+        { teamId: 200, championId: 11, spell1Id: 4, spell2Id: 12, puuid: 'red-1', summonerName: 'Red 1', perks: {}, bot: false },
+        { teamId: 200, championId: 12, spell1Id: 11, spell2Id: 4, puuid: 'red-2', summonerName: 'Red 2', perks: {}, bot: false },
+        { teamId: 200, championId: 13, spell1Id: 4, spell2Id: 12, puuid: 'red-3', summonerName: 'Red 3', perks: {}, bot: false },
+        { teamId: 200, championId: 14, spell1Id: 4, spell2Id: 7, puuid: 'red-4', summonerName: 'Red 4', perks: {}, bot: false },
+        { teamId: 200, championId: 15, spell1Id: 4, spell2Id: 14, puuid: 'red-5', summonerName: 'Red 5', perks: {}, bot: false },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+      target: { value: 'Blue 1#NA1' },
+    });
+    fireEvent.click(screen.getByLabelText('Find live game'));
+
+    await waitFor(() => expect(getWinConditionAnalysis).toHaveBeenCalled());
+    expect(await screen.findByText('Blue win condition')).toBeInTheDocument();
+    expect(screen.getByText('Pick B+')).toBeInTheDocument();
+    expect(screen.getByText('55.0%')).toBeInTheDocument();
+    expect(screen.getByText('11-9 over 20 similar comps')).toBeInTheDocument();
+    queryClient.clear();
+  });
 });
+
+const winConditionFixture = vi.hoisted(() => ({
+  catalogPatch: '16.10.1',
+  filters: {
+    queueId: 420,
+    patch: '',
+    rankBucket: '',
+    rawTeamRows: 20,
+    filteredTeamRows: 20,
+  },
+  blue: {
+    championIds: [1, 2, 3, 4, 5],
+    scores: { splitpush: 8, pick: 16, siege: 8, control: 10, teamfight: 8 },
+    ratings: { splitpush: 'C', pick: 'B+', siege: 'C', control: 'C+', teamfight: 'C' },
+    axes: [
+      { key: 'splitpush', label: 'SplitPush', score: 8, rating: 'C' },
+      { key: 'pick', label: 'Pick', score: 16, rating: 'B+' },
+      { key: 'siege', label: 'Siege', score: 8, rating: 'C' },
+      { key: 'control', label: 'Control', score: 10, rating: 'C+' },
+      { key: 'teamfight', label: 'TeamFight', score: 8, rating: 'C' },
+    ],
+    primaryCondition: 'Pick',
+    primaryScore: 16,
+    primaryRating: 'B+',
+    missingChampionIds: [],
+  },
+  red: {
+    championIds: [11, 12, 13, 14, 15],
+    scores: { splitpush: 6, pick: 8, siege: 10, control: 16, teamfight: 10 },
+    ratings: { splitpush: 'C-', pick: 'C', siege: 'C+', control: 'B+', teamfight: 'C+' },
+    axes: [
+      { key: 'splitpush', label: 'SplitPush', score: 6, rating: 'C-' },
+      { key: 'pick', label: 'Pick', score: 8, rating: 'C' },
+      { key: 'siege', label: 'Siege', score: 10, rating: 'C+' },
+      { key: 'control', label: 'Control', score: 16, rating: 'B+' },
+      { key: 'teamfight', label: 'TeamFight', score: 10, rating: 'C+' },
+    ],
+    primaryCondition: 'Control',
+    primaryScore: 16,
+    primaryRating: 'B+',
+    missingChampionIds: [],
+  },
+  blueMatchups: [
+    {
+      condition: 'SplitPush',
+      rating: 'C',
+      opponentCondition: 'Control',
+      opponentRating: 'B+',
+      primary: false,
+      wins: 4,
+      games: 8,
+      winRate: 50,
+      confidence: 22,
+      meetsMinGames: true,
+      buckets: [],
+    },
+    {
+      condition: 'Pick',
+      rating: 'B+',
+      opponentCondition: 'Control',
+      opponentRating: 'B+',
+      primary: true,
+      wins: 11,
+      games: 20,
+      winRate: 55,
+      confidence: 34,
+      meetsMinGames: true,
+      buckets: [
+        { bucket: '0-20', wins: 2, games: 4, winRate: 50, confidence: 15, meetsMinGames: false },
+        { bucket: '20-25', wins: 3, games: 5, winRate: 60, confidence: 23, meetsMinGames: true },
+        { bucket: '25-30', wins: 3, games: 5, winRate: 60, confidence: 23, meetsMinGames: true },
+        { bucket: '30-35', wins: 2, games: 3, winRate: 66.7, confidence: 21, meetsMinGames: false },
+        { bucket: '35+', wins: 1, games: 3, winRate: 33.3, confidence: 6, meetsMinGames: false },
+      ],
+    },
+  ],
+  redMatchups: [
+    {
+      condition: 'Control',
+      rating: 'B+',
+      opponentCondition: 'Pick',
+      opponentRating: 'B+',
+      primary: true,
+      wins: 9,
+      games: 20,
+      winRate: 45,
+      confidence: 26,
+      meetsMinGames: true,
+      buckets: [],
+    },
+  ],
+}));
