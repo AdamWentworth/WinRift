@@ -473,8 +473,14 @@ button {
   max-width: 1500px;
 }
 
+.cards-container > .win-condition-panel {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+}
+
 .champion-row,
-.stat-row {
+.build-row {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -703,52 +709,53 @@ button {
   justify-content: center;
 }
 
-.match-stat-card {
+.match-build-card {
   background: #222;
   border: 1px solid #ccc;
   color: #f6f7f8;
   display: grid;
-  gap: 8px;
-  min-height: 214px;
+  gap: 6px;
+  min-height: 196px;
   min-width: 0;
-  padding: 10px;
+  padding: 8px;
 }
 
-.stat-heading {
+.match-build-card.blue {
+  box-shadow: 0 0 7px 2px rgb(135 206 235 / 42%);
+}
+
+.match-build-card.red {
+  box-shadow: 0 0 7px 2px rgb(240 128 128 / 42%);
+}
+
+.build-heading {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   text-align: center;
 }
 
-.stat-heading span {
+.build-heading span {
   color: #ffffff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.stat-heading strong {
-  font-size: 13px;
+.build-heading strong {
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.stat-sides {
-  display: grid;
-  gap: 7px;
-  grid-template-columns: 1fr 1fr;
-  min-width: 0;
 }
 
 .build-side {
   align-content: start;
   border: 1px solid #ccc;
   display: grid;
-  gap: 7px;
+  gap: 5px;
   min-height: 148px;
   min-width: 0;
-  padding: 8px 6px;
+  padding: 6px;
   text-align: center;
 }
 
@@ -857,7 +864,7 @@ button {
 
 @media (max-width: 1120px) {
   .champion-row,
-  .stat-row {
+  .build-row {
     grid-template-columns: repeat(5, minmax(160px, 1fr));
     overflow-x: auto;
     padding: 6px;
@@ -872,7 +879,7 @@ button {
   }
 
   .player-card,
-  .match-stat-card {
+  .match-build-card {
     min-width: 160px;
   }
 }
@@ -923,25 +930,25 @@ button {
   }
 
   .champion-row,
-  .stat-row {
+  .build-row {
     grid-template-columns: 1fr;
     overflow-x: visible;
     padding: 0;
   }
 
   .cards-container {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr;
   }
 
   .blue-row,
   .red-row,
-  .stat-row {
+  .build-row {
     align-content: start;
     display: grid;
   }
 
   .player-card,
-  .match-stat-card {
+  .match-build-card {
     min-height: 196px;
     min-width: 0;
     padding: 9px;
@@ -984,7 +991,7 @@ button {
 
   .summoner-name,
   .champion-name,
-  .stat-heading strong {
+  .build-heading strong {
     font-size: 10px;
   }
 
@@ -996,8 +1003,7 @@ button {
     font-size: 9px;
   }
 
-  .card-loadout,
-  .stat-sides {
+  .card-loadout {
     grid-template-columns: 1fr;
   }
 

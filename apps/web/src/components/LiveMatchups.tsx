@@ -146,14 +146,25 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
         <span>{liveGame.platform}</span>
         <span>{liveGame.gameMode}</span>
       </div>
-      {blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
-        <WinConditionPanel
-          analysis={winConditionQuery.data}
-          loading={winConditionQuery.isLoading}
-          error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
-        />
-      ) : null}
       <div className="cards-container">
+        <div className="build-row blue-build-row">
+          {pairs.map((pair, index) => {
+            if (!pair.blue || !pair.red) return null;
+            return (
+              <MatchupBuildCard
+                key={`blue-build-${participantKey(pair.blue, index)}-${participantKey(pair.red, index)}`}
+                role={pair.role}
+                side="blue"
+                participant={pair.blue}
+                opponent={pair.red}
+                champions={champions}
+                items={items}
+                itemSlots={statsByKey.get(statKey(index, 'blue'))?.itemSlots ?? []}
+                loading={statsByKey.get(statKey(index, 'blue'))?.loading ?? false}
+              />
+            );
+          })}
+        </div>
         <div className="champion-row blue-row">
           {blueTeam.map((participant, index) => (
             <LiveChampionCard
@@ -186,25 +197,13 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
             />
           ))}
         </div>
-        <div className="stat-row">
-          {pairs.map((pair, index) => {
-            if (!pair.blue || !pair.red) return null;
-            return (
-              <MatchupStatCard
-                key={`${participantKey(pair.blue, index)}-${participantKey(pair.red, index)}`}
-                role={pair.role}
-                blue={pair.blue}
-                red={pair.red}
-                champions={champions}
-                items={items}
-                blueItemSlots={statsByKey.get(statKey(index, 'blue'))?.itemSlots ?? []}
-                redItemSlots={statsByKey.get(statKey(index, 'red'))?.itemSlots ?? []}
-                blueLoading={statsByKey.get(statKey(index, 'blue'))?.loading ?? false}
-                redLoading={statsByKey.get(statKey(index, 'red'))?.loading ?? false}
-              />
-            );
-          })}
-        </div>
+        {blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
+          <WinConditionPanel
+            analysis={winConditionQuery.data}
+            loading={winConditionQuery.isLoading}
+            error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
+          />
+        ) : null}
         <div className="champion-row red-row">
           {redTeam.map((participant, index) => (
             <LiveChampionCard
@@ -236,6 +235,24 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               }}
             />
           ))}
+        </div>
+        <div className="build-row red-build-row">
+          {pairs.map((pair, index) => {
+            if (!pair.blue || !pair.red) return null;
+            return (
+              <MatchupBuildCard
+                key={`red-build-${participantKey(pair.red, index)}-${participantKey(pair.blue, index)}`}
+                role={pair.role}
+                side="red"
+                participant={pair.red}
+                opponent={pair.blue}
+                champions={champions}
+                items={items}
+                itemSlots={statsByKey.get(statKey(index, 'red'))?.itemSlots ?? []}
+                loading={statsByKey.get(statKey(index, 'red'))?.loading ?? false}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
@@ -455,40 +472,35 @@ function ChampionRecordBlock({ stats }: { stats?: ChampionRecord }) {
   );
 }
 
-function MatchupStatCard({
+function MatchupBuildCard({
   role,
-  blue,
-  red,
+  side,
+  participant,
+  opponent,
   champions,
   items,
-  blueItemSlots,
-  redItemSlots,
-  blueLoading,
-  redLoading,
+  itemSlots,
+  loading,
 }: {
   role: string;
-  blue: LiveParticipant;
-  red: LiveParticipant;
+  side: TeamSide;
+  participant: LiveParticipant;
+  opponent: LiveParticipant;
   champions?: ChampionData;
   items?: ItemData;
-  blueItemSlots: AnalyticsItemSlot[];
-  redItemSlots: AnalyticsItemSlot[];
-  blueLoading: boolean;
-  redLoading: boolean;
+  itemSlots: AnalyticsItemSlot[];
+  loading: boolean;
 }) {
-  const blueChampion = championByKey(champions, blue.championId);
-  const redChampion = championByKey(champions, red.championId);
+  const champion = championByKey(champions, participant.championId);
+  const opponentChampion = championByKey(champions, opponent.championId);
 
   return (
-    <article className="match-stat-card">
-      <div className="stat-heading">
+    <article className={`match-build-card ${side}`}>
+      <div className="build-heading">
         <span>{roleLabels[role] ?? role}</span>
-        <strong>{blueChampion?.name ?? blue.championId} vs {redChampion?.name ?? red.championId}</strong>
+        <strong>{champion?.name ?? participant.championId} into {opponentChampion?.name ?? opponent.championId}</strong>
       </div>
-      <div className="stat-sides">
-        <BuildSide side="blue" itemSlots={blueItemSlots} loading={blueLoading} items={items} />
-        <BuildSide side="red" itemSlots={redItemSlots} loading={redLoading} items={items} />
-      </div>
+      <BuildSide side={side} itemSlots={itemSlots} loading={loading} items={items} />
     </article>
   );
 }
