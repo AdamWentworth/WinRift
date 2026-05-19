@@ -85,3 +85,8 @@ cd apps/web && npm test && npm run build
 - [Policy-Safe Live UX](docs/policy-safe-live-ux.md)
 - [Live Match Experience Roadmap](docs/live-match-experience-roadmap.md)
 - [Legacy Win Condition Audit](docs/legacy-win-condition-audit.md)
+- [Analytics Philosophy](docs/product/analytics-philosophy.md)
+- Discussions:
+  - [Match Collection](docs/discussions/match-collection.md)
+  - [Build Matchup Analytics](docs/discussions/build-matchup-analytics.md)
+  - [Win Conditions](docs/discussions/win-conditions.md)
