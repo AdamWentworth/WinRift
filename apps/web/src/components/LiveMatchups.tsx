@@ -424,10 +424,19 @@ function MissingItemSlotLine({ slot }: { slot: number }) {
 
 function RuneLoadout({ runes, participant }: { runes?: RuneData; participant: LiveParticipant }) {
   const triggerRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ left: 0, top: 0, align: 'center' as 'left' | 'center' | 'right' });
-  const keystoneId = participant.perks?.perkIds?.[0];
-  const secondaryStyleId = participant.perks?.perkSubStyle;
+  const perkIds = selectedRuneIds(participant);
+  const primaryStyleId = primaryStyleForParticipant(runes, participant);
+  const secondaryStyleId = secondaryStyleForParticipant(runes, participant, primaryStyleId);
+  const keystoneId = keystoneForParticipant(runes, participant, primaryStyleId);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+  }, []);
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return undefined;
@@ -455,20 +464,34 @@ function RuneLoadout({ runes, participant }: { runes?: RuneData; participant: Li
     };
   }, [open]);
 
+  const openPopover = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = undefined;
+    }
+    setOpen(true);
+  };
+  const scheduleClose = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => setOpen(false), 120);
+  };
+
   return (
     <div
       ref={triggerRef}
       className="runes rune-popover-trigger"
       tabIndex={0}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
+      onMouseEnter={openPopover}
+      onMouseLeave={scheduleClose}
+      onFocus={openPopover}
+      onBlur={scheduleClose}
       aria-label="Rune selections"
     >
       <RuneIcon runes={runes} runeId={keystoneId} />
       <RuneStyleIcon runes={runes} styleId={secondaryStyleId} />
-      {open ? <RunePopover runes={runes} participant={participant} position={position} /> : null}
+      {open ? <RunePopover runes={runes} participant={participant} position={position} onMouseEnter={openPopover} onMouseLeave={scheduleClose} /> : null}
     </div>
   );
 }
@@ -477,22 +500,29 @@ function RunePopover({
   runes,
   participant,
   position,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   runes?: RuneData;
   participant: LiveParticipant;
   position: { left: number; top: number; align: 'left' | 'center' | 'right' };
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
 }) {
-  const perkIds = participant.perks?.perkIds ?? [];
-  const primaryStyleId = participant.perks?.perkStyle;
-  const secondaryStyleId = participant.perks?.perkSubStyle;
+  const perkIds = selectedRuneIds(participant);
+  const primaryStyleId = primaryStyleForParticipant(runes, participant);
+  const secondaryStyleId = secondaryStyleForParticipant(runes, participant, primaryStyleId);
   const primaryStyle = runeStyleById(runes, primaryStyleId);
   const secondaryStyle = runeStyleById(runes, secondaryStyleId);
   const primarySelections = selectedRunesForStyle(runes, primaryStyleId, perkIds);
   const secondarySelections = selectedRunesForStyle(runes, secondaryStyleId, perkIds);
+  const statSelections = statSelectionsForParticipant(participant);
 
   return createPortal(
     <div
       className={`rune-popover rune-popover-${position.align}`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         left: `${position.left}px`,
         top: `${position.top}px`,
@@ -504,15 +534,16 @@ function RunePopover({
         title={primaryStyle?.name ?? runeStyleName(runes, primaryStyleId)}
         styleId={primaryStyleId}
         selections={primarySelections}
-        fallbackIds={perkIds.slice(0, 4)}
+        expectedSlots={primaryStyle?.slots.length ?? 4}
       />
       <RuneTreeBlock
         runes={runes}
         title={secondaryStyle?.name ?? runeStyleName(runes, secondaryStyleId)}
         styleId={secondaryStyleId}
         selections={secondarySelections}
-        fallbackIds={perkIds.slice(4, 6)}
+        expectedSlots={secondaryStyle?.slots.length ?? 4}
       />
+      <StatShardBlock selections={statSelections} />
     </div>,
     document.body,
   );
@@ -523,15 +554,15 @@ function RuneTreeBlock({
   title,
   styleId,
   selections,
-  fallbackIds,
+  expectedSlots,
 }: {
   runes?: RuneData;
   title: string;
   styleId?: number;
   selections: RuneSelection[];
-  fallbackIds: number[];
+  expectedSlots: number;
 }) {
-  const visibleSelections = selections.length ? selections : fallbackIds.map((runeId, index) => ({ runeId, slotIndex: index, runeName: runeName(runes, runeId) }));
+  const rows = runeRows(selections, expectedSlots);
   const styleImageUrl = runeStyleImageUrl(runes, styleId);
   return (
     <section className="rune-tree-block">
@@ -540,13 +571,37 @@ function RuneTreeBlock({
         <span>{title}</span>
       </div>
       <div className="rune-tree-list">
-        {visibleSelections.length ? visibleSelections.map((selection) => (
-          <div className="rune-tree-row" key={`${selection.slotIndex}-${selection.runeId}`}>
-            <span className="rune-tree-slot">{selection.slotIndex + 1}</span>
-            <RuneIcon runes={runes} runeId={selection.runeId} />
-            <span className="rune-tree-name">{selection.runeName}</span>
+        {rows.map((selection, index) => (
+          <div className={`rune-tree-row${selection ? '' : ' rune-tree-row-missing'}`} key={selection ? `${selection.slotIndex}-${selection.runeId}` : `missing-${index}`}>
+            <span className="rune-tree-slot">{slotLabel(index)}</span>
+            {selection ? <RuneIcon runes={runes} runeId={selection.runeId} /> : <span className="rune-fallback">?</span>}
+            <span className="rune-tree-name">{selection?.runeName ?? 'Missing selection'}</span>
           </div>
-        )) : <div className="rune-tree-empty">No rune data</div>}
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StatShardBlock({ selections }: { selections: StatShardSelection[] }) {
+  const rows = ['Offense', 'Flex', 'Defense'].map((label, index) => ({
+    label,
+    selection: selections[index],
+  }));
+  return (
+    <section className="rune-tree-block">
+      <div className="rune-tree-heading">
+        <span className="rune-tree-style-fallback">+</span>
+        <span>Stat Shards</span>
+      </div>
+      <div className="rune-tree-list stat-shard-list">
+        {rows.map(({ label, selection }) => (
+          <div className={`rune-tree-row${selection ? '' : ' rune-tree-row-missing'}`} key={label}>
+            <span className="rune-tree-slot">{label.slice(0, 1)}</span>
+            {selection ? <img src={selection.iconUrl} alt={selection.name} title={selection.name} /> : <span className="rune-fallback">?</span>}
+            <span className="rune-tree-name">{selection ? `${label}: ${selection.name}` : `${label}: Missing selection`}</span>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -558,6 +613,12 @@ type RuneSelection = {
   runeName: string;
 };
 
+type StatShardSelection = {
+  id: number;
+  name: string;
+  iconUrl: string;
+};
+
 function selectedRunesForStyle(runes: RuneData | undefined, styleId: number | undefined, perkIds: number[]): RuneSelection[] {
   const style = runeStyleById(runes, styleId);
   if (!style) return [];
@@ -567,6 +628,88 @@ function selectedRunesForStyle(runes: RuneData | undefined, styleId: number | un
     return rune ? [{ runeId: rune.id, slotIndex, runeName: rune.name }] : [];
   });
 }
+
+function selectedRuneIds(participant: LiveParticipant) {
+  const styleSelections = participant.perks?.styles?.flatMap((style) => style.selections?.map((selection) => selection.perk) ?? []) ?? [];
+  if (styleSelections.length) return styleSelections;
+  return (participant.perks?.perkIds ?? []).filter((perkId) => !isStatShardId(perkId));
+}
+
+function primaryStyleForParticipant(runes: RuneData | undefined, participant: LiveParticipant) {
+  if (participant.perks?.perkStyle) return participant.perks.perkStyle;
+  const explicitPrimary = participant.perks?.styles?.find((style) => style.description === 'primaryStyle')?.style;
+  if (explicitPrimary) return explicitPrimary;
+  return styleIdForRune(runes, selectedRuneIds(participant)[0]);
+}
+
+function secondaryStyleForParticipant(runes: RuneData | undefined, participant: LiveParticipant, primaryStyleId?: number) {
+  if (participant.perks?.perkSubStyle) return participant.perks.perkSubStyle;
+  const explicitSecondary = participant.perks?.styles?.find((style) => style.description === 'subStyle')?.style;
+  if (explicitSecondary) return explicitSecondary;
+  const runeIDs = selectedRuneIds(participant);
+  for (const runeId of runeIDs) {
+    const styleId = styleIdForRune(runes, runeId);
+    if (styleId && styleId !== primaryStyleId) return styleId;
+  }
+  return undefined;
+}
+
+function keystoneForParticipant(runes: RuneData | undefined, participant: LiveParticipant, primaryStyleId?: number) {
+  const primarySelections = selectedRunesForStyle(runes, primaryStyleId, selectedRuneIds(participant));
+  return primarySelections[0]?.runeId ?? selectedRuneIds(participant)[0];
+}
+
+function styleIdForRune(runes: RuneData | undefined, runeId: number | undefined) {
+  if (!runes || !runeId) return undefined;
+  return runes.data.find((style) => style.slots.some((slot) => slot.runes.some((rune) => rune.id === runeId)))?.id;
+}
+
+function statSelectionsForParticipant(participant: LiveParticipant): StatShardSelection[] {
+  const statPerks = participant.perks?.statPerks;
+  const ids = statPerks
+    ? [statPerks.offense, statPerks.flex, statPerks.defense]
+    : (participant.perks?.perkIds ?? []).filter(isStatShardId).slice(-3);
+  return ids
+    .filter((id): id is number => Boolean(id))
+    .map((id) => statShardSelection(id));
+}
+
+function statShardSelection(id: number): StatShardSelection {
+  const metadata = statShardMetadata[id] ?? {
+    name: `Stat Shard ${id}`,
+    icon: 'StatModsAdaptiveForceIcon',
+  };
+  return {
+    id,
+    name: metadata.name,
+    iconUrl: `https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/${metadata.icon}.png`,
+  };
+}
+
+function runeRows(selections: RuneSelection[], expectedSlots: number) {
+  if (!expectedSlots) return selections;
+  return Array.from({ length: expectedSlots }, (_, index) => selections.find((selection) => selection.slotIndex === index));
+}
+
+function slotLabel(index: number) {
+  return index === 0 ? 'K' : String(index);
+}
+
+function isStatShardId(perkId: number) {
+  return perkId >= 5000 && perkId < 6000;
+}
+
+const statShardMetadata: Record<number, { name: string; icon: string }> = {
+  5001: { name: 'Health Scaling', icon: 'StatModsHealthScalingIcon' },
+  5002: { name: 'Armor', icon: 'StatModsArmorIcon' },
+  5003: { name: 'Magic Resist', icon: 'StatModsMagicResIcon' },
+  5005: { name: 'Attack Speed', icon: 'StatModsAttackSpeedIcon' },
+  5007: { name: 'Ability Haste', icon: 'StatModsCDRScalingIcon' },
+  5008: { name: 'Adaptive Force', icon: 'StatModsAdaptiveForceIcon' },
+  5010: { name: 'Move Speed', icon: 'StatModsMovementSpeedIcon' },
+  5011: { name: 'Health', icon: 'StatModsHealthPlusIcon' },
+  5013: { name: 'Tenacity and Slow Resist', icon: 'StatModsTenacityIcon' },
+};
 
 function RuneIcon({ runes, runeId }: { runes?: RuneData; runeId?: number }) {
   const imageUrl = runeImageUrl(runes, runeId);
