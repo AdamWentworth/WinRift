@@ -19,7 +19,7 @@ Go is used for the API/collector because the target deployment is a lightweight 
 2. Start the stack:
 
 ```bash
-docker compose up --build
+make up
 ```
 
 3. Open the app:
@@ -34,7 +34,15 @@ http://localhost:5173
 http://localhost:8000/api/health
 ```
 
-The collector worker is behind the `worker` Compose profile so normal local startup will not spend Riot API budget. Run it explicitly with `docker compose --profile worker up worker`, or call `POST /api/dev/collector/seed` in development. The worker can collect multiple Riot platforms via `COLLECTOR_PLATFORMS`, with per-platform budgets and optional Challenger-ladder auto-seeding.
+The collector worker is behind the `worker` Compose profile so normal local startup will not spend Riot API budget. Run it explicitly with `make up-worker`, or call `POST /api/dev/collector/seed` in development. The worker can collect multiple Riot platforms via `COLLECTOR_PLATFORMS`, with per-platform budgets and optional Challenger-ladder auto-seeding.
+
+To fully stop the project, including the profiled worker, use:
+
+```bash
+make down
+```
+
+This runs `docker compose --profile worker down --remove-orphans`. Avoid relying on profile-less stop/down commands when the worker may have been started, because the profiled worker can be left running by accident.
 
 ## Local API
 

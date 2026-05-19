@@ -3,7 +3,7 @@
 ## Start Infrastructure
 
 ```bash
-docker compose up --build clickhouse api
+make up
 ```
 
 ## Seed From API
@@ -71,13 +71,33 @@ RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
 Then run:
 
 ```bash
-docker compose --profile worker up --build worker
+make up-worker
 ```
 
 For a detached worker, follow progress with:
 
 ```bash
-docker compose logs -f worker
+make logs-worker
+```
+
+## Full Shutdown
+
+Use this when putting the project down, especially before leaving the laptop unattended:
+
+```bash
+make down
+```
+
+This includes the `worker` Compose profile and removes orphan containers:
+
+```bash
+docker compose --profile worker down --remove-orphans
+```
+
+Do not use profile-less stop/down commands as the canonical shutdown path when the collector has been running. The worker is profile-gated, and leaving it out can leave a collector container alive while ClickHouse/API are stopped. Verify with:
+
+```bash
+make status
 ```
 
 At startup, the worker resolves env seeds into `collector_frontier`. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, and records Riot requests in a rolling regional budget ledger. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
