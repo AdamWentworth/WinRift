@@ -369,8 +369,8 @@ button {
 }
 
 .chart-section {
-  align-content: stretch;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
 }
 
 .alternative-list {
@@ -469,18 +469,27 @@ button {
 }
 
 .chart-shell {
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 7px;
-  grid-template-rows: minmax(220px, 1fr) auto;
-  height: 100%;
   min-height: 0;
 }
 
-.winrate-chart {
+.chart-plot {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 10%);
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  width: 100%;
+}
+
+.winrate-chart {
+  display: block;
   height: 100%;
-  min-height: 220px;
+  inset: 0;
+  position: absolute;
   width: 100%;
 }
 
