@@ -1,4 +1,4 @@
-import { RadioTower, Search } from 'lucide-react';
+import { CircleAlert, LoaderCircle, RadioTower, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { resolveAccountAlias, searchAccountAliases } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
@@ -117,6 +117,7 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
   };
 
   const lookupMessage = validationError || (error ? lookupErrorMessage(lastSearch || riotId, error.message) : '');
+  const pendingMessage = aliasLoading ? 'Checking saved Riot IDs...' : loading ? 'Checking live game...' : '';
   const showLiveGame = Boolean(liveGame && !lookupMessage);
 
   return (
@@ -181,9 +182,18 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
             ))}
           </div>
         )}
-        {aliasLoading && <div className="search-message">Checking saved Riot IDs...</div>}
-        {loading && <div className="search-message">Checking live game...</div>}
-        {lookupMessage && <div className="search-message error">{lookupMessage}</div>}
+        {pendingMessage && (
+          <div className="search-message-card checking">
+            <LoaderCircle size={16} aria-hidden="true" />
+            <span>{pendingMessage}</span>
+          </div>
+        )}
+        {lookupMessage && (
+          <div className="search-message-card error">
+            <CircleAlert size={16} aria-hidden="true" />
+            <span>{lookupMessage}</span>
+          </div>
+        )}
       </div>
       {showLiveGame && liveGame && (
         <LiveMatchups

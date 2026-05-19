@@ -231,20 +231,46 @@ button {
   background: #858585;
 }
 
-.search-message {
+.search-message-card {
+  align-items: center;
+  border: 1px solid rgb(255 255 255 / 12%);
   color: #fff;
-  font-weight: 700;
-  margin-top: 14px;
+  display: flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  margin: 12px auto 0;
+  min-height: 36px;
+  padding: 8px 12px;
   text-align: center;
+  width: min(520px, 100%);
 }
 
-.has-game .search-message {
-  color: #d7dde1;
+.search-message-card.checking {
+  background: rgb(135 206 235 / 14%);
+  border-color: rgb(135 206 235 / 32%);
+  color: #d8f5ff;
+}
+
+.search-message-card.checking svg {
+  animation: spin 0.85s linear infinite;
+}
+
+.search-message-card.error {
+  background: rgb(240 128 128 / 15%);
+  border-color: rgb(240 128 128 / 38%);
+  color: #ffd3d3;
+}
+
+.has-game .search-message-card {
   margin-top: 8px;
 }
 
-.search-message.error {
-  color: #f05a5a;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .game-board {
