@@ -433,7 +433,7 @@ function WinConditionSummaryCard({
         <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
       <div className="legacy-win-stat">
-        <span>{strategyProfileLabel(team.sharpnessLabel, team.primaryMargin)}</span>
+        <span>{condition} {rating}</span>
         {metric && metric.games > 0 ? (
           <>
             <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
@@ -708,11 +708,11 @@ function WinConditionEnemyCard({
         <img className="legacy-condition-icon" src={conditionIconUrl(condition)} alt="" />
         <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
+      <WinConditionProfileBars team={team} selectedCondition={condition} />
       <div className="enemy-strategy-note">
         <strong>Adjust The Read</strong>
         <span>If the enemy is clearly playing through another plan, select that strategy below to update the matchup context.</span>
       </div>
-      <WinConditionProfileBars team={team} selectedCondition={condition} />
       <WinConditionPlanSwitches
         label="Enemy Plans"
         metrics={metrics}
@@ -1300,25 +1300,6 @@ function evidenceLevelFallback(games: number) {
 function planLabelFallback(metric?: WinConditionMetric) {
   if (!metric) return 'Unknown';
   return metric.primary ? 'Primary' : 'Alternative';
-}
-
-function strategyProfileLabel(label?: string, primaryMargin?: number) {
-  const normalized = label?.toLowerCase();
-  if (normalized === 'tied identity') return 'Even strategy profile';
-  if (normalized === 'contested identity') return 'Narrow primary plan';
-  if (normalized === 'flexible identity') return 'Flexible strategy profile';
-  if (normalized === 'clear identity') return 'Clear primary plan';
-  if (normalized === 'sharp identity') return 'Sharp primary plan';
-  return sharpnessFallback(primaryMargin);
-}
-
-function sharpnessFallback(primaryMargin?: number) {
-  if (primaryMargin === undefined) return 'Strategy profile';
-  if (primaryMargin <= 0) return 'Even strategy profile';
-  if (primaryMargin === 1) return 'Narrow primary plan';
-  if (primaryMargin <= 3) return 'Flexible strategy profile';
-  if (primaryMargin <= 6) return 'Clear primary plan';
-  return 'Sharp primary plan';
 }
 
 function planPairRead(metric: WinConditionMetric) {
