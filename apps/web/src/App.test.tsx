@@ -393,6 +393,7 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Show Enemy Plans Siege'));
     expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
     expect(screen.getByText('Enemy Siege B')).toBeInTheDocument();
+    expect(screen.getByLabelText('Show Enemy Plans Control')).toBeInTheDocument();
     expect(screen.getByText('Siege response read')).toBeInTheDocument();
     queryClient.clear();
   });

@@ -456,6 +456,7 @@ function WinConditionSummaryCard({
           metrics={metrics}
           selectedCondition={selectedCondition ?? condition}
           opponentCondition={opponentCondition}
+          primaryCondition={team.primaryCondition}
           onSelect={onSelect}
         />
       ) : null}
@@ -484,19 +485,17 @@ function WinConditionPlanSwitches({
   metrics,
   selectedCondition,
   opponentCondition,
+  primaryCondition,
   onSelect,
 }: {
   label: string;
   metrics: WinConditionMetric[];
   selectedCondition: string;
   opponentCondition: string;
+  primaryCondition: string;
   onSelect: (condition: string) => void;
 }) {
-  const alternatives = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((metric) => (
-    metric.opponentCondition === opponentCondition
-    && metric.condition !== selectedCondition
-    && isPlayerFacingPlan(metric)
-  )));
+  const alternatives = planSwitchMetrics(metrics, selectedCondition, opponentCondition, primaryCondition);
   return (
     <div className="strategy-switcher">
       <span className="strategy-switcher-title">{label}</span>
@@ -513,7 +512,7 @@ function WinConditionPlanSwitches({
               <img src={conditionIconUrl(metric.condition)} alt="" />
               <span>
                 <strong>{metric.condition} {metric.rating}</strong>
-                <em>{metric.games > 0 ? `${metric.winRate.toFixed(0)}% · ${metric.games}g` : 'No sample'}</em>
+                <em>{metric.condition === primaryCondition ? 'Primary · ' : ''}{metric.games > 0 ? `${metric.winRate.toFixed(0)}% · ${metric.games}g` : 'No sample'}</em>
               </span>
             </button>
           ))
@@ -715,6 +714,7 @@ function WinConditionEnemyCard({
         metrics={metrics}
         selectedCondition={condition}
         opponentCondition={opponentCondition}
+        primaryCondition={team.primaryCondition}
         onSelect={onSelect}
       />
     </div>
@@ -1237,6 +1237,27 @@ function uniqueConditionMetrics(metrics: WinConditionMetric[]) {
     seen.add(metric.condition);
     return true;
   });
+}
+
+function planSwitchMetrics(metrics: WinConditionMetric[], selectedCondition: string, opponentCondition: string, primaryCondition: string) {
+  const exactAlternatives = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((metric) => (
+    metric.opponentCondition === opponentCondition
+    && metric.condition !== selectedCondition
+    && isPlayerFacingPlan(metric)
+  )));
+  if (selectedCondition === primaryCondition) {
+    return exactAlternatives.slice(0, 3);
+  }
+
+  const primaryReturn = exactAlternatives.find((metric) => metric.condition === primaryCondition)
+    ?? metrics.find((metric) => metric.condition === primaryCondition && metric.opponentCondition === opponentCondition)
+    ?? metrics.find((metric) => metric.condition === primaryCondition);
+  if (!primaryReturn) {
+    return exactAlternatives.slice(0, 3);
+  }
+
+  const withoutPrimary = exactAlternatives.filter((metric) => metric.condition !== primaryCondition);
+  return [primaryReturn, ...withoutPrimary].slice(0, 3);
 }
 
 function isPlayerFacingPlan(metric: WinConditionMetric) {
