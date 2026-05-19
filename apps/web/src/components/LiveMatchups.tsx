@@ -5,6 +5,7 @@ import { getChampionRoleRates, getItemSlots, getWinConditionAnalysis } from '../
 import {
   championByKey,
   championImageUrl,
+  championSplashUrl,
   itemImageUrl,
   itemName,
   rankIconUrl,
@@ -682,6 +683,7 @@ function LiveChampionCard({
   const champion = championByKey(champions, participant.championId);
   const championName = champion?.name ?? String(participant.championId);
   const championUrl = championImageUrl(champions, participant.championId);
+  const championBackdropUrl = championSplashUrl(champions, participant.championId);
   const keystoneId = participant.perks?.perkIds?.[0];
   const secondaryStyleId = participant.perks?.perkSubStyle;
   const playerName = participant.riotId || participant.summonerName || 'Unknown player';
@@ -700,7 +702,7 @@ function LiveChampionCard({
       onDragEnd={onDragEnd}
       title="Drag to reorder matchup slots"
     >
-      {championUrl ? <img className="player-card-backdrop" src={championUrl} alt="" aria-hidden="true" /> : null}
+      {championBackdropUrl ? <img className="player-card-backdrop" src={championBackdropUrl} alt="" aria-hidden="true" /> : null}
       <div className="card-topline">
         {championUrl ? <img className="profile-picture" src={championUrl} alt={championName} /> : <div className="profile-picture profile-fallback">{participant.championId}</div>}
         <div className="player-title">

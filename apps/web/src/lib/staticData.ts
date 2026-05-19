@@ -16,6 +16,12 @@ export function championImageUrl(champions: ChampionData | undefined, championId
   return `https://ddragon.leagueoflegends.com/cdn/${champions.version}/img/champion/${champion.image.full}`;
 }
 
+export function championSplashUrl(champions: ChampionData | undefined, championId: number) {
+  const champion = championByKey(champions, championId);
+  if (!champion) return '';
+  return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg`;
+}
+
 export function itemImageUrl(items: ItemData | undefined, itemId: string) {
   const item = items?.data.data[itemId];
   if (!item?.image || !items) return '';
