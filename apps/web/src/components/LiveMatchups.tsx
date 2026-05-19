@@ -443,6 +443,23 @@ function WinConditionSummaryCard({
           </>
         )}
       </div>
+      <WinConditionProfileBars team={team} selectedCondition={condition} />
+    </div>
+  );
+}
+
+function WinConditionProfileBars({ team, selectedCondition }: { team: WinConditionTeamProfile; selectedCondition: string }) {
+  return (
+    <div className="win-profile-bars" aria-label="Team win condition profile">
+      {team.axes.map((axis) => (
+        <div className={`win-profile-row${axis.label === selectedCondition ? ' selected' : ''}`} key={axis.key}>
+          <span className="win-profile-name">{axis.label}</span>
+          <span className="win-profile-track">
+            <span className="win-profile-fill" style={{ width: `${Math.min(100, (axis.score / 25) * 100)}%` }} />
+          </span>
+          <span className="win-profile-rating">{axis.rating}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -644,6 +661,7 @@ function WinConditionEnemyCard({
         <img className="legacy-condition-icon" src={conditionIconUrl(condition)} alt="" />
         <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
+      <WinConditionProfileBars team={team} selectedCondition={condition} />
       <div className="enemy-other-conditions">
         {otherMetrics.map((candidate) => (
           <button key={candidate.condition} type="button" onClick={() => onSelect(candidate.condition)} aria-label={`Show enemy ${candidate.condition}`}>

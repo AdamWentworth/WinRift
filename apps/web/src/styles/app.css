@@ -437,6 +437,62 @@ button {
   line-height: 1.2;
 }
 
+.win-profile-bars {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
+.win-profile-row {
+  align-items: center;
+  display: grid;
+  gap: 5px;
+  grid-template-columns: 58px minmax(0, 1fr) 25px;
+  min-width: 0;
+}
+
+.win-profile-name,
+.win-profile-rating {
+  color: rgb(0 0 0 / 78%);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.win-profile-name {
+  text-align: right;
+}
+
+.win-profile-rating {
+  text-align: left;
+}
+
+.win-profile-track {
+  background: rgb(0 0 0 / 17%);
+  border: 1px solid rgb(0 0 0 / 18%);
+  display: block;
+  height: 7px;
+  overflow: hidden;
+}
+
+.win-profile-fill {
+  background: rgb(0 0 0 / 52%);
+  display: block;
+  height: 100%;
+}
+
+.win-profile-row.selected .win-profile-fill {
+  background: #fff;
+}
+
+.win-profile-row.selected .win-profile-name,
+.win-profile-row.selected .win-profile-rating {
+  color: #000;
+}
+
 .alternatives-section,
 .match-read-section,
 .chart-section {
