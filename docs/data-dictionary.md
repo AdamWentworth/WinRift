@@ -59,7 +59,9 @@ Compiled win-condition matchup metrics used by the live UI.
 
 Dimensions: patch, platform, queue, rank bucket, team condition, team rating, opponent primary condition, opponent primary rating, whether the team condition was the team's primary identity, and game-length bucket.
 
-Measures: wins and games. The API computes winrate and Wilson lower-bound confidence.
+Measures: wins, games, precomputed winrate percentage, and precomputed Wilson lower-bound confidence percentage.
+
+Rollups are stored as normal rows: `platform = ALL`, `rank_bucket = ALL`, and `game_length_bucket = ALL`. `team_primary = 1` means primary-only, `0` means non-primary-only, and `2` means any primary state. Live UI requests should read these compiled rows directly instead of recomputing percentages from raw team rows.
 
 ## `participants`
 

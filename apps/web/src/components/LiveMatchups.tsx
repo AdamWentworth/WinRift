@@ -49,6 +49,7 @@ type RoleRateMap = Map<number, Map<string, ChampionRoleRate>>;
 
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
   const liveChampionIds = useMemo(() => uniqueChampionIds(liveGame.participants), [liveGame.participants]);
+  const patchBucket = useMemo(() => patchBucketFromVersion(champions?.version), [champions?.version]);
   const roleRatesQuery = useQuery({
     queryKey: ['champion-role-rates', liveGame.gameQueueConfigId, liveChampionIds],
     queryFn: () => getChampionRoleRates(liveChampionIds, liveGame.gameQueueConfigId),
@@ -66,11 +67,12 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
   const winConditionQuery = useQuery({
-    queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, blueChampionIds, redChampionIds],
+    queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, patchBucket, blueChampionIds, redChampionIds],
     queryFn: () => getWinConditionAnalysis({
       blueChampionIds,
       redChampionIds,
       queueId: liveGame.gameQueueConfigId,
+      patch: patchBucket,
       minGames: 5,
     }),
     enabled: blueChampionIds.length === 5 && redChampionIds.length === 5,
@@ -825,6 +827,11 @@ function uniqueChampionIds(participants: LiveParticipant[]) {
 
 function teamChampionIds(participants: LiveParticipant[]) {
   return participants.map((participant) => participant.championId).filter(Boolean);
+}
+
+function patchBucketFromVersion(version?: string) {
+  const match = version?.match(/^(\d+\.\d+)/);
+  return match?.[1];
 }
 
 function buildRoleRateMap(rows: ChampionRoleRate[] = []): RoleRateMap {

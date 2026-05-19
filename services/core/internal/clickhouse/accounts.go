@@ -84,6 +84,8 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 			game_length_bucket LowCardinality(String),
 			wins UInt64,
 			games UInt64,
+			win_rate_percent Float64,
+			confidence_percent Float64,
 			compiled_at DateTime DEFAULT now()
 		)
 		ENGINE = ReplacingMergeTree(compiled_at)
@@ -100,6 +102,10 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 			team_primary,
 			game_length_bucket
 		)
+	`, `
+		ALTER TABLE patch_win_condition_metrics ADD COLUMN IF NOT EXISTS win_rate_percent Float64 AFTER games
+	`, `
+		ALTER TABLE patch_win_condition_metrics ADD COLUMN IF NOT EXISTS confidence_percent Float64 AFTER win_rate_percent
 	`}
 	for _, statement := range statements {
 		if _, err := r.db.ExecContext(ctx, statement); err != nil {

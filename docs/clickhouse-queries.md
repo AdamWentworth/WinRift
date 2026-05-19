@@ -182,21 +182,19 @@ SELECT
   opponent_condition,
   opponent_rating,
   game_length_bucket,
-  sum(wins) AS wins,
-  sum(games) AS games,
-  wins / games AS win_rate
+  wins,
+  games,
+  win_rate_percent,
+  confidence_percent
 FROM patch_win_condition_metrics FINAL
 WHERE patch = '16.10'
+  AND platform = 'ALL'
   AND queue_id = 420
+  AND rank_bucket = 'ALL'
+  AND team_primary = 1
   AND team_condition = 'Pick'
   AND team_rating = 'B'
   AND opponent_condition = 'Siege'
   AND opponent_rating = 'B'
-GROUP BY
-  team_condition,
-  team_rating,
-  opponent_condition,
-  opponent_rating,
-  game_length_bucket
 ORDER BY game_length_bucket;
 ```

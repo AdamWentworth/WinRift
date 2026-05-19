@@ -46,6 +46,8 @@ docker compose run --rm api /winrift-patchctl -action win-conditions -patch 16.1
 
 This is useful during active collection because the live UI can read fast compiled strategy metrics while raw match rows continue to grow.
 
+The refresh writes patch/platform rows and also refreshes `platform = ALL` rollups for that patch. It stores `game_length_bucket = ALL` totals, per-duration buckets, `rank_bucket = ALL` totals, winrate percentages, and Wilson confidence percentages so live requests do not recompute those numbers.
+
 ## Delete Raw Closed-Patch Data
 
 Run this only after compile succeeds and the retention window has passed:

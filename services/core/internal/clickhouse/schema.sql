@@ -253,6 +253,8 @@ CREATE TABLE IF NOT EXISTS winrift.patch_win_condition_metrics
     game_length_bucket LowCardinality(String),
     wins UInt64,
     games UInt64,
+    win_rate_percent Float64,
+    confidence_percent Float64,
     compiled_at DateTime DEFAULT now()
 )
 ENGINE = ReplacingMergeTree(compiled_at)

@@ -15,7 +15,7 @@ Current live-game constraints:
 - Live board with champion cards, ranks, champion performance, spells, compact rune icons, drag reorder, and matchup item-slot stats.
 - Role correction using one-Smite jungle detection plus champion role-rate data from ClickHouse.
 - Live backfill seeding for players with low champion samples.
-- Win-condition panel backed by the validated champion profile fixture and read-time ClickHouse composition aggregates.
+- Win-condition panel backed by the validated champion profile fixture and precompiled ClickHouse win-condition metrics.
 
 ## High-Value Additions
 
