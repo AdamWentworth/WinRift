@@ -393,6 +393,16 @@ button {
   border-color: #fff;
 }
 
+.alternative-empty {
+  background: #2b2b2b;
+  border: 1px solid #555;
+  color: #c9d1d6;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px 8px;
+  text-align: center;
+}
+
 .alternative-images {
   align-items: center;
   display: flex;

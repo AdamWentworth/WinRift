@@ -252,6 +252,15 @@ This does not change the underlying scores or the legacy-style primary-vs-altern
 
 If a weak or low-rated angle shows a high historical winrate, the match read now warns that this is likely correlation rather than causation. For example, `SplitPush C-` with a high winrate into `Control B` should not imply those teams won by splitpushing well. More likely, those games were won through the composition's stronger plans while also matching the low SplitPush rating row.
 
+The live UI now filters alternatives by plan fit. It still asks the backend for the full matrix, but the player-facing condition buttons hide weak angles by default. The default display shows:
+
+- `Primary`
+- `Co-primary`
+- `Strong secondary`
+- `Secondary` only when the plan is close enough to the primary score or has at least a `B-` rating
+
+This keeps the middle panel focused on strategies the composition can plausibly execute. Weak-angle rows remain available in the API response for diagnostics, future advanced views, and model validation.
+
 ## Building Block 7: Winrates By Game Length
 
 The legacy system uses duration buckets:

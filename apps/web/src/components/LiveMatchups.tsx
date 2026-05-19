@@ -381,25 +381,33 @@ function WinConditionAlternatives({
   opponentCondition: string;
   onSelect: (condition: string) => void;
 }) {
-  const alternatives = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((metric) => metric.opponentCondition === opponentCondition && metric.condition !== selectedCondition));
+  const alternatives = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((metric) => (
+    metric.opponentCondition === opponentCondition
+    && metric.condition !== selectedCondition
+    && isPlayerFacingPlan(metric)
+  )));
   return (
     <div className="legacy-stats-section alternatives-section">
       <h2>Alternatives</h2>
       <div className="alternative-list">
-        {alternatives.map((metric) => (
-          <button className="alternative-item" key={`${metric.condition}-${metric.opponentCondition}`} type="button" onClick={() => onSelect(metric.condition)}>
-            <span className="alternative-images">
-              <img src={conditionIconUrl(metric.condition)} alt="" />
-              <img src={ratingImageUrl(metric.rating)} alt={metric.rating} />
-            </span>
-            <span className="alternative-text">
-              <strong>{metric.games > 0 ? metric.winRate.toFixed(2) : '--'}%</strong>
-              <em>{metric.planLabel ?? planLabelFallback(metric)}</em>
-              <em>{metric.games} Matches</em>
-              <em>{metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</em>
-            </span>
-          </button>
-        ))}
+        {alternatives.length > 0 ? (
+          alternatives.map((metric) => (
+            <button className="alternative-item" key={`${metric.condition}-${metric.opponentCondition}`} type="button" onClick={() => onSelect(metric.condition)}>
+              <span className="alternative-images">
+                <img src={conditionIconUrl(metric.condition)} alt="" />
+                <img src={ratingImageUrl(metric.rating)} alt={metric.rating} />
+              </span>
+              <span className="alternative-text">
+                <strong>{metric.games > 0 ? metric.winRate.toFixed(2) : '--'}%</strong>
+                <em>{metric.planLabel ?? planLabelFallback(metric)}</em>
+                <em>{metric.games} Matches</em>
+                <em>{metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</em>
+              </span>
+            </button>
+          ))
+        ) : (
+          <div className="alternative-empty">No other strong plans</div>
+        )}
       </div>
     </div>
   );
@@ -482,7 +490,11 @@ function WinConditionEnemyCard({
 }) {
   const condition = metric?.condition ?? team.primaryCondition;
   const rating = metric?.rating ?? team.primaryRating;
-  const otherMetrics = uniqueConditionMetrics(metrics.filter((candidate) => candidate.opponentCondition === opponentCondition && candidate.condition !== condition));
+  const otherMetrics = uniqueConditionMetrics(sortedAlternativeMetrics(metrics).filter((candidate) => (
+    candidate.opponentCondition === opponentCondition
+    && candidate.condition !== condition
+    && isPlayerFacingPlan(candidate)
+  )));
   return (
     <div className={`legacy-win-card enemy ${side}`}>
       <h2>Enemy Team's Win Condition</h2>
@@ -878,6 +890,30 @@ function uniqueConditionMetrics(metrics: WinConditionMetric[]) {
     seen.add(metric.condition);
     return true;
   });
+}
+
+function isPlayerFacingPlan(metric: WinConditionMetric) {
+  const role = metric.planRole?.toLowerCase();
+  if (metric.primary || role === 'primary') return true;
+  if (role === 'co-primary' || role === 'strong-secondary') return true;
+  if (role === 'secondary') {
+    return isRelevantSecondaryPlan(metric);
+  }
+  if (!role) {
+    return metric.primary || isRelevantSecondaryPlan(metric);
+  }
+  return false;
+}
+
+function isRelevantSecondaryPlan(metric: WinConditionMetric) {
+  const closeToPrimary = metric.deltaFromPrimary !== undefined && metric.deltaFromPrimary <= 5;
+  return closeToPrimary || ratingRank(metric.rating) >= ratingRank('B-');
+}
+
+function ratingRank(rating: string) {
+  const ratings = ['D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+', 'S-', 'S', 'S+'];
+  const index = ratings.indexOf(rating);
+  return index >= 0 ? index : -1;
 }
 
 function evidenceLevelFallback(games: number) {
