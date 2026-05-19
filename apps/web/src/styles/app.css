@@ -399,8 +399,13 @@ button {
 
 .legacy-win-card,
 .legacy-stats-section {
-  background: #222;
-  border: 1px solid #ccc;
+  background:
+    linear-gradient(180deg, rgb(32 37 39 / 96%), rgb(19 21 23 / 98%)),
+    #202020;
+  border: 1px solid rgb(255 255 255 / 12%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 7%),
+    0 10px 22px rgb(0 0 0 / 18%);
   color: #fff;
   display: grid;
   min-height: 0;
@@ -410,21 +415,44 @@ button {
 
 .legacy-win-card {
   align-content: start;
-  color: #000;
+  --team-accent: #d6e6eb;
+  --team-accent-soft: rgb(214 230 235 / 16%);
+  color: #f3f6f7;
   gap: 8px;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   justify-items: center;
+  overflow: hidden;
+  position: relative;
   text-align: center;
 }
 
+.legacy-win-card::before {
+  background:
+    radial-gradient(circle at 50% 0, var(--team-accent-soft), transparent 62%),
+    linear-gradient(90deg, transparent, var(--team-accent), transparent);
+  content: "";
+  height: 82px;
+  inset: 0 0 auto;
+  opacity: 0.72;
+  pointer-events: none;
+  position: absolute;
+}
+
+.legacy-win-card > * {
+  position: relative;
+  z-index: 1;
+}
+
 .legacy-win-card.blue {
-  background: skyblue;
-  border-color: #87ceeb;
+  --team-accent: #82d7ff;
+  --team-accent-soft: rgb(130 215 255 / 20%);
+  border-color: rgb(130 215 255 / 44%);
 }
 
 .legacy-win-card.red {
-  background: lightcoral;
-  border-color: #f08080;
+  --team-accent: #ff8888;
+  --team-accent-soft: rgb(255 136 136 / 20%);
+  border-color: rgb(255 136 136 / 44%);
 }
 
 .legacy-win-card.enemy {
@@ -438,53 +466,87 @@ button {
 .legacy-win-card h2,
 .legacy-stats-section h2 {
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-  font-size: 14px;
+  color: #f8fbfc;
+  font-size: 13px;
   font-weight: 900;
   line-height: 1.1;
   margin: 0;
   text-align: center;
-  text-shadow: 0 1px 2px rgb(0 0 0 / 38%);
+  text-shadow: 0 2px 4px rgb(0 0 0 / 55%);
+  text-transform: uppercase;
 }
 
 .legacy-stats-section h2 {
-  color: #fff;
+  color: #f8fbfc;
 }
 
 .legacy-win-images {
   align-items: center;
+  background:
+    radial-gradient(circle at 35% 25%, rgb(255 255 255 / 18%), transparent 38%),
+    rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  box-shadow: inset 0 0 22px rgb(0 0 0 / 18%);
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
-  min-height: 74px;
+  min-height: 82px;
+  padding: 8px 10px;
+  width: 100%;
 }
 
 .legacy-condition-icon,
 .legacy-rating-icon {
-  height: clamp(50px, 4.2vw, 74px);
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / 48%));
+  height: clamp(50px, 4.2vw, 72px);
   object-fit: contain;
-  width: clamp(50px, 4.2vw, 74px);
+  width: clamp(50px, 4.2vw, 72px);
+}
+
+.legacy-condition-icon {
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  padding: 3px;
 }
 
 .legacy-win-stat {
-  background: rgb(0 0 0 / 8%);
-  border: 1px solid rgb(0 0 0 / 11%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)),
+    rgb(0 0 0 / 22%);
+  border: 1px solid rgb(255 255 255 / 10%);
   display: grid;
   gap: 3px;
   font-weight: 900;
-  padding: 7px;
+  padding: 8px;
   width: 100%;
 }
 
 .legacy-win-stat strong,
 .legacy-win-stat span {
-  font-size: 12px;
+  color: #eef6f8;
+  font-size: 11px;
   line-height: 1.2;
+}
+
+.legacy-win-stat strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.legacy-win-stat span:first-child {
+  color: var(--team-accent);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 13px;
+  text-transform: uppercase;
 }
 
 .win-profile-bars {
   align-self: end;
-  background: rgb(0 0 0 / 9%);
-  border: 1px solid rgb(0 0 0 / 12%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
+    rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 10%);
   display: grid;
   gap: 4px;
   margin-top: auto;
@@ -502,7 +564,7 @@ button {
 
 .win-profile-name,
 .win-profile-rating {
-  color: rgb(0 0 0 / 78%);
+  color: #b9c8ce;
   font-size: 10px;
   font-weight: 900;
   line-height: 1;
@@ -520,26 +582,27 @@ button {
 }
 
 .win-profile-track {
-  background: rgb(0 0 0 / 17%);
-  border: 1px solid rgb(0 0 0 / 18%);
+  background: rgb(0 0 0 / 34%);
+  border: 1px solid rgb(255 255 255 / 9%);
   display: block;
   height: 8px;
   overflow: hidden;
 }
 
 .win-profile-fill {
-  background: rgb(0 0 0 / 52%);
+  background: rgb(255 255 255 / 38%);
   display: block;
   height: 100%;
 }
 
 .win-profile-row.selected .win-profile-fill {
-  background: #fff;
+  background: linear-gradient(90deg, #fff, var(--team-accent));
+  box-shadow: 0 0 9px var(--team-accent-soft);
 }
 
 .win-profile-row.selected .win-profile-name,
 .win-profile-row.selected .win-profile-rating {
-  color: #000;
+  color: #fff;
 }
 
 .alternatives-section,
@@ -555,7 +618,8 @@ button {
 
 .chart-section {
   background:
-    linear-gradient(180deg, rgb(41 48 50 / 92%), rgb(28 31 33 / 96%)),
+    radial-gradient(circle at 50% 0, rgb(100 239 232 / 10%), transparent 54%),
+    linear-gradient(180deg, rgb(35 43 45 / 94%), rgb(18 21 23 / 98%)),
     #222;
   border-color: #6f8589;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 5%);
@@ -575,6 +639,7 @@ button {
 .alternative-item {
   align-items: center;
   background:
+    radial-gradient(circle at 0 50%, rgb(255 255 255 / 10%), transparent 48%),
     linear-gradient(90deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%)),
     rgb(0 0 0 / 16%);
   border: 1px solid rgb(255 255 255 / 12%);
@@ -592,8 +657,10 @@ button {
 
 .alternative-item:hover,
 .enemy-other-conditions button:hover {
-  background: rgb(255 255 255 / 11%);
-  border-color: rgb(255 255 255 / 72%);
+  background:
+    radial-gradient(circle at 0 50%, rgb(130 215 255 / 18%), transparent 52%),
+    rgb(255 255 255 / 9%);
+  border-color: rgb(255 255 255 / 48%);
 }
 
 .alternative-empty {
@@ -645,9 +712,10 @@ button {
 
 .match-read-section {
   background:
-    linear-gradient(180deg, rgb(34 38 40 / 94%), rgb(24 26 28 / 96%)),
+    radial-gradient(circle at 50% 0, rgb(135 206 235 / 9%), transparent 50%),
+    linear-gradient(180deg, rgb(31 37 40 / 96%), rgb(16 18 20 / 98%)),
     #222;
-  border-color: #5d6a70;
+  border-color: rgb(129 151 158 / 48%);
 }
 
 .match-read-copy {
@@ -659,8 +727,10 @@ button {
 }
 
 .match-read-headline {
-  background: rgb(0 0 0 / 22%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 2%)),
+    rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 11%);
   display: grid;
   gap: 4px;
   padding: 8px;
@@ -669,7 +739,7 @@ button {
 .match-read-pair-strip {
   align-items: center;
   background:
-    linear-gradient(90deg, rgb(135 206 235 / 18%), transparent 45%, rgb(240 128 128 / 17%)),
+    linear-gradient(90deg, rgb(130 215 255 / 20%), transparent 45%, rgb(255 136 136 / 18%)),
     rgb(0 0 0 / 30%);
   border: 1px solid rgb(255 255 255 / 12%);
   display: grid;
@@ -788,10 +858,14 @@ button {
 }
 
 .match-read-primary {
+  background: rgb(255 255 255 / 5%);
+  border-left: 3px solid #64efe8;
   color: #f4f6f8;
-  font-size: 12px;
-  font-weight: 800;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 900;
   line-height: 1.22;
+  padding: 8px;
 }
 
 .match-read-grid {
@@ -801,8 +875,10 @@ button {
 }
 
 .match-read-block {
-  background: rgb(0 0 0 / 18%);
-  border: 1px solid rgb(255 255 255 / 7%);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
+    rgb(0 0 0 / 20%);
+  border: 1px solid rgb(255 255 255 / 9%);
   display: grid;
   gap: 4px;
   padding: 6px;
@@ -846,10 +922,11 @@ button {
 
 .chart-plot {
   background:
+    radial-gradient(circle at 50% 0, rgb(125 244 221 / 15%), transparent 46%),
     linear-gradient(180deg, rgb(89 234 203 / 10%), transparent 42%),
     linear-gradient(180deg, transparent 55%, rgb(255 103 103 / 9%)),
     rgb(10 14 15 / 58%);
-  border: 1px solid rgb(151 198 202 / 22%);
+  border: 1px solid rgb(151 198 202 / 30%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 7%),
     0 8px 18px rgb(0 0 0 / 18%);
