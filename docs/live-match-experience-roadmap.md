@@ -127,3 +127,16 @@ See [Legacy Win Condition Audit](legacy-win-condition-audit.md).
 3. Recent champion/role history panel.
 4. Comfort flags.
 5. Combined build plus team-strategy analytics.
+
+## Current UI Refinement Pass
+
+The live match screen should feel like one cohesive match dashboard, not separate widgets stacked together. The near-term design pass is:
+
+- Add a compact match header with queue, platform, game clock, searched side, patch context, and team average rank.
+- Add fixed lane labels so build cards, champion cards, and matchup analytics visually lock to Top/Jungle/Mid/Bot/Support.
+- Make player cards more scannable: champion identity first, then ranked record, champion record, spells, and runes.
+- Make build cards read as "best observed item path into this opponent" with clear sample-size language and better no-data states.
+- Turn the win-condition match read into a structured card with "play toward," "watch for," timing, evidence, and sample notes.
+- Make alternatives feel like lightweight strategy chips instead of another large card competing with the primary read.
+- Keep the duration chart visually strong, but keep its language honest: these are game-length outcome buckets, not live minute-by-minute win probability.
+- Split the large live component into smaller components once the visual direction settles, so future changes are easier to reason about.
