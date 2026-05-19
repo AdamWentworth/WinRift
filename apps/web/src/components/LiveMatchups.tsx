@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { createPortal } from 'react-dom';
-import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData } from '../api/types';
+import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
 import { getItemSlots } from '../api/client';
 import {
   championByKey,
@@ -517,6 +517,7 @@ function RunePopover({
   const primarySelections = selectedRunesForStyle(runes, primaryStyleId, perkIds);
   const secondarySelections = selectedRunesForStyle(runes, secondaryStyleId, perkIds);
   const statSelections = statSelectionsForParticipant(participant);
+  const liveLimited = hasLimitedLiveRuneData(participant);
 
   return createPortal(
     <div
@@ -529,21 +530,24 @@ function RunePopover({
         width: `min(340px, calc(100vw - 24px))`,
       }}
     >
+      {liveLimited ? <div className="rune-popover-note">Live data exposes keystone and rune trees. Full selections are available after match collection.</div> : null}
       <RuneTreeBlock
         runes={runes}
         title={primaryStyle?.name ?? runeStyleName(runes, primaryStyleId)}
         styleId={primaryStyleId}
         selections={primarySelections}
-        expectedSlots={primaryStyle?.slots.length ?? 4}
+        slotIndexes={runeSlotIndexes(primaryStyle, 'primary')}
+        emptyLabel={liveLimited ? 'Unavailable live' : 'Unknown selection'}
       />
       <RuneTreeBlock
         runes={runes}
         title={secondaryStyle?.name ?? runeStyleName(runes, secondaryStyleId)}
         styleId={secondaryStyleId}
         selections={secondarySelections}
-        expectedSlots={secondaryStyle?.slots.length ?? 4}
+        slotIndexes={runeSlotIndexes(secondaryStyle, 'secondary')}
+        emptyLabel={liveLimited ? 'Unavailable live' : 'Not selected'}
       />
-      <StatShardBlock selections={statSelections} />
+      <StatShardBlock selections={statSelections} emptyLabel={liveLimited ? 'Unavailable live' : 'Unknown'} />
     </div>,
     document.body,
   );
@@ -554,15 +558,17 @@ function RuneTreeBlock({
   title,
   styleId,
   selections,
-  expectedSlots,
+  slotIndexes,
+  emptyLabel,
 }: {
   runes?: RuneData;
   title: string;
   styleId?: number;
   selections: RuneSelection[];
-  expectedSlots: number;
+  slotIndexes: number[];
+  emptyLabel: string;
 }) {
-  const rows = runeRows(selections, expectedSlots);
+  const rows = runeRows(selections, slotIndexes);
   const styleImageUrl = runeStyleImageUrl(runes, styleId);
   return (
     <section className="rune-tree-block">
@@ -571,11 +577,11 @@ function RuneTreeBlock({
         <span>{title}</span>
       </div>
       <div className="rune-tree-list">
-        {rows.map((selection, index) => (
-          <div className={`rune-tree-row${selection ? '' : ' rune-tree-row-missing'}`} key={selection ? `${selection.slotIndex}-${selection.runeId}` : `missing-${index}`}>
-            <span className="rune-tree-slot">{slotLabel(index)}</span>
-            {selection ? <RuneIcon runes={runes} runeId={selection.runeId} /> : <span className="rune-fallback">?</span>}
-            <span className="rune-tree-name">{selection?.runeName ?? 'Missing selection'}</span>
+        {rows.map((row) => (
+          <div className={`rune-tree-row${row.selection ? '' : ' rune-tree-row-empty'}`} key={row.selection ? `${row.slotIndex}-${row.selection.runeId}` : `empty-${row.slotIndex}`}>
+            <span className="rune-tree-slot">{slotLabel(row.slotIndex)}</span>
+            {row.selection ? <RuneIcon runes={runes} runeId={row.selection.runeId} /> : <span className="rune-fallback">?</span>}
+            <span className="rune-tree-name">{row.selection?.runeName ?? emptyLabel}</span>
           </div>
         ))}
       </div>
@@ -583,7 +589,7 @@ function RuneTreeBlock({
   );
 }
 
-function StatShardBlock({ selections }: { selections: StatShardSelection[] }) {
+function StatShardBlock({ selections, emptyLabel }: { selections: StatShardSelection[]; emptyLabel: string }) {
   const rows = ['Offense', 'Flex', 'Defense'].map((label, index) => ({
     label,
     selection: selections[index],
@@ -596,10 +602,10 @@ function StatShardBlock({ selections }: { selections: StatShardSelection[] }) {
       </div>
       <div className="rune-tree-list stat-shard-list">
         {rows.map(({ label, selection }) => (
-          <div className={`rune-tree-row${selection ? '' : ' rune-tree-row-missing'}`} key={label}>
+          <div className={`rune-tree-row${selection ? '' : ' rune-tree-row-empty'}`} key={label}>
             <span className="rune-tree-slot">{label.slice(0, 1)}</span>
             {selection ? <img src={selection.iconUrl} alt={selection.name} title={selection.name} /> : <span className="rune-fallback">?</span>}
-            <span className="rune-tree-name">{selection ? `${label}: ${selection.name}` : `${label}: Missing selection`}</span>
+            <span className="rune-tree-name">{selection ? `${label}: ${selection.name}` : `${label}: ${emptyLabel}`}</span>
           </div>
         ))}
       </div>
@@ -686,13 +692,30 @@ function statShardSelection(id: number): StatShardSelection {
   };
 }
 
-function runeRows(selections: RuneSelection[], expectedSlots: number) {
-  if (!expectedSlots) return selections;
-  return Array.from({ length: expectedSlots }, (_, index) => selections.find((selection) => selection.slotIndex === index));
+function runeSlotIndexes(style: RuneStyle | undefined, kind: 'primary' | 'secondary') {
+  if (!style) return kind === 'primary' ? [0, 1, 2, 3] : [1, 2, 3];
+  const indexes = style.slots.map((_, index) => index);
+  if (kind === 'secondary' && indexes.length >= 4) return indexes.filter((index) => index > 0);
+  return indexes;
+}
+
+function runeRows(selections: RuneSelection[], slotIndexes: number[]) {
+  if (!slotIndexes.length) return selections.map((selection) => ({ slotIndex: selection.slotIndex, selection }));
+  return slotIndexes.map((slotIndex) => ({
+    slotIndex,
+    selection: selections.find((selection) => selection.slotIndex === slotIndex),
+  }));
 }
 
 function slotLabel(index: number) {
   return index === 0 ? 'K' : String(index);
+}
+
+function hasLimitedLiveRuneData(participant: LiveParticipant) {
+  const runeIds = selectedRuneIds(participant);
+  const hasMatchStyleSelections = Boolean(participant.perks?.styles?.some((style) => style.selections?.length));
+  const hasStatPerks = Boolean(participant.perks?.statPerks) || (participant.perks?.perkIds ?? []).some(isStatShardId);
+  return !hasMatchStyleSelections && runeIds.length <= 1 && !hasStatPerks;
 }
 
 function isStatShardId(perkId: number) {

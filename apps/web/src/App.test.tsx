@@ -347,4 +347,91 @@ describe('App', () => {
     expect(screen.getByText('Defense: Armor')).toBeInTheDocument();
     queryClient.clear();
   });
+
+  it('labels unavailable live rune rows without pretending selections are missing', async () => {
+    vi.mocked(getRunes).mockResolvedValueOnce({
+      version: 'test',
+      data: [
+        {
+          id: 8100,
+          key: 'Domination',
+          name: 'Domination',
+          icon: 'perk-images/Styles/7200_Domination.png',
+          slots: [
+            { runes: [{ id: 8112, key: 'Electrocute', name: 'Electrocute', icon: 'perk-images/Styles/Domination/Electrocute/Electrocute.png' }] },
+            { runes: [{ id: 8126, key: 'CheapShot', name: 'Cheap Shot', icon: 'perk-images/Styles/Domination/CheapShot/CheapShot.png' }] },
+            { runes: [{ id: 8138, key: 'EyeballCollection', name: 'Eyeball Collection', icon: 'perk-images/Styles/Domination/EyeballCollection/EyeballCollection.png' }] },
+            { runes: [{ id: 8106, key: 'UltimateHunter', name: 'Ultimate Hunter', icon: 'perk-images/Styles/Domination/UltimateHunter/UltimateHunter.png' }] },
+          ],
+        },
+        {
+          id: 8200,
+          key: 'Sorcery',
+          name: 'Sorcery',
+          icon: 'perk-images/Styles/7202_Sorcery.png',
+          slots: [
+            { runes: [{ id: 8214, key: 'SummonAery', name: 'Summon Aery', icon: 'perk-images/Styles/Sorcery/SummonAery/SummonAery.png' }] },
+            { runes: [{ id: 8226, key: 'ManaflowBand', name: 'Manaflow Band', icon: 'perk-images/Styles/Sorcery/ManaflowBand/ManaflowBand.png' }] },
+            { runes: [{ id: 8210, key: 'Transcendence', name: 'Transcendence', icon: 'perk-images/Styles/Sorcery/Transcendence/Transcendence.png' }] },
+            { runes: [{ id: 8237, key: 'Scorch', name: 'Scorch', icon: 'perk-images/Styles/Sorcery/Scorch/Scorch.png' }] },
+          ],
+        },
+      ],
+    });
+    vi.mocked(getLiveGame).mockResolvedValueOnce({
+      platform: 'NA1',
+      puuid: 'blue-puuid',
+      gameId: 789,
+      mapId: 11,
+      gameMode: 'CLASSIC',
+      gameType: 'MATCHED_GAME',
+      gameQueueConfigId: 420,
+      gameStartTime: Date.now(),
+      participants: [
+        {
+          teamId: 100,
+          championId: 1,
+          spell1Id: 4,
+          spell2Id: 14,
+          puuid: 'blue-puuid',
+          summonerName: 'Live Rune Blue',
+          perks: {
+            perkIds: [8112],
+            perkStyle: 8100,
+            perkSubStyle: 8200,
+          },
+          bot: false,
+        },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+      target: { value: 'Live Rune Blue#NA1' },
+    });
+    fireEvent.click(screen.getByLabelText('Find live game'));
+
+    const runeTrigger = await screen.findByLabelText('Rune selections');
+    fireEvent.mouseEnter(runeTrigger);
+
+    expect(await screen.findByText('Electrocute')).toBeInTheDocument();
+    expect(screen.getByText('Domination')).toBeInTheDocument();
+    expect(screen.getByText('Sorcery')).toBeInTheDocument();
+    expect(screen.getByText('Live data exposes keystone and rune trees. Full selections are available after match collection.')).toBeInTheDocument();
+    expect(screen.queryByText(/Missing selection/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Cheap Shot')).not.toBeInTheDocument();
+    expect(screen.getByText('Offense: Unavailable live')).toBeInTheDocument();
+    queryClient.clear();
+  });
 });
