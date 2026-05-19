@@ -1020,7 +1020,6 @@ button {
   min-width: 0;
 }
 
-.role-confidence,
 .comfort-flag {
   background: rgb(0 0 0 / 34%);
   border: 1px solid rgb(255 255 255 / 10%);
@@ -1036,18 +1035,11 @@ button {
   white-space: nowrap;
 }
 
-.role-confidence.strong,
 .comfort-flag.good {
   border-color: rgb(116 233 130 / 42%);
   color: #bff5c7;
 }
 
-.role-confidence.manual {
-  border-color: rgb(243 214 113 / 42%);
-  color: #f3d671;
-}
-
-.role-confidence.thin,
 .comfort-flag.thin {
   color: #aeb8bf;
 }

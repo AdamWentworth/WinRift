@@ -58,12 +58,11 @@ Implementation notes:
 
 Current implementation:
 
-- Live cards show a compact role-confidence chip.
-- Unique Smite junglers display `Smite lock`.
-- Strong role-rate evidence displays `Role data N%`.
-- Thin role-rate evidence displays `Thin role N%`.
-- Manually dragged cards display `Manual slot`.
-- Fallback assignments display `Fallback order`.
+- Role confidence is used for ordering, but is not shown on the default card UI.
+- Unique Smite still heavily locks jungle assignment.
+- Champion role-rate evidence still informs lane ordering.
+- Manual drag still overrides automatic ordering.
+- If this is shown later, it should be in a tooltip/debug affordance rather than always-visible chips.
 
 ### Recent Champion/Role History
 

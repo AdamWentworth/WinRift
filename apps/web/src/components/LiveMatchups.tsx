@@ -68,8 +68,6 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const [manualOrder, setManualOrder] = useState(false);
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
-  const blueSmiteCount = useMemo(() => blueTeam.filter(hasSmite).length, [blueTeam]);
-  const redSmiteCount = useMemo(() => redTeam.filter(hasSmite).length, [redTeam]);
   const yourSide = livePlayerSide(liveGame);
   const searchedParticipant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
   const winConditionQuery = useQuery({
@@ -195,9 +193,6 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               champions={champions}
               spells={spells}
               runes={runes}
-              roleRate={roleRates.get(participant.championId)?.get(roles[index])}
-              manualOrder={manualOrder}
-              teamSmiteCount={blueSmiteCount}
               dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
               dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
               onDragStart={() => setDraggedCard({ side: 'blue', index })}
@@ -239,9 +234,6 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               champions={champions}
               spells={spells}
               runes={runes}
-              roleRate={roleRates.get(participant.championId)?.get(roles[index])}
-              manualOrder={manualOrder}
-              teamSmiteCount={redSmiteCount}
               dragging={draggedCard?.side === 'red' && draggedCard.index === index}
               dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
               onDragStart={() => setDraggedCard({ side: 'red', index })}
@@ -671,9 +663,6 @@ function LiveChampionCard({
   champions,
   spells,
   runes,
-  roleRate,
-  manualOrder,
-  teamSmiteCount,
   dragging,
   dropTarget,
   onDragStart,
@@ -688,9 +677,6 @@ function LiveChampionCard({
   champions?: ChampionData;
   spells?: SummonerSpellData;
   runes?: RuneData;
-  roleRate?: ChampionRoleRate;
-  manualOrder: boolean;
-  teamSmiteCount: number;
   dragging: boolean;
   dropTarget: boolean;
   onDragStart: () => void;
@@ -705,7 +691,6 @@ function LiveChampionCard({
   const keystoneId = participant.perks?.perkIds?.[0];
   const secondaryStyleId = participant.perks?.perkSubStyle;
   const playerName = participant.riotId || participant.summonerName || 'Unknown player';
-  const roleEvidence = roleEvidenceForParticipant(participant, role, roleRate, manualOrder, teamSmiteCount);
   const comfortFlags = comfortFlagsForParticipant(participant);
 
   return (
@@ -733,7 +718,6 @@ function LiveChampionCard({
         </div>
       </div>
       <div className="card-context-row">
-        <span className={`role-confidence ${roleEvidence.tone}`}>{roleEvidence.label}</span>
         {comfortFlags.map((flag) => (
           <span className={`comfort-flag ${flag.tone}`} key={flag.label}>{flag.label}</span>
         ))}
@@ -931,22 +915,6 @@ function itemContextForParticipant(participant: LiveParticipant, role: string): 
   if (hasSmite(participant)) return 'JUNGLE';
   if (role === 'UTILITY') return 'SUPPORT';
   return undefined;
-}
-
-function roleEvidenceForParticipant(participant: LiveParticipant, role: string, roleRate: ChampionRoleRate | undefined, manualOrder: boolean, teamSmiteCount: number) {
-  if (manualOrder) {
-    return { label: 'Manual slot', tone: 'manual' };
-  }
-  if (role === 'JUNGLE' && hasSmite(participant) && teamSmiteCount === 1) {
-    return { label: 'Smite lock', tone: 'strong' };
-  }
-  if (roleRate && roleRate.totalGames >= 25) {
-    return { label: `Role data ${Math.round(roleRate.pickRate)}%`, tone: roleRate.pickRate >= 60 ? 'strong' : 'normal' };
-  }
-  if (roleRate && roleRate.totalGames > 0) {
-    return { label: `Thin role ${Math.round(roleRate.pickRate)}%`, tone: 'thin' };
-  }
-  return { label: 'Fallback order', tone: 'thin' };
 }
 
 function comfortFlagsForParticipant(participant: LiveParticipant) {
