@@ -68,6 +68,8 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const [manualOrder, setManualOrder] = useState(false);
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
+  const blueSmiteCount = useMemo(() => blueTeam.filter(hasSmite).length, [blueTeam]);
+  const redSmiteCount = useMemo(() => redTeam.filter(hasSmite).length, [redTeam]);
   const yourSide = livePlayerSide(liveGame);
   const searchedParticipant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
   const winConditionQuery = useQuery({
@@ -188,10 +190,14 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               key={participantKey(participant, index)}
               participant={participant}
               index={index}
+              role={roles[index]}
               side="blue"
               champions={champions}
               spells={spells}
               runes={runes}
+              roleRate={roleRates.get(participant.championId)?.get(roles[index])}
+              manualOrder={manualOrder}
+              teamSmiteCount={blueSmiteCount}
               dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
               dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
               onDragStart={() => setDraggedCard({ side: 'blue', index })}
@@ -228,10 +234,14 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               key={participantKey(participant, index)}
               participant={participant}
               index={index}
+              role={roles[index]}
               side="red"
               champions={champions}
               spells={spells}
               runes={runes}
+              roleRate={roleRates.get(participant.championId)?.get(roles[index])}
+              manualOrder={manualOrder}
+              teamSmiteCount={redSmiteCount}
               dragging={draggedCard?.side === 'red' && draggedCard.index === index}
               dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
               onDragStart={() => setDraggedCard({ side: 'red', index })}
@@ -656,10 +666,14 @@ function WinConditionEnemyCard({
 function LiveChampionCard({
   participant,
   index,
+  role,
   side,
   champions,
   spells,
   runes,
+  roleRate,
+  manualOrder,
+  teamSmiteCount,
   dragging,
   dropTarget,
   onDragStart,
@@ -669,10 +683,14 @@ function LiveChampionCard({
 }: {
   participant: LiveParticipant;
   index: number;
+  role: string;
   side: TeamSide;
   champions?: ChampionData;
   spells?: SummonerSpellData;
   runes?: RuneData;
+  roleRate?: ChampionRoleRate;
+  manualOrder: boolean;
+  teamSmiteCount: number;
   dragging: boolean;
   dropTarget: boolean;
   onDragStart: () => void;
@@ -687,6 +705,8 @@ function LiveChampionCard({
   const keystoneId = participant.perks?.perkIds?.[0];
   const secondaryStyleId = participant.perks?.perkSubStyle;
   const playerName = participant.riotId || participant.summonerName || 'Unknown player';
+  const roleEvidence = roleEvidenceForParticipant(participant, role, roleRate, manualOrder, teamSmiteCount);
+  const comfortFlags = comfortFlagsForParticipant(participant);
 
   return (
     <article
@@ -707,10 +727,16 @@ function LiveChampionCard({
         {championUrl ? <img className="profile-picture" src={championUrl} alt={championName} /> : <div className="profile-picture profile-fallback">{participant.championId}</div>}
         <img className="ranked-card-icon" src={rankIconUrl(participant.rank)} alt={participant.rank ? rankLabel(participant.rank) : 'Rank unavailable'} />
         <div className="player-title">
-          <div className="player-role-chip">{roleLabels[roles[index]] ?? roles[index] ?? 'Role'}</div>
+          <div className="player-role-chip">{roleLabels[role] ?? role ?? 'Role'}</div>
           <div className="summoner-name">{playerName}</div>
           <div className="champion-name">{championName}</div>
         </div>
+      </div>
+      <div className="card-context-row">
+        <span className={`role-confidence ${roleEvidence.tone}`}>{roleEvidence.label}</span>
+        {comfortFlags.map((flag) => (
+          <span className={`comfort-flag ${flag.tone}`} key={flag.label}>{flag.label}</span>
+        ))}
       </div>
       <div className="player-stat-columns">
         <ChampionRecordBlock stats={participant.championStats} />
@@ -899,6 +925,45 @@ function itemContextForParticipant(participant: LiveParticipant, role: string): 
   if (hasSmite(participant)) return 'JUNGLE';
   if (role === 'UTILITY') return 'SUPPORT';
   return undefined;
+}
+
+function roleEvidenceForParticipant(participant: LiveParticipant, role: string, roleRate: ChampionRoleRate | undefined, manualOrder: boolean, teamSmiteCount: number) {
+  if (manualOrder) {
+    return { label: 'Manual slot', tone: 'manual' };
+  }
+  if (role === 'JUNGLE' && hasSmite(participant) && teamSmiteCount === 1) {
+    return { label: 'Smite lock', tone: 'strong' };
+  }
+  if (roleRate && roleRate.totalGames >= 25) {
+    return { label: `Role data ${Math.round(roleRate.pickRate)}%`, tone: roleRate.pickRate >= 60 ? 'strong' : 'normal' };
+  }
+  if (roleRate && roleRate.totalGames > 0) {
+    return { label: `Thin role ${Math.round(roleRate.pickRate)}%`, tone: 'thin' };
+  }
+  return { label: 'Fallback order', tone: 'thin' };
+}
+
+function comfortFlagsForParticipant(participant: LiveParticipant) {
+  const flags: { label: string; tone: string }[] = [];
+  const stats = participant.championStats;
+  if (!stats || stats.games <= 0) {
+    flags.push({ label: 'No champ sample', tone: 'thin' });
+  } else if (stats.games < 5) {
+    flags.push({ label: 'Low champ sample', tone: 'thin' });
+  } else if (stats.games >= 20 && stats.winRate >= 55) {
+    flags.push({ label: 'Champion comfort', tone: 'good' });
+  } else if (stats.games >= 20 && stats.winRate <= 45) {
+    flags.push({ label: 'Rough champ sample', tone: 'warn' });
+  }
+
+  const rank = participant.rank;
+  if (!rank || rank.rankAvailable === false) {
+    flags.push({ label: 'Rank pending', tone: 'thin' });
+  } else if (rank.totalGames >= 30 && rank.winRate >= 55) {
+    flags.push({ label: 'Strong ranked form', tone: 'good' });
+  }
+
+  return flags.slice(0, 2);
 }
 
 function highestSlotSample(itemSlots: AnalyticsItemSlot[]) {

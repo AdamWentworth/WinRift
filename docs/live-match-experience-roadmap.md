@@ -56,6 +56,15 @@ Implementation notes:
 - The current role assignment function already computes enough information to expose this.
 - Store role assignment metadata beside ordered participants instead of returning only a reordered array.
 
+Current implementation:
+
+- Live cards show a compact role-confidence chip.
+- Unique Smite junglers display `Smite lock`.
+- Strong role-rate evidence displays `Role data N%`.
+- Thin role-rate evidence displays `Thin role N%`.
+- Manually dragged cards display `Manual slot`.
+- Fallback assignments display `Fallback order`.
+
 ### Recent Champion/Role History
 
 Add an OP.GG-style recent-history strip per player:
@@ -80,6 +89,13 @@ Compact flags that help interpret a player:
 - Recent poor sample warning.
 
 These should be contextual, not insulting, and should avoid deterministic language.
+
+Current implementation:
+
+- Cards show at most two compact context flags.
+- Champion comfort is based on stored champion sample size and winrate.
+- Low or missing champion samples are labeled as sample limitations.
+- Rank pending and strong ranked form are shown from the live enriched rank object.
 
 ### Matchup Build Context
 

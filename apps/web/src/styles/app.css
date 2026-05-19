@@ -870,7 +870,7 @@ button {
   color: #fff;
   cursor: grab;
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
   min-height: 222px;
   min-width: 0;
   padding: 12px;
@@ -1008,6 +1008,53 @@ button {
   color: #d8d8d8;
   font-size: 13px;
   margin-top: 3px;
+}
+
+.card-context-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin: 6px 0 2px;
+  min-width: 0;
+}
+
+.role-confidence,
+.comfort-flag {
+  background: rgb(0 0 0 / 34%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #dce5ea;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 5px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.role-confidence.strong,
+.comfort-flag.good {
+  border-color: rgb(116 233 130 / 42%);
+  color: #bff5c7;
+}
+
+.role-confidence.manual {
+  border-color: rgb(243 214 113 / 42%);
+  color: #f3d671;
+}
+
+.role-confidence.thin,
+.comfort-flag.thin {
+  color: #aeb8bf;
+}
+
+.comfort-flag.warn {
+  border-color: rgb(255 214 160 / 35%);
+  color: #ffd6a0;
 }
 
 .player-stat-columns {
