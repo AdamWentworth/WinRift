@@ -344,7 +344,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 				opponent_champion_id,
 				patch AS patch_value,
 				rank_bucket AS rank_value,
-				arrayFilter(item -> toUInt32OrZero(item) IN (%s), splitByChar('-', multiIf(core3_signature != '', core3_signature, core2_signature != '', core2_signature, final_items_signature))) AS items,
+				arrayFilter(item -> toUInt32OrZero(item) IN (%s), splitByChar('-', final_items_signature)) AS items,
 				wins,
 				games
 			FROM patch_build_metrics FINAL
@@ -377,9 +377,9 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 			wins / games AS win_rate
 		FROM
 		(
-			SELECT * FROM raw_item_slots WHERE item_slot <= 3
+			SELECT * FROM raw_item_slots WHERE item_slot <= 6
 			UNION ALL
-			SELECT * FROM compiled_item_slots WHERE item_slot <= 3
+			SELECT * FROM compiled_item_slots WHERE item_slot <= 6
 		)
 		WHERE item_id > 0`, itemList, itemList, patchBucketExpr, rankBucketExpr)
 	args := []any{}
@@ -733,7 +733,7 @@ func (r *Repository) compilePatchItemTimingMetrics(ctx context.Context, patch, p
 			quantile(0.75)(first_purchase_ms) AS p75_timing_ms,
 			quantile(0.90)(first_purchase_ms) AS p90_timing_ms
 		FROM item_slots
-		WHERE item_slot <= 3
+		WHERE item_slot <= 6
 		GROUP BY
 			patch,
 			platform,

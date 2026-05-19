@@ -381,14 +381,15 @@ function BuildSide({
     return <div className={`build-side ${side} muted`}>No item samples</div>;
   }
 
-  const bestBySlot = [1, 2, 3]
-    .map((slot) => itemSlots.find((row) => row.itemSlot === slot))
-    .filter((row): row is AnalyticsItemSlot => Boolean(row));
+  const bestBySlot = [1, 2, 3, 4, 5, 6].map((slot) => ({
+    slot,
+    row: itemSlots.find((candidate) => candidate.itemSlot === slot),
+  }));
 
   return (
     <div className={`build-side ${side}`}>
-      {bestBySlot.map((row) => (
-        <ItemSlotLine key={`${row.itemSlot}-${row.itemId}`} row={row} items={items} />
+      {bestBySlot.map(({ slot, row }) => (
+        row ? <ItemSlotLine key={`${row.itemSlot}-${row.itemId}`} row={row} items={items} /> : <MissingItemSlotLine key={slot} slot={slot} />
       ))}
     </div>
   );
@@ -406,7 +407,21 @@ function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData
         <strong>{row.winRate.toFixed(1)}%</strong>
         <span>{row.games} games</span>
       </div>
-      <span className={row.games < 20 ? 'sample-warning' : 'sample-note'}>{row.confidence.toFixed(1)}% conf.</span>
+      <span className={row.games < 20 ? 'sample-warning' : 'sample-note'} title="Wilson confidence floor">{row.confidence.toFixed(1)}% floor</span>
+    </div>
+  );
+}
+
+function MissingItemSlotLine({ slot }: { slot: number }) {
+  return (
+    <div className="item-slot-line missing-item-slot">
+      <span className="item-slot-number">{ordinal(slot)}</span>
+      <span className="item-slot-empty">--</span>
+      <div className="item-slot-stats">
+        <strong>--</strong>
+        <span>No sample</span>
+      </div>
+      <span className="sample-note">--</span>
     </div>
   );
 }
@@ -429,7 +444,7 @@ function buildFilters(championId: number, opponentChampionId: number, role: stri
     opponentChampionId,
     role,
     minGames: 1,
-    limit: 5,
+    limit: 6,
   };
 }
 

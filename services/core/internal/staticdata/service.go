@@ -80,7 +80,7 @@ func (s *Service) LatestVersion(ctx context.Context) (string, error) {
 	return versions[0], nil
 }
 
-func (s *Service) BuildItemIDs(ctx context.Context, patch string) ([]uint32, error) {
+func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle bool) ([]uint32, error) {
 	payload, err := s.Get(ctx, "items", patch)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s *Service) BuildItemIDs(ctx context.Context, patch string) ([]uint32, err
 			continue
 		}
 		id := uint32(id64)
-		if isBuildItem(id, item) {
+		if isBuildItem(id, item, includeJungle) {
 			ids = append(ids, id)
 		}
 	}
@@ -114,7 +114,7 @@ func (s *Service) BuildItemIDs(ctx context.Context, patch string) ([]uint32, err
 	return ids, nil
 }
 
-func isBuildItem(id uint32, item map[string]any) bool {
+func isBuildItem(id uint32, item map[string]any, includeJungle bool) bool {
 	if excludedBuildItems[id] {
 		return false
 	}
@@ -129,6 +129,9 @@ func isBuildItem(id uint32, item map[string]any) bool {
 	tags := itemTags(item)
 	if tags["Consumable"] || tags["Trinket"] {
 		return false
+	}
+	if tags["Jungle"] {
+		return includeJungle
 	}
 	totalGold, purchasable := itemGold(item)
 	if !purchasable || totalGold < 700 {

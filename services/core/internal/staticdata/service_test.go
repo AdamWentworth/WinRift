@@ -4,10 +4,11 @@ import "testing"
 
 func TestIsBuildItem(t *testing.T) {
 	tests := []struct {
-		name string
-		id   uint32
-		item map[string]any
-		want bool
+		name          string
+		id            uint32
+		item          map[string]any
+		includeJungle bool
+		want          bool
 	}{
 		{
 			name: "legendary item",
@@ -39,10 +40,23 @@ func TestIsBuildItem(t *testing.T) {
 			item: itemFixture(75, true, 0, []string{"Consumable", "Vision"}, nil),
 			want: false,
 		},
+		{
+			name:          "jungle item for jungler",
+			id:            1101,
+			item:          itemFixture(450, true, 0, []string{"Jungle"}, nil),
+			includeJungle: true,
+			want:          true,
+		},
+		{
+			name: "jungle item for non jungler",
+			id:   1101,
+			item: itemFixture(450, true, 0, []string{"Jungle"}, nil),
+			want: false,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := isBuildItem(test.id, test.item); got != test.want {
+			if got := isBuildItem(test.id, test.item, test.includeJungle); got != test.want {
 				t.Fatalf("isBuildItem() = %v, want %v", got, test.want)
 			}
 		})

@@ -218,8 +218,8 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 		"rank_bucket":          strings.ToUpper(query.Get("rankBucket")),
 	}
 	minGames := queryInt(query.Get("minGames"), 1)
-	limit := queryInt(query.Get("limit"), 8)
-	buildItemIDs, err := s.static.BuildItemIDs(r.Context(), "")
+	limit := queryInt(query.Get("limit"), 6)
+	buildItemIDs, err := s.static.BuildItemIDs(r.Context(), "", filters["role"] == "JUNGLE")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

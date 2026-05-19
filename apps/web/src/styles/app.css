@@ -603,17 +603,33 @@ button {
   background: rgb(0 0 0 / 12%);
   border: 1px solid rgb(0 0 0 / 16%);
   display: grid;
-  gap: 5px;
-  grid-template-columns: 28px 28px minmax(0, 1fr);
+  gap: 4px;
+  grid-template-columns: 24px 26px minmax(0, 1fr) auto;
   min-width: 0;
-  padding: 5px;
+  padding: 4px;
   text-align: left;
 }
 
 .item-slot-line img,
-.item-slot-line .item-pill {
-  height: 26px;
-  width: 26px;
+.item-slot-line .item-pill,
+.item-slot-empty {
+  height: 24px;
+  width: 24px;
+}
+
+.item-slot-empty {
+  align-items: center;
+  background: rgb(0 0 0 / 18%);
+  border: 1px solid rgb(0 0 0 / 18%);
+  color: #333;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  justify-content: center;
+}
+
+.missing-item-slot {
+  opacity: 0.56;
 }
 
 .item-slot-number {
@@ -630,7 +646,7 @@ button {
 
 .item-slot-stats strong {
   color: #111;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -642,8 +658,9 @@ button {
 
 .item-slot-line .sample-note,
 .item-slot-line .sample-warning {
-  grid-column: 2 / 4;
-  text-align: left;
+  font-size: 10px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .mini-spells img {
