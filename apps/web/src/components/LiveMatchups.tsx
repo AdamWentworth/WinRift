@@ -495,20 +495,33 @@ function WinConditionScriptPanel({ metric }: { metric?: WinConditionMetric }) {
       <div className="match-read-copy">
         {script ? (
           <>
-            <strong>{script.headline}</strong>
-            <p>{script.playerRead}</p>
-            <p>{planPairRead(metric)}</p>
-            <p>{script.matchup}</p>
-            <p>{script.modeRead}</p>
-            <p>{script.timingRead}</p>
+            <div className="match-read-headline">
+              <strong>{script.headline}</strong>
+              <span>{planPairRead(metric)}</span>
+            </div>
+            <p className="match-read-primary">{script.playerRead}</p>
+            <div className="match-read-grid">
+              <ReadBlock label="Play toward" text={script.modeRead} />
+              <ReadBlock label="Watch for" text={script.matchup} />
+              <ReadBlock label="Timing" text={script.timingRead} />
+              <ReadBlock label="Evidence" text={metric.evidence?.summary ?? script.sampleRead} />
+            </div>
             {script.cautionRead ? <p className="match-read-caution">{script.cautionRead}</p> : null}
-            {metric.evidence?.summary ? <p>{metric.evidence.summary}</p> : null}
             <em>{script.sampleRead}</em>
           </>
         ) : (
           <p>Select a win condition pairing to see the match read.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function ReadBlock({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="match-read-block">
+      <span>{label}</span>
+      <p>{text}</p>
     </div>
   );
 }
