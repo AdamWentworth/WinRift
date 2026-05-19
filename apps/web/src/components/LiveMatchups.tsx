@@ -447,35 +447,49 @@ function WinConditionLengthChart({ metric }: { metric?: WinConditionMetric }) {
     bucket,
   })).filter((point) => point.bucket.games > 0);
   const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
+  const areaPath = chartAreaPath(points);
   return (
     <div className="legacy-stats-section chart-section">
       <h2>Winrate By Game Length</h2>
       <div className="chart-shell">
         <div className="chart-plot">
           <svg className="winrate-chart" viewBox="0 0 100 100" role="img" aria-label="Winrate by game length from 35% to 65%" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="durationWinrateArea" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#7df4dd" stopOpacity="0.28" />
+                <stop offset="58%" stopColor="#4bc0c0" stopOpacity="0.11" />
+                <stop offset="100%" stopColor="#ff7979" stopOpacity="0.08" />
+              </linearGradient>
+            </defs>
             <line className="chart-gridline" x1="10" y1={chartY(65)} x2="92" y2={chartY(65)} />
             <line className="chart-gridline chart-baseline" x1="10" y1={chartY(50)} x2="92" y2={chartY(50)} />
             <line className="chart-gridline" x1="10" y1={chartY(35)} x2="92" y2={chartY(35)} />
-            <text x="4" y={chartY(65) + 1.5}>65</text>
-            <text x="4" y={chartY(50) + 1.5}>50</text>
-            <text x="4" y={chartY(35) + 1.5}>35</text>
-            {pointString ? <polyline points={pointString} /> : null}
-            {points.map((point) => (
-              <circle
-                className={chartPointClass(point.bucket.winRate)}
-                key={point.bucket.bucket}
-                cx={point.x}
-                cy={point.y}
-                r="2.8"
-              />
-            ))}
+            <text className="chart-y-label" x="3.5" y={chartY(65) + 1.8}>65%</text>
+            <text className="chart-y-label chart-y-label-baseline" x="3.5" y={chartY(50) + 1.8}>50%</text>
+            <text className="chart-y-label" x="3.5" y={chartY(35) + 1.8}>35%</text>
+            {areaPath ? <path className="chart-area" d={areaPath} /> : null}
+            {pointString ? <polyline className="chart-line" points={pointString} /> : null}
           </svg>
+          {points.map((point) => (
+            <span
+              className={`chart-marker ${chartPointClass(point.bucket.winRate)}`}
+              key={point.bucket.bucket}
+              style={{ left: `${point.x}%`, top: `${point.y}%` }}
+              title={`${point.bucket.bucket}: ${point.bucket.winRate.toFixed(1)}% over ${point.bucket.games} games`}
+            >
+              <span className="chart-marker-value">{point.bucket.winRate.toFixed(0)}%</span>
+            </span>
+          ))}
+          {!points.length ? <div className="chart-no-samples">No duration samples</div> : null}
         </div>
         <div className="chart-labels">
           {buckets.map((bucket) => (
-            <span className={bucket.meetsMinGames ? '' : 'thin-sample'} key={bucket.bucket}>
+            <span
+              className={`${bucket.meetsMinGames ? '' : 'thin-sample'} ${bucket.games > 0 ? chartPointClass(bucket.winRate) : ''}`.trim()}
+              key={bucket.bucket}
+            >
               <b>{bucket.bucket}</b>
-              {bucket.games > 0 ? `${bucket.winRate.toFixed(0)}%` : '--'}
+              <strong>{bucket.games > 0 ? `${bucket.winRate.toFixed(0)}%` : '--'}</strong>
             </span>
           ))}
         </div>
@@ -493,6 +507,14 @@ function chartY(winRate: number) {
   const clamped = Math.max(chartMinWinRate, Math.min(chartMaxWinRate, winRate));
   const progress = (clamped - chartMinWinRate) / (chartMaxWinRate - chartMinWinRate);
   return chartBottom - progress * (chartBottom - chartTop);
+}
+
+function chartAreaPath(points: { x: number; y: number }[]) {
+  if (!points.length) return '';
+  const first = points[0];
+  const last = points[points.length - 1];
+  const line = points.map((point) => `L ${point.x} ${point.y}`).join(' ');
+  return `M ${first.x} ${chartBottom} ${line} L ${last.x} ${chartBottom} Z`;
 }
 
 function chartPointClass(winRate: number) {
