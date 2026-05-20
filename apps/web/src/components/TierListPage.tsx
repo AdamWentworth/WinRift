@@ -243,10 +243,11 @@ function winriftScore(summary: ChampionGuideSummary) {
 }
 
 function tierForSummary(summary: ChampionGuideSummary) {
-  if (!summary.roleRank || !summary.roleRankTotal) return '?';
-  const percentile = summary.roleRank / summary.roleRankTotal;
-  if (percentile <= 0.03) return 'S+';
-  if (percentile <= 0.1) return 'S';
+	if (!summary.roleRank || !summary.roleRankTotal) return '?';
+	const percentile = summary.roleRank / summary.roleRankTotal;
+	if (summary.roleRank === 1) return 'S+';
+	if (percentile <= 0.03) return 'S+';
+	if (percentile <= 0.1) return 'S';
   if (percentile <= 0.25) return 'A';
   if (percentile <= 0.55) return 'B';
   if (percentile <= 0.78) return 'C';

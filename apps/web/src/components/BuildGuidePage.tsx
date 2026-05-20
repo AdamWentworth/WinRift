@@ -126,7 +126,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       <div className="guide-hero" style={{ '--guide-splash': splash ? `url(${splash})` : undefined } as CSSProperties}>
         <div className="guide-hero-main">
           <div className="guide-champion-card">
-            <span className={`guide-tier ${guideTier(guide)}`}>{guideTier(guide)}</span>
+            <span className={`guide-tier ${guideTierClassName(guideTier(guide))}`}>{guideTier(guide)}</span>
             {champion ? <img src={championImageUrl(champions, championId)} alt={champion.name} /> : null}
           </div>
           <div className="guide-title-block">
@@ -571,11 +571,19 @@ function patchBucket(version?: string) {
 function guideTier(guide?: ChampionGuideResponse) {
   const summary = guide?.summary;
   if (!summary?.games) return '?';
+  if (summary.roleRank === 1) return 'S+';
+  if (summary.roleRank && summary.roleRankTotal && summary.roleRank / summary.roleRankTotal <= 0.03) return 'S+';
+  if (summary.roleRank && summary.roleRankTotal && summary.roleRank / summary.roleRankTotal <= 0.1) return 'S';
   if (summary.games >= 250 && summary.winRate >= 53) return 'S';
   if (summary.games >= 100 && summary.winRate >= 51.5) return 'A';
   if (summary.winRate >= 50) return 'B';
   if (summary.winRate >= 48) return 'C';
   return 'D';
+}
+
+function guideTierClassName(tier: string) {
+  if (tier === 'S+') return 'guide-tier-s-plus';
+  return `guide-tier-${tier.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'unknown'}`;
 }
 
 function formatNumber(value: number) {

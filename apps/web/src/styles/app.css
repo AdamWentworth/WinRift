@@ -3837,18 +3837,24 @@ button {
   z-index: 2;
 }
 
-.guide-tier.S {
+.guide-tier.guide-tier-s-plus {
+  border-color: #f7d777;
+  box-shadow: 0 0 18px rgb(247 215 119 / 22%);
+  color: #ffeab0;
+}
+
+.guide-tier.guide-tier-s {
   border-color: #58d9ff;
   color: #91f4ff;
 }
 
-.guide-tier.A {
+.guide-tier.guide-tier-a {
   border-color: #76ffb5;
   color: #a5ffd0;
 }
 
-.guide-tier.C,
-.guide-tier.D {
+.guide-tier.guide-tier-c,
+.guide-tier.guide-tier-d {
   border-color: #ff8b8b;
   color: #ffd0d0;
 }

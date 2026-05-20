@@ -28,7 +28,7 @@ This intentionally keeps winning as the center of gravity while letting populari
 
 The frontend maps rank percentile to:
 
-- `S+`: top 3%
+- `S+`: rank 1 in the selected scope, plus any other champions in the top 3%
 - `S`: top 10%
 - `A`: top 25%
 - `B`: top 55%
