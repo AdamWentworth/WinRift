@@ -20,6 +20,7 @@ import {
   summonerSpellName,
 } from '../lib/staticData';
 import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
+import { MetricTile } from './ui/MetricTile';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -283,19 +284,10 @@ function GuideCoverage({ loading, championCount, totalGames, selectedGames, role
         <Database size={15} />
         <span>Stored Coverage</span>
       </div>
-      <GuideCoverageStat label="Champions with data" value={loading ? '...' : formatNumber(championCount)} />
-      <GuideCoverageStat label={`${role} games indexed`} value={loading ? '...' : formatNumber(totalGames)} />
-      <GuideCoverageStat label="Selected champion" value={loading ? '...' : formatNumber(selectedGames)} />
-      <GuideCoverageStat label="Scope" value={`${patch || 'all patches'} / ${rankLabel}`} />
-    </div>
-  );
-}
-
-function GuideCoverageStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="guide-coverage-stat">
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <MetricTile className="guide-coverage-stat" label="Champions with data" value={loading ? '...' : formatNumber(championCount)} />
+      <MetricTile className="guide-coverage-stat" label={`${role} games indexed`} value={loading ? '...' : formatNumber(totalGames)} />
+      <MetricTile className="guide-coverage-stat" label="Selected champion" value={loading ? '...' : formatNumber(selectedGames)} />
+      <MetricTile className="guide-coverage-stat" label="Scope" value={`${patch || 'all patches'} / ${rankLabel}`} />
     </div>
   );
 }
@@ -304,22 +296,13 @@ function GuideStats({ guide, loading }: { guide?: ChampionGuideResponse; loading
   const summary = guide?.summary;
   return (
     <div className="guide-stat-strip">
-      <GuideStat label="Tier" value={loading ? '...' : guideTier(guide)} tone="tier" />
-      <GuideStat label="Win Rate" value={summary?.games ? `${summary.winRate.toFixed(2)}%` : '--'} />
-      <GuideStat label="Rank" value={summary?.roleRank ? `${summary.roleRank} / ${summary.roleRankTotal}` : '--'} />
-      <GuideStat label="Pick Rate" value={summary?.games ? `${summary.pickRate.toFixed(2)}%` : '--'} />
-      <GuideStat label="Ban Rate" value={summary?.banRate ? `${summary.banRate.toFixed(2)}%` : '--'} />
-      <GuideStat label="Confidence" value={summary?.games ? `${summary.confidence.toFixed(1)}%` : '--'} />
-      <GuideStat label="Matches" value={formatNumber(summary?.games ?? 0)} />
-    </div>
-  );
-}
-
-function GuideStat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div className={`guide-stat ${tone ?? ''}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <MetricTile className="guide-stat" label="Tier" value={loading ? '...' : guideTier(guide)} tone="tier" />
+      <MetricTile className="guide-stat" label="Win Rate" value={summary?.games ? `${summary.winRate.toFixed(2)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Rank" value={summary?.roleRank ? `${summary.roleRank} / ${summary.roleRankTotal}` : '--'} />
+      <MetricTile className="guide-stat" label="Pick Rate" value={summary?.games ? `${summary.pickRate.toFixed(2)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Ban Rate" value={summary?.banRate ? `${summary.banRate.toFixed(2)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Confidence" value={summary?.games ? `${summary.confidence.toFixed(1)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Matches" value={formatNumber(summary?.games ?? 0)} />
     </div>
   );
 }

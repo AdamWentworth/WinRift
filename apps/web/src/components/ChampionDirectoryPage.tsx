@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import type { Champion, ChampionData } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
 import { championImageUrl, championList, championSplashUrl } from '../lib/staticData';
+import { MetricTile } from './ui/MetricTile';
 
 const sortModes = [
   { value: 'name-asc', label: 'Name A-Z' },
@@ -101,12 +102,7 @@ function ChampionDirectoryCard({ champion, champions, onSelect }: { champion: Ch
 }
 
 function DirectorySummaryStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+  return <MetricTile label={label} value={value} />;
 }
 
 function sortChampions(a: Champion, b: Champion, sortMode: SortMode) {

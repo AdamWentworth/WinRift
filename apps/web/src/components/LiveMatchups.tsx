@@ -29,6 +29,7 @@ import {
   type TeamSide,
 } from './live-match/types';
 import { hasSmite, idsMatch, participantKey } from './live-match/utils';
+import { StatChip } from './ui/MetricTile';
 
 type Props = {
   liveGame: LiveGame;
@@ -414,15 +415,6 @@ function ChampionRecordBlock({ stats }: { stats?: ChampionRecord }) {
         <StatChip label="Avg K/D/A" value={`${stats.avgKills.toFixed(1)} / ${stats.avgDeaths.toFixed(1)} / ${stats.avgAssists.toFixed(1)}`} wide />
       </div>
     </div>
-  );
-}
-
-function StatChip({ label, value, primary, wide }: { label: string; value: string; primary?: boolean; wide?: boolean }) {
-  return (
-    <span className={`stat-chip${primary ? ' primary' : ''}${wide ? ' wide' : ''}`}>
-      <strong>{value}</strong>
-      <em>{label}</em>
-    </span>
   );
 }
 

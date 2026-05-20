@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../../api/types';
+import { MetricTile } from '../ui/MetricTile';
 import type { TeamSide } from './types';
 
 export function WinConditionPanel({
@@ -106,10 +107,10 @@ function WinConditionSummaryCard({
           <strong>{rating}</strong>
         </div>
         <div className="legacy-win-stat-grid">
-          <WinConditionStatTile label="Win Rate" value={winRateValue} accent />
-          <WinConditionStatTile label="Strategy" value={strategyValue} />
-          <WinConditionStatTile label="Total Games" displayLabel="Games" value={gamesValue} />
-          <WinConditionStatTile label="Confidence" value={confidenceValue} />
+          <MetricTile accent className="legacy-win-stat-tile" label="Win Rate" labelTag="small" value={winRateValue} />
+          <MetricTile className="legacy-win-stat-tile" label="Strategy" labelTag="small" value={strategyValue} />
+          <MetricTile ariaLabel={`Total Games: ${gamesValue}`} className="legacy-win-stat-tile" label="Games" labelTag="small" value={gamesValue} />
+          <MetricTile className="legacy-win-stat-tile" label="Confidence" labelTag="small" value={confidenceValue} />
         </div>
       </div>
       <WinConditionProfileBars team={team} selectedCondition={condition} />
@@ -124,15 +125,6 @@ function WinConditionSummaryCard({
         />
       ) : null}
     </div>
-  );
-}
-
-function WinConditionStatTile({ label, displayLabel, value, accent = false }: { label: string; displayLabel?: string; value: string; accent?: boolean }) {
-  return (
-    <span className={`legacy-win-stat-tile${accent ? ' accent' : ''}`} aria-label={`${label}: ${value}`}>
-      <small>{displayLabel ?? label}</small>
-      <strong>{value}</strong>
-    </span>
   );
 }
 

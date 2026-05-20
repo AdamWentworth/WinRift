@@ -7,6 +7,7 @@ import type { Champion, ChampionData, ChampionGuideSummary } from '../api/types'
 import { normalizeLookup } from '../lib/lookup';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championImageUrl, championSplashUrl } from '../lib/staticData';
+import { MetricTile } from './ui/MetricTile';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -185,12 +186,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
 }
 
 function TierHeroStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+  return <MetricTile label={label} value={value} />;
 }
 
 function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
