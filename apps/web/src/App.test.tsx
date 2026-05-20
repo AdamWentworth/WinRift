@@ -260,6 +260,47 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it('uses the WinRift logo to return from live match view to home search', async () => {
+    vi.mocked(getLiveGame).mockResolvedValueOnce({
+      platform: 'NA1',
+      puuid: 'blue-puuid',
+      gameId: 456,
+      mapId: 11,
+      gameMode: 'CLASSIC',
+      gameType: 'MATCHED_GAME',
+      gameQueueConfigId: 420,
+      gameStartTime: Date.now(),
+      participants: [
+        { teamId: 100, championId: 1, spell1Id: 4, spell2Id: 14, puuid: 'blue-puuid', summonerName: 'Logo Blue', perks: {}, bot: false },
+        { teamId: 200, championId: 2, spell1Id: 4, spell2Id: 12, puuid: 'red-puuid', summonerName: 'Logo Red', perks: {}, bot: false },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+      target: { value: 'Logo Blue#NA1' },
+    });
+    fireEvent.click(screen.getByLabelText('Find live game'));
+
+    await waitFor(() => expect(screen.getAllByText('Logo Blue').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole('button', { name: 'WinRift home' }));
+
+    await waitFor(() => expect(screen.queryByText('Logo Blue')).not.toBeInTheDocument());
+    expect(screen.getByText('Live Match Lookup')).toBeInTheDocument();
+    queryClient.clear();
+  });
+
   it('uses smite and champion role rates to place live cards by role', async () => {
     vi.mocked(getChampionRoleRates).mockResolvedValueOnce({
       results: [
