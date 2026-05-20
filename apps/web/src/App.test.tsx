@@ -433,15 +433,15 @@ describe('App', () => {
     expect(screen.getByText('Your Pick B+')).toBeInTheDocument();
     expect(screen.getByText('Enemy Control B+')).toBeInTheDocument();
     expect(screen.getByText('Primary pick read')).toBeInTheDocument();
-    expect(screen.getByText('Win Rate: 55.00%')).toBeInTheDocument();
-    expect(screen.getByText('Total Games: 20')).toBeInTheDocument();
+    expect(screen.getByLabelText('Win Rate: 55.00%')).toBeInTheDocument();
+    expect(screen.getByLabelText('Total Games: 20')).toBeInTheDocument();
     const enemySplitPush = screen.getByLabelText('Show Enemy Strategies SplitPush');
     expect(within(enemySplitPush).getByText('SplitPush C-')).toBeInTheDocument();
     expect(enemySplitPush).not.toHaveTextContent('80%');
     expect(enemySplitPush).not.toHaveTextContent('20g');
     expect(screen.queryByLabelText('Show Enemy Strategies Control')).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Show Enemy Strategies Siege'));
-    expect(await screen.findByText('Win Rate: 70.00%')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Win Rate: 70.00%')).toBeInTheDocument();
     expect(screen.getByText('Enemy Siege B')).toBeInTheDocument();
     expect(screen.getByLabelText('Show Enemy Strategies Control')).toBeInTheDocument();
     expect(screen.queryByLabelText('Show Enemy Strategies Siege')).not.toBeInTheDocument();

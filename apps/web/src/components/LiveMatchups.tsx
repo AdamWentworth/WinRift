@@ -530,6 +530,11 @@ function WinConditionSummaryCard({
 }) {
   const condition = metric?.condition ?? team.primaryCondition;
   const rating = metric?.rating ?? team.primaryRating;
+  const hasSample = Boolean(metric && metric.games > 0);
+  const winRateValue = hasSample && metric ? `${metric.winRate.toFixed(2)}%` : '--';
+  const strategyValue = hasSample && metric ? (metric.planLabel ?? planLabelFallback(metric)) : 'No sample';
+  const gamesValue = hasSample && metric ? String(metric.games) : '0';
+  const confidenceValue = hasSample && metric ? (metric.evidence?.level ?? evidenceLevelFallback(metric.games)) : 'No sample';
   return (
     <div className={`legacy-win-card ${side}`}>
       <h2>{title}</h2>
@@ -538,21 +543,16 @@ function WinConditionSummaryCard({
         <img className="legacy-rating-icon" src={ratingImageUrl(rating)} alt={rating} />
       </div>
       <div className="legacy-win-stat">
-        <span>{condition} {rating}</span>
-        {metric && metric.games > 0 ? (
-          <>
-            <strong>Win Rate: {metric.winRate.toFixed(2)}%</strong>
-            <span>Strategy: {metric.planLabel ?? planLabelFallback(metric)}</span>
-            <span>Total Games: {metric.games}</span>
-            <span>Confidence: {metric.evidence?.level ?? evidenceLevelFallback(metric.games)}</span>
-          </>
-        ) : (
-          <>
-            <strong>Win Rate: --</strong>
-            <span>Total Games: 0</span>
-            <span>Confidence: No sample</span>
-          </>
-        )}
+        <div className="legacy-win-stat-heading">
+          <span>{condition}</span>
+          <strong>{rating}</strong>
+        </div>
+        <div className="legacy-win-stat-grid">
+          <WinConditionStatTile label="Win Rate" value={winRateValue} accent />
+          <WinConditionStatTile label="Strategy" value={strategyValue} />
+          <WinConditionStatTile label="Total Games" displayLabel="Games" value={gamesValue} />
+          <WinConditionStatTile label="Confidence" value={confidenceValue} />
+        </div>
       </div>
       <WinConditionProfileBars team={team} selectedCondition={condition} />
       {metrics && opponentCondition && onSelect ? (
@@ -566,6 +566,15 @@ function WinConditionSummaryCard({
         />
       ) : null}
     </div>
+  );
+}
+
+function WinConditionStatTile({ label, displayLabel, value, accent = false }: { label: string; displayLabel?: string; value: string; accent?: boolean }) {
+  return (
+    <span className={`legacy-win-stat-tile${accent ? ' accent' : ''}`} aria-label={`${label}: ${value}`}>
+      <small>{displayLabel ?? label}</small>
+      <strong>{value}</strong>
+    </span>
   );
 }
 
