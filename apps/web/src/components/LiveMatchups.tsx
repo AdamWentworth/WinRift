@@ -17,15 +17,9 @@ import {
   summonerSpellImageUrl,
   summonerSpellName,
 } from '../lib/staticData';
+import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 
-const roles = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
-const roleLabels: Record<string, string> = {
-  TOP: 'Top',
-  JUNGLE: 'Jungle',
-  MIDDLE: 'Mid',
-  BOTTOM: 'Bot',
-  UTILITY: 'Support',
-};
+const roles: string[] = ROLE_OPTIONS.map((role) => role.value);
 const BUILD_MATCHUP_MIN_GAMES = 5;
 const BUILD_BASELINE_MIN_GAMES = 10;
 const BUILD_SLOT_CANDIDATE_LIMIT = 12;
@@ -413,7 +407,10 @@ function LaneHeader() {
   return (
     <div className="lane-header-row" aria-label="Matchup lanes">
       {roles.map((role) => (
-        <div className="lane-header-cell" key={role}>{roleLabels[role] ?? role}</div>
+        <div className="lane-header-cell" key={role}>
+          <RoleIcon role={role} />
+          <span>{roleLabel(role)}</span>
+        </div>
       ))}
     </div>
   );
@@ -429,7 +426,8 @@ function LaneTabs({ selectedIndex, onSelect }: { selectedIndex: number; onSelect
           onClick={() => onSelect(index)}
           type="button"
         >
-          {roleLabels[role] ?? role}
+          <RoleIcon role={role} />
+          <span>{roleLabel(role)}</span>
         </button>
       ))}
     </div>
@@ -899,7 +897,7 @@ function FocusedBuildPanel({
         <div className="focused-build-player">
           {championUrl ? <img src={championUrl} alt={champion?.name ?? 'Champion'} /> : null}
           <span>
-            <small>{roleLabels[selection.role] ?? selection.role}</small>
+            <small><RoleIcon role={selection.role} /> {roleLabel(selection.role)}</small>
             <strong>{champion?.name ?? selection.participant.championId}</strong>
             <em>{playerName}</em>
           </span>
@@ -1000,7 +998,7 @@ function BuildParticipantPicker({
               {optionUrl ? <img src={optionUrl} alt="" /> : null}
               <strong>{optionChampion?.name ?? option.participant.championId}</strong>
               <em>{labelName}</em>
-              <small>{roleLabels[option.role] ?? option.role}</small>
+              <small><RoleIcon role={option.role} /> {roleLabel(option.role)}</small>
             </button>
           );
         })}
@@ -1129,7 +1127,7 @@ function LiveChampionCard({
         {championUrl ? <img className="profile-picture" src={championUrl} alt={championName} /> : <div className="profile-picture profile-fallback">{participant.championId}</div>}
         <img className="ranked-card-icon" src={rankIconUrl(participant.rank)} alt={participant.rank ? rankLabel(participant.rank) : 'Rank unavailable'} />
         <div className="player-title">
-          <div className="player-role-chip">{roleLabels[role] ?? role ?? 'Role'}</div>
+          <div className="player-role-chip"><RoleIcon role={role} /><span>{roleLabel(role)}</span></div>
           <div className="summoner-name" title={playerName}>{playerName}</div>
           <div className="champion-name">{championName}</div>
         </div>

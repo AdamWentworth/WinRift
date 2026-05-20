@@ -5,16 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getChampionGuideIndex } from '../api/client';
 import type { Champion, ChampionData, ChampionGuideSummary } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
+import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championImageUrl, championSplashUrl } from '../lib/staticData';
-
-const roles = [
-  { value: '', label: 'All Roles' },
-  { value: 'TOP', label: 'Top' },
-  { value: 'JUNGLE', label: 'Jungle' },
-  { value: 'MIDDLE', label: 'Mid' },
-  { value: 'BOTTOM', label: 'Bot' },
-  { value: 'UTILITY', label: 'Support' },
-];
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -69,7 +61,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
     enabled: Boolean(patch),
     staleTime: 5 * 60 * 1000,
   });
-  const selectedRole = roles.find((candidate) => candidate.value === role)?.label ?? 'All Roles';
+  const selectedRole = roleLabel(role);
   const selectedRank = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
   const normalizedSearch = normalizeLookup(searchText);
   const rows = useMemo(() => {
@@ -115,9 +107,10 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           <span>Filters</span>
         </div>
         <div className="guide-role-tabs tier-role-tabs" aria-label="Tier list role">
-          {roles.map((candidate) => (
+          {ROLE_OPTIONS_WITH_ALL.map((candidate) => (
             <button key={candidate.value || 'ALL'} className={candidate.value === role ? 'selected' : ''} onClick={() => setRole(candidate.value)} type="button">
-              {candidate.label}
+              <RoleIcon role={candidate.value} />
+              <span>{candidate.label}</span>
             </button>
           ))}
         </div>
@@ -215,7 +208,7 @@ function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; c
         {champion ? <img src={championImageUrl(champions, row.summary.championId)} alt="" /> : null}
         <span>
           <strong>{champion?.name ?? row.summary.championId}</strong>
-          <em>#{row.summary.roleRank || '-'} {row.summary.role || 'All Roles'}</em>
+          <em><RoleIcon role={row.summary.role} /> #{row.summary.roleRank || '-'} {roleLabel(row.summary.role)}</em>
         </span>
       </div>
       <p>{row.summary.winRate.toFixed(2)}% WR · {formatNumber(row.summary.games)} games · {row.score.toFixed(1)} score</p>
@@ -232,7 +225,7 @@ function TierTableRow({ row, champions, onSelectChampion }: { row: TierRow; cham
         {champion ? <img src={championImageUrl(champions, row.summary.championId)} alt="" /> : null}
         <span>
           <strong>{champion?.name ?? row.summary.championId}</strong>
-          <em>Rank {row.summary.roleRank || '-'} of {row.summary.roleRankTotal || '-'}</em>
+          <em><RoleIcon role={row.summary.role} /> Rank {row.summary.roleRank || '-'} of {row.summary.roleRankTotal || '-'}</em>
         </span>
       </span>
       <span>{row.summary.winRate.toFixed(2)}%</span>

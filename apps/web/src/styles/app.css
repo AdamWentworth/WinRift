@@ -26,6 +26,15 @@ button {
   cursor: pointer;
 }
 
+.role-icon {
+  color: currentColor;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 1.18em;
+  vertical-align: -0.16em;
+  width: 1.18em;
+}
+
 .app-shell {
   background:
     radial-gradient(ellipse at 50% -20%, rgb(121 197 207 / 12%), transparent 46%),
@@ -2030,6 +2039,7 @@ button {
 }
 
 .lane-header-cell {
+  align-items: center;
   background:
     linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
     #202020;
@@ -2038,6 +2048,9 @@ button {
   color: #dce5ea;
   font-size: 12px;
   font-weight: 900;
+  display: inline-flex;
+  gap: 6px;
+  justify-content: center;
   letter-spacing: 0.04em;
   padding: 7px 6px;
   text-align: center;
@@ -2180,16 +2193,24 @@ button {
 }
 
 .player-role-chip {
+  align-items: center;
   background: rgb(0 0 0 / 38%);
   border: 1px solid rgb(255 255 255 / 10%);
   color: #dce5ea;
-  display: inline-block;
+  display: inline-flex;
   font-size: 9px;
   font-weight: 900;
+  gap: 3px;
+  justify-content: center;
   line-height: 1;
   margin-bottom: 4px;
   padding: 3px 6px;
   text-transform: uppercase;
+}
+
+.player-role-chip .role-icon {
+  height: 1.25em;
+  width: 1.25em;
 }
 
 .summoner-name,
@@ -2497,6 +2518,16 @@ button {
   text-transform: uppercase;
 }
 
+.focused-build-player small {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.focused-build-player.enemy small {
+  justify-self: end;
+}
+
 .focused-build-player strong {
   color: #fff;
   font-size: 18px;
@@ -2629,6 +2660,13 @@ button {
   font-style: normal;
   font-weight: 800;
   line-height: 1;
+}
+
+.focused-build-picker small {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+  justify-content: center;
 }
 
 .focused-build-result {
@@ -3480,9 +3518,12 @@ button {
 
 .tier-feature-card em {
   color: #d5edf3;
+  align-items: center;
+  display: inline-flex;
   font-size: 10px;
   font-style: normal;
   font-weight: 1000;
+  gap: 4px;
   margin-top: 4px;
   text-transform: uppercase;
 }
@@ -3607,10 +3648,13 @@ button {
 }
 
 .tier-champion-cell em {
+  align-items: center;
   color: #9fb6bd;
+  display: inline-flex;
   font-size: 10px;
   font-style: normal;
   font-weight: 900;
+  gap: 4px;
   margin-top: 2px;
   text-transform: uppercase;
 }
@@ -3749,7 +3793,10 @@ button {
 }
 
 .guide-title-block h2 em {
+  align-items: center;
   color: #b9d6dd;
+  display: inline-flex;
+  gap: 8px;
   font-style: normal;
   font-weight: 650;
 }
@@ -3909,11 +3956,15 @@ button {
 }
 
 .guide-role-tabs button {
+  align-items: center;
   background: transparent;
   border: 0;
   color: #adc1c7;
+  display: inline-flex;
   font-size: 12px;
   font-weight: 1000;
+  gap: 5px;
+  justify-content: center;
   min-width: 64px;
   padding: 0 10px;
 }
@@ -4804,11 +4855,15 @@ button {
   }
 
   .mobile-lane-tabs button {
+    align-items: center;
     background: rgb(0 0 0 / 26%);
     border: 1px solid rgb(255 255 255 / 10%);
     color: #b7c4cb;
+    display: inline-flex;
     font-size: 9px;
     font-weight: 900;
+    gap: 3px;
+    justify-content: center;
     line-height: 1;
     min-height: 32px;
     padding: 0 3px;

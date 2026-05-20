@@ -19,14 +19,7 @@ import {
   summonerSpellImageUrl,
   summonerSpellName,
 } from '../lib/staticData';
-
-const roles = [
-  { value: 'TOP', label: 'Top' },
-  { value: 'JUNGLE', label: 'Jungle' },
-  { value: 'MIDDLE', label: 'Mid' },
-  { value: 'BOTTOM', label: 'Bot' },
-  { value: 'UTILITY', label: 'Support' },
-];
+import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -105,7 +98,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const itemSlots = itemSlotsQuery.data?.results ?? [];
   const splash = championSplashUrl(champions, championId);
   const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
-  const titleRole = roles.find((candidate) => candidate.value === role)?.label ?? role;
+  const titleRole = roleLabel(role);
   const sampleContext = opponent ? `${champion?.name ?? championId} vs ${opponent.name}` : `${champion?.name ?? championId} overall`;
   const guideIndexQuery = useQuery({
     queryKey: ['champion-guide-index', role, patch, rankBucket],
@@ -135,7 +128,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
           <div className="guide-title-block">
             <span className="guide-kicker">WinRift Build Atlas</span>
             <h2>
-              <span>{champion?.name ?? 'Champion'}</span> <em>{titleRole} patterns</em>
+              <span>{champion?.name ?? 'Champion'}</span> <em><RoleIcon role={role} /> {titleRole} patterns</em>
             </h2>
             <div className="guide-ability-row">
               <AbilityIcon champions={champions} ability={champion?.passive} label="P" />
@@ -255,9 +248,10 @@ function GuideFilters({
         </select>
       </label>
       <div className="guide-role-tabs" aria-label="Role">
-        {roles.map((candidate) => (
+        {ROLE_OPTIONS.map((candidate) => (
           <button key={candidate.value} className={candidate.value === role ? 'selected' : ''} onClick={() => onRoleChange(candidate.value)} type="button">
-            {candidate.label}
+            <RoleIcon role={candidate.value} />
+            <span>{candidate.label}</span>
           </button>
         ))}
       </div>
