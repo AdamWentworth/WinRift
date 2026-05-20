@@ -353,10 +353,8 @@ button {
     #090b0c;
   inset: 0;
   overflow: hidden;
-  perspective: 1400px;
   pointer-events: none;
   position: absolute;
-  transform-style: preserve-3d;
   z-index: 0;
 }
 
@@ -386,28 +384,29 @@ button {
 }
 
 .home-art-slide {
-  filter: saturate(0.82) contrast(0.94) brightness(0.72) blur(0.4px);
-  inset: -2%;
+  filter: saturate(0.78) contrast(0.94) brightness(0.68);
+  inset: -4%;
   opacity: 0;
   overflow: hidden;
   position: absolute;
-  transform: translate3d(0, 0, -40px) rotateX(1deg) scale(1.035);
+  transform: translate3d(0, 0, 0);
   transform-origin: center;
-  will-change: opacity, transform, filter;
+  will-change: opacity;
 }
 
 .home-art-slide img {
+  backface-visibility: hidden;
   display: block;
   height: 100%;
   object-fit: cover;
-  opacity: 0.74;
-  transform: scale(1.015);
+  opacity: 0.72;
+  transform: translate3d(0, 0, 0) scale(1.06);
   width: 100%;
   will-change: transform;
 }
 
 .home-art-slide.active {
-  animation: homeArtReveal 2500ms ease-out forwards;
+  animation: homeArtReveal 2600ms ease-out forwards;
   z-index: 1;
 }
 
@@ -417,27 +416,27 @@ button {
 }
 
 .home-art-slide.pan-east img {
-  animation: homeArtDriftEast 10500ms ease-in-out forwards;
+  animation: homeArtDriftEast 10500ms linear forwards;
 }
 
 .home-art-slide.pan-west img {
-  animation: homeArtDriftWest 10500ms ease-in-out forwards;
+  animation: homeArtDriftWest 10500ms linear forwards;
 }
 
 .home-art-slide.pan-rise img {
-  animation: homeArtDriftRise 10500ms ease-in-out forwards;
+  animation: homeArtDriftRise 10500ms linear forwards;
 }
 
 .home-art-slide.pan-fall img {
-  animation: homeArtDriftFall 10500ms ease-in-out forwards;
+  animation: homeArtDriftFall 10500ms linear forwards;
 }
 
 .home-art-slide.pan-northeast img {
-  animation: homeArtDriftNortheast 10500ms ease-in-out forwards;
+  animation: homeArtDriftNortheast 10500ms linear forwards;
 }
 
 .home-art-slide.pan-southwest img {
-  animation: homeArtDriftSouthwest 10500ms ease-in-out forwards;
+  animation: homeArtDriftSouthwest 10500ms linear forwards;
 }
 
 .home-art-slide.exiting img {
@@ -445,106 +444,98 @@ button {
 }
 
 .home-art-slide.exiting.pan-east img {
-  transform: translate3d(1.6%, -0.5%, 0) scale(1.055);
+  transform: translate3d(1.1%, -0.35%, 0) scale(1.06);
 }
 
 .home-art-slide.exiting.pan-west img {
-  transform: translate3d(-1.7%, 0.5%, 0) scale(1.055);
+  transform: translate3d(-1.1%, 0.35%, 0) scale(1.06);
 }
 
 .home-art-slide.exiting.pan-rise img {
-  transform: translate3d(0.8%, -1.5%, 0) scale(1.052);
+  transform: translate3d(0.45%, -1%, 0) scale(1.06);
 }
 
 .home-art-slide.exiting.pan-fall img {
-  transform: translate3d(-0.8%, 1.5%, 0) scale(1.052);
+  transform: translate3d(-0.45%, 1%, 0) scale(1.06);
 }
 
 .home-art-slide.exiting.pan-northeast img {
-  transform: translate3d(1.4%, -1.2%, 0) scale(1.056);
+  transform: translate3d(0.95%, -0.85%, 0) scale(1.06);
 }
 
 .home-art-slide.exiting.pan-southwest img {
-  transform: translate3d(-1.4%, 1.2%, 0) scale(1.056);
+  transform: translate3d(-0.95%, 0.85%, 0) scale(1.06);
 }
 
 @keyframes homeArtReveal {
   0% {
-    filter: saturate(0.68) contrast(0.9) brightness(0.5) blur(3px);
     opacity: 0;
-    transform: translate3d(0, 0, -90px) rotateX(1.4deg) scale(1.065);
   }
   100% {
-    filter: saturate(0.84) contrast(0.96) brightness(0.74) blur(0.55px);
     opacity: 0.9;
-    transform: translate3d(0, 0, 24px) rotateX(0deg) scale(1.025);
   }
 }
 
 @keyframes homeArtDepart {
   0% {
-    filter: saturate(0.84) contrast(0.96) brightness(0.74) blur(0.55px);
     opacity: 0.9;
-    transform: translate3d(0, 0, 24px) rotateX(0deg) scale(1.025);
   }
   100% {
-    filter: saturate(0.58) contrast(0.86) brightness(0.48) blur(2.2px);
     opacity: 0;
-    transform: translate3d(0, 0, -70px) rotateX(-0.8deg) scale(1.06);
   }
 }
 
 @keyframes homeArtDriftEast {
   0% {
-    transform: translate3d(-1.8%, 0.2%, 0) scale(1.03);
+    transform: translate3d(-1.1%, 0.35%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(1.6%, -0.5%, 0) scale(1.055);
+    transform: translate3d(1.1%, -0.35%, 0) scale(1.06);
   }
 }
 
 @keyframes homeArtDriftWest {
   0% {
-    transform: translate3d(1.8%, -0.4%, 0) scale(1.035);
+    transform: translate3d(1.1%, -0.35%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(-1.7%, 0.5%, 0) scale(1.055);
+    transform: translate3d(-1.1%, 0.35%, 0) scale(1.06);
   }
 }
 
 @keyframes homeArtDriftRise {
   0% {
-    transform: translate3d(-0.4%, 1.5%, 0) scale(1.032);
+    transform: translate3d(-0.45%, 1%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(0.8%, -1.5%, 0) scale(1.052);
+    transform: translate3d(0.45%, -1%, 0) scale(1.06);
   }
 }
 
 @keyframes homeArtDriftFall {
   0% {
-    transform: translate3d(0.4%, -1.5%, 0) scale(1.032);
+    transform: translate3d(0.45%, -1%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(-0.8%, 1.5%, 0) scale(1.052);
+    transform: translate3d(-0.45%, 1%, 0) scale(1.06);
   }
 }
 
 @keyframes homeArtDriftNortheast {
   0% {
-    transform: translate3d(-1.4%, 1.1%, 0) scale(1.032);
+    transform: translate3d(-0.95%, 0.85%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(1.4%, -1.2%, 0) scale(1.056);
+    transform: translate3d(0.95%, -0.85%, 0) scale(1.06);
   }
 }
 
 @keyframes homeArtDriftSouthwest {
   0% {
-    transform: translate3d(1.4%, -1.1%, 0) scale(1.032);
+    transform: translate3d(0.95%, -0.85%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(-1.4%, 1.2%, 0) scale(1.056);
+    transform: translate3d(-0.95%, 0.85%, 0) scale(1.06);
   }
 }
 
