@@ -419,6 +419,9 @@ describe('App', () => {
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
 
+    expect(await screen.findByRole('button', { name: 'Show Win Conditions mode' })).toBeInTheDocument();
+    expect(getWinConditionAnalysis).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Show Win Conditions mode' }));
     await waitFor(() => expect(getWinConditionAnalysis).toHaveBeenCalled());
     expect(await screen.findByText("Your Team's Win Condition")).toBeInTheDocument();
     expect(screen.getByText('Other Strategies')).toBeInTheDocument();

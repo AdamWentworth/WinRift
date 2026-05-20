@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Network, Swords } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData, WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../api/types';
 import { getChampionRoleRates, getItemSlots, getWinConditionAnalysis } from '../api/client';
@@ -41,6 +41,7 @@ type StatRequest = {
 };
 
 type TeamSide = 'blue' | 'red';
+type LiveMode = 'builds' | 'winConditions';
 
 type DraggedCard = {
   side: TeamSide;
@@ -51,8 +52,11 @@ type RoleRateMap = Map<number, Map<string, ChampionRoleRate>>;
 
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
   const [now, setNow] = useState(() => Date.now());
+  const [liveMode, setLiveMode] = useState<LiveMode>('builds');
   const liveChampionIds = useMemo(() => uniqueChampionIds(liveGame.participants), [liveGame.participants]);
   const patchBucket = useMemo(() => patchBucketFromVersion(champions?.version), [champions?.version]);
+  const showBuildMode = liveMode === 'builds';
+  const showWinConditionMode = liveMode === 'winConditions';
   const roleRatesQuery = useQuery({
     queryKey: ['champion-role-rates', liveGame.gameQueueConfigId, liveChampionIds],
     queryFn: () => getChampionRoleRates(liveChampionIds, liveGame.gameQueueConfigId),
@@ -81,7 +85,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
       patch: patchBucket,
       minGames: 5,
     }),
-    enabled: blueChampionIds.length === 5 && redChampionIds.length === 5,
+    enabled: showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5,
     staleTime: 60_000,
   });
 
@@ -115,13 +119,14 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     setRedTeam((team) => moveParticipantToIndex(team, fromIndex, toIndex));
   };
 
-  const pairs = roles.map((role, index) => ({
+  const pairs = useMemo(() => roles.map((role, index) => ({
     role,
     blue: blueTeam[index],
     red: redTeam[index],
-  })).filter((pair) => pair.blue && pair.red);
+  })).filter((pair) => pair.blue && pair.red), [blueTeam, redTeam]);
 
   const statRequests = useMemo(() => {
+    if (!showBuildMode) return [];
     const requests: StatRequest[] = [];
     pairs.forEach((pair, index) => {
       if (!pair.blue || !pair.red) return;
@@ -135,7 +140,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
       });
     });
     return requests;
-  }, [pairs, patchBucket]);
+  }, [pairs, patchBucket, showBuildMode]);
 
   const statQueries = useQueries({
     queries: statRequests.map((request) => ({
@@ -165,141 +170,201 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
         blueTeam={blueTeam}
         redTeam={redTeam}
       />
-      {manualOrder ? (
-        <div className="board-actions">
-          <button
-            type="button"
-            onClick={() => {
-              setManualOrder(false);
-              setBlueTeam(initialBlue);
-              setRedTeam(initialRed);
-              setDraggedCard(null);
-              setDragTarget(null);
-            }}
-          >
-            Reset Lane Order
-          </button>
-        </div>
-      ) : null}
-      <div className="cards-container">
-        <LaneTabs selectedIndex={selectedLaneIndex} onSelect={setSelectedLaneIndex} />
-        <LaneHeader />
-        <div className="build-row blue-build-row">
-          {pairs.map((pair, index) => {
-            if (!pair.blue || !pair.red) return null;
-            return (
-              <MatchupBuildCard
-                key={`blue-build-${participantKey(pair.blue, index)}-${participantKey(pair.red, index)}`}
-                role={pair.role}
-                side="blue"
-                participant={pair.blue}
-                opponent={pair.red}
-                champions={champions}
-                items={items}
-                itemSlots={statsByKey.get(statKey(index, 'blue'))?.itemSlots ?? []}
-                loading={statsByKey.get(statKey(index, 'blue'))?.loading ?? false}
-                mobileActive={index === selectedLaneIndex}
+      <div className="live-mode-layout">
+        <LiveModeRail mode={liveMode} onChange={setLiveMode} />
+        <div className="live-mode-content">
+          {manualOrder ? (
+            <div className="board-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setManualOrder(false);
+                  setBlueTeam(initialBlue);
+                  setRedTeam(initialRed);
+                  setDraggedCard(null);
+                  setDragTarget(null);
+                }}
+              >
+                Reset Lane Order
+              </button>
+            </div>
+          ) : null}
+          <div className="cards-container">
+            <LaneTabs selectedIndex={selectedLaneIndex} onSelect={setSelectedLaneIndex} />
+            <LaneHeader />
+            {showBuildMode ? (
+              <div className="build-row blue-build-row">
+                {pairs.map((pair, index) => {
+                  if (!pair.blue || !pair.red) return null;
+                  return (
+                    <MatchupBuildCard
+                      key={`blue-build-${participantKey(pair.blue, index)}-${participantKey(pair.red, index)}`}
+                      role={pair.role}
+                      side="blue"
+                      participant={pair.blue}
+                      opponent={pair.red}
+                      champions={champions}
+                      items={items}
+                      itemSlots={statsByKey.get(statKey(index, 'blue'))?.itemSlots ?? []}
+                      loading={statsByKey.get(statKey(index, 'blue'))?.loading ?? false}
+                      mobileActive={index === selectedLaneIndex}
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className="champion-row blue-row">
+              {blueTeam.map((participant, index) => (
+                <LiveChampionCard
+                  key={participantKey(participant, index)}
+                  participant={participant}
+                  index={index}
+                  role={roles[index]}
+                  side="blue"
+                  champions={champions}
+                  spells={spells}
+                  runes={runes}
+                  dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
+                  dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
+                  onDragStart={() => setDraggedCard({ side: 'blue', index })}
+                  mobileActive={index === selectedLaneIndex}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragTarget({ side: 'blue', index });
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggedCard?.side === 'blue') {
+                      moveCardToIndex('blue', draggedCard.index, index);
+                    }
+                    setDraggedCard(null);
+                    setDragTarget(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedCard(null);
+                    setDragTarget(null);
+                  }}
+                />
+              ))}
+            </div>
+            {showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
+              <WinConditionPanel
+                analysis={winConditionQuery.data}
+                yourSide={yourSide}
+                loading={winConditionQuery.isLoading}
+                error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
               />
-            );
-          })}
-        </div>
-        <div className="champion-row blue-row">
-          {blueTeam.map((participant, index) => (
-            <LiveChampionCard
-              key={participantKey(participant, index)}
-              participant={participant}
-              index={index}
-              role={roles[index]}
-              side="blue"
-              champions={champions}
-              spells={spells}
-              runes={runes}
-              dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
-              dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
-              onDragStart={() => setDraggedCard({ side: 'blue', index })}
-              mobileActive={index === selectedLaneIndex}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragTarget({ side: 'blue', index });
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (draggedCard?.side === 'blue') {
-                  moveCardToIndex('blue', draggedCard.index, index);
-                }
-                setDraggedCard(null);
-                setDragTarget(null);
-              }}
-              onDragEnd={() => {
-                setDraggedCard(null);
-                setDragTarget(null);
-              }}
-            />
-          ))}
-        </div>
-        {blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
-          <WinConditionPanel
-            analysis={winConditionQuery.data}
-            yourSide={yourSide}
-            loading={winConditionQuery.isLoading}
-            error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
-          />
-        ) : null}
-        <div className="champion-row red-row">
-          {redTeam.map((participant, index) => (
-            <LiveChampionCard
-              key={participantKey(participant, index)}
-              participant={participant}
-              index={index}
-              role={roles[index]}
-              side="red"
-              champions={champions}
-              spells={spells}
-              runes={runes}
-              dragging={draggedCard?.side === 'red' && draggedCard.index === index}
-              dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
-              onDragStart={() => setDraggedCard({ side: 'red', index })}
-              mobileActive={index === selectedLaneIndex}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragTarget({ side: 'red', index });
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (draggedCard?.side === 'red') {
-                  moveCardToIndex('red', draggedCard.index, index);
-                }
-                setDraggedCard(null);
-                setDragTarget(null);
-              }}
-              onDragEnd={() => {
-                setDraggedCard(null);
-                setDragTarget(null);
-              }}
-            />
-          ))}
-        </div>
-        <div className="build-row red-build-row">
-          {pairs.map((pair, index) => {
-            if (!pair.blue || !pair.red) return null;
-            return (
-              <MatchupBuildCard
-                key={`red-build-${participantKey(pair.red, index)}-${participantKey(pair.blue, index)}`}
-                role={pair.role}
-                side="red"
-                participant={pair.red}
-                opponent={pair.blue}
-                champions={champions}
-                items={items}
-                itemSlots={statsByKey.get(statKey(index, 'red'))?.itemSlots ?? []}
-                loading={statsByKey.get(statKey(index, 'red'))?.loading ?? false}
-                mobileActive={index === selectedLaneIndex}
-              />
-            );
-          })}
+            ) : null}
+            <div className="champion-row red-row">
+              {redTeam.map((participant, index) => (
+                <LiveChampionCard
+                  key={participantKey(participant, index)}
+                  participant={participant}
+                  index={index}
+                  role={roles[index]}
+                  side="red"
+                  champions={champions}
+                  spells={spells}
+                  runes={runes}
+                  dragging={draggedCard?.side === 'red' && draggedCard.index === index}
+                  dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
+                  onDragStart={() => setDraggedCard({ side: 'red', index })}
+                  mobileActive={index === selectedLaneIndex}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragTarget({ side: 'red', index });
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggedCard?.side === 'red') {
+                      moveCardToIndex('red', draggedCard.index, index);
+                    }
+                    setDraggedCard(null);
+                    setDragTarget(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedCard(null);
+                    setDragTarget(null);
+                  }}
+                />
+              ))}
+            </div>
+            {showBuildMode ? (
+              <div className="build-row red-build-row">
+                {pairs.map((pair, index) => {
+                  if (!pair.blue || !pair.red) return null;
+                  return (
+                    <MatchupBuildCard
+                      key={`red-build-${participantKey(pair.red, index)}-${participantKey(pair.blue, index)}`}
+                      role={pair.role}
+                      side="red"
+                      participant={pair.red}
+                      opponent={pair.blue}
+                      champions={champions}
+                      items={items}
+                      itemSlots={statsByKey.get(statKey(index, 'red'))?.itemSlots ?? []}
+                      loading={statsByKey.get(statKey(index, 'red'))?.loading ?? false}
+                      mobileActive={index === selectedLaneIndex}
+                    />
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+const liveModeOptions: Array<{
+  id: LiveMode;
+  label: string;
+  kicker: string;
+  description: string;
+  icon: typeof Swords;
+}> = [
+  {
+    id: 'builds',
+    label: 'Builds',
+    kicker: 'Matchups',
+    description: 'Item path matchup stats',
+    icon: Swords,
+  },
+  {
+    id: 'winConditions',
+    label: 'Win Conditions',
+    kicker: 'Strategy',
+    description: 'Team identity and timing',
+    icon: Network,
+  },
+];
+
+function LiveModeRail({ mode, onChange }: { mode: LiveMode; onChange: (mode: LiveMode) => void }) {
+  return (
+    <nav className="live-mode-rail" aria-label="Live analytics mode">
+      {liveModeOptions.map((option) => {
+        const Icon = option.icon;
+        const selected = option.id === mode;
+        return (
+          <button
+            aria-label={`Show ${option.label} mode`}
+            aria-pressed={selected}
+            className={`live-mode-button${selected ? ' selected' : ''}`}
+            key={option.id}
+            onClick={() => onChange(option.id)}
+            title={option.description}
+            type="button"
+          >
+            <Icon aria-hidden="true" size={20} strokeWidth={2.4} />
+            <span>
+              <strong>{option.label}</strong>
+              <em>{option.kicker}</em>
+            </span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
