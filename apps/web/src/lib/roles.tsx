@@ -92,21 +92,22 @@ function RoleGlyph({ role }: { role: RoleCode | '' }) {
   }
   if (role === 'BOTTOM') {
     return (
-      <>
-        <path d="M5 5h14v14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-        <path d="M5 19 16 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.45" opacity="0.65" />
-        <path d="M13 19h6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" opacity="0.55" />
-      </>
+      <g transform="scale(1.5)">
+        <path d="M10.133 5.867H5.867v4.266h4.266z" fill="currentColor" opacity="0.42" />
+        <path d="M0 0v14.75l2.828-2.829V2.828h9.094L14.75 0z" fill="currentColor" opacity="0.42" />
+        <path d="M16 16V1.25L13.172 4.08v9.093H4.078L1.25 16z" fill="currentColor" />
+      </g>
     );
   }
   if (role === 'UTILITY') {
     return (
-      <>
-        <path d="M12 4.5 16.6 7v4.4c0 3.6-1.6 6-4.6 8.1-3-2.1-4.6-4.5-4.6-8.1V7L12 4.5Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.8" />
-        <path d="M4.6 10.2c1.9.2 3.2.9 4 2.2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" opacity="0.62" />
-        <path d="M19.4 10.2c-1.9.2-3.2.9-4 2.2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" opacity="0.62" />
-        <path d="M12 8v6" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" opacity="0.75" />
-      </>
+      <g transform="scale(1.5)">
+        <path
+          d="M8.43 5.67l1.703 8.616L8 16l-2.133-1.714L7.57 5.67 8 6.249l.43-.578zM16 3.404c-.304 2.498-4.119 2.261-4.119 2.261l1.75 2.315-2.81 1.13L9.6 5.234l1.857-1.83zm-11.457 0L6.4 5.233 5.18 9.11 2.368 7.98l1.75-2.316S.305 5.901 0 3.403h4.543zM9.998 0l.669 1.185L8 4.456 5.333 1.185 6.003 0h3.995z"
+          fill="currentColor"
+          fillRule="evenodd"
+        />
+      </g>
     );
   }
   return (
