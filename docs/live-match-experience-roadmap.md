@@ -215,6 +215,7 @@ Implementation notes:
 
 - `liveMode` state in `LiveMatchups` is `'match' | 'builds' | 'winConditions'`.
 - Gate the focused item-slot batch query so it only runs in Builds mode. The current batch asks for two rows of advice: exact matchup and champion baseline. This avoids frontend and API work for hidden build panels.
+- Build rows use minimum sample thresholds before an item can appear: 5+ games for exact matchup slots and 10+ games for champion baseline slots. Results are still sorted by Wilson lower-bound confidence after the threshold, so a 1-game 100% item does not outrank a more established pattern.
 - Gate win-condition query so it only runs in Win Conditions mode, unless we later want to prefetch after idle.
 - Keep the current champion card drag/drop shared across all modes because role correction affects every mode.
 - Use icons plus short labels in the rail. Good icon choices from lucide: sword/build, network/strategy, user/player form.

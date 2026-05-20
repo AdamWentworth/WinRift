@@ -2608,6 +2608,17 @@ button {
   white-space: nowrap;
 }
 
+.build-min-sample {
+  color: #d1bb7a;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .build-sample-chip {
   border: 1px solid rgb(255 255 255 / 16%);
   display: inline-flex;

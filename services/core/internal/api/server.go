@@ -19,6 +19,8 @@ import (
 	"winrift/services/core/internal/winconditions"
 )
 
+const defaultItemSlotMinGames = 5
+
 type Server struct {
 	cfg       config.Config
 	riot      *riot.Client
@@ -228,7 +230,7 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 		OpponentChampionID: uint16(queryInt(query.Get("opponentChampionId"), 0)),
 		Patch:              query.Get("patch"),
 		RankBucket:         strings.ToUpper(query.Get("rankBucket")),
-		MinGames:           queryInt(query.Get("minGames"), 1),
+		MinGames:           queryInt(query.Get("minGames"), defaultItemSlotMinGames),
 		Limit:              queryInt(query.Get("limit"), 6),
 		Fallback:           queryBool(query.Get("fallback")),
 	}
@@ -299,7 +301,7 @@ func (s Server) queryScopedItemSlots(ctx context.Context, request itemSlotAnalyt
 	filters := request.filters()
 	minGames := request.MinGames
 	if minGames <= 0 {
-		minGames = 1
+		minGames = defaultItemSlotMinGames
 	}
 	limit := request.Limit
 	if limit <= 0 {

@@ -26,6 +26,8 @@ const roleLabels: Record<string, string> = {
   BOTTOM: 'Bot',
   UTILITY: 'Support',
 };
+const BUILD_MATCHUP_MIN_GAMES = 5;
+const BUILD_BASELINE_MIN_GAMES = 10;
 
 type Props = {
   liveGame: LiveGame;
@@ -931,8 +933,9 @@ function FocusedBuildPanel({
           itemSlots={matchupItemSlots}
           loading={loading}
           items={items}
+          minGames={BUILD_MATCHUP_MIN_GAMES}
           emptyTitle="No matchup build yet"
-          emptySubtitle="Needs more stored games for this exact pairing"
+          emptySubtitle={`Needs ${BUILD_MATCHUP_MIN_GAMES}+ stored games for this exact pairing`}
         />
         <BuildResultCard
           title="Champion Baseline"
@@ -943,8 +946,9 @@ function FocusedBuildPanel({
           itemSlots={championItemSlots}
           loading={loading}
           items={items}
+          minGames={BUILD_BASELINE_MIN_GAMES}
           emptyTitle="No champion build yet"
-          emptySubtitle="Needs more stored games for this champion"
+          emptySubtitle={`Needs ${BUILD_BASELINE_MIN_GAMES}+ stored games for this champion`}
         />
       </div>
     </section>
@@ -1001,6 +1005,7 @@ function BuildResultCard({
   itemSlots,
   loading,
   items,
+  minGames,
   emptyTitle,
   emptySubtitle,
 }: {
@@ -1012,6 +1017,7 @@ function BuildResultCard({
   itemSlots: AnalyticsItemSlot[];
   loading: boolean;
   items?: ItemData;
+  minGames: number;
   emptyTitle: string;
   emptySubtitle: string;
 }) {
@@ -1024,6 +1030,7 @@ function BuildResultCard({
         </span>
         <div>
           <b className={`build-sample-chip ${sample.tone}`}>{sample.label}</b>
+          <small className="build-min-sample">{minGames}+ games/item</small>
           {scopeLabel ? <small className="build-scope-label">{scopeLabel}</small> : null}
         </div>
       </header>
@@ -1286,7 +1293,7 @@ function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, r
     opponentChampionId: opponent.championId,
     itemContext: itemContextForParticipant(participant, role),
     patch,
-    minGames: 1,
+    minGames: BUILD_MATCHUP_MIN_GAMES,
     limit: 6,
     fallback: Boolean(patch),
   };
@@ -1297,7 +1304,7 @@ function championBuildFiltersFor(participant: LiveParticipant, role: string, pat
     championId: participant.championId,
     itemContext: itemContextForParticipant(participant, role),
     patch,
-    minGames: 1,
+    minGames: BUILD_BASELINE_MIN_GAMES,
     limit: 6,
     fallback: Boolean(patch),
   };
