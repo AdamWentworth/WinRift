@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { GripVertical, Network, Swords, Users } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData, WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../api/types';
 import { getChampionRoleRates, getItemSlotsBatch, getWinConditionAnalysis } from '../api/client';
@@ -17,12 +17,23 @@ import {
   summonerSpellImageUrl,
   summonerSpellName,
 } from '../lib/staticData';
-import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
-
-const roles: string[] = ROLE_OPTIONS.map((role) => role.value);
-const BUILD_MATCHUP_MIN_GAMES = 5;
-const BUILD_BASELINE_MIN_GAMES = 10;
-const BUILD_SLOT_CANDIDATE_LIMIT = 12;
+import { RoleIcon, roleLabel } from '../lib/roles';
+import { LaneHeader, LaneTabs } from './live-match/LaneNavigation';
+import { LiveModeRail } from './live-match/LiveModeRail';
+import { MatchHeader } from './live-match/MatchHeader';
+import {
+  BUILD_BASELINE_MIN_GAMES,
+  BUILD_MATCHUP_MIN_GAMES,
+  BUILD_SLOT_CANDIDATE_LIMIT,
+  roles,
+  type BuildParticipantOption,
+  type BuildPathSummary,
+  type DraggedCard,
+  type FocusedBuildSelection,
+  type LiveMode,
+  type RoleRateMap,
+  type TeamSide,
+} from './live-match/types';
 
 type Props = {
   liveGame: LiveGame;
@@ -30,40 +41,6 @@ type Props = {
   items?: ItemData;
   spells?: SummonerSpellData;
   runes?: RuneData;
-};
-
-type TeamSide = 'blue' | 'red';
-type LiveMode = 'match' | 'builds' | 'winConditions';
-
-type DraggedCard = {
-  side: TeamSide;
-  index: number;
-};
-
-type RoleRateMap = Map<number, Map<string, ChampionRoleRate>>;
-
-type BuildParticipantOption = {
-  key: string;
-  side: TeamSide;
-  role: string;
-  index: number;
-  participant: LiveParticipant;
-};
-
-type FocusedBuildSelection = {
-  side: TeamSide;
-  role: string;
-  participantKey: string;
-  participant: LiveParticipant;
-  opponentKey: string;
-  opponent: LiveParticipant;
-  participantOptions: BuildParticipantOption[];
-  opponentOptions: BuildParticipantOption[];
-};
-
-type BuildPathSummary = {
-  weightedWinRate: number;
-  totalGames: number;
 };
 
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
@@ -291,145 +268,6 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-const liveModeOptions: Array<{
-  id: LiveMode;
-  label: string;
-  kicker: string;
-  description: string;
-  icon: typeof Swords;
-}> = [
-  {
-    id: 'match',
-    label: 'Match',
-    kicker: 'Scout',
-    description: 'Player cards and live match context',
-    icon: Users,
-  },
-  {
-    id: 'builds',
-    label: 'Builds',
-    kicker: 'Focused',
-    description: 'Focused item path matchup stats',
-    icon: Swords,
-  },
-  {
-    id: 'winConditions',
-    label: 'Win Conditions',
-    kicker: 'Strategy',
-    description: 'Team identity and timing',
-    icon: Network,
-  },
-];
-
-function LiveModeRail({ mode, onChange }: { mode: LiveMode; onChange: (mode: LiveMode) => void }) {
-  return (
-    <nav className="live-mode-rail" aria-label="Live analytics mode">
-      {liveModeOptions.map((option) => {
-        const Icon = option.icon;
-        const selected = option.id === mode;
-        return (
-          <button
-            aria-label={`Show ${option.label} mode`}
-            aria-pressed={selected}
-            className={`live-mode-button${selected ? ' selected' : ''}`}
-            key={option.id}
-            onClick={() => onChange(option.id)}
-            title={option.description}
-            type="button"
-          >
-            <Icon aria-hidden="true" size={20} strokeWidth={2.4} />
-            <span>
-              <strong>{option.label}</strong>
-              <em>{option.kicker}</em>
-            </span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function MatchHeader({
-  liveGame,
-  now,
-  patch,
-  searchedParticipant,
-  yourSide,
-  blueTeam,
-  redTeam,
-}: {
-  liveGame: LiveGame;
-  now: number;
-  patch?: string;
-  searchedParticipant?: LiveParticipant;
-  yourSide: TeamSide;
-  blueTeam: LiveParticipant[];
-  redTeam: LiveParticipant[];
-}) {
-  const blueAverage = averageRankLabel(blueTeam);
-  const redAverage = averageRankLabel(redTeam);
-  const searchedName = searchedParticipant?.riotId || searchedParticipant?.summonerName || 'Live player';
-  return (
-    <header className={`match-header ${yourSide}-side`}>
-      <div className="match-header-main">
-        <div className="match-kicker">{queueLabel(liveGame.gameQueueConfigId)} · {liveGame.platform}</div>
-        <h2>{searchedName}</h2>
-        <div className="match-subline">
-          <span>{liveGame.gameMode}</span>
-          <span>{yourSide === 'blue' ? 'Blue side' : 'Red side'}</span>
-          {patch ? <span>Patch {patch}</span> : null}
-        </div>
-      </div>
-      <div className="match-header-stats" aria-label="Live match context">
-        <HeaderStat label="Clock" value={matchClock(liveGame.gameStartTime, now)} />
-        <HeaderStat label="Blue Avg" value={blueAverage.label} detail={blueAverage.detail} tone="blue" />
-        <HeaderStat label="Red Avg" value={redAverage.label} detail={redAverage.detail} tone="red" />
-      </div>
-    </header>
-  );
-}
-
-function HeaderStat({ label, value, detail, tone }: { label: string; value: string; detail?: string; tone?: TeamSide }) {
-  return (
-    <div className={`match-header-stat${tone ? ` ${tone}` : ''}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {detail ? <em>{detail}</em> : null}
-    </div>
-  );
-}
-
-function LaneHeader() {
-  return (
-    <div className="lane-header-row" aria-label="Matchup lanes">
-      {roles.map((role) => (
-        <div className="lane-header-cell" key={role}>
-          <RoleIcon role={role} />
-          <span>{roleLabel(role)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function LaneTabs({ selectedIndex, onSelect }: { selectedIndex: number; onSelect: (index: number) => void }) {
-  return (
-    <div className="mobile-lane-tabs" aria-label="Mobile lane selector">
-      {roles.map((role, index) => (
-        <button
-          className={index === selectedIndex ? 'selected' : ''}
-          key={role}
-          onClick={() => onSelect(index)}
-          type="button"
-        >
-          <RoleIcon role={role} />
-          <span>{roleLabel(role)}</span>
-        </button>
-      ))}
     </div>
   );
 }
@@ -1482,73 +1320,6 @@ function buildScopeLabel(itemSlots: AnalyticsItemSlot[]) {
   return 'Mixed fallback samples';
 }
 
-function matchClock(gameStartTime: number, now: number) {
-  if (!gameStartTime) return '--:--';
-  const elapsedSeconds = Math.max(0, Math.floor((now - gameStartTime) / 1000));
-  const minutes = Math.floor(elapsedSeconds / 60);
-  const seconds = elapsedSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function averageRankLabel(team: LiveParticipant[]) {
-  const values = team.map(rankValue).filter((value): value is number => value !== undefined);
-  if (!values.length) {
-    return { label: 'Unknown', detail: `0/${team.length || 5} ranked` };
-  }
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-  return {
-    label: labelForRankValue(average),
-    detail: `${values.length}/${team.length || 5} ranked`,
-  };
-}
-
-const rankTierValues: Record<string, number> = {
-  IRON: 0,
-  BRONZE: 4,
-  SILVER: 8,
-  GOLD: 12,
-  PLATINUM: 16,
-  EMERALD: 20,
-  DIAMOND: 24,
-  MASTER: 28,
-  GRANDMASTER: 30,
-  CHALLENGER: 32,
-};
-
-const rankDivisionValues: Record<string, number> = {
-  IV: 0,
-  III: 1,
-  II: 2,
-  I: 3,
-};
-
-function rankValue(participant: LiveParticipant) {
-  const rank = participant.rank;
-  if (!rank || rank.rankAvailable === false || !rank.tier) return undefined;
-  const tierValue = rankTierValues[rank.tier.toUpperCase()];
-  if (tierValue === undefined) return undefined;
-  if (tierValue >= rankTierValues.MASTER) {
-    return tierValue + Math.min(1.9, Math.max(0, rank.leaguePoints) / 500);
-  }
-  const division = rank.division || rank.rank || 'IV';
-  return tierValue + (rankDivisionValues[division.toUpperCase()] ?? 0) + Math.min(0.99, Math.max(0, rank.leaguePoints) / 100);
-}
-
-function labelForRankValue(value: number) {
-  if (value >= rankTierValues.CHALLENGER) return 'Challenger';
-  if (value >= rankTierValues.GRANDMASTER) return 'Grandmaster';
-  if (value >= rankTierValues.MASTER) return 'Master';
-  const tiers = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND'];
-  const tierIndex = Math.max(0, Math.min(tiers.length - 1, Math.floor(value / 4)));
-  const divisionOffset = Math.max(0, Math.min(3, Math.round(value - tierIndex * 4)));
-  const division = ['IV', 'III', 'II', 'I'][divisionOffset];
-  return `${titleCase(tiers[tierIndex])} ${division}`;
-}
-
-function titleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-}
-
 function ordinal(value: number) {
   if (value === 1) return '1st';
   if (value === 2) return '2nd';
@@ -1785,14 +1556,6 @@ function idsMatch(left?: string, right?: string) {
 
 function participantKey(participant: LiveParticipant, index: number) {
   return `${participant.teamId}-${participant.summonerId ?? participant.riotId ?? participant.championId}-${index}`;
-}
-
-function queueLabel(queueId: number) {
-  if (queueId === 420) return 'Ranked Solo/Duo';
-  if (queueId === 440) return 'Ranked Flex';
-  if (queueId === 400) return 'Normal Draft';
-  if (queueId === 430) return 'Normal Blind';
-  return `Queue ${queueId}`;
 }
 
 function conditionIconUrl(condition: string) {
