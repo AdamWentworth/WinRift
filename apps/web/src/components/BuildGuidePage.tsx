@@ -21,7 +21,7 @@ import {
 } from '../lib/staticData';
 import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { MetricTile } from './ui/MetricTile';
-import { EmptyState, PanelTitle } from './ui/Panel';
+import { EmptyState, PanelCard, PanelTitle } from './ui/Panel';
 import { RoleTabs } from './ui/RoleTabs';
 import { SelectControl } from './ui/SelectControl';
 
@@ -300,7 +300,7 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
   const primary = runes?.data.find((style) => style.id === parsed.primaryStyleId);
   const secondary = runes?.data.find((style) => style.id === parsed.secondaryStyleId);
   return (
-    <article className="guide-card rune-guide-card">
+    <PanelCard className="guide-card rune-guide-card">
       <PanelTitle title="Runes" detail={runeRow ? `${runeRow.winRate.toFixed(2)}% WR (${formatNumber(runeRow.games)} matches)` : loading ? 'Loading...' : 'No rune sample yet'} />
       {runeRow ? (
         <div className="guide-rune-grid">
@@ -314,7 +314,7 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
           </div>
         </div>
       ) : <EmptyState message="Rune pages will appear once this champion has enough collected games." />}
-    </article>
+    </PanelCard>
   );
 }
 
@@ -352,7 +352,7 @@ function SpellGuideCard({ guide, spells, loading }: { guide?: ChampionGuideRespo
   const spellRow = guide?.topSpells[0];
   const spellIds = signatureSpells(spellRow?.spellSignature ?? '');
   return (
-    <article className="guide-card spell-guide-card">
+    <PanelCard className="guide-card spell-guide-card">
       <PanelTitle title="Summoner Spells" detail={spellRow ? `${spellRow.winRate.toFixed(2)}% WR (${formatNumber(spellRow.games)} matches)` : loading ? 'Loading...' : 'No spell sample yet'} />
       {spellIds.length ? (
         <div className="guide-spell-pair">
@@ -361,13 +361,13 @@ function SpellGuideCard({ guide, spells, loading }: { guide?: ChampionGuideRespo
           ))}
         </div>
       ) : <EmptyState message="Summoner spell samples will appear after collection." />}
-    </article>
+    </PanelCard>
   );
 }
 
 function MatchupStrip({ title, subtitle, rows, champions, tone, loading }: { title: string; subtitle: string; rows: { opponentChampionId: number; winRate: number; games: number }[]; champions?: ChampionData; tone: 'good' | 'bad'; loading: boolean }) {
   return (
-    <section className="guide-card matchup-strip">
+    <PanelCard as="section" className="guide-card matchup-strip">
       <PanelTitle title={title} detail={subtitle} />
       <div className="guide-matchup-row">
         {rows.length ? rows.map((row) => {
@@ -382,7 +382,7 @@ function MatchupStrip({ title, subtitle, rows, champions, tone, loading }: { tit
           );
         }) : <EmptyState message={loading ? 'Loading matchups...' : 'No matchup sample yet for this filter.'} />}
       </div>
-    </section>
+    </PanelCard>
   );
 }
 
@@ -391,7 +391,7 @@ function SkillGuideCard({ guide, champion, champions, loading }: { guide?: Champ
   const skillOrder = guide?.topSkillOrders?.[0];
   const priority = skillPriority(skillOrder?.skillOrderSignature ?? '');
   return (
-    <article className="guide-card skill-priority-card">
+    <PanelCard className="guide-card skill-priority-card">
       <PanelTitle title="Skill Priority" detail={skillOrder ? `${skillOrder.winRate.toFixed(2)}% WR (${formatNumber(skillOrder.games)} matches)` : loading ? 'Loading...' : 'No skill sample yet'} />
       <div className="skill-priority-icons">
         {(priority.length ? priority : [1, 2, 3]).map((slot) => {
@@ -409,7 +409,7 @@ function SkillGuideCard({ guide, champion, champions, loading }: { guide?: Champ
       ) : (
         <p>{loading ? 'Checking collected timelines.' : 'Skill order will appear after guide analytics refreshes for this champion.'}</p>
       )}
-    </article>
+    </PanelCard>
   );
 }
 
@@ -417,7 +417,7 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
   const skillOrder = guide?.topSkillOrders?.[0];
   const slots = skillSlots(skillOrder?.skillOrderSignature ?? '');
   return (
-    <article className="guide-card skill-path-card">
+    <PanelCard className="guide-card skill-path-card">
       <PanelTitle title="Skill Path" detail={skillOrder ? `${formatNumber(skillOrder.games)} matching paths` : loading ? 'Loading...' : 'No path sample yet'} />
       {slots.length ? (
         <div className="skill-path-placeholder-grid">
@@ -434,7 +434,7 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
         </div>
       ) : <EmptyState message={loading ? 'Loading skill path...' : `No skill path sample yet for ${championName}.`} />}
       <p>{slots.length ? `${championName} skill order is shown from the most common collected path.` : 'This panel stays empty until real timeline data exists.'}</p>
-    </article>
+    </PanelCard>
   );
 }
 
@@ -454,7 +454,7 @@ function ItemGuideGrid({ rows, items, loading, context }: { rows: AnalyticsItemS
 
 function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { title: string; subtitle: string; rows: AnalyticsItemSlot[]; items?: ItemData; loading: boolean; linked?: boolean }) {
   return (
-    <article className="guide-card guide-item-panel">
+    <PanelCard className="guide-card guide-item-panel">
       <PanelTitle title={title} />
       {rows.length ? (
         <div className={linked ? 'guide-item-list linked' : 'guide-item-list'}>
@@ -471,25 +471,25 @@ function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { tit
         </div>
       ) : <EmptyState message={loading ? 'Loading items...' : 'No item sample yet.'} />}
       <small>{subtitle}</small>
-    </article>
+    </PanelCard>
   );
 }
 
 function RoleQuestCard() {
   return (
-    <article className="guide-card guide-role-quest">
+    <PanelCard className="guide-card guide-role-quest">
       <PanelTitle title="Role Quest" detail="Jungle context" />
       <p>Jungle builds include starter jungle items when they appear in the collected purchase path. This keeps jungle-specific first-slot data separate from lane builds.</p>
-    </article>
+    </PanelCard>
   );
 }
 
 function GuideMiniNote({ title, body }: { title: string; body: string }) {
   return (
-    <article className="guide-card guide-mini-note">
+    <PanelCard className="guide-card guide-mini-note">
       <PanelTitle title={title} />
       <p>{body}</p>
-    </article>
+    </PanelCard>
   );
 }
 
