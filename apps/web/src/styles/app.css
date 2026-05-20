@@ -125,8 +125,9 @@ button {
 
 .home-art-stage {
   background:
+    radial-gradient(ellipse at 50% 32%, rgb(90 146 156 / 15%), transparent 46%),
     linear-gradient(180deg, rgb(0 0 0 / 34%), rgb(0 0 0 / 62%)),
-    url("https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg") center 36% / cover;
+    #090b0c;
   inset: 0;
   overflow: hidden;
   perspective: 1400px;

@@ -28,28 +28,40 @@ type HomeSplashSlide = {
 
 const fallbackHomeSplashSlides: HomeSplashSlide[] = [
   {
-    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg',
-    title: 'Jinx',
-    position: 'center 36%',
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Akali_0.jpg',
+    title: 'Akali',
+    position: 'center 38%',
     panClass: 'pan-east',
   },
   {
-    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_0.jpg',
-    title: 'Lux',
-    position: 'center 34%',
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ashe_0.jpg',
+    title: 'Ashe',
+    position: 'center 40%',
     panClass: 'pan-west',
   },
   {
-    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg',
-    title: 'Ahri',
-    position: 'center 38%',
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ekko_0.jpg',
+    title: 'Ekko',
+    position: 'center 36%',
     panClass: 'pan-rise',
   },
   {
-    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg',
-    title: 'Yasuo',
-    position: 'center 34%',
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Thresh_0.jpg',
+    title: 'Thresh',
+    position: 'center 42%',
     panClass: 'pan-fall',
+  },
+  {
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/AurelionSol_0.jpg',
+    title: 'Aurelion Sol',
+    position: 'center 46%',
+    panClass: 'pan-northeast',
+  },
+  {
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Leona_0.jpg',
+    title: 'Leona',
+    position: 'center 38%',
+    panClass: 'pan-southwest',
   },
 ];
 
