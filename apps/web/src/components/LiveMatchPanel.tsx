@@ -185,7 +185,7 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
           <RadioTower className="search-mark" size={22} />
           <input
             value={riotId}
-            placeholder="Riot ID, e.g. TWITCH ELOSANTA#1111"
+            placeholder="Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111"
             onChange={(event) => {
               setRiotId(event.target.value);
               setValidationError('');

@@ -101,7 +101,8 @@ describe('App', () => {
     );
 
     expect(screen.getByText('WinRift')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Search champions or summoners')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Build Explorer')).not.toBeInTheDocument());
     expect(screen.queryByText('Contextual Patterns')).not.toBeInTheDocument();
     expect(screen.queryByText(/buy this/i)).not.toBeInTheDocument();
@@ -131,7 +132,7 @@ describe('App', () => {
     queryClient.clear();
   });
 
-  it('routes champion names from the shared search to champion pages', async () => {
+  it('routes champion names from the homepage search to champion pages', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -145,11 +146,11 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Search champions or summoners'), {
+    await waitFor(() => expect(screen.getByTitle('Wukong')).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'wukong' },
     });
-    await screen.findByText('Champion: Wukong');
-    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+    fireEvent.click(screen.getByLabelText('Find live game'));
 
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(window.location.pathname).toBe('/champions/MonkeyKing');
@@ -172,7 +173,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Test Summoner#NA1' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -195,7 +196,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Test Summoner' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -228,7 +229,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'sneaky' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -263,7 +264,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Sne' },
     });
 
@@ -348,7 +349,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Ranked Blue#NA1' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -390,7 +391,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Logo Blue#NA1' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -467,7 +468,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue Top#NA1' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -542,7 +543,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue Mid#NA1' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));
@@ -639,7 +640,7 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue 1#NA1' },
     });
     fireEvent.click(screen.getByLabelText('Find live game'));

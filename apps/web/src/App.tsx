@@ -1,18 +1,12 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
 import { getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
-import type { Champion, ChampionData } from './api/types';
 import { BuildGuidePage } from './components/BuildGuidePage';
 import { LiveMatchPanel } from './components/LiveMatchPanel';
 import { SummonerProfilePage } from './components/SummonerProfilePage';
 import {
   championIdFromRoute,
   championRouteSlug,
-  findChampionByLookup,
-  parseRiotId,
-  platformLabel,
-  platforms,
   summonerPath,
 } from './lib/lookup';
 
@@ -53,19 +47,6 @@ export function App() {
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
 
-  const runUniversalSearch = useCallback((value: string, platform: string, championMatch?: Champion) => {
-    const parsed = parseRiotId(value);
-    if (!parsed.gameName) {
-      return;
-    }
-    const champion = championMatch ?? (!parsed.tagLine ? findChampionByLookup(champions.data, parsed.gameName) : undefined);
-    if (champion) {
-      navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
-      return;
-    }
-    navigate({ kind: 'summoner', platform, gameName: parsed.gameName, tagLine: parsed.tagLine || undefined });
-  }, [champions.data, navigate]);
-
   return (
     <main className={route.kind === 'champion' ? 'app-shell guide-mode' : 'app-shell'}>
       <header className="topbar">
@@ -76,7 +57,6 @@ export function App() {
             </button>
           </h1>
         </div>
-        <UniversalSearch champions={champions.data} onSubmit={runUniversalSearch} />
         <nav className="topbar-nav" aria-label="Primary">
           <button className={activeSection === 'home' ? 'selected' : ''} onClick={goHome} type="button">Home</button>
           <button
@@ -131,39 +111,6 @@ export function App() {
         />
       )}
     </main>
-  );
-}
-
-function UniversalSearch({ champions, onSubmit }: { champions?: ChampionData; onSubmit: (value: string, platform: string, championMatch?: Champion) => void }) {
-  const [value, setValue] = useState('');
-  const [platform, setPlatform] = useState('NA1');
-  const parsed = parseRiotId(value);
-  const championMatch = !parsed.tagLine ? findChampionByLookup(champions, parsed.gameName) : undefined;
-  const intentLabel = championMatch ? `Champion: ${championMatch.name}` : parsed.gameName ? 'Summoner profile' : 'Champion or Riot ID';
-
-  return (
-    <form
-      className="topbar-search"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit(value, platform, championMatch);
-      }}
-    >
-      <Search aria-hidden="true" size={16} />
-      <input
-        aria-label="Search champions or summoners"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        placeholder="Champion or Riot ID"
-      />
-      <span className="topbar-search-intent">{intentLabel}</span>
-      <select aria-label="Default region" value={platform} onChange={(event) => setPlatform(event.target.value)}>
-        {platforms.map((candidate) => (
-          <option key={candidate.value} value={candidate.value}>{platformLabel(candidate.value)}</option>
-        ))}
-      </select>
-      <button type="submit">Go</button>
-    </form>
   );
 }
 
