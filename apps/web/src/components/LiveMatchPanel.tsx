@@ -1,7 +1,8 @@
 import { CircleAlert, LoaderCircle, RadioTower, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { resolveAccountAlias, searchAccountAliases } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
+import { championList } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
 
 const platforms = [
@@ -18,24 +19,47 @@ const platforms = [
   { value: 'OC1', label: 'OCE', color: 'steelblue' },
 ] as const;
 
-const homeSplashSlides = [
+type HomeSplashSlide = {
+  src: string;
+  title: string;
+  position: string;
+  panClass: string;
+};
+
+const fallbackHomeSplashSlides: HomeSplashSlide[] = [
   {
     src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg',
-    position: 'center 24%',
+    title: 'Jinx',
+    position: 'center 36%',
+    panClass: 'pan-east',
   },
   {
     src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_0.jpg',
-    position: 'center 20%',
+    title: 'Lux',
+    position: 'center 34%',
+    panClass: 'pan-west',
   },
   {
     src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg',
-    position: 'center 28%',
+    title: 'Ahri',
+    position: 'center 38%',
+    panClass: 'pan-rise',
   },
   {
     src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg',
-    position: 'center 18%',
+    title: 'Yasuo',
+    position: 'center 34%',
+    panClass: 'pan-fall',
   },
-] as const;
+];
+
+type HomeSlideState = {
+  deck: HomeSplashSlide[];
+  active: HomeSplashSlide;
+  previous?: HomeSplashSlide;
+  nextIndex: number;
+  cycle: number;
+};
 
 type Props = {
   champions?: ChampionData;
@@ -142,13 +166,7 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
   return (
     <section className={showLiveGame ? 'live-panel has-game' : 'live-panel search-only'}>
       {!showLiveGame ? (
-        <div className="home-art-stage" aria-hidden="true">
-          {homeSplashSlides.map((slide) => (
-            <div className="home-art-slide" key={slide.src}>
-              <img src={slide.src} alt="" style={{ objectPosition: slide.position }} />
-            </div>
-          ))}
-        </div>
+        <HomeArtStage champions={champions} />
       ) : null}
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
@@ -243,6 +261,121 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
       )}
     </section>
   );
+}
+
+function HomeArtStage({ champions }: { champions?: ChampionData }) {
+  const slidePool = useMemo(() => buildHomeSplashPool(champions), [champions]);
+  const [slideState, setSlideState] = useState(() => initialHomeSlideState(fallbackHomeSplashSlides));
+
+  useEffect(() => {
+    setSlideState(initialHomeSlideState(slidePool));
+  }, [slidePool]);
+
+  useEffect(() => {
+    if (slidePool.length <= 1) {
+      return undefined;
+    }
+    const interval = window.setInterval(() => {
+      setSlideState((current) => nextHomeSlideState(current, slidePool));
+    }, 10500);
+    return () => window.clearInterval(interval);
+  }, [slidePool]);
+
+  return (
+    <div className="home-art-stage" aria-hidden="true">
+      {slideState.previous ? (
+        <HomeArtSlide
+          key={`previous-${slideState.cycle}-${slideState.previous.src}`}
+          slide={slideState.previous}
+          state="exiting"
+        />
+      ) : null}
+      <HomeArtSlide
+        key={`active-${slideState.cycle}-${slideState.active.src}`}
+        slide={slideState.active}
+        state="active"
+      />
+    </div>
+  );
+}
+
+function HomeArtSlide({ slide, state }: { slide: HomeSplashSlide; state: 'active' | 'exiting' }) {
+  return (
+    <div className={`home-art-slide ${state} ${slide.panClass}`}>
+      <img src={slide.src} alt="" title={slide.title} style={{ objectPosition: slide.position }} />
+    </div>
+  );
+}
+
+function buildHomeSplashPool(champions?: ChampionData): HomeSplashSlide[] {
+  const championsByName = championList(champions);
+  if (!championsByName.length) {
+    return fallbackHomeSplashSlides;
+  }
+  return championsByName.map((champion, index) => ({
+    src: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg`,
+    title: champion.name,
+    position: homeSplashPosition(champion.id),
+    panClass: homeSplashPan(champion.id, index),
+  }));
+}
+
+function initialHomeSlideState(slides: HomeSplashSlide[]): HomeSlideState {
+  const deck = shuffleHomeSlides(slides);
+  return {
+    deck,
+    active: deck[0] ?? fallbackHomeSplashSlides[0],
+    nextIndex: deck.length > 1 ? 1 : 0,
+    cycle: 0,
+  };
+}
+
+function nextHomeSlideState(current: HomeSlideState, slidePool: HomeSplashSlide[]): HomeSlideState {
+  let deck = current.deck;
+  let nextIndex = current.nextIndex;
+  if (nextIndex >= deck.length) {
+    deck = shuffleHomeSlides(slidePool, current.active.src);
+    nextIndex = 0;
+  }
+  const active = deck[nextIndex] ?? current.active;
+  return {
+    deck,
+    active,
+    previous: current.active,
+    nextIndex: nextIndex + 1,
+    cycle: current.cycle + 1,
+  };
+}
+
+function shuffleHomeSlides(slides: HomeSplashSlide[], avoidFirstSrc?: string): HomeSplashSlide[] {
+  const shuffled = [...slides];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  if (avoidFirstSrc && shuffled.length > 1 && shuffled[0]?.src === avoidFirstSrc) {
+    const swapIndex = 1 + Math.floor(Math.random() * (shuffled.length - 1));
+    [shuffled[0], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[0]];
+  }
+  return shuffled;
+}
+
+function homeSplashPosition(championId: string) {
+  const positions = ['center 34%', 'center 38%', 'center 42%', '44% 38%', '56% 38%', '50% 46%'];
+  return positions[hashText(championId) % positions.length];
+}
+
+function homeSplashPan(championId: string, index: number) {
+  const pans = ['pan-east', 'pan-west', 'pan-rise', 'pan-fall', 'pan-northeast', 'pan-southwest'];
+  return pans[(hashText(championId) + index) % pans.length];
+}
+
+function hashText(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }
 
 function lookupErrorMessage(riotId: string, message: string) {
