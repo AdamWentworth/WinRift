@@ -165,3 +165,62 @@ Recent refinements:
 - Build cards use a labeled fallback ladder so sparse exact matchups can still show champion-wide context without hiding the source.
 - Live lookup loading and miss states are presented as status plates instead of loose text.
 - Win-condition match reads surface the selected `Your condition vs Enemy condition` pairing, evidence strength, game count, and likely winrate range near the headline.
+
+## Static Art And Deployment Notes
+
+The home background slideshow uses Riot/Data Dragon art through URL references, not checked-in image files.
+
+Current flow:
+
+- The API serves `GET /api/static/champion-splashes`.
+- That endpoint reads Data Dragon champion metadata, expands champions into base-skin plus skin splash URLs, filters chroma/variant rows that do not have standalone splash files, and caches the resulting manifest in API memory.
+- The web app randomizes across that manifest and the browser loads the selected image directly from Data Dragon's CDN.
+- The repo stores only code and URL-generating logic. It does not store Riot artwork.
+
+This is the right default for development and early self-hosted deployment because it avoids thousands of large binary files in git and avoids local disk growth.
+
+Deployment options later:
+
+- Keep CDN mode as default. This is simplest and should be good enough while the app is online-only.
+- Add an optional external asset cache outside git if CDN latency or availability becomes a problem, for example `/srv/winrift/assets/ddragon/splash/Aatrox_7.jpg` on the server or NAS-backed storage.
+- If self-hosting assets, keep them in a mounted volume, not in the repository. A future asset sync command could read `/api/static/champion-splashes`, download missing images, and rewrite served URLs to local static paths.
+- Do not commit Riot splash art to git. It bloats the repo and creates unnecessary licensing/distribution risk.
+
+## Live Match Mode Rail
+
+A side mode rail is a strong direction for the live match page. The screen is starting to contain several valuable but competing ideas: matchup item paths, team win-condition analysis, player rank/champion comfort, and eventually recent history. Showing everything at once will keep making the live page taller, denser, and harder to read.
+
+Recommended model:
+
+- Keep the match header, lane labels, and the two teams' champion cards always visible.
+- Add a narrow vertical mode rail on the left side of the live board on desktop.
+- On mobile, turn the same modes into a compact segmented control above the lane tabs.
+- Swap the analytics layer based on mode instead of stacking all analytics at once.
+
+Initial modes:
+
+- Build Matchups: show blue build row, champion rows, and red build row. This is the item-path matchup view.
+- Win Conditions: show champion rows with the win-condition analysis band between teams. Hide the item build rows to reduce noise.
+- Player Form later: show ranked/champion comfort, recent games, off-role/specialist flags, and live backfill status.
+
+Why this is good:
+
+- It reduces clutter without deleting any of the work.
+- It lets each analytic surface breathe visually.
+- It gives the app a clearer mental model: same live match, different analytical lenses.
+- It gives us room to add future modes without turning the page into one giant spreadsheet.
+
+Implementation notes:
+
+- Add `liveMode` state in `LiveMatchups`, probably `'builds' | 'winConditions' | 'players'`.
+- Gate item-slot `useQueries` so they only run in Build Matchups mode. This avoids frontend and API work for hidden build panels.
+- Gate win-condition query so it only runs in Win Conditions mode, unless we later want to prefetch after idle.
+- Keep the current champion card drag/drop shared across all modes because role correction affects every mode.
+- Use icons plus short labels in the rail. Good icon choices from lucide: sword/build, network/strategy, user/player form.
+- Default mode can be Build Matchups because that is the primary MVP product promise right now.
+
+Open UX questions:
+
+- Whether the rail belongs on the left or right. Left is discoverable; right may stay out of the way of the WinRift logo/search header.
+- Whether to show a small mode description under the match header. Useful early, but maybe unnecessary once the UI is obvious.
+- Whether Win Conditions should become the default when build sample sizes are very thin. Probably not yet; better to keep defaults predictable.
