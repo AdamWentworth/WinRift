@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getChampionRoleRates, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getChampionRoleRates, getItemSlotsBatch, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 vi.mock('./api/client', () => ({
@@ -26,10 +26,12 @@ describe('App', () => {
     cleanup();
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
+    vi.mocked(getItemSlotsBatch).mockReset();
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
+    vi.mocked(getItemSlotsBatch).mockResolvedValue({ results: [] });
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
     vi.mocked(resolveAccountAlias).mockResolvedValue({ status: 'not_found' });
     vi.mocked(searchAccountAliases).mockResolvedValue({ matches: [] });
@@ -376,6 +378,87 @@ describe('App', () => {
         'Red Support',
       ]);
     });
+    queryClient.clear();
+  });
+
+  it('focuses build mode on the searched player after role sorting', async () => {
+    vi.mocked(getChampionRoleRates).mockResolvedValueOnce({
+      results: [
+        { championId: 1, role: 'TOP', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 2, role: 'JUNGLE', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 3, role: 'MIDDLE', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 4, role: 'BOTTOM', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 5, role: 'UTILITY', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 11, role: 'TOP', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 12, role: 'JUNGLE', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 13, role: 'MIDDLE', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 14, role: 'BOTTOM', games: 100, totalGames: 100, pickRate: 100 },
+        { championId: 15, role: 'UTILITY', games: 100, totalGames: 100, pickRate: 100 },
+      ],
+    });
+    vi.mocked(getLiveGame).mockResolvedValueOnce({
+      platform: 'NA1',
+      puuid: 'blue-mid',
+      gameId: 322,
+      mapId: 11,
+      gameMode: 'CLASSIC',
+      gameType: 'MATCHED_GAME',
+      gameQueueConfigId: 420,
+      gameStartTime: Date.now(),
+      participants: [
+        { teamId: 100, championId: 4, spell1Id: 4, spell2Id: 7, puuid: 'blue-bot', summonerName: 'Blue Bot', perks: {}, bot: false },
+        { teamId: 100, championId: 5, spell1Id: 4, spell2Id: 14, puuid: 'blue-support', summonerName: 'Blue Support', perks: {}, bot: false },
+        { teamId: 100, championId: 3, spell1Id: 4, spell2Id: 12, puuid: 'blue-mid', summonerName: 'Blue Mid', perks: {}, bot: false },
+        { teamId: 100, championId: 1, spell1Id: 4, spell2Id: 12, puuid: 'blue-top', summonerName: 'Blue Top', perks: {}, bot: false },
+        { teamId: 100, championId: 2, spell1Id: 11, spell2Id: 4, puuid: 'blue-jungle', summonerName: 'Blue Jungle', perks: {}, bot: false },
+        { teamId: 200, championId: 14, spell1Id: 4, spell2Id: 7, puuid: 'red-bot', summonerName: 'Red Bot', perks: {}, bot: false },
+        { teamId: 200, championId: 15, spell1Id: 4, spell2Id: 14, puuid: 'red-support', summonerName: 'Red Support', perks: {}, bot: false },
+        { teamId: 200, championId: 13, spell1Id: 4, spell2Id: 12, puuid: 'red-mid', summonerName: 'Red Mid', perks: {}, bot: false },
+        { teamId: 200, championId: 11, spell1Id: 4, spell2Id: 12, puuid: 'red-top', summonerName: 'Red Top', perks: {}, bot: false },
+        { teamId: 200, championId: 12, spell1Id: 11, spell2Id: 4, puuid: 'red-jungle', summonerName: 'Red Jungle', perks: {}, bot: false },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Riot ID, e.g. TWITCH ELOSANTA#1111'), {
+      target: { value: 'Blue Mid#NA1' },
+    });
+    fireEvent.click(screen.getByLabelText('Find live game'));
+
+    await waitFor(() => {
+      expect([...container.querySelectorAll('.blue-row .summoner-name')].map((node) => node.textContent)).toEqual([
+        'Blue Top',
+        'Blue Jungle',
+        'Blue Mid',
+        'Blue Bot',
+        'Blue Support',
+      ]);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Builds mode' }));
+
+    await waitFor(() => expect(getItemSlotsBatch).toHaveBeenCalledWith([
+      expect.objectContaining({
+        key: 'focused',
+        championId: 3,
+        opponentChampionId: 13,
+        minGames: 1,
+        limit: 6,
+        fallback: false,
+      }),
+    ]));
+    expect(screen.getAllByText('Blue Mid').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Red Mid').length).toBeGreaterThan(0);
     queryClient.clear();
   });
 

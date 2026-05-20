@@ -79,10 +79,10 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
   const yourSide = livePlayerSide(liveGame);
-  const searchedParticipant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
+  const searchedParticipant = liveGame.participants.find((candidate) => idsMatch(candidate.puuid, liveGame.puuid));
   const focusedBuildBase = useMemo(
-    () => focusedBuildSelection(yourSide, searchedParticipant, blueTeam, redTeam),
-    [blueTeam, redTeam, searchedParticipant, yourSide],
+    () => focusedBuildSelection(searchedParticipant, blueTeam, redTeam),
+    [blueTeam, redTeam, searchedParticipant],
   );
   const focusedBuild = useMemo(() => {
     if (!focusedBuildBase) return undefined;
@@ -1168,17 +1168,15 @@ function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, r
   };
 }
 
-function focusedBuildSelection(yourSide: TeamSide, searchedParticipant: LiveParticipant | undefined, blueTeam: LiveParticipant[], redTeam: LiveParticipant[]): FocusedBuildSelection | undefined {
+function focusedBuildSelection(searchedParticipant: LiveParticipant | undefined, blueTeam: LiveParticipant[], redTeam: LiveParticipant[]): FocusedBuildSelection | undefined {
+  if (!searchedParticipant) return undefined;
   const searchedSide: TeamSide | undefined = searchedParticipant?.teamId === 200 ? 'red' : searchedParticipant?.teamId === 100 ? 'blue' : undefined;
-  const side = searchedSide ?? yourSide;
+  if (!searchedSide) return undefined;
+  const side = searchedSide;
   const team = side === 'blue' ? blueTeam : redTeam;
   const opponentTeam = side === 'blue' ? redTeam : blueTeam;
   if (!team.length || !opponentTeam.length) return undefined;
-  const participantIndex = Math.max(0, team.findIndex((participant) => (
-    searchedParticipant
-      ? participant.puuid === searchedParticipant.puuid || participant.summonerId === searchedParticipant.summonerId
-      : false
-  )));
+  const participantIndex = Math.max(0, team.findIndex((participant) => sameParticipantIdentity(participant, searchedParticipant)));
   const participant = team[participantIndex] ?? team[0];
   const opponent = opponentTeam[participantIndex] ?? opponentTeam[0];
   return {
@@ -1529,8 +1527,18 @@ function planPairRead(metric: WinConditionMetric) {
 }
 
 function livePlayerSide(liveGame: LiveGame): TeamSide {
-  const participant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
+  const participant = liveGame.participants.find((candidate) => idsMatch(candidate.puuid, liveGame.puuid));
   return participant?.teamId === 200 ? 'red' : 'blue';
+}
+
+function sameParticipantIdentity(participant: LiveParticipant, target: LiveParticipant) {
+  return idsMatch(participant.puuid, target.puuid) || idsMatch(participant.summonerId, target.summonerId);
+}
+
+function idsMatch(left?: string, right?: string) {
+  const normalizedLeft = left?.trim();
+  const normalizedRight = right?.trim();
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
 }
 
 function participantKey(participant: LiveParticipant, index: number) {
