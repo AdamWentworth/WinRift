@@ -8,7 +8,7 @@ The collection system is fundamentally sound, but naturally constrained by Riot 
 - ClickHouse is a good storage fit. The timeline and raw JSON data compress well, and append-first tables match the workload.
 - The worker/frontier model is the right base shape. It can start from seed PUUIDs, collect recent ranked matches, discover participants, and keep expanding.
 - Riot rate limits are respected through regional request budgets, request spacing, 429 handling, and bounded retries.
-- Expired API key behavior is safe. A 401/403 writes the auth-failure marker and stops worker/API activity instead of retrying forever.
+- Expired API key behavior is safe. A 401/403 writes the auth-failure marker and stops worker activity instead of retrying forever, while the API remains up for cached/static/analytics responses.
 - Patch retention is explicit: current plus previous patch for raw/normalized collection, with closed-patch metrics retained separately.
 - Rank and account alias enrichment are separate lanes, which keeps metadata useful without turning every match insert into a burst of extra API calls.
 

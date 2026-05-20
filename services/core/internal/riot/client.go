@@ -255,6 +255,9 @@ func (c *Client) getBytesWithRetries(ctx context.Context, route, path string, pa
 		c.markAuthFailure(route, path, http.StatusServiceUnavailable)
 		return nil, APIError{StatusCode: http.StatusServiceUnavailable, Message: "RIOT_API_KEY is not configured"}
 	}
+	if authFailureMarkerExists(c.authMarker) {
+		return nil, APIError{StatusCode: http.StatusServiceUnavailable, Message: "Riot API key is unavailable; refresh the key and recreate the API/worker containers"}
+	}
 	if err := c.waitForTurn(ctx); err != nil {
 		return nil, err
 	}
@@ -308,6 +311,10 @@ func ClearAuthFailureMarker(cfg config.Config) {
 	}
 }
 
+func AuthFailureMarkerExists(cfg config.Config) bool {
+	return authFailureMarkerExists(cfg.RiotAuthFailureMarkerPath)
+}
+
 func StartAuthFailureMonitor(cfg config.Config, component string) {
 	if !cfg.RiotAuthFailureExit {
 		return
@@ -344,6 +351,15 @@ func (c *Client) markAuthFailure(route, apiPath string, status int) {
 		return
 	}
 	log.Printf("riot auth failure marker written path=%s status=%d route=%s path=%s", marker, status, route, safeLogPath(apiPath))
+}
+
+func authFailureMarkerExists(marker string) bool {
+	marker = strings.TrimSpace(marker)
+	if marker == "" {
+		return false
+	}
+	_, err := os.Stat(marker)
+	return err == nil
 }
 
 func retryAfter(value string) time.Duration {

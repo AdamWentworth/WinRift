@@ -91,6 +91,9 @@ func TestAuthFailureMarker(t *testing.T) {
 	if !strings.Contains(string(body), "status=403") {
 		t.Fatalf("marker body = %q, want status", body)
 	}
+	if !AuthFailureMarkerExists(config.Config{RiotAuthFailureMarkerPath: marker}) {
+		t.Fatal("expected auth failure marker to exist")
+	}
 
 	ClearAuthFailureMarker(config.Config{RiotAuthFailureMarkerPath: marker})
 	if _, err := os.Stat(marker); !errors.Is(err, os.ErrNotExist) {

@@ -1,0 +1,37 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"winrift/services/core/internal/riot"
+)
+
+func TestWriteRiotErrorMapsAuthFailureToUnavailable(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	writeRiotError(recorder, riot.APIError{StatusCode: http.StatusForbidden, Message: "forbidden"})
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["code"] != "RIOT_API_KEY_UNAVAILABLE" {
+		t.Fatalf("code = %q, want RIOT_API_KEY_UNAVAILABLE", body["code"])
+	}
+}
+
+func TestWriteRiotErrorKeepsRateLimitStatus(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	writeRiotError(recorder, riot.APIError{StatusCode: http.StatusTooManyRequests, Message: "Riot API rate limited"})
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
+	}
+}

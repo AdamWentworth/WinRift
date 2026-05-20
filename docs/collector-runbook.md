@@ -143,7 +143,9 @@ COLLECTOR_AUTO_SEED_CHALLENGER=true
 
 Keep match counts low on a development key. The client honors Riot 429 `Retry-After` with bounded retries, but large crawl seeds can still consume a daily development-key window quickly.
 
-If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MARKER_PATH`. The worker exits immediately, and the API watches the same marker and exits too. This prevents an expired or unauthorized development key from being retried every collector interval. The frontier row is marked `blocked` when the failure happens during a collection pass.
+If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MARKER_PATH`. The worker exits immediately. The API stays online, but Riot-dependent endpoints return `503 RIOT_API_KEY_UNAVAILABLE` and the Riot client short-circuits additional Riot calls while the marker exists. Cached analytics, static metadata, and health checks remain available. This prevents an expired or unauthorized development key from being retried every collector interval without making the whole app look dead. The frontier row is marked `blocked` when the failure happens during a collection pass.
+
+Riot 404s are different: they mean the requested resource is absent, such as an unknown Riot ID or a player not currently being in a live game. They do not write the auth-failure marker.
 
 If Riot returns 429, the client sleeps for `Retry-After` and retries up to `RIOT_RATE_LIMIT_MAX_RETRIES`. If Riot asks for a longer wait than `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`, the collector defers that region for the rest of the pass and resumes on the next cycle.
 
@@ -154,8 +156,8 @@ Safety knobs:
 - `RIOT_MIN_REQUEST_INTERVAL_MS`: process-local spacing between Riot requests. `75`ms stays under the `20 requests / 1 second` bucket.
 - `RIOT_RATE_LIMIT_MAX_RETRIES`: max immediate sleeps/retries for Riot 429 responses.
 - `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`: longest 429 `Retry-After` sleep before deferring the region to the next collector cycle.
-- `RIOT_AUTH_FAILURE_EXIT`: when true, the API and worker stop when a Riot auth failure marker appears.
-- `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate an auth-failure stop.
+- `RIOT_AUTH_FAILURE_EXIT`: when true, the worker stops when a Riot auth failure marker appears. The API does not exit; it reports Riot-backed endpoints as unavailable.
+- `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate auth-failure behavior.
 - `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
 - `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.10`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch.
 - `COLLECTOR_PATCH_RETENTION_COUNT`: number of same-season patch buckets to keep eligible for ingestion. With `COLLECTOR_CURRENT_PATCH=16.10` and `COLLECTOR_PATCH_RETENTION_COUNT=2`, the collector accepts `16.10` and `16.9`, then stops the current PUUID as soon as it sees `16.8` or older. When Riot moves to `16.11`, bump `COLLECTOR_CURRENT_PATCH` to `16.11` so the active window becomes `16.11` and `16.10`.

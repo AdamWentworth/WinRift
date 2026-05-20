@@ -54,6 +54,7 @@ The public UI only shows aggregate contextual stats. It must not present hidden 
 The core service:
 
 - Sends `X-Riot-Token` from environment.
-- Stops on 401/403.
+- Treats 401 and 403 as Riot API key auth failures. The worker stops hard; the API stays up and returns `503 RIOT_API_KEY_UNAVAILABLE` for Riot-dependent endpoints while cached/static/analytics endpoints remain available.
+- Treats 404 as ordinary absence, such as an unknown Riot ID or a player not currently being in a live game.
 - Honors 429 `Retry-After` once before failing.
 - Does not log the API key.

@@ -58,7 +58,11 @@ func (s Server) Routes() http.Handler {
 }
 
 func (s Server) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	riotStatus := "ok"
+	if riot.AuthFailureMarkerExists(s.cfg) {
+		riotStatus = "auth_failed"
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "riotApi": riotStatus})
 }
 
 func (s Server) resolveAccount(w http.ResponseWriter, r *http.Request) {
@@ -851,6 +855,13 @@ func (s Server) cors(next http.Handler) http.Handler {
 }
 
 func writeRiotError(w http.ResponseWriter, err error) {
+	if riot.IsAuthFailure(err) {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"code":   "RIOT_API_KEY_UNAVAILABLE",
+			"detail": "Riot API key is unavailable. Refresh the key and recreate the API/worker containers.",
+		})
+		return
+	}
 	var apiErr riot.APIError
 	if errors.As(err, &apiErr) {
 		writeError(w, apiErr.StatusCode, apiErr.Message)
