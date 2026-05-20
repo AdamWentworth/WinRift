@@ -192,16 +192,17 @@ A side mode rail is a strong direction for the live match page. The screen is st
 
 Recommended model:
 
-- Keep the match header, lane labels, and the two teams' champion cards always visible.
+- Keep the match header visible in all modes.
 - Add a narrow vertical mode rail on the left side of the live board on desktop.
 - On mobile, turn the same modes into a compact segmented control above the lane tabs.
 - Swap the analytics layer based on mode instead of stacking all analytics at once.
 
-Initial modes:
+Current modes:
 
-- Build Matchups: show blue build row, champion rows, and red build row. This is the item-path matchup view.
-- Win Conditions: show champion rows with the win-condition analysis band between teams. Hide the item build rows to reduce noise.
-- Player Form later: show ranked/champion comfort, recent games, off-role/specialist flags, and live backfill status.
+- Match: default scout view with lane labels and the two teams' champion cards. No heavier analytics are loaded.
+- Builds: focused item-path matchup view for the searched player. The default opponent is the lane opponent, with a selector to inspect a different enemy champion.
+- Win Conditions: show champion rows with the win-condition analysis band between teams.
+- Player Form later: deeper recent games, off-role/specialist flags, and live backfill status if the card stats need more context.
 
 Why this is good:
 
@@ -212,12 +213,12 @@ Why this is good:
 
 Implementation notes:
 
-- Add `liveMode` state in `LiveMatchups`, probably `'builds' | 'winConditions' | 'players'`.
-- Gate item-slot `useQueries` so they only run in Build Matchups mode. This avoids frontend and API work for hidden build panels.
+- `liveMode` state in `LiveMatchups` is `'match' | 'builds' | 'winConditions'`.
+- Gate the focused item-slot query so it only runs in Builds mode. This avoids frontend and API work for hidden build panels.
 - Gate win-condition query so it only runs in Win Conditions mode, unless we later want to prefetch after idle.
 - Keep the current champion card drag/drop shared across all modes because role correction affects every mode.
 - Use icons plus short labels in the rail. Good icon choices from lucide: sword/build, network/strategy, user/player form.
-- Default mode can be Build Matchups because that is the primary MVP product promise right now.
+- Default mode is Match because the first live lookup should answer "who is in my game?" before opening an analytic lens.
 
 Open UX questions:
 

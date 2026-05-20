@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { GripVertical, Network, Swords } from 'lucide-react';
+import { GripVertical, Network, Swords, Users } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData, WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../api/types';
 import { getChampionRoleRates, getItemSlotsBatch, getWinConditionAnalysis } from '../api/client';
@@ -35,13 +35,8 @@ type Props = {
   runes?: RuneData;
 };
 
-type StatRequest = {
-  key: string;
-  filters: BuildFilters;
-};
-
 type TeamSide = 'blue' | 'red';
-type LiveMode = 'builds' | 'winConditions';
+type LiveMode = 'match' | 'builds' | 'winConditions';
 
 type DraggedCard = {
   side: TeamSide;
@@ -50,9 +45,17 @@ type DraggedCard = {
 
 type RoleRateMap = Map<number, Map<string, ChampionRoleRate>>;
 
+type FocusedBuildSelection = {
+  side: TeamSide;
+  role: string;
+  participant: LiveParticipant;
+  opponent: LiveParticipant;
+  opponentOptions: LiveParticipant[];
+};
+
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
   const [now, setNow] = useState(() => Date.now());
-  const [liveMode, setLiveMode] = useState<LiveMode>('builds');
+  const [liveMode, setLiveMode] = useState<LiveMode>('match');
   const liveChampionIds = useMemo(() => uniqueChampionIds(liveGame.participants), [liveGame.participants]);
   const patchBucket = useMemo(() => patchBucketFromVersion(champions?.version), [champions?.version]);
   const showBuildMode = liveMode === 'builds';
@@ -72,10 +75,26 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const [dragTarget, setDragTarget] = useState<DraggedCard | null>(null);
   const [manualOrder, setManualOrder] = useState(false);
   const [selectedLaneIndex, setSelectedLaneIndex] = useState(0);
+  const [selectedBuildOpponentKey, setSelectedBuildOpponentKey] = useState('');
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
   const yourSide = livePlayerSide(liveGame);
   const searchedParticipant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
+  const focusedBuildBase = useMemo(
+    () => focusedBuildSelection(yourSide, searchedParticipant, blueTeam, redTeam),
+    [blueTeam, redTeam, searchedParticipant, yourSide],
+  );
+  const focusedBuild = useMemo(() => {
+    if (!focusedBuildBase) return undefined;
+    const selectedOpponent = focusedBuildBase.opponentOptions.find((opponent, index) => participantKey(opponent, index) === selectedBuildOpponentKey);
+    return {
+      ...focusedBuildBase,
+      opponent: selectedOpponent ?? focusedBuildBase.opponent,
+    };
+  }, [focusedBuildBase, selectedBuildOpponentKey]);
+  const focusedBuildFilters = useMemo(() => (
+    focusedBuild ? buildFilters(focusedBuild.participant, focusedBuild.opponent, focusedBuild.role, patchBucket) : undefined
+  ), [focusedBuild, patchBucket]);
   const winConditionQuery = useQuery({
     queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, patchBucket, blueChampionIds, redChampionIds],
     queryFn: () => getWinConditionAnalysis({
@@ -94,6 +113,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     setDraggedCard(null);
     setDragTarget(null);
     setSelectedLaneIndex(0);
+    setSelectedBuildOpponentKey('');
   }, [liveGame.gameId]);
 
   useEffect(() => {
@@ -125,38 +145,14 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     red: redTeam[index],
   })).filter((pair) => pair.blue && pair.red), [blueTeam, redTeam]);
 
-  const statRequests = useMemo(() => {
-    if (!showBuildMode) return [];
-    const requests: StatRequest[] = [];
-    pairs.forEach((pair, index) => {
-      if (!pair.blue || !pair.red) return;
-      requests.push({
-        key: statKey(index, 'blue'),
-        filters: buildFilters(pair.blue, pair.red, pair.role, patchBucket),
-      });
-      requests.push({
-        key: statKey(index, 'red'),
-        filters: buildFilters(pair.red, pair.blue, pair.role, patchBucket),
-      });
-    });
-    return requests;
-  }, [pairs, patchBucket, showBuildMode]);
-
-  const itemSlotBatchQuery = useQuery({
-    queryKey: ['live-board-item-slots-batch', statRequests],
-    queryFn: () => getItemSlotsBatch(statRequests.map((request) => ({ key: request.key, ...request.filters }))),
-    enabled: showBuildMode && statRequests.length > 0,
+  const focusedItemSlotQuery = useQuery({
+    queryKey: ['live-focused-item-slots', focusedBuildFilters],
+    queryFn: () => getItemSlotsBatch([{ key: 'focused', ...focusedBuildFilters! }]),
+    enabled: showBuildMode && Boolean(focusedBuildFilters),
     staleTime: 30_000,
   });
 
-  const statsByKey = new Map<string, { loading: boolean; itemSlots: AnalyticsItemSlot[] }>();
-  const batchResultsByKey = new Map((itemSlotBatchQuery.data?.results ?? []).map((result) => [result.key, result.results]));
-  statRequests.forEach((request) => {
-    statsByKey.set(request.key, {
-      loading: itemSlotBatchQuery.isLoading,
-      itemSlots: batchResultsByKey.get(request.key) ?? [],
-    });
-  });
+  const focusedItemSlots = focusedItemSlotQuery.data?.results.find((result) => result.key === 'focused')?.results ?? [];
 
   return (
     <div className="game-board">
@@ -172,7 +168,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
       <div className="live-mode-layout">
         <LiveModeRail mode={liveMode} onChange={setLiveMode} />
         <div className="live-mode-content">
-          {manualOrder ? (
+          {manualOrder && liveMode !== 'builds' ? (
             <div className="board-actions">
               <button
                 type="button"
@@ -188,128 +184,98 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               </button>
             </div>
           ) : null}
-          <div className="cards-container">
-            <LaneTabs selectedIndex={selectedLaneIndex} onSelect={setSelectedLaneIndex} />
-            <LaneHeader />
-            {showBuildMode ? (
-              <div className="build-row blue-build-row">
-                {pairs.map((pair, index) => {
-                  if (!pair.blue || !pair.red) return null;
-                  return (
-                    <MatchupBuildCard
-                      key={`blue-build-${participantKey(pair.blue, index)}-${participantKey(pair.red, index)}`}
-                      role={pair.role}
-                      side="blue"
-                      participant={pair.blue}
-                      opponent={pair.red}
-                      champions={champions}
-                      items={items}
-                      itemSlots={statsByKey.get(statKey(index, 'blue'))?.itemSlots ?? []}
-                      loading={statsByKey.get(statKey(index, 'blue'))?.loading ?? false}
-                      mobileActive={index === selectedLaneIndex}
-                    />
-                  );
-                })}
+          {showBuildMode ? (
+            <FocusedBuildPanel
+              selection={focusedBuild}
+              champions={champions}
+              items={items}
+              itemSlots={focusedItemSlots}
+              loading={focusedItemSlotQuery.isLoading}
+              selectedOpponentKey={selectedBuildOpponentKey}
+              onSelectOpponent={setSelectedBuildOpponentKey}
+            />
+          ) : (
+            <div className="cards-container">
+              <LaneTabs selectedIndex={selectedLaneIndex} onSelect={setSelectedLaneIndex} />
+              <LaneHeader />
+              <div className="champion-row blue-row">
+                {blueTeam.map((participant, index) => (
+                  <LiveChampionCard
+                    key={participantKey(participant, index)}
+                    participant={participant}
+                    index={index}
+                    role={roles[index]}
+                    side="blue"
+                    champions={champions}
+                    spells={spells}
+                    runes={runes}
+                    dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
+                    dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
+                    onDragStart={() => setDraggedCard({ side: 'blue', index })}
+                    mobileActive={index === selectedLaneIndex}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragTarget({ side: 'blue', index });
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (draggedCard?.side === 'blue') {
+                        moveCardToIndex('blue', draggedCard.index, index);
+                      }
+                      setDraggedCard(null);
+                      setDragTarget(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedCard(null);
+                      setDragTarget(null);
+                    }}
+                  />
+                ))}
               </div>
-            ) : null}
-            <div className="champion-row blue-row">
-              {blueTeam.map((participant, index) => (
-                <LiveChampionCard
-                  key={participantKey(participant, index)}
-                  participant={participant}
-                  index={index}
-                  role={roles[index]}
-                  side="blue"
-                  champions={champions}
-                  spells={spells}
-                  runes={runes}
-                  dragging={draggedCard?.side === 'blue' && draggedCard.index === index}
-                  dropTarget={dragTarget?.side === 'blue' && dragTarget.index === index}
-                  onDragStart={() => setDraggedCard({ side: 'blue', index })}
-                  mobileActive={index === selectedLaneIndex}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragTarget({ side: 'blue', index });
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (draggedCard?.side === 'blue') {
-                      moveCardToIndex('blue', draggedCard.index, index);
-                    }
-                    setDraggedCard(null);
-                    setDragTarget(null);
-                  }}
-                  onDragEnd={() => {
-                    setDraggedCard(null);
-                    setDragTarget(null);
-                  }}
+              {showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
+                <WinConditionPanel
+                  analysis={winConditionQuery.data}
+                  yourSide={yourSide}
+                  loading={winConditionQuery.isLoading}
+                  error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
                 />
-              ))}
-            </div>
-            {showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5 ? (
-              <WinConditionPanel
-                analysis={winConditionQuery.data}
-                yourSide={yourSide}
-                loading={winConditionQuery.isLoading}
-                error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
-              />
-            ) : null}
-            <div className="champion-row red-row">
-              {redTeam.map((participant, index) => (
-                <LiveChampionCard
-                  key={participantKey(participant, index)}
-                  participant={participant}
-                  index={index}
-                  role={roles[index]}
-                  side="red"
-                  champions={champions}
-                  spells={spells}
-                  runes={runes}
-                  dragging={draggedCard?.side === 'red' && draggedCard.index === index}
-                  dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
-                  onDragStart={() => setDraggedCard({ side: 'red', index })}
-                  mobileActive={index === selectedLaneIndex}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragTarget({ side: 'red', index });
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (draggedCard?.side === 'red') {
-                      moveCardToIndex('red', draggedCard.index, index);
-                    }
-                    setDraggedCard(null);
-                    setDragTarget(null);
-                  }}
-                  onDragEnd={() => {
-                    setDraggedCard(null);
-                    setDragTarget(null);
-                  }}
-                />
-              ))}
-            </div>
-            {showBuildMode ? (
-              <div className="build-row red-build-row">
-                {pairs.map((pair, index) => {
-                  if (!pair.blue || !pair.red) return null;
-                  return (
-                    <MatchupBuildCard
-                      key={`red-build-${participantKey(pair.red, index)}-${participantKey(pair.blue, index)}`}
-                      role={pair.role}
-                      side="red"
-                      participant={pair.red}
-                      opponent={pair.blue}
-                      champions={champions}
-                      items={items}
-                      itemSlots={statsByKey.get(statKey(index, 'red'))?.itemSlots ?? []}
-                      loading={statsByKey.get(statKey(index, 'red'))?.loading ?? false}
-                      mobileActive={index === selectedLaneIndex}
-                    />
-                  );
-                })}
+              ) : null}
+              <div className="champion-row red-row">
+                {redTeam.map((participant, index) => (
+                  <LiveChampionCard
+                    key={participantKey(participant, index)}
+                    participant={participant}
+                    index={index}
+                    role={roles[index]}
+                    side="red"
+                    champions={champions}
+                    spells={spells}
+                    runes={runes}
+                    dragging={draggedCard?.side === 'red' && draggedCard.index === index}
+                    dropTarget={dragTarget?.side === 'red' && dragTarget.index === index}
+                    onDragStart={() => setDraggedCard({ side: 'red', index })}
+                    mobileActive={index === selectedLaneIndex}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragTarget({ side: 'red', index });
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (draggedCard?.side === 'red') {
+                        moveCardToIndex('red', draggedCard.index, index);
+                      }
+                      setDraggedCard(null);
+                      setDragTarget(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedCard(null);
+                      setDragTarget(null);
+                    }}
+                  />
+                ))}
               </div>
-            ) : null}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -324,10 +290,17 @@ const liveModeOptions: Array<{
   icon: typeof Swords;
 }> = [
   {
+    id: 'match',
+    label: 'Match',
+    kicker: 'Scout',
+    description: 'Player cards and live match context',
+    icon: Users,
+  },
+  {
     id: 'builds',
     label: 'Builds',
-    kicker: 'Matchups',
-    description: 'Item path matchup stats',
+    kicker: 'Focused',
+    description: 'Focused item path matchup stats',
     icon: Swords,
   },
   {
@@ -859,6 +832,93 @@ function WinConditionEnemyCard({
   );
 }
 
+function FocusedBuildPanel({
+  selection,
+  champions,
+  items,
+  itemSlots,
+  loading,
+  selectedOpponentKey,
+  onSelectOpponent,
+}: {
+  selection?: FocusedBuildSelection;
+  champions?: ChampionData;
+  items?: ItemData;
+  itemSlots: AnalyticsItemSlot[];
+  loading: boolean;
+  selectedOpponentKey: string;
+  onSelectOpponent: (key: string) => void;
+}) {
+  if (!selection) {
+    return <section className="focused-build-panel build-empty-state">No live player found for build focus.</section>;
+  }
+  const champion = championByKey(champions, selection.participant.championId);
+  const opponentChampion = championByKey(champions, selection.opponent.championId);
+  const championUrl = championImageUrl(champions, selection.participant.championId);
+  const opponentUrl = championImageUrl(champions, selection.opponent.championId);
+  const playerName = participantDisplayName(selection.participant);
+  const opponentName = participantDisplayName(selection.opponent);
+  const totalSamples = highestSlotSample(itemSlots);
+  const sample = buildSampleQuality(totalSamples);
+  const scopeLabel = buildScopeLabel(itemSlots);
+  const defaultOpponentIndex = Math.max(0, selection.opponentOptions.indexOf(selection.opponent));
+  const activeOpponentKey = selectedOpponentKey || participantKey(selection.opponent, defaultOpponentIndex);
+
+  return (
+    <section className={`focused-build-panel ${selection.side}`} aria-label="Focused build matchup">
+      <div className="focused-build-header">
+        <div className="focused-build-player">
+          {championUrl ? <img src={championUrl} alt={champion?.name ?? 'Champion'} /> : null}
+          <span>
+            <small>{roleLabels[selection.role] ?? selection.role}</small>
+            <strong>{champion?.name ?? selection.participant.championId}</strong>
+            <em>{playerName}</em>
+          </span>
+        </div>
+        <div className="focused-build-versus">
+          <b>vs</b>
+        </div>
+        <div className="focused-build-player enemy">
+          {opponentUrl ? <img src={opponentUrl} alt={opponentChampion?.name ?? 'Opponent'} /> : null}
+          <span>
+            <small>Opponent</small>
+            <strong>{opponentChampion?.name ?? selection.opponent.championId}</strong>
+            <em>{opponentName}</em>
+          </span>
+        </div>
+      </div>
+      <div className="focused-build-meta">
+        <span className={`build-sample-chip ${sample.tone}`}>{sample.label}</span>
+        {scopeLabel ? <span className="build-scope-label">{scopeLabel}</span> : null}
+      </div>
+      <BuildSide side={selection.side} itemSlots={itemSlots} loading={loading} items={items} />
+      <div className="focused-opponent-picker">
+        <span>Change Opponent</span>
+        <div>
+          {selection.opponentOptions.map((opponent, index) => {
+            const key = participantKey(opponent, index);
+            const optionChampion = championByKey(champions, opponent.championId);
+            const optionUrl = championImageUrl(champions, opponent.championId);
+            return (
+              <button
+                className={key === activeOpponentKey ? 'selected' : ''}
+                key={key}
+                onClick={() => onSelectOpponent(key)}
+                type="button"
+                aria-label={`Build against ${optionChampion?.name ?? opponent.championId}`}
+              >
+                {optionUrl ? <img src={optionUrl} alt="" /> : null}
+                <strong>{optionChampion?.name ?? opponent.championId}</strong>
+                <em>{participantDisplayName(opponent)}</em>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LiveChampionCard({
   participant,
   index,
@@ -1018,46 +1078,6 @@ function StatChip({ label, value, primary, wide }: { label: string; value: strin
   );
 }
 
-function MatchupBuildCard({
-  role,
-  side,
-  participant,
-  opponent,
-  champions,
-  items,
-  itemSlots,
-  loading,
-  mobileActive,
-}: {
-  role: string;
-  side: TeamSide;
-  participant: LiveParticipant;
-  opponent: LiveParticipant;
-  champions?: ChampionData;
-  items?: ItemData;
-  itemSlots: AnalyticsItemSlot[];
-  loading: boolean;
-  mobileActive: boolean;
-}) {
-  const champion = championByKey(champions, participant.championId);
-  const opponentChampion = championByKey(champions, opponent.championId);
-  const totalSamples = highestSlotSample(itemSlots);
-  const sample = buildSampleQuality(totalSamples);
-  const scopeLabel = buildScopeLabel(itemSlots);
-
-  return (
-    <article className={`match-build-card ${side}${mobileActive ? ' mobile-active' : ' mobile-hidden'}`}>
-      <div className="build-heading">
-        <span>{roleLabels[role] ?? role}</span>
-        <strong>{champion?.name ?? participant.championId} vs {opponentChampion?.name ?? opponent.championId}</strong>
-        <em className={`build-sample-chip ${sample.tone}`}>{sample.label}</em>
-        {scopeLabel ? <small className="build-scope-label">{scopeLabel}</small> : null}
-      </div>
-      <BuildSide side={side} itemSlots={itemSlots} loading={loading} items={items} />
-    </article>
-  );
-}
-
 function BuildSide({
   side,
   itemSlots,
@@ -1148,10 +1168,36 @@ function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, r
   };
 }
 
+function focusedBuildSelection(yourSide: TeamSide, searchedParticipant: LiveParticipant | undefined, blueTeam: LiveParticipant[], redTeam: LiveParticipant[]): FocusedBuildSelection | undefined {
+  const searchedSide: TeamSide | undefined = searchedParticipant?.teamId === 200 ? 'red' : searchedParticipant?.teamId === 100 ? 'blue' : undefined;
+  const side = searchedSide ?? yourSide;
+  const team = side === 'blue' ? blueTeam : redTeam;
+  const opponentTeam = side === 'blue' ? redTeam : blueTeam;
+  if (!team.length || !opponentTeam.length) return undefined;
+  const participantIndex = Math.max(0, team.findIndex((participant) => (
+    searchedParticipant
+      ? participant.puuid === searchedParticipant.puuid || participant.summonerId === searchedParticipant.summonerId
+      : false
+  )));
+  const participant = team[participantIndex] ?? team[0];
+  const opponent = opponentTeam[participantIndex] ?? opponentTeam[0];
+  return {
+    side,
+    role: roles[participantIndex] ?? 'UNKNOWN',
+    participant,
+    opponent,
+    opponentOptions: opponentTeam,
+  };
+}
+
 function itemContextForParticipant(participant: LiveParticipant, role: string): BuildFilters['itemContext'] {
   if (hasSmite(participant)) return 'JUNGLE';
   if (role === 'UTILITY') return 'SUPPORT';
   return undefined;
+}
+
+function participantDisplayName(participant: LiveParticipant) {
+  return participant.riotId || participant.summonerName || 'Unknown player';
 }
 
 function comfortFlagsForParticipant(participant: LiveParticipant) {
@@ -1485,10 +1531,6 @@ function planPairRead(metric: WinConditionMetric) {
 function livePlayerSide(liveGame: LiveGame): TeamSide {
   const participant = liveGame.participants.find((candidate) => candidate.puuid && candidate.puuid === liveGame.puuid);
   return participant?.teamId === 200 ? 'red' : 'blue';
-}
-
-function statKey(index: number, side: 'blue' | 'red') {
-  return `${index}-${side}`;
 }
 
 function participantKey(participant: LiveParticipant, index: number) {

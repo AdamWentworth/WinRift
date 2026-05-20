@@ -2228,6 +2228,207 @@ button {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%), 0 0 7px 1px rgb(240 128 128 / 24%);
 }
 
+.focused-build-panel {
+  background:
+    radial-gradient(ellipse at 50% 0, rgb(255 255 255 / 7%), transparent 54%),
+    linear-gradient(180deg, rgb(31 36 38 / 96%), rgb(18 21 23 / 98%)),
+    #202020;
+  border: 1px solid rgb(255 255 255 / 12%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 7%),
+    0 14px 28px rgb(0 0 0 / 20%);
+  color: #f4f6f8;
+  display: grid;
+  gap: 10px;
+  margin: 0 auto;
+  max-width: 980px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.focused-build-panel.blue {
+  border-color: rgb(135 206 235 / 46%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%), 0 0 18px rgb(135 206 235 / 16%);
+}
+
+.focused-build-panel.red {
+  border-color: rgb(240 128 128 / 46%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%), 0 0 18px rgb(240 128 128 / 16%);
+}
+
+.focused-build-header {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.focused-build-player {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 2%)),
+    rgb(0 0 0 / 22%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 52px minmax(0, 1fr);
+  min-width: 0;
+  padding: 8px;
+}
+
+.focused-build-player.enemy {
+  text-align: right;
+}
+
+.focused-build-player img {
+  border: 1px solid rgb(255 255 255 / 18%);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 38%);
+  height: 52px;
+  object-fit: cover;
+  width: 52px;
+}
+
+.focused-build-player span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.focused-build-player small,
+.focused-build-player em,
+.focused-opponent-picker > span {
+  color: #9fb0b8;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.focused-build-player strong {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focused-build-player em {
+  color: #c9d3d8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.focused-build-versus {
+  align-items: center;
+  background: rgb(0 0 0 / 32%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #eef7f8;
+  display: flex;
+  font-size: 11px;
+  font-weight: 900;
+  height: 34px;
+  justify-content: center;
+  text-transform: uppercase;
+  width: 34px;
+}
+
+.focused-build-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.focused-build-panel .build-side {
+  min-height: 126px;
+  padding: 8px;
+}
+
+.focused-build-panel .item-slot-column {
+  gap: 5px;
+  grid-template-rows: 16px 38px auto;
+  padding: 7px 4px;
+}
+
+.focused-build-panel .item-slot-column img,
+.focused-build-panel .item-slot-column .item-pill,
+.focused-build-panel .item-slot-empty {
+  height: 38px;
+  width: 38px;
+}
+
+.focused-opponent-picker {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.focused-opponent-picker > span {
+  text-align: center;
+}
+
+.focused-opponent-picker > div {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.focused-opponent-picker button {
+  align-items: center;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #dce5ea;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-width: 0;
+  padding: 6px 4px;
+}
+
+.focused-opponent-picker button:hover,
+.focused-opponent-picker button:focus-visible,
+.focused-opponent-picker button.selected {
+  border-color: #64efe8;
+  box-shadow: inset 0 2px 0 #64efe8;
+  color: #fff;
+  outline: none;
+}
+
+.focused-opponent-picker img {
+  height: 28px;
+  object-fit: cover;
+  width: 28px;
+}
+
+.focused-opponent-picker strong,
+.focused-opponent-picker em {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focused-opponent-picker strong {
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.focused-opponent-picker em {
+  color: #9fb0b8;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .build-heading {
   display: grid;
   gap: 3px;
@@ -2465,7 +2666,7 @@ button {
   }
 
   .live-mode-rail {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin: 0 auto 8px;
     max-width: 1500px;
     position: static;
@@ -2502,6 +2703,10 @@ button {
 
   .match-header-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .focused-build-panel {
+    max-width: 1500px;
   }
 
   .win-condition-panel {
@@ -2599,6 +2804,25 @@ button {
 
   .live-mode-button em {
     display: none;
+  }
+
+  .focused-build-header {
+    grid-template-columns: 1fr;
+  }
+
+  .focused-build-versus {
+    height: 24px;
+    justify-self: center;
+    width: 42px;
+  }
+
+  .focused-build-player.enemy {
+    text-align: left;
+  }
+
+  .focused-build-panel .build-side,
+  .focused-opponent-picker > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .win-condition-panel {
