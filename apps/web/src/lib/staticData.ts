@@ -22,6 +22,11 @@ export function championSplashUrl(champions: ChampionData | undefined, championI
   return `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg`;
 }
 
+export function championAbilityImageUrl(champions: ChampionData | undefined, imageFull?: string, folder = 'spell') {
+  if (!champions || !imageFull) return '';
+  return `https://ddragon.leagueoflegends.com/cdn/${champions.version}/img/${folder}/${imageFull}`;
+}
+
 export function itemImageUrl(items: ItemData | undefined, itemId: string) {
   const item = items?.data.data[itemId];
   if (!item?.image || !items) return '';

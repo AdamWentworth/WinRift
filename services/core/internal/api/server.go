@@ -46,6 +46,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/account/aliases", s.accountAliases)
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
+	mux.HandleFunc("GET /api/analytics/champion-guide", s.analyticsChampionGuide)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
 	mux.HandleFunc("POST /api/analytics/item-slots/batch", s.analyticsItemSlotsBatch)
 	mux.HandleFunc("GET /api/analytics/champion-roles", s.analyticsChampionRoles)
@@ -225,6 +226,28 @@ func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
+func (s Server) analyticsChampionGuide(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	filters := map[string]string{
+		"champion_id": query.Get("championId"),
+		"role":        strings.ToUpper(query.Get("role")),
+		"patch":       query.Get("patch"),
+		"rank_bucket": strings.ToUpper(query.Get("rankBucket")),
+	}
+	if strings.TrimSpace(filters["champion_id"]) == "" {
+		writeError(w, http.StatusBadRequest, "championId is required")
+		return
+	}
+	minGames := queryInt(query.Get("minGames"), 5)
+	limit := queryInt(query.Get("limit"), 12)
+	guide, err := s.repo.QueryChampionGuide(r.Context(), filters, minGames, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, championGuideResponse(guide))
+}
+
 func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	request := itemSlotAnalyticsRequest{
@@ -338,6 +361,60 @@ func itemSlotRowsResponse(scopedRows []scopedItemSlotRow) []map[string]any {
 			"itemSlot": row.ItemSlot, "itemId": row.ItemID,
 			"wins": row.Wins, "games": row.Games, "winRate": round(row.WinRate * 100), "confidence": round(row.Confidence * 100),
 			"sampleScope": scoped.Scope.Key, "sampleScopeLabel": scoped.Scope.Label, "fallback": scoped.Scope.Fallback,
+		})
+	}
+	return results
+}
+
+func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
+	return map[string]any{
+		"summary":          championGuideSummaryResponse(guide.Summary),
+		"toughestMatchups": championGuideMatchupRowsResponse(guide.ToughestMatchups),
+		"bestMatchups":     championGuideMatchupRowsResponse(guide.BestMatchups),
+		"topRunes":         championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
+		"topSpells":        championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
+	}
+}
+
+func championGuideSummaryResponse(row clickhouse.ChampionGuideSummary) map[string]any {
+	return map[string]any{
+		"championId":    row.ChampionID,
+		"role":          row.Role,
+		"patchBucket":   row.PatchBucket,
+		"rankBucket":    row.RankBucket,
+		"wins":          row.Wins,
+		"games":         row.Games,
+		"winRate":       round(row.WinRate * 100),
+		"confidence":    round(row.Confidence * 100),
+		"pickRate":      round(row.PickRate * 100),
+		"roleRank":      row.RoleRank,
+		"roleRankTotal": row.RoleRankTotal,
+	}
+}
+
+func championGuideMatchupRowsResponse(rows []clickhouse.ChampionGuideMatchupRow) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"opponentChampionId": row.OpponentChampionID,
+			"wins":               row.Wins,
+			"games":              row.Games,
+			"winRate":            round(row.WinRate * 100),
+			"confidence":         round(row.Confidence * 100),
+		})
+	}
+	return results
+}
+
+func championGuideSignatureRowsResponse(rows []clickhouse.ChampionGuideSignatureRow, key string) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			key:          row.Signature,
+			"wins":       row.Wins,
+			"games":      row.Games,
+			"winRate":    round(row.WinRate * 100),
+			"confidence": round(row.Confidence * 100),
 		})
 	}
 	return results

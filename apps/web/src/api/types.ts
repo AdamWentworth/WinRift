@@ -9,7 +9,19 @@ export type Champion = {
   id: string;
   key: string;
   name: string;
+  title?: string;
   image: {
+    full: string;
+  };
+  passive?: ChampionAbility;
+  spells?: ChampionAbility[];
+};
+
+export type ChampionAbility = {
+  id: string;
+  name: string;
+  description?: string;
+  image?: {
     full: string;
   };
 };
@@ -132,6 +144,52 @@ export type AnalyticsItemSlotBatchResult = {
 
 export type AnalyticsItemSlotBatchResponse = {
   results: AnalyticsItemSlotBatchResult[];
+};
+
+export type ChampionGuideSummary = {
+  championId: number;
+  role: string;
+  patchBucket: string;
+  rankBucket: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+  pickRate: number;
+  roleRank: number;
+  roleRankTotal: number;
+};
+
+export type ChampionGuideMatchup = {
+  opponentChampionId: number;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+};
+
+export type ChampionGuideRune = {
+  runeSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+};
+
+export type ChampionGuideSpells = {
+  spellSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+};
+
+export type ChampionGuideResponse = {
+  summary: ChampionGuideSummary;
+  toughestMatchups: ChampionGuideMatchup[];
+  bestMatchups: ChampionGuideMatchup[];
+  topRunes: ChampionGuideRune[];
+  topSpells: ChampionGuideSpells[];
 };
 
 export type ChampionRoleRate = {

@@ -2,16 +2,43 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getChampionRoleRates, getItemSlotsBatch, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getChampionGuide, getChampionRoleRates, getItemSlotsBatch, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 vi.mock('./api/client', () => ({
   getBuilds: vi.fn(async () => ({ results: [] })),
+  getChampionGuide: vi.fn(async () => ({
+    summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+    toughestMatchups: [],
+    bestMatchups: [],
+    topRunes: [],
+    topSpells: [],
+  })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
   getItemSlotsBatch: vi.fn(async () => ({ results: [] })),
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
   getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
-  getChampions: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
+  getChampions: vi.fn(async () => ({
+    version: '16.10.1',
+    data: {
+      data: {
+        MonkeyKing: {
+          id: 'MonkeyKing',
+          key: '62',
+          name: 'Wukong',
+          title: 'the Monkey King',
+          image: { full: 'MonkeyKing.png' },
+          passive: { id: 'MonkeyKingPassive', name: 'Stone Skin', image: { full: 'MonkeyKingStoneSkin.png' } },
+          spells: [
+            { id: 'MonkeyKingQ', name: 'Crushing Blow', image: { full: 'MonkeyKingQ.png' } },
+            { id: 'MonkeyKingW', name: 'Warrior Trickster', image: { full: 'MonkeyKingW.png' } },
+            { id: 'MonkeyKingE', name: 'Nimbus Strike', image: { full: 'MonkeyKingE.png' } },
+            { id: 'MonkeyKingR', name: 'Cyclone', image: { full: 'MonkeyKingR.png' } },
+          ],
+        },
+      },
+    },
+  })),
   getChampionSplashes: vi.fn(async () => ({ version: 'test', data: [] })),
   getItems: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
   getRunes: vi.fn(async () => ({ version: 'test', data: [] })),
@@ -26,11 +53,19 @@ describe('App', () => {
     cleanup();
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
+    vi.mocked(getChampionGuide).mockReset();
     vi.mocked(getItemSlotsBatch).mockReset();
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
+    vi.mocked(getChampionGuide).mockResolvedValue({
+      summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+      toughestMatchups: [],
+      bestMatchups: [],
+      topRunes: [],
+      topSpells: [],
+    });
     vi.mocked(getItemSlotsBatch).mockResolvedValue({ results: [] });
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
     vi.mocked(resolveAccountAlias).mockResolvedValue({ status: 'not_found' });
@@ -56,6 +91,28 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByText('Build Explorer')).not.toBeInTheDocument());
     expect(screen.queryByText('Contextual Patterns')).not.toBeInTheDocument();
     expect(screen.queryByText(/buy this/i)).not.toBeInTheDocument();
+    queryClient.clear();
+  });
+
+  it('opens the champion build guide page', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Build Guides' }));
+
+    await waitFor(() => expect(screen.getByText(/WinRift build guide for ranked Solo\/Duo/i)).toBeInTheDocument());
+    expect(screen.getByText('Recommended')).toBeInTheDocument();
+    await waitFor(() => expect(getChampionGuide).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
     queryClient.clear();
   });
 
@@ -470,14 +527,16 @@ describe('App', () => {
           opponentChampionId: 13,
           minGames: 5,
           limit: 12,
-          fallback: false,
+          patch: '16.10',
+          fallback: true,
         }),
         expect.objectContaining({
           key: 'champion',
           championId: 3,
           minGames: 10,
           limit: 12,
-          fallback: false,
+          patch: '16.10',
+          fallback: true,
         }),
       ]);
       expect(requests[1]).not.toHaveProperty('opponentChampionId');
