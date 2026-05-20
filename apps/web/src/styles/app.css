@@ -61,10 +61,35 @@ button {
 .search-only {
   align-items: center;
   background:
+    linear-gradient(115deg, transparent 0 35%, rgb(130 215 255 / 7%) 35.2% 35.8%, transparent 36% 64%, rgb(240 128 128 / 7%) 64.2% 64.8%, transparent 65%),
+    linear-gradient(24deg, transparent 0 40%, rgb(255 255 255 / 4%) 40.2% 40.5%, transparent 41%),
     radial-gradient(ellipse at 50% 44%, rgb(116 202 214 / 10%), transparent 38%),
     linear-gradient(180deg, #303234 0%, #2c2e30 72%, #111 100%);
   display: flex;
   justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.search-only::before {
+  background:
+    linear-gradient(90deg, transparent 0 22%, rgb(255 255 255 / 4%) 22.1% 22.25%, transparent 22.4% 77%, rgb(255 255 255 / 4%) 77.1% 77.25%, transparent 77.4%),
+    linear-gradient(0deg, transparent 0 16%, rgb(255 255 255 / 3%) 16.1% 16.25%, transparent 16.4% 83%, rgb(255 255 255 / 3%) 83.1% 83.25%, transparent 83.4%);
+  content: "";
+  inset: 77px 0 0;
+  opacity: 0.65;
+  pointer-events: none;
+  position: absolute;
+}
+
+.search-only::after {
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 28%), transparent 24%, transparent 76%, rgb(0 0 0 / 28%)),
+    linear-gradient(180deg, transparent 0 70%, rgb(0 0 0 / 26%));
+  content: "";
+  inset: 77px 0 0;
+  pointer-events: none;
+  position: absolute;
 }
 
 .has-game .search-section {
@@ -81,6 +106,7 @@ button {
 
 .search-section {
   position: relative;
+  z-index: 1;
 }
 
 .lookup-console {
@@ -94,6 +120,8 @@ button {
     inset 0 1px 0 rgb(255 255 255 / 8%),
     0 18px 36px rgb(0 0 0 / 30%);
   padding: 18px;
+  position: relative;
+  z-index: 1;
 }
 
 .lookup-console-header {
@@ -315,7 +343,7 @@ button {
   font-weight: 800;
   gap: 8px;
   justify-content: center;
-  margin: 12px auto 0;
+  margin: 0 auto;
   min-height: 36px;
   padding: 8px 12px;
   text-align: center;
@@ -338,8 +366,28 @@ button {
   color: #ffd3d3;
 }
 
+.lookup-status {
+  display: grid;
+  margin: 10px auto 0;
+  min-height: 38px;
+  place-items: start center;
+  width: min(560px, 100%);
+}
+
+.lookup-status:not(.has-message) {
+  pointer-events: none;
+}
+
 .has-game .search-message-card {
-  margin-top: 8px;
+  margin-top: 0;
+}
+
+.has-game .lookup-status {
+  min-height: 0;
+}
+
+.has-game .lookup-status:not(.has-message) {
+  display: none;
 }
 
 @keyframes spin {
@@ -384,36 +432,44 @@ button {
 }
 
 .match-header {
-  align-items: stretch;
+  align-items: center;
   background:
     linear-gradient(90deg, rgb(135 206 235 / 16%), rgb(240 128 128 / 15%)),
     #202020;
   border: 1px solid #50575a;
   color: #f4f6f8;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
-  margin: 0 auto 10px;
+  margin: 0 auto 8px;
   max-width: 1500px;
-  padding: 12px;
+  padding: 8px 10px;
 }
 
 .match-header-main {
-  display: grid;
-  gap: 4px;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
   min-width: 0;
 }
 
 .match-kicker {
+  background: rgb(0 0 0 / 20%);
+  border: 1px solid rgb(255 255 255 / 7%);
   color: #b7c4cb;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 900;
+  line-height: 1;
+  padding: 5px 6px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .match-header h2 {
   color: #fff;
-  font-size: 22px;
+  flex: 1 1 auto;
+  font-size: 18px;
   line-height: 1.05;
   margin: 0;
   min-width: 0;
@@ -426,30 +482,31 @@ button {
   color: #dce5ea;
   display: flex;
   flex-wrap: wrap;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
-  gap: 8px;
+  gap: 5px;
 }
 
 .match-subline span {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 7%);
-  padding: 4px 6px;
+  line-height: 1;
+  padding: 5px 6px;
 }
 
 .match-header-stats {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 6px;
+  grid-template-columns: repeat(3, minmax(82px, 1fr));
 }
 
 .match-header-stat {
   background: rgb(0 0 0 / 22%);
   border: 1px solid rgb(255 255 255 / 9%);
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: center;
 }
 
@@ -464,7 +521,7 @@ button {
 .match-header-stat span,
 .match-header-stat em {
   color: #aeb8bf;
-  font-size: 10px;
+  font-size: 9px;
   font-style: normal;
   font-weight: 900;
   line-height: 1.1;
@@ -473,7 +530,7 @@ button {
 
 .match-header-stat strong {
   color: #fff;
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.05;
 }
 
@@ -1942,6 +1999,15 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .match-header-main {
+    display: grid;
+    gap: 5px;
+  }
+
+  .match-header h2 {
+    font-size: 20px;
+  }
+
   .match-header-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2136,13 +2202,15 @@ button {
   }
 
   .server-options-row {
-    flex-wrap: wrap;
-    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    left: 0;
+    right: 0;
     transform: none;
+    width: 100%;
   }
 
   .search-autocomplete {
-    position: static;
+    left: 0;
     transform: none;
     width: 100%;
   }

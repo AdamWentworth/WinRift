@@ -189,18 +189,20 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
             ))}
           </div>
         )}
-        {pendingMessage && (
-          <div className="search-message-card checking">
-            <LoaderCircle size={16} aria-hidden="true" />
-            <span>{pendingMessage}</span>
-          </div>
-        )}
-        {lookupMessage && (
-          <div className="search-message-card error">
-            <CircleAlert size={16} aria-hidden="true" />
-            <span>{lookupMessage}</span>
-          </div>
-        )}
+        <div className={pendingMessage || lookupMessage ? 'lookup-status has-message' : 'lookup-status'} aria-live="polite">
+          {pendingMessage && (
+            <div className="search-message-card checking">
+              <LoaderCircle size={16} aria-hidden="true" />
+              <span>{pendingMessage}</span>
+            </div>
+          )}
+          {lookupMessage && (
+            <div className="search-message-card error">
+              <CircleAlert size={16} aria-hidden="true" />
+              <span>{lookupMessage}</span>
+            </div>
+          )}
+        </div>
       </div>
       {showLiveGame && liveGame && (
         <LiveMatchups
