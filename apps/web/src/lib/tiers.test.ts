@@ -1,18 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { championTier, sPlusCutoff } from './tiers';
+import { championTier, isSPlus } from './tiers';
 
 describe('champion tiers', () => {
-  it('uses broader role-aware S+ bands', () => {
-    expect(sPlusCutoff({ role: 'TOP', roleRankTotal: 50 })).toBe(5);
-    expect(sPlusCutoff({ role: 'JUNGLE', roleRankTotal: 50 })).toBe(6);
-    expect(sPlusCutoff({ role: 'MIDDLE', roleRankTotal: 50 })).toBe(8);
-    expect(sPlusCutoff({ role: 'BOTTOM', roleRankTotal: 50 })).toBe(2);
-    expect(sPlusCutoff({ role: 'UTILITY', roleRankTotal: 50 })).toBe(9);
+  it('awards S+ from score threshold instead of role quotas', () => {
+    expect(isSPlus({ confidence: 45, games: 80, roleRank: 14, roleRankTotal: 80, tierScore: 72, winRate: 51 })).toBe(true);
+    expect(championTier({ confidence: 45, games: 80, roleRank: 14, roleRankTotal: 80, tierScore: 72, winRate: 51 })).toBe('S+');
   });
 
-  it('scales S+ down for thin stored samples', () => {
-    expect(sPlusCutoff({ role: 'UTILITY', roleRankTotal: 8 })).toBe(2);
-    expect(championTier({ games: 20, role: 'UTILITY', roleRank: 2, roleRankTotal: 8, winRate: 52 })).toBe('S+');
-    expect(championTier({ games: 20, role: 'UTILITY', roleRank: 3, roleRankTotal: 8, winRate: 52 })).toBe('A');
+  it('awards S+ from strong winrate with enough confidence', () => {
+    expect(championTier({ confidence: 48, games: 100, roleRank: 9, roleRankTotal: 100, winRate: 54 })).toBe('S+');
+    expect(championTier({ confidence: 47.99, games: 100, roleRank: 9, roleRankTotal: 100, winRate: 54 })).toBe('S');
+    expect(championTier({ confidence: 48, games: 99, roleRank: 9, roleRankTotal: 100, winRate: 54 })).toBe('S');
   });
 });

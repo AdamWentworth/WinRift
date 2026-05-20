@@ -26,18 +26,12 @@ This intentionally keeps winning as the center of gravity while letting populari
 
 ## Tiers
 
-The frontend maps WinRift rank into presentation tiers. `S+` is intentionally a visible elite band rather than a single unreachable edge case. It uses role-aware caps inspired by what players expect from public tier-list surfaces, then scales down when our stored sample is thin.
+The frontend maps WinRift rank into presentation tiers. `S+` is not a fixed number of champions per role. It is earned by crossing a high-performance threshold:
 
-Current `S+` caps:
+- `tierScore >= 72`, or
+- `54%+` winrate with at least `100` games and `48%+` Wilson confidence.
 
-- Top: up to 5 champions
-- Jungle: up to 6 champions
-- Mid: up to 8 champions
-- Bot: up to 2 champions
-- Support: up to 9 champions
-- All roles: up to 12 champions
-
-The actual `S+` count is capped at 18% of the selected scope, so tiny samples do not label half the page as elite. After `S+`, the remaining tiers use broad percentile bands:
+This keeps `S+` attainable when the data clearly supports it, without reserving slots or forcing every role to have the same count. After `S+`, the remaining tiers use broad percentile bands:
 
 - `S`: top 22%
 - `A`: top 40%
