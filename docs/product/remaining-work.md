@@ -4,7 +4,7 @@ This is the next-session list from the live app rebuild work. The project is mov
 
 ## Frontend Structure
 
-Status: items 1-4 have been addressed in the current cleanup pass. Item 5 is the next product/data pass.
+Status: items 1-5 have been addressed in the current cleanup pass. Item 6 is the next product/data pass.
 
 1. Split `LiveMatchups.tsx` into smaller live-match modules. It currently owns the page shell, mode rail, champion cards, build view, win-condition view, charting, and matchup helpers.
 2. Extract shared UI pieces for stat tiles, sample chips, champion rows, role selectors, and card shells so the live page, champion guide, and tier list feel consistently built instead of copied forward.
@@ -13,7 +13,7 @@ Status: items 1-4 have been addressed in the current cleanup pass. Item 5 is the
 
 ## Product Surfaces
 
-5. Improve the tier-list ranking formula. Current data is useful, but tiering should eventually include sample size, pick rate, winrate confidence, ban signal, and role population.
+5. Improve the tier-list ranking formula. Current data is useful, but tiering should eventually include sample size, pick rate, winrate confidence, ban signal, and role population. First pass complete; see `docs/product/tier-list-ranking.md`.
 6. Expand champion guide backend data for skill order, matchup counters, rune paths, summoner spell pairs, and item-path summaries.
 7. Add a future summoner profile page that can show stored match history, live-game redirect state, aliases, champion comfort, and ranked form.
 8. Refine live-match modes so Match, Builds, and Win Conditions each have a clear job and do not silently load hidden heavy analytics.

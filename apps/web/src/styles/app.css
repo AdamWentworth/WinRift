@@ -3629,18 +3629,24 @@ button {
   text-align: center;
 }
 
-.tier-badge.S {
+.tier-badge.tier-s-plus {
+  border-color: #f7d777;
+  box-shadow: 0 0 18px rgb(247 215 119 / 22%);
+  color: #ffeab0;
+}
+
+.tier-badge.tier-s {
   border-color: #58d9ff;
   color: #91f4ff;
 }
 
-.tier-badge.A {
+.tier-badge.tier-a {
   border-color: #76ffb5;
   color: #a5ffd0;
 }
 
-.tier-badge.C,
-.tier-badge.D {
+.tier-badge.tier-c,
+.tier-badge.tier-d {
   border-color: #ff8b8b;
   color: #ffd0d0;
 }
@@ -3656,7 +3662,7 @@ button {
 .tier-table-row {
   display: grid;
   gap: 10px;
-  grid-template-columns: 70px minmax(220px, 1fr) repeat(5, minmax(88px, 0.45fr));
+  grid-template-columns: 70px minmax(220px, 1fr) repeat(6, minmax(82px, 0.45fr));
 }
 
 .tier-table-header {
@@ -4607,7 +4613,7 @@ button {
 
   .tier-table-header,
   .tier-table-row {
-    min-width: 880px;
+    min-width: 980px;
   }
 
   .guide-filter-label,

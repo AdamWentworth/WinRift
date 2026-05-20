@@ -158,6 +158,16 @@ export type ChampionGuideSummary = {
   confidence: number;
   pickRate: number;
   banRate: number;
+  avgKills?: number;
+  avgDeaths?: number;
+  avgAssists?: number;
+  kda?: number;
+  tierScore?: number;
+  winScore?: number;
+  sampleScore?: number;
+  pickScore?: number;
+  banScore?: number;
+  impactScore?: number;
   roleRank: number;
   roleRankTotal: number;
 };

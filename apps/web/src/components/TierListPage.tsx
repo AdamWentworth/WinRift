@@ -1,4 +1,4 @@
-import { Database, Filter, Search, Trophy } from 'lucide-react';
+import { Database, Filter, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -30,8 +30,9 @@ const minimumSamples = [
 
 const sortModes = [
   { value: 'rank', label: 'WinRift Rank' },
-  { value: 'confidence', label: 'Score' },
+  { value: 'confidence', label: 'WinRift Score' },
   { value: 'win-rate', label: 'Win Rate' },
+  { value: 'impact', label: 'Impact' },
   { value: 'pick-rate', label: 'Pick Rate' },
   { value: 'ban-rate', label: 'Ban Rate' },
   { value: 'games', label: 'Games' },
@@ -95,7 +96,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           <span>WinRift Tier List</span>
           <h2>{selectedRole} Rankings</h2>
           <p>
-            A confidence-weighted read on champion strength from collected ranked Solo/Duo games. Use this as the broad meta view, then open a champion guide for builds, runes, skill paths, and matchup detail.
+            A multi-signal read on champion strength from collected ranked Solo/Duo games: winrate, confidence, sample size, pick/ban pressure, and role-relative KDA impact.
           </p>
         </div>
         <div className="tier-list-hero-stats">
@@ -161,6 +162,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           <span>Tier</span>
           <span>Champion</span>
           <span>Win Rate</span>
+          <span>Impact</span>
           <span>Pick</span>
           <span>Ban</span>
           <span>Score</span>
@@ -186,13 +188,13 @@ function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; c
   const champion = row.champion;
   return (
     <button
-      className={`tier-feature-card ${row.tier}`}
+      className={`tier-feature-card ${tierClassName(row.tier)}`}
       disabled={!champion}
       onClick={() => champion && onSelectChampion(champion)}
       style={{ '--tier-splash': `url(${championSplashUrl(champions, row.summary.championId)})` } as CSSProperties}
       type="button"
     >
-      <span className={`tier-badge ${row.tier}`}>{row.tier}</span>
+      <span className={`tier-badge ${tierClassName(row.tier)}`}>{row.tier}</span>
       <ChampionIdentity
         as="div"
         champion={champion}
@@ -201,7 +203,7 @@ function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; c
         className="tier-feature-identity"
         detail={<><RoleIcon role={row.summary.role} /> #{row.summary.roleRank || '-'} {roleLabel(row.summary.role)}</>}
       />
-      <p>{row.summary.winRate.toFixed(2)}% WR · {formatNumber(row.summary.games)} games · {row.score.toFixed(1)} score</p>
+      <p>{row.summary.winRate.toFixed(2)}% WR · {formatNumber(row.summary.games)} games · {row.score.toFixed(1)} score · {impactLabel(row.summary)}</p>
     </button>
   );
 }
@@ -210,7 +212,7 @@ function TierTableRow({ row, champions, onSelectChampion }: { row: TierRow; cham
   const champion = row.champion;
   return (
     <button className="tier-table-row" disabled={!champion} onClick={() => champion && onSelectChampion(champion)} type="button">
-      <span><b className={`tier-badge ${row.tier}`}>{row.tier}</b></span>
+      <span><b className={`tier-badge ${tierClassName(row.tier)}`}>{row.tier}</b></span>
       <ChampionIdentity
         champion={champion}
         championId={row.summary.championId}
@@ -219,6 +221,7 @@ function TierTableRow({ row, champions, onSelectChampion }: { row: TierRow; cham
         detail={<><RoleIcon role={row.summary.role} /> Rank {row.summary.roleRank || '-'} of {row.summary.roleRankTotal || '-'}</>}
       />
       <span>{row.summary.winRate.toFixed(2)}%</span>
+      <span>{impactLabel(row.summary)}</span>
       <span>{row.summary.pickRate.toFixed(2)}%</span>
       <span>{row.summary.banRate.toFixed(2)}%</span>
       <span>{row.score.toFixed(1)}</span>
@@ -236,17 +239,33 @@ function patchBucket(version?: string) {
 }
 
 function winriftScore(summary: ChampionGuideSummary) {
-  return summary.confidence || 0;
+  return summary.tierScore ?? summary.confidence ?? 0;
 }
 
 function tierForSummary(summary: ChampionGuideSummary) {
   if (!summary.roleRank || !summary.roleRankTotal) return '?';
   const percentile = summary.roleRank / summary.roleRankTotal;
-  if (percentile <= 0.08) return 'S';
-  if (percentile <= 0.22) return 'A';
-  if (percentile <= 0.5) return 'B';
-  if (percentile <= 0.75) return 'C';
+  if (percentile <= 0.03) return 'S+';
+  if (percentile <= 0.1) return 'S';
+  if (percentile <= 0.25) return 'A';
+  if (percentile <= 0.55) return 'B';
+  if (percentile <= 0.78) return 'C';
   return 'D';
+}
+
+function tierClassName(tier: string) {
+  if (tier === 'S+') return 'tier-s-plus';
+  return `tier-${tier.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'unknown'}`;
+}
+
+function impactLabel(summary: ChampionGuideSummary) {
+  if (typeof summary.impactScore === 'number' && summary.impactScore > 0) {
+    return `${summary.impactScore.toFixed(1)} impact`;
+  }
+  if (typeof summary.kda === 'number' && summary.kda > 0) {
+    return `${summary.kda.toFixed(2)} KDA`;
+  }
+  return '--';
 }
 
 function sortRows(a: TierRow, b: TierRow, sortMode: SortMode) {
@@ -258,6 +277,9 @@ function sortRows(a: TierRow, b: TierRow, sortMode: SortMode) {
   }
   if (sortMode === 'win-rate') {
     return b.summary.winRate - a.summary.winRate || b.summary.games - a.summary.games;
+  }
+  if (sortMode === 'impact') {
+    return (b.summary.impactScore ?? 0) - (a.summary.impactScore ?? 0) || b.score - a.score;
   }
   if (sortMode === 'pick-rate') {
     return b.summary.pickRate - a.summary.pickRate || b.summary.games - a.summary.games;

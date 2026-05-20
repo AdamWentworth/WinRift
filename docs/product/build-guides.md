@@ -9,6 +9,7 @@ The current version can show:
 - champion, role, patch, rank, and optional opponent filters
 - stored coverage for every champion in the selected role/patch/rank scope
 - champion win rate, match sample, pick-rate estimate, confidence, and role rank within the stored sample
+- tier-list scoring signals: WinRift score, win score, sample score, pick score, ban score, and KDA-based impact score
 - rune page aggregates from stored `rune_signature` values
 - summoner spell aggregates from stored `spell_signature` values
 - skill priority/path aggregates from stored `SKILL_LEVEL_UP` timeline events
@@ -27,6 +28,7 @@ Known gaps:
 
 - Ban rate is sample-relative: `champion bans / stored ranked matches` for the selected patch. Riot does not expose a separate global champion-ban-rate endpoint, so this should be labeled as our stored sample.
 - Pick rate is a sample-relative estimate from stored participant rows, not global Riot-wide popularity.
+- Tier-list impact currently uses KDA because final damage, final CS, final gold, and vision are not yet normalized into participant summaries. See `docs/product/tier-list-ranking.md`.
 - Item paths are currently slot aggregates, not full path sequence aggregates. This is useful for matchup-specific item choice, but it is not identical to a U.GG full build path.
 - Skill paths are real timeline-derived paths, but they are still aggregated by champion/role/rank/patch rather than matchup-specific skill paths.
 

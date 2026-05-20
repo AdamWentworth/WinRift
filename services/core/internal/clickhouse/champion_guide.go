@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,6 +23,16 @@ type ChampionGuideSummary struct {
 	Confidence    float64
 	PickRate      float64
 	BanRate       float64
+	AvgKills      float64
+	AvgDeaths     float64
+	AvgAssists    float64
+	KDA           float64
+	TierScore     float64
+	WinScore      float64
+	SampleScore   float64
+	PickScore     float64
+	BanScore      float64
+	ImpactScore   float64
 	RoleRank      int
 	RoleRankTotal int
 }
@@ -77,7 +88,10 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 			champion_id,
 			sum(win) AS wins,
 			count() AS games,
-			wins / games AS win_rate
+			wins / games AS win_rate,
+			sum(kills) AS kills,
+			sum(deaths) AS deaths,
+			sum(assists) AS assists
 		` + baseSQL + `
 		GROUP BY champion_id
 		HAVING games >= ?
@@ -92,9 +106,11 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	out := []ChampionGuideSummary{}
 	for rows.Next() {
 		var row ChampionGuideSummary
-		if err := rows.Scan(&row.ChampionID, &row.Wins, &row.Games, &row.WinRate); err != nil {
+		var kills, deaths, assists int
+		if err := rows.Scan(&row.ChampionID, &row.Wins, &row.Games, &row.WinRate, &kills, &deaths, &assists); err != nil {
 			return nil, err
 		}
+		applyCombatAverages(&row, kills, deaths, assists)
 		row.Role = roleLabel(filters["role"])
 		row.PatchBucket = patchBucketLabel(filters["patch"])
 		row.RankBucket = rankBucketLabel(filters["rank_bucket"])
@@ -109,32 +125,9 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Confidence != out[j].Confidence {
-			return out[i].Confidence > out[j].Confidence
-		}
-		if out[i].WinRate != out[j].WinRate {
-			return out[i].WinRate > out[j].WinRate
-		}
-		if out[i].Games != out[j].Games {
-			return out[i].Games > out[j].Games
-		}
-		return out[i].ChampionID < out[j].ChampionID
-	})
-	totalRanked := len(out)
-	for index := range out {
-		out[index].RoleRank = index + 1
-		out[index].RoleRankTotal = totalRanked
-	}
-	banRates, err := r.queryChampionBanRates(ctx, filters)
+	out, err = r.rankChampionGuideSummaries(ctx, filters, out)
 	if err != nil {
 		return nil, err
-	}
-	for index := range out {
-		if banRate, ok := banRates[out[index].ChampionID]; ok {
-			out[index].Bans = banRate.Bans
-			out[index].BanRate = banRate.BanRate
-		}
 	}
 	if len(out) > limit {
 		out = out[:limit]
@@ -205,11 +198,14 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 			champion_id,
 			sum(win) AS wins,
 			count() AS games,
-			wins / games AS win_rate
+			wins / games AS win_rate,
+			sum(kills) AS kills,
+			sum(deaths) AS deaths,
+			sum(assists) AS assists
 		` + baseSQL + `
 		GROUP BY champion_id
 		HAVING games >= ?
-		ORDER BY win_rate DESC, games DESC, champion_id ASC`
+		ORDER BY games DESC, champion_id ASC`
 	rankArgs := append(append([]any{}, baseArgs...), minGames)
 	rows, err := r.db.QueryContext(ctx, rankQuery, rankArgs...)
 	if err != nil {
@@ -217,6 +213,7 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 	}
 	defer rows.Close()
 
+	candidates := []ChampionGuideSummary{}
 	summary := ChampionGuideSummary{
 		PatchBucket: patchBucketLabel(filters["patch"]),
 		RankBucket:  rankBucketLabel(filters["rank_bucket"]),
@@ -224,13 +221,13 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 	if parsed, ok := parseUint16Filter(championID); ok {
 		summary.ChampionID = parsed
 	}
-	rank := 0
 	for rows.Next() {
-		rank++
 		var candidate ChampionGuideSummary
-		if err := rows.Scan(&candidate.ChampionID, &candidate.Wins, &candidate.Games, &candidate.WinRate); err != nil {
+		var kills, deaths, assists int
+		if err := rows.Scan(&candidate.ChampionID, &candidate.Wins, &candidate.Games, &candidate.WinRate, &kills, &deaths, &assists); err != nil {
 			return ChampionGuideSummary{}, err
 		}
+		applyCombatAverages(&candidate, kills, deaths, assists)
 		if candidate.Games > 0 {
 			candidate.Confidence = analytics.WilsonLowerBound(candidate.Wins, candidate.Games, 1.96)
 		}
@@ -240,23 +237,25 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 		candidate.Role = roleLabel(filters["role"])
 		candidate.PatchBucket = summary.PatchBucket
 		candidate.RankBucket = summary.RankBucket
-		candidate.RoleRank = rank
-		if candidate.ChampionID == summary.ChampionID {
-			summary = candidate
-		}
+		candidates = append(candidates, candidate)
 	}
 	if err := rows.Err(); err != nil {
 		return ChampionGuideSummary{}, err
 	}
-	summary.RoleRankTotal = rank
-	if summary.Games > 0 {
-		return summary, nil
+	candidates, err = r.rankChampionGuideSummaries(ctx, filters, candidates)
+	if err != nil {
+		return ChampionGuideSummary{}, err
+	}
+	for _, candidate := range candidates {
+		if candidate.ChampionID == summary.ChampionID {
+			return candidate, nil
+		}
 	}
 	direct, err := r.queryChampionGuideDirectSummary(ctx, filters, totalRoleGames)
 	if err != nil {
 		return ChampionGuideSummary{}, err
 	}
-	direct.RoleRankTotal = rank
+	direct.RoleRankTotal = len(candidates)
 	return direct, nil
 }
 
@@ -268,7 +267,10 @@ func (r *Repository) queryChampionGuideDirectSummary(ctx context.Context, filter
 			champion_id,
 			sum(win) AS wins,
 			count() AS games,
-			wins / games AS win_rate
+			wins / games AS win_rate,
+			sum(kills) AS kills,
+			sum(deaths) AS deaths,
+			sum(assists) AS assists
 		` + baseSQL + `
 		GROUP BY champion_id
 		LIMIT 1`
@@ -280,20 +282,154 @@ func (r *Repository) queryChampionGuideDirectSummary(ctx context.Context, filter
 	if parsed, ok := parseUint16Filter(filters["champion_id"]); ok {
 		summary.ChampionID = parsed
 	}
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&summary.ChampionID, &summary.Wins, &summary.Games, &summary.WinRate)
+	var kills, deaths, assists int
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&summary.ChampionID, &summary.Wins, &summary.Games, &summary.WinRate, &kills, &deaths, &assists)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return summary, nil
 		}
 		return ChampionGuideSummary{}, err
 	}
+	applyCombatAverages(&summary, kills, deaths, assists)
 	if summary.Games > 0 {
 		summary.Confidence = analytics.WilsonLowerBound(summary.Wins, summary.Games, 1.96)
 	}
 	if totalRoleGames > 0 {
 		summary.PickRate = float64(summary.Games) / float64(totalRoleGames)
 	}
-	return summary, nil
+	scored := applyChampionTierScores([]ChampionGuideSummary{summary})
+	return scored[0], nil
+}
+
+func (r *Repository) rankChampionGuideSummaries(ctx context.Context, filters map[string]string, rows []ChampionGuideSummary) ([]ChampionGuideSummary, error) {
+	if len(rows) == 0 {
+		return rows, nil
+	}
+	banRates, err := r.queryChampionBanRates(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	for index := range rows {
+		if banRate, ok := banRates[rows[index].ChampionID]; ok {
+			rows[index].Bans = banRate.Bans
+			rows[index].BanRate = banRate.BanRate
+		}
+	}
+	rows = applyChampionTierScores(rows)
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].TierScore != rows[j].TierScore {
+			return rows[i].TierScore > rows[j].TierScore
+		}
+		if rows[i].WinScore != rows[j].WinScore {
+			return rows[i].WinScore > rows[j].WinScore
+		}
+		if rows[i].Confidence != rows[j].Confidence {
+			return rows[i].Confidence > rows[j].Confidence
+		}
+		if rows[i].WinRate != rows[j].WinRate {
+			return rows[i].WinRate > rows[j].WinRate
+		}
+		if rows[i].Games != rows[j].Games {
+			return rows[i].Games > rows[j].Games
+		}
+		return rows[i].ChampionID < rows[j].ChampionID
+	})
+	totalRanked := len(rows)
+	for index := range rows {
+		rows[index].RoleRank = index + 1
+		rows[index].RoleRankTotal = totalRanked
+	}
+	return rows, nil
+}
+
+func applyCombatAverages(row *ChampionGuideSummary, kills, deaths, assists int) {
+	if row.Games <= 0 {
+		return
+	}
+	row.AvgKills = float64(kills) / float64(row.Games)
+	row.AvgDeaths = float64(deaths) / float64(row.Games)
+	row.AvgAssists = float64(assists) / float64(row.Games)
+	if deaths > 0 {
+		row.KDA = float64(kills+assists) / float64(deaths)
+		return
+	}
+	row.KDA = float64(kills + assists)
+}
+
+func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary {
+	if len(rows) == 0 {
+		return rows
+	}
+	maxGames := 0
+	maxPickRate := 0.0
+	maxBanRate := 0.0
+	totalKDAWeight := 0
+	weightedKDA := 0.0
+	for _, row := range rows {
+		if row.Games > maxGames {
+			maxGames = row.Games
+		}
+		if row.PickRate > maxPickRate {
+			maxPickRate = row.PickRate
+		}
+		if row.BanRate > maxBanRate {
+			maxBanRate = row.BanRate
+		}
+		if row.Games > 0 && row.KDA > 0 {
+			totalKDAWeight += row.Games
+			weightedKDA += row.KDA * float64(row.Games)
+		}
+	}
+	averageKDA := 0.0
+	if totalKDAWeight > 0 {
+		averageKDA = weightedKDA / float64(totalKDAWeight)
+	}
+
+	for index := range rows {
+		winRateScore := clampFloat(50+((rows[index].WinRate-0.5)*500), 0, 100)
+		confidenceScore := clampFloat(rows[index].Confidence*100, 0, 100)
+		rows[index].WinScore = clampFloat(0.65*winRateScore+0.35*confidenceScore, 0, 100)
+		if maxGames > 0 {
+			rows[index].SampleScore = math.Sqrt(float64(rows[index].Games)/float64(maxGames)) * 100
+		}
+		rows[index].PickScore = normalizedShareScore(rows[index].PickRate, maxPickRate)
+		rows[index].BanScore = normalizedShareScore(rows[index].BanRate, maxBanRate)
+		rows[index].ImpactScore = normalizedImpactScore(rows[index].KDA, averageKDA)
+		rows[index].TierScore = clampFloat(
+			0.58*rows[index].WinScore+
+				0.14*rows[index].SampleScore+
+				0.12*rows[index].PickScore+
+				0.08*rows[index].BanScore+
+				0.08*rows[index].ImpactScore,
+			0,
+			100,
+		)
+	}
+	return rows
+}
+
+func normalizedShareScore(value, maxValue float64) float64 {
+	if maxValue <= 0 {
+		return 50
+	}
+	return clampFloat(math.Sqrt(value/maxValue)*100, 0, 100)
+}
+
+func normalizedImpactScore(kda, averageKDA float64) float64 {
+	if averageKDA <= 0 || kda <= 0 {
+		return 50
+	}
+	return clampFloat(50+((kda-averageKDA)/averageKDA)*35, 0, 100)
+}
+
+func clampFloat(value, minValue, maxValue float64) float64 {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }
 
 func (r *Repository) queryChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
@@ -402,7 +538,10 @@ func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScop
 				) AS rank_bucket,
 				pm.rune_signature,
 				pm.spell_signature,
-				pm.win
+				pm.win,
+				pm.kills,
+				pm.deaths,
+				pm.assists
 			FROM participant_matchups AS pm FINAL
 			LEFT JOIN
 			(
