@@ -41,6 +41,23 @@ Compact closed-patch build matchup metrics. This is the historical equivalent of
 
 Compact closed-patch item timing metrics for first, second, and third non-trinket item purchases.
 
+## `item_slot_analytics`
+
+Current read model for live build matchup cards. One row per patch, item context, champion, role, opponent champion, rank bucket, item slot, and item id.
+
+`item_context` is one of:
+
+- `DEFAULT`: lane build items, excluding jungle/support-specific starts.
+- `JUNGLE`: lane build items plus jungle items.
+- `SUPPORT`: lane build items plus support items.
+
+The live API reads this table first. If it is empty, the API can fall back to the older timeline scan, but normal operation should refresh this table and serve item cards from compact aggregate rows.
+
+Refresh options:
+
+- Local/dev API: `POST /api/dev/analytics/item-slots/refresh`
+- CLI: `patchctl -action item-slots -patch 16.10 -queue 420`
+
 ## `patch_power_curve_metrics`
 
 Compact closed-patch participant power-curve metrics at 10, 15, and 20 minutes.

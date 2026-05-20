@@ -115,6 +115,19 @@ For live matchup cards, the item-slot endpoint now fills missing slots through a
 
 The fallback is slot-by-slot. If slot one has exact matchup data but slot five does not, slot one stays exact while slot five can fall back. The UI labels mixed fallback samples instead of pretending the whole row came from one exact matchup.
 
+### Read Model And Batch Loading
+
+The live page should not ask ClickHouse to replay timeline item history while a player is waiting for a match read.
+
+Current direction:
+
+- The web app sends one batch request for all ten live build cards.
+- The API reads `item_slot_analytics` first.
+- The expensive timeline scan remains only as a safety fallback when the read model has not been populated yet.
+- Refresh the read model after collection runs or patch changes with `POST /api/dev/analytics/item-slots/refresh` locally, or `patchctl -action item-slots -patch <patch> -queue 420` in ops scripts.
+
+This keeps the player-facing response path simple: compact aggregate rows in, formatted build cards out.
+
 ### Causal Guardrails
 
 Eventually use timing-aware features:
