@@ -447,18 +447,46 @@ describe('App', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Show Builds mode' }));
 
-    await waitFor(() => expect(getItemSlotsBatch).toHaveBeenCalledWith([
-      expect.objectContaining({
-        key: 'focused',
-        championId: 3,
-        opponentChampionId: 13,
-        minGames: 1,
-        limit: 6,
-        fallback: false,
-      }),
-    ]));
+    await waitFor(() => {
+      const calls = vi.mocked(getItemSlotsBatch).mock.calls;
+      const requests = calls[calls.length - 1]?.[0] ?? [];
+      expect(requests).toEqual([
+        expect.objectContaining({
+          key: 'matchup',
+          championId: 3,
+          opponentChampionId: 13,
+          minGames: 1,
+          limit: 6,
+          fallback: false,
+        }),
+        expect.objectContaining({
+          key: 'champion',
+          championId: 3,
+          minGames: 1,
+          limit: 6,
+          fallback: false,
+        }),
+      ]);
+      expect(requests[1]).not.toHaveProperty('opponentChampionId');
+    });
     expect(screen.getAllByText('Blue Mid').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Red Mid').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByLabelText('Build For Red Jungle'));
+    await waitFor(() => {
+      const calls = vi.mocked(getItemSlotsBatch).mock.calls;
+      const requests = calls[calls.length - 1]?.[0] ?? [];
+      expect(requests).toEqual([
+        expect.objectContaining({
+          key: 'matchup',
+          championId: 12,
+          opponentChampionId: 2,
+        }),
+        expect.objectContaining({
+          key: 'champion',
+          championId: 12,
+        }),
+      ]);
+    });
     queryClient.clear();
   });
 

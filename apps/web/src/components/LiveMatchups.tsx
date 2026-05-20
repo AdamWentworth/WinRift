@@ -45,12 +45,23 @@ type DraggedCard = {
 
 type RoleRateMap = Map<number, Map<string, ChampionRoleRate>>;
 
+type BuildParticipantOption = {
+  key: string;
+  side: TeamSide;
+  role: string;
+  index: number;
+  participant: LiveParticipant;
+};
+
 type FocusedBuildSelection = {
   side: TeamSide;
   role: string;
+  participantKey: string;
   participant: LiveParticipant;
+  opponentKey: string;
   opponent: LiveParticipant;
-  opponentOptions: LiveParticipant[];
+  participantOptions: BuildParticipantOption[];
+  opponentOptions: BuildParticipantOption[];
 };
 
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
@@ -75,25 +86,20 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
   const [dragTarget, setDragTarget] = useState<DraggedCard | null>(null);
   const [manualOrder, setManualOrder] = useState(false);
   const [selectedLaneIndex, setSelectedLaneIndex] = useState(0);
+  const [selectedBuildParticipantKey, setSelectedBuildParticipantKey] = useState('');
   const [selectedBuildOpponentKey, setSelectedBuildOpponentKey] = useState('');
   const blueChampionIds = useMemo(() => teamChampionIds(blueTeam), [blueTeam]);
   const redChampionIds = useMemo(() => teamChampionIds(redTeam), [redTeam]);
   const yourSide = livePlayerSide(liveGame);
   const searchedParticipant = liveGame.participants.find((candidate) => idsMatch(candidate.puuid, liveGame.puuid));
-  const focusedBuildBase = useMemo(
-    () => focusedBuildSelection(searchedParticipant, blueTeam, redTeam),
-    [blueTeam, redTeam, searchedParticipant],
-  );
   const focusedBuild = useMemo(() => {
-    if (!focusedBuildBase) return undefined;
-    const selectedOpponent = focusedBuildBase.opponentOptions.find((opponent, index) => participantKey(opponent, index) === selectedBuildOpponentKey);
-    return {
-      ...focusedBuildBase,
-      opponent: selectedOpponent ?? focusedBuildBase.opponent,
-    };
-  }, [focusedBuildBase, selectedBuildOpponentKey]);
+    return focusedBuildSelection(searchedParticipant, blueTeam, redTeam, selectedBuildParticipantKey, selectedBuildOpponentKey);
+  }, [blueTeam, redTeam, searchedParticipant, selectedBuildOpponentKey, selectedBuildParticipantKey]);
   const focusedBuildFilters = useMemo(() => (
     focusedBuild ? buildFilters(focusedBuild.participant, focusedBuild.opponent, focusedBuild.role, patchBucket) : undefined
+  ), [focusedBuild, patchBucket]);
+  const championBuildFilters = useMemo(() => (
+    focusedBuild ? championBuildFiltersFor(focusedBuild.participant, focusedBuild.role, patchBucket) : undefined
   ), [focusedBuild, patchBucket]);
   const winConditionQuery = useQuery({
     queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, patchBucket, blueChampionIds, redChampionIds],
@@ -113,6 +119,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     setDraggedCard(null);
     setDragTarget(null);
     setSelectedLaneIndex(0);
+    setSelectedBuildParticipantKey('');
     setSelectedBuildOpponentKey('');
   }, [liveGame.gameId]);
 
@@ -139,20 +146,18 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     setRedTeam((team) => moveParticipantToIndex(team, fromIndex, toIndex));
   };
 
-  const pairs = useMemo(() => roles.map((role, index) => ({
-    role,
-    blue: blueTeam[index],
-    red: redTeam[index],
-  })).filter((pair) => pair.blue && pair.red), [blueTeam, redTeam]);
-
   const focusedItemSlotQuery = useQuery({
-    queryKey: ['live-focused-item-slots', focusedBuildFilters],
-    queryFn: () => getItemSlotsBatch([{ key: 'focused', ...focusedBuildFilters! }]),
-    enabled: showBuildMode && Boolean(focusedBuildFilters),
+    queryKey: ['live-focused-item-slots', focusedBuildFilters, championBuildFilters],
+    queryFn: () => getItemSlotsBatch([
+      { key: 'matchup', ...focusedBuildFilters! },
+      { key: 'champion', ...championBuildFilters! },
+    ]),
+    enabled: showBuildMode && Boolean(focusedBuildFilters && championBuildFilters),
     staleTime: 30_000,
   });
 
-  const focusedItemSlots = focusedItemSlotQuery.data?.results.find((result) => result.key === 'focused')?.results ?? [];
+  const matchupItemSlots = focusedItemSlotQuery.data?.results.find((result) => result.key === 'matchup')?.results ?? [];
+  const championItemSlots = focusedItemSlotQuery.data?.results.find((result) => result.key === 'champion')?.results ?? [];
 
   return (
     <div className="game-board">
@@ -189,8 +194,14 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               selection={focusedBuild}
               champions={champions}
               items={items}
-              itemSlots={focusedItemSlots}
+              matchupItemSlots={matchupItemSlots}
+              championItemSlots={championItemSlots}
               loading={focusedItemSlotQuery.isLoading}
+              selectedParticipantKey={selectedBuildParticipantKey}
+              onSelectParticipant={(key) => {
+                setSelectedBuildParticipantKey(key);
+                setSelectedBuildOpponentKey('');
+              }}
               selectedOpponentKey={selectedBuildOpponentKey}
               onSelectOpponent={setSelectedBuildOpponentKey}
             />
@@ -836,16 +847,22 @@ function FocusedBuildPanel({
   selection,
   champions,
   items,
-  itemSlots,
+  matchupItemSlots,
+  championItemSlots,
   loading,
+  selectedParticipantKey,
+  onSelectParticipant,
   selectedOpponentKey,
   onSelectOpponent,
 }: {
   selection?: FocusedBuildSelection;
   champions?: ChampionData;
   items?: ItemData;
-  itemSlots: AnalyticsItemSlot[];
+  matchupItemSlots: AnalyticsItemSlot[];
+  championItemSlots: AnalyticsItemSlot[];
   loading: boolean;
+  selectedParticipantKey: string;
+  onSelectParticipant: (key: string) => void;
   selectedOpponentKey: string;
   onSelectOpponent: (key: string) => void;
 }) {
@@ -858,11 +875,12 @@ function FocusedBuildPanel({
   const opponentUrl = championImageUrl(champions, selection.opponent.championId);
   const playerName = participantDisplayName(selection.participant);
   const opponentName = participantDisplayName(selection.opponent);
-  const totalSamples = highestSlotSample(itemSlots);
-  const sample = buildSampleQuality(totalSamples);
-  const scopeLabel = buildScopeLabel(itemSlots);
-  const defaultOpponentIndex = Math.max(0, selection.opponentOptions.indexOf(selection.opponent));
-  const activeOpponentKey = selectedOpponentKey || participantKey(selection.opponent, defaultOpponentIndex);
+  const matchupSample = buildSampleQuality(highestSlotSample(matchupItemSlots));
+  const championSample = buildSampleQuality(highestSlotSample(championItemSlots));
+  const matchupScopeLabel = buildScopeLabel(matchupItemSlots);
+  const championScopeLabel = buildScopeLabel(championItemSlots);
+  const activeParticipantKey = selectedParticipantKey || selection.participantKey;
+  const activeOpponentKey = selectedOpponentKey || selection.opponentKey;
 
   return (
     <section className={`focused-build-panel ${selection.side}`} aria-label="Focused build matchup">
@@ -887,35 +905,137 @@ function FocusedBuildPanel({
           </span>
         </div>
       </div>
-      <div className="focused-build-meta">
-        <span className={`build-sample-chip ${sample.tone}`}>{sample.label}</span>
-        {scopeLabel ? <span className="build-scope-label">{scopeLabel}</span> : null}
+      <div className="focused-build-controls">
+        <BuildParticipantPicker
+          title="Build For"
+          options={selection.participantOptions}
+          selectedKey={activeParticipantKey}
+          champions={champions}
+          onSelect={onSelectParticipant}
+        />
+        <BuildParticipantPicker
+          title="Against"
+          options={selection.opponentOptions}
+          selectedKey={activeOpponentKey}
+          champions={champions}
+          onSelect={onSelectOpponent}
+        />
       </div>
-      <BuildSide side={selection.side} itemSlots={itemSlots} loading={loading} items={items} />
-      <div className="focused-opponent-picker">
-        <span>Change Opponent</span>
-        <div>
-          {selection.opponentOptions.map((opponent, index) => {
-            const key = participantKey(opponent, index);
-            const optionChampion = championByKey(champions, opponent.championId);
-            const optionUrl = championImageUrl(champions, opponent.championId);
-            return (
-              <button
-                className={key === activeOpponentKey ? 'selected' : ''}
-                key={key}
-                onClick={() => onSelectOpponent(key)}
-                type="button"
-                aria-label={`Build against ${optionChampion?.name ?? opponent.championId}`}
-              >
-                {optionUrl ? <img src={optionUrl} alt="" /> : null}
-                <strong>{optionChampion?.name ?? opponent.championId}</strong>
-                <em>{participantDisplayName(opponent)}</em>
-              </button>
-            );
-          })}
-        </div>
+      <div className="focused-build-results">
+        <BuildResultCard
+          title="Matchup Build"
+          description={`${champion?.name ?? selection.participant.championId} vs ${opponentChampion?.name ?? selection.opponent.championId}`}
+          sample={matchupSample}
+          scopeLabel={matchupScopeLabel}
+          side={selection.side}
+          itemSlots={matchupItemSlots}
+          loading={loading}
+          items={items}
+          emptyTitle="No matchup build yet"
+          emptySubtitle="Needs more stored games for this exact pairing"
+        />
+        <BuildResultCard
+          title="Champion Baseline"
+          description={`Highest winrate ${champion?.name ?? selection.participant.championId} items overall`}
+          sample={championSample}
+          scopeLabel={championScopeLabel}
+          side={selection.side}
+          itemSlots={championItemSlots}
+          loading={loading}
+          items={items}
+          emptyTitle="No champion build yet"
+          emptySubtitle="Needs more stored games for this champion"
+        />
       </div>
     </section>
+  );
+}
+
+function BuildParticipantPicker({
+  title,
+  options,
+  selectedKey,
+  champions,
+  onSelect,
+}: {
+  title: string;
+  options: BuildParticipantOption[];
+  selectedKey: string;
+  champions?: ChampionData;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <div className="focused-build-picker">
+      <span>{title}</span>
+      <div>
+        {options.map((option) => {
+          const optionChampion = championByKey(champions, option.participant.championId);
+          const optionUrl = championImageUrl(champions, option.participant.championId);
+          const labelName = participantDisplayName(option.participant);
+          return (
+            <button
+              className={`${option.side}${option.key === selectedKey ? ' selected' : ''}`}
+              key={option.key}
+              onClick={() => onSelect(option.key)}
+              type="button"
+              aria-label={`${title} ${labelName}`}
+            >
+              {optionUrl ? <img src={optionUrl} alt="" /> : null}
+              <strong>{optionChampion?.name ?? option.participant.championId}</strong>
+              <em>{labelName}</em>
+              <small>{roleLabels[option.role] ?? option.role}</small>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BuildResultCard({
+  title,
+  description,
+  sample,
+  scopeLabel,
+  side,
+  itemSlots,
+  loading,
+  items,
+  emptyTitle,
+  emptySubtitle,
+}: {
+  title: string;
+  description: string;
+  sample: { label: string; tone: string };
+  scopeLabel: string;
+  side: TeamSide;
+  itemSlots: AnalyticsItemSlot[];
+  loading: boolean;
+  items?: ItemData;
+  emptyTitle: string;
+  emptySubtitle: string;
+}) {
+  return (
+    <article className="focused-build-result">
+      <header>
+        <span>
+          <strong>{title}</strong>
+          <em>{description}</em>
+        </span>
+        <div>
+          <b className={`build-sample-chip ${sample.tone}`}>{sample.label}</b>
+          {scopeLabel ? <small className="build-scope-label">{scopeLabel}</small> : null}
+        </div>
+      </header>
+      <BuildSide
+        side={side}
+        itemSlots={itemSlots}
+        loading={loading}
+        items={items}
+        emptyTitle={emptyTitle}
+        emptySubtitle={emptySubtitle}
+      />
+    </article>
   );
 }
 
@@ -1083,11 +1203,15 @@ function BuildSide({
   itemSlots,
   loading,
   items,
+  emptyTitle = 'No matchup build yet',
+  emptySubtitle = 'Needs more stored games',
 }: {
   side: 'blue' | 'red';
   itemSlots: AnalyticsItemSlot[];
   loading: boolean;
   items?: ItemData;
+  emptyTitle?: string;
+  emptySubtitle?: string;
 }) {
   if (loading) {
     return <div className={`build-side ${side} muted`}>Loading item patterns...</div>;
@@ -1095,8 +1219,8 @@ function BuildSide({
   if (!itemSlots.length) {
     return (
       <div className={`build-side ${side} muted build-empty-state`}>
-        <strong>No matchup build yet</strong>
-        <span>Needs more stored games</span>
+        <strong>{emptyTitle}</strong>
+        <span>{emptySubtitle}</span>
       </div>
     );
   }
@@ -1168,24 +1292,70 @@ function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, r
   };
 }
 
-function focusedBuildSelection(searchedParticipant: LiveParticipant | undefined, blueTeam: LiveParticipant[], redTeam: LiveParticipant[]): FocusedBuildSelection | undefined {
-  if (!searchedParticipant) return undefined;
-  const searchedSide: TeamSide | undefined = searchedParticipant?.teamId === 200 ? 'red' : searchedParticipant?.teamId === 100 ? 'blue' : undefined;
-  if (!searchedSide) return undefined;
-  const side = searchedSide;
-  const team = side === 'blue' ? blueTeam : redTeam;
-  const opponentTeam = side === 'blue' ? redTeam : blueTeam;
-  if (!team.length || !opponentTeam.length) return undefined;
-  const participantIndex = Math.max(0, team.findIndex((participant) => sameParticipantIdentity(participant, searchedParticipant)));
-  const participant = team[participantIndex] ?? team[0];
-  const opponent = opponentTeam[participantIndex] ?? opponentTeam[0];
+function championBuildFiltersFor(participant: LiveParticipant, role: string, patch?: string): BuildFilters {
   return {
-    side,
-    role: roles[participantIndex] ?? 'UNKNOWN',
-    participant,
-    opponent,
-    opponentOptions: opponentTeam,
+    championId: participant.championId,
+    itemContext: itemContextForParticipant(participant, role),
+    patch,
+    minGames: 1,
+    limit: 6,
+    fallback: Boolean(patch),
   };
+}
+
+function focusedBuildSelection(
+  searchedParticipant: LiveParticipant | undefined,
+  blueTeam: LiveParticipant[],
+  redTeam: LiveParticipant[],
+  selectedParticipantKey: string,
+  selectedOpponentKey: string,
+): FocusedBuildSelection | undefined {
+  const participantOptions = buildParticipantOptions(blueTeam, redTeam);
+  if (!participantOptions.length) return undefined;
+  const searchedOption = searchedParticipant
+    ? participantOptions.find((option) => sameParticipantIdentity(option.participant, searchedParticipant))
+    : undefined;
+  const selectedOption = participantOptions.find((option) => option.key === selectedParticipantKey);
+  const target = selectedOption ?? searchedOption;
+  if (!target) return undefined;
+
+  const opponentOptions = participantOptions.filter((option) => option.side !== target.side);
+  if (!opponentOptions.length) return undefined;
+  const selectedOpponent = opponentOptions.find((option) => option.key === selectedOpponentKey);
+  const laneOpponent = opponentOptions.find((option) => option.index === target.index);
+  const opponent = selectedOpponent ?? laneOpponent ?? opponentOptions[0];
+
+  return {
+    side: target.side,
+    role: target.role,
+    participantKey: target.key,
+    participant: target.participant,
+    opponentKey: opponent.key,
+    opponent: opponent.participant,
+    participantOptions,
+    opponentOptions,
+  };
+}
+
+function buildParticipantOptions(blueTeam: LiveParticipant[], redTeam: LiveParticipant[]): BuildParticipantOption[] {
+  return [
+    ...teamBuildParticipantOptions('blue', blueTeam),
+    ...teamBuildParticipantOptions('red', redTeam),
+  ];
+}
+
+function teamBuildParticipantOptions(side: TeamSide, team: LiveParticipant[]): BuildParticipantOption[] {
+  return team.map((participant, index) => ({
+    key: buildParticipantOptionKey(side, participant, index),
+    side,
+    role: roles[index] ?? 'UNKNOWN',
+    index,
+    participant,
+  }));
+}
+
+function buildParticipantOptionKey(side: TeamSide, participant: LiveParticipant, index: number) {
+  return `${side}-${participantKey(participant, index)}`;
 }
 
 function itemContextForParticipant(participant: LiveParticipant, role: string): BuildFilters['itemContext'] {
@@ -1236,7 +1406,7 @@ function buildSampleQuality(samples: number) {
 function buildScopeLabel(itemSlots: AnalyticsItemSlot[]) {
   const labels = [...new Set(itemSlots.map((row) => row.sampleScopeLabel).filter(Boolean))];
   if (!labels.length) return '';
-  if (labels.length === 1) return labels[0];
+  if (labels.length === 1) return labels[0] ?? '';
   return 'Mixed fallback samples';
 }
 

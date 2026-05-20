@@ -200,7 +200,7 @@ Recommended model:
 Current modes:
 
 - Match: default scout view with lane labels and the two teams' champion cards. No heavier analytics are loaded.
-- Builds: focused item-path matchup view for the searched player. The default opponent is the lane opponent, with a selector to inspect a different enemy champion.
+- Builds: focused item-path view. It defaults to the searched player and lane opponent, but both the build target and opponent can be changed from the live match. It shows both the exact matchup item path and the champion-wide baseline, so a player can compare "what works into this enemy" against "what generally works on this champion."
 - Win Conditions: show champion rows with the win-condition analysis band between teams.
 - Player Form later: deeper recent games, off-role/specialist flags, and live backfill status if the card stats need more context.
 
@@ -214,7 +214,7 @@ Why this is good:
 Implementation notes:
 
 - `liveMode` state in `LiveMatchups` is `'match' | 'builds' | 'winConditions'`.
-- Gate the focused item-slot query so it only runs in Builds mode. This avoids frontend and API work for hidden build panels.
+- Gate the focused item-slot batch query so it only runs in Builds mode. The current batch asks for two rows of advice: exact matchup and champion baseline. This avoids frontend and API work for hidden build panels.
 - Gate win-condition query so it only runs in Win Conditions mode, unless we later want to prefetch after idle.
 - Keep the current champion card drag/drop shared across all modes because role correction affects every mode.
 - Use icons plus short labels in the rail. Good icon choices from lucide: sword/build, network/strategy, user/player form.
