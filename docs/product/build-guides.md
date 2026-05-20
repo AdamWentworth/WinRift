@@ -15,6 +15,7 @@ The current version can show:
 - skill priority/path aggregates from stored `SKILL_LEVEL_UP` timeline events
 - ban-rate estimates derived from champion bans in stored Match-V5 payloads
 - toughest and favorable opponent matchups from stored participant matchup rows
+- complete item-path summaries from `core3_signature` and `final_items_signature`
 - item slot panels from the precomputed `item_slot_analytics` read model
 
 Backend contracts:
@@ -29,7 +30,8 @@ Known gaps:
 - Ban rate is sample-relative: `champion bans / stored ranked matches` for the selected patch. Riot does not expose a separate global champion-ban-rate endpoint, so this should be labeled as our stored sample.
 - Pick rate is a sample-relative estimate from stored participant rows, not global Riot-wide popularity.
 - Tier-list impact is still a correlation-heavy score. It now uses final participant performance fields, but those signals should be validated as the corpus grows. See `docs/product/tier-list-ranking.md`.
-- Item paths are currently slot aggregates, not full path sequence aggregates. This is useful for matchup-specific item choice, but it is not identical to a U.GG full build path.
+- Item paths use timeline-derived first-three completed item signatures where available, then final inventory signatures for the completed build. Final inventory order is still Riot inventory order, not guaranteed purchase order.
+- Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin.
 - Skill paths are real timeline-derived paths, but they are still aggregated by champion/role/rank/patch rather than matchup-specific skill paths.
 
 The build guide page should remain a reference surface. Live match mode can point users toward contextual matchup stats, while guide mode lets users explore champion-wide and matchup-specific patterns calmly before queueing.

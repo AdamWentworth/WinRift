@@ -4482,6 +4482,117 @@ button {
   color: #fff;
 }
 
+.item-path-summary-card {
+  margin-top: 12px;
+}
+
+.guide-build-path-list {
+  display: grid;
+  gap: 10px;
+}
+
+.guide-build-path-card {
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgb(74 174 187 / 13%), transparent 58%),
+    rgb(7 10 12 / 44%);
+  border: 1px solid rgb(130 215 255 / 13%);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(128px, auto);
+  min-width: 0;
+  padding: 12px;
+}
+
+.guide-build-path-rank {
+  align-items: center;
+  background: #4aaebb;
+  color: #071112;
+  display: flex;
+  font-size: 14px;
+  font-weight: 1000;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.guide-build-path-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.guide-build-path-line {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.guide-build-path-line span {
+  color: #93dceb;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.guide-build-path-line.final span {
+  color: #c1c9ef;
+}
+
+.guide-build-path-icons {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.guide-build-path-icons img {
+  border: 1px solid rgb(255 255 255 / 16%);
+  height: 34px;
+  object-fit: cover;
+  width: 34px;
+}
+
+.guide-build-path-icons em {
+  color: #7e8790;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.guide-build-path-stats {
+  text-align: right;
+}
+
+.guide-build-path-stats b,
+.guide-build-path-stats span,
+.guide-build-path-stats em {
+  display: block;
+}
+
+.guide-build-path-stats b {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 1000;
+}
+
+.guide-build-path-stats span {
+  color: #c1c9ef;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.guide-build-path-stats em {
+  color: #7e8790;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .guide-item-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -4629,6 +4740,15 @@ button {
 
   .guide-item-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guide-build-path-card {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .guide-build-path-stats {
+    grid-column: 2;
+    text-align: left;
   }
 
   .live-mode-layout {
@@ -4797,6 +4917,19 @@ button {
   .guide-rune-grid,
   .guide-item-grid {
     grid-template-columns: 1fr;
+  }
+
+  .guide-build-path-card {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-build-path-rank {
+    height: 24px;
+    width: 24px;
+  }
+
+  .guide-build-path-stats {
+    grid-column: auto;
   }
 
   .guide-stat {

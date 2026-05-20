@@ -14,6 +14,7 @@ vi.mock('./api/client', () => ({
     topRunes: [],
     topSpells: [],
     topSkillOrders: [],
+    topItemPaths: [],
   })),
   getChampionGuideIndex: vi.fn(async () => ({
     results: [
@@ -74,6 +75,7 @@ describe('App', () => {
       topRunes: [],
       topSpells: [],
       topSkillOrders: [],
+      topItemPaths: [],
     });
     vi.mocked(getChampionGuideIndex).mockResolvedValue({
       results: [

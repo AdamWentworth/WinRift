@@ -225,6 +225,15 @@ export type ChampionGuideSkillOrder = {
   confidence: number;
 };
 
+export type ChampionGuideItemPath = {
+  core3Signature: string;
+  finalItemsSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+};
+
 export type ChampionGuideResponse = {
   summary: ChampionGuideSummary;
   toughestMatchups: ChampionGuideMatchup[];
@@ -232,6 +241,7 @@ export type ChampionGuideResponse = {
   topRunes: ChampionGuideRune[];
   topSpells: ChampionGuideSpells[];
   topSkillOrders: ChampionGuideSkillOrder[];
+  topItemPaths: ChampionGuideItemPath[];
 };
 
 export type ChampionGuideIndexResponse = {

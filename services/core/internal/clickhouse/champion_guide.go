@@ -82,6 +82,15 @@ type ChampionGuideSkillOrderRow struct {
 	Confidence float64
 }
 
+type ChampionGuideItemPathRow struct {
+	Core3Signature      string
+	FinalItemsSignature string
+	Wins                int
+	Games               int
+	WinRate             float64
+	Confidence          float64
+}
+
 type ChampionGuideData struct {
 	Summary          ChampionGuideSummary
 	ToughestMatchups []ChampionGuideMatchupRow
@@ -89,6 +98,7 @@ type ChampionGuideData struct {
 	TopRunes         []ChampionGuideSignatureRow
 	TopSpells        []ChampionGuideSignatureRow
 	TopSkillOrders   []ChampionGuideSkillOrderRow
+	TopItemPaths     []ChampionGuideItemPathRow
 }
 
 type championGuidePerformance struct {
@@ -247,6 +257,10 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 	if err != nil {
 		return ChampionGuideData{}, err
 	}
+	itemPaths, err := r.queryChampionGuideItemPaths(ctx, filters, minGames, limit)
+	if err != nil {
+		return ChampionGuideData{}, err
+	}
 	banRates, err := r.queryChampionBanRates(ctx, filters)
 	if err != nil {
 		return ChampionGuideData{}, err
@@ -262,6 +276,7 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 		TopRunes:         runes,
 		TopSpells:        spells,
 		TopSkillOrders:   skills,
+		TopItemPaths:     itemPaths,
 	}, nil
 }
 
@@ -654,6 +669,105 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 	return rows
 }
 
+func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideItemPathRow, error) {
+	if minGames <= 0 {
+		minGames = 5
+	}
+	if limit <= 0 {
+		limit = 12
+	}
+	roleScope := analyticsRoleScope(filters["role"])
+	rawSQL, rawArgs := championGuideBaseSQL(filters, roleScope, true)
+	compiledWhere := `
+		FROM patch_build_metrics FINAL
+		WHERE champion_id = ?
+			AND core3_signature != ''
+			AND final_items_signature != ''`
+	compiledArgs := []any{filters["champion_id"]}
+	if roleScope.whereSQL != "" {
+		compiledWhere += " AND " + roleScope.whereSQL
+		compiledArgs = append(compiledArgs, roleScope.args...)
+	}
+	if filterValue(filters["patch"]) != "" {
+		compiledWhere += " AND patch = ?"
+		compiledArgs = append(compiledArgs, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		compiledWhere += " AND rank_bucket = ?"
+		compiledArgs = append(compiledArgs, filterValue(filters["rank_bucket"]))
+	}
+	query := `
+		SELECT
+			core3_signature,
+			final_items_signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM
+		(
+			SELECT
+				core3_signature,
+				final_items_signature,
+				toUInt64(sum(win)) AS wins,
+				toUInt64(count()) AS games
+			` + rawSQL + `
+				AND core3_signature != ''
+				AND final_items_signature != ''
+			GROUP BY core3_signature, final_items_signature
+			UNION ALL
+			SELECT
+				core3_signature,
+				final_items_signature,
+				toUInt64(sum(wins)) AS wins,
+				toUInt64(sum(games)) AS games
+			` + compiledWhere + `
+			GROUP BY core3_signature, final_items_signature
+		)
+		GROUP BY core3_signature, final_items_signature
+		HAVING games >= ?
+		ORDER BY games DESC, win_rate DESC
+		LIMIT ?`
+	args := append([]any{}, rawArgs...)
+	args = append(args, compiledArgs...)
+	args = append(args, minGames, limit*5)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ChampionGuideItemPathRow{}
+	for rows.Next() {
+		var row ChampionGuideItemPathRow
+		if err := rows.Scan(&row.Core3Signature, &row.FinalItemsSignature, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Confidence != out[j].Confidence {
+			return out[i].Confidence > out[j].Confidence
+		}
+		if out[i].WinRate != out[j].WinRate {
+			return out[i].WinRate > out[j].WinRate
+		}
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		if out[i].Core3Signature != out[j].Core3Signature {
+			return out[i].Core3Signature < out[j].Core3Signature
+		}
+		return out[i].FinalItemsSignature < out[j].FinalItemsSignature
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (r *Repository) queryChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
 	roleScope := analyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)
@@ -760,6 +874,9 @@ func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScop
 				) AS rank_bucket,
 				pm.rune_signature,
 				pm.spell_signature,
+				pm.final_items_signature,
+				pm.core2_signature,
+				pm.core3_signature,
 				pm.win,
 				pm.kills,
 				pm.deaths,

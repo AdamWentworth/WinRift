@@ -393,6 +393,7 @@ func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
 		"topRunes":         championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
 		"topSpells":        championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
 		"topSkillOrders":   championGuideSkillOrderRowsResponse(guide.TopSkillOrders),
+		"topItemPaths":     championGuideItemPathRowsResponse(guide.TopItemPaths),
 	}
 }
 
@@ -486,6 +487,21 @@ func championGuideSkillOrderRowsResponse(rows []clickhouse.ChampionGuideSkillOrd
 	for _, row := range rows {
 		results = append(results, map[string]any{
 			"skillOrderSignature": row.Signature,
+			"wins":                row.Wins,
+			"games":               row.Games,
+			"winRate":             round(row.WinRate * 100),
+			"confidence":          round(row.Confidence * 100),
+		})
+	}
+	return results
+}
+
+func championGuideItemPathRowsResponse(rows []clickhouse.ChampionGuideItemPathRow) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"core3Signature":      row.Core3Signature,
+			"finalItemsSignature": row.FinalItemsSignature,
 			"wins":                row.Wins,
 			"games":               row.Games,
 			"winRate":             round(row.WinRate * 100),

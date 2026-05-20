@@ -200,6 +200,8 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
       </div>
 
+      <ItemPathSummaryCard guide={guide} items={items} loading={guideQuery.isLoading} />
+
       <ItemGuideGrid rows={itemSlots} items={items} loading={itemSlotsQuery.isLoading} context={opponent ? `Filtered into ${opponent.name}` : 'Champion-wide build path'} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
@@ -452,6 +454,55 @@ function ItemGuideGrid({ rows, items, loading, context }: { rows: AnalyticsItemS
   );
 }
 
+function ItemPathSummaryCard({ guide, items, loading }: { guide?: ChampionGuideResponse; items?: ItemData; loading: boolean }) {
+  const rows = guide?.topItemPaths ?? [];
+  return (
+    <PanelCard className="guide-card item-path-summary-card">
+      <PanelTitle
+        title="Item Paths"
+        detail={rows[0] ? `${rows[0].winRate.toFixed(2)}% WR (${formatNumber(rows[0].games)} matches) for the strongest complete path` : loading ? 'Loading...' : 'No complete path sample yet'}
+      />
+      {rows.length ? (
+        <div className="guide-build-path-list">
+          {rows.slice(0, 3).map((row, index) => (
+            <div key={`${row.core3Signature}-${row.finalItemsSignature}`} className="guide-build-path-card">
+              <div className="guide-build-path-rank">{index + 1}</div>
+              <div className="guide-build-path-main">
+                <div className="guide-build-path-line">
+                  <span>Core</span>
+                  <ItemSignatureImages signature={row.core3Signature} items={items} />
+                </div>
+                <div className="guide-build-path-line final">
+                  <span>Final</span>
+                  <ItemSignatureImages signature={row.finalItemsSignature} items={items} limit={6} />
+                </div>
+              </div>
+              <div className="guide-build-path-stats">
+                <b>{row.winRate.toFixed(2)}%</b>
+                <span>{formatNumber(row.games)} games</span>
+                <em>{row.confidence.toFixed(1)} confidence</em>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState message={loading ? 'Loading item paths...' : 'Complete item paths will appear after this champion has enough collected games.'} />
+      )}
+    </PanelCard>
+  );
+}
+
+function ItemSignatureImages({ signature, items, limit }: { signature: string; items?: ItemData; limit?: number }) {
+  const itemIds = signatureItems(signature).slice(0, limit ?? 99);
+  return (
+    <div className="guide-build-path-icons">
+      {itemIds.length ? itemIds.map((itemId) => (
+        <img key={`${signature}-${itemId}`} src={itemImageUrl(items, String(itemId))} alt={itemName(items, String(itemId))} title={itemName(items, String(itemId))} />
+      )) : <em>No items</em>}
+    </div>
+  );
+}
+
 function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { title: string; subtitle: string; rows: AnalyticsItemSlot[]; items?: ItemData; loading: boolean; linked?: boolean }) {
   return (
     <PanelCard className="guide-card guide-item-panel">
@@ -549,6 +600,13 @@ function skillSlots(signature: string) {
     .split('-')
     .map((part) => Number(part))
     .filter((slot) => slot >= 1 && slot <= 4);
+}
+
+function signatureItems(signature: string) {
+  return signature
+    .split('-')
+    .map((part) => Number(part))
+    .filter((itemId) => itemId > 0);
 }
 
 function skillPriority(signature: string) {
