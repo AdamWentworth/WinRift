@@ -5,6 +5,7 @@ import type { Champion, ChampionData } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
 import { championImageUrl, championList, championSplashUrl } from '../lib/staticData';
 import { MetricTile } from './ui/MetricTile';
+import { SelectControl } from './ui/SelectControl';
 
 const sortModes = [
   { value: 'name-asc', label: 'Name A-Z' },
@@ -57,14 +58,11 @@ export function ChampionDirectoryPage({ champions, onSelectChampion }: Props) {
             placeholder="Search champions"
           />
         </label>
-        <label className="guide-select-control compact">
-          <span>Sort</span>
-          <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-            {sortModes.map((candidate) => (
-              <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
-            ))}
-          </select>
-        </label>
+        <SelectControl className="guide-select-control compact" label="Sort" value={sortMode} onChange={(value) => setSortMode(value as SortMode)}>
+          {sortModes.map((candidate) => (
+            <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+          ))}
+        </SelectControl>
       </div>
 
       <div className="champion-directory-meta">

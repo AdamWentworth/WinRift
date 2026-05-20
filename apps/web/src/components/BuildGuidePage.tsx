@@ -23,6 +23,7 @@ import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { MetricTile } from './ui/MetricTile';
 import { EmptyState, PanelTitle } from './ui/Panel';
 import { RoleTabs } from './ui/RoleTabs';
+import { SelectControl } from './ui/SelectControl';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -237,37 +238,28 @@ function GuideFilters({
         <Filter size={17} />
         <span>Filters</span>
       </div>
-      <label className="guide-select-control">
-        <span>Champion</span>
-        <select value={championId} onChange={(event) => onChampionChange(Number(event.target.value))}>
-          {champions.map((champion) => {
-            const games = coverage.get(Number(champion.key))?.games ?? 0;
-            return (
-              <option key={champion.key} value={champion.key}>
-                {champion.name}{games ? ` (${formatNumber(games)})` : ''}
-              </option>
-            );
-          })}
-        </select>
-      </label>
+      <SelectControl label="Champion" value={championId} onChange={(value) => onChampionChange(Number(value))}>
+        {champions.map((champion) => {
+          const games = coverage.get(Number(champion.key))?.games ?? 0;
+          return (
+            <option key={champion.key} value={champion.key}>
+              {champion.name}{games ? ` (${formatNumber(games)})` : ''}
+            </option>
+          );
+        })}
+      </SelectControl>
       <RoleTabs options={ROLE_OPTIONS} value={role} onChange={onRoleChange} />
-      <label className="guide-select-control compact">
-        <span>Rank</span>
-        <select value={rankBucket} onChange={(event) => onRankChange(event.target.value)}>
-          {ranks.map((candidate) => (
-            <option key={candidate.value || 'ALL'} value={candidate.value}>{candidate.label}</option>
-          ))}
-        </select>
-      </label>
-      <label className="guide-select-control matchup">
-        <Search size={15} />
-        <select value={opponentChampionId} onChange={(event) => onOpponentChange(Number(event.target.value))}>
-          <option value={0}>vs. Champion...</option>
-          {champions.map((champion) => (
-            <option key={champion.key} value={champion.key}>{champion.name}</option>
-          ))}
-        </select>
-      </label>
+      <SelectControl className="guide-select-control compact" label="Rank" value={rankBucket} onChange={onRankChange}>
+        {ranks.map((candidate) => (
+          <option key={candidate.value || 'ALL'} value={candidate.value}>{candidate.label}</option>
+        ))}
+      </SelectControl>
+      <SelectControl className="guide-select-control matchup" icon={<Search size={15} />} value={opponentChampionId} onChange={(value) => onOpponentChange(Number(value))}>
+        <option value={0}>vs. Champion...</option>
+        {champions.map((champion) => (
+          <option key={champion.key} value={champion.key}>{champion.name}</option>
+        ))}
+      </SelectControl>
     </div>
   );
 }

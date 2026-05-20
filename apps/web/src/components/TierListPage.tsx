@@ -6,9 +6,11 @@ import { getChampionGuideIndex } from '../api/client';
 import type { Champion, ChampionData, ChampionGuideSummary } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
-import { championByKey, championImageUrl, championSplashUrl } from '../lib/staticData';
+import { championByKey, championSplashUrl } from '../lib/staticData';
+import { ChampionIdentity } from './ui/ChampionIdentity';
 import { MetricTile } from './ui/MetricTile';
 import { RoleTabs } from './ui/RoleTabs';
+import { SelectControl } from './ui/SelectControl';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -115,30 +117,21 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           value={role}
           onChange={setRole}
         />
-        <label className="guide-select-control compact">
-          <span>Rank</span>
-          <select value={rankBucket} onChange={(event) => setRankBucket(event.target.value)}>
-            {ranks.map((candidate) => (
-              <option key={candidate.value || 'ALL'} value={candidate.value}>{candidate.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="guide-select-control compact">
-          <span>Sample</span>
-          <select value={minGames} onChange={(event) => setMinGames(Number(event.target.value))}>
-            {minimumSamples.map((candidate) => (
-              <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="guide-select-control compact">
-          <span>Sort</span>
-          <select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-            {sortModes.map((candidate) => (
-              <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
-            ))}
-          </select>
-        </label>
+        <SelectControl className="guide-select-control compact" label="Rank" value={rankBucket} onChange={setRankBucket}>
+          {ranks.map((candidate) => (
+            <option key={candidate.value || 'ALL'} value={candidate.value}>{candidate.label}</option>
+          ))}
+        </SelectControl>
+        <SelectControl className="guide-select-control compact" label="Sample" value={minGames} onChange={(value) => setMinGames(Number(value))}>
+          {minimumSamples.map((candidate) => (
+            <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+          ))}
+        </SelectControl>
+        <SelectControl className="guide-select-control compact" label="Sort" value={sortMode} onChange={(value) => setSortMode(value as SortMode)}>
+          {sortModes.map((candidate) => (
+            <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
+          ))}
+        </SelectControl>
       </div>
 
       <div className="tier-list-tools">
@@ -200,13 +193,14 @@ function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; c
       type="button"
     >
       <span className={`tier-badge ${row.tier}`}>{row.tier}</span>
-      <div>
-        {champion ? <img src={championImageUrl(champions, row.summary.championId)} alt="" /> : null}
-        <span>
-          <strong>{champion?.name ?? row.summary.championId}</strong>
-          <em><RoleIcon role={row.summary.role} /> #{row.summary.roleRank || '-'} {roleLabel(row.summary.role)}</em>
-        </span>
-      </div>
+      <ChampionIdentity
+        as="div"
+        champion={champion}
+        championId={row.summary.championId}
+        champions={champions}
+        className="tier-feature-identity"
+        detail={<><RoleIcon role={row.summary.role} /> #{row.summary.roleRank || '-'} {roleLabel(row.summary.role)}</>}
+      />
       <p>{row.summary.winRate.toFixed(2)}% WR · {formatNumber(row.summary.games)} games · {row.score.toFixed(1)} score</p>
     </button>
   );
@@ -217,13 +211,13 @@ function TierTableRow({ row, champions, onSelectChampion }: { row: TierRow; cham
   return (
     <button className="tier-table-row" disabled={!champion} onClick={() => champion && onSelectChampion(champion)} type="button">
       <span><b className={`tier-badge ${row.tier}`}>{row.tier}</b></span>
-      <span className="tier-champion-cell">
-        {champion ? <img src={championImageUrl(champions, row.summary.championId)} alt="" /> : null}
-        <span>
-          <strong>{champion?.name ?? row.summary.championId}</strong>
-          <em><RoleIcon role={row.summary.role} /> Rank {row.summary.roleRank || '-'} of {row.summary.roleRankTotal || '-'}</em>
-        </span>
-      </span>
+      <ChampionIdentity
+        champion={champion}
+        championId={row.summary.championId}
+        champions={champions}
+        className="tier-champion-cell"
+        detail={<><RoleIcon role={row.summary.role} /> Rank {row.summary.roleRank || '-'} of {row.summary.roleRankTotal || '-'}</>}
+      />
       <span>{row.summary.winRate.toFixed(2)}%</span>
       <span>{row.summary.pickRate.toFixed(2)}%</span>
       <span>{row.summary.banRate.toFixed(2)}%</span>
