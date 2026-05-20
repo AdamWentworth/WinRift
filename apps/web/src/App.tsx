@@ -16,9 +16,11 @@ export function App() {
     liveGame.mutate({ gameName, tagLine, platform });
   };
 
+  const hasLiveGame = Boolean(!liveGame.isError && liveGame.data);
+
   return (
-    <main className="app-shell">
-      <header className="topbar">
+    <main className={hasLiveGame ? 'app-shell live-mode' : 'app-shell'}>
+      <header className={hasLiveGame ? 'topbar live-topbar' : 'topbar'}>
         <div>
           <h1>WinRift</h1>
         </div>
