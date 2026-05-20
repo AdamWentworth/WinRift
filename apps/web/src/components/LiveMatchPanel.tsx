@@ -1,7 +1,7 @@
 import { CircleAlert, LoaderCircle, RadioTower, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { resolveAccountAlias, searchAccountAliases } from '../api/client';
-import type { AccountAliasMatch, ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
+import type { AccountAliasMatch, ChampionData, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
 import { championList } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
 
@@ -75,6 +75,7 @@ type HomeSlideState = {
 
 type Props = {
   champions?: ChampionData;
+  championSplashes?: ChampionSplashData;
   items?: ItemData;
   spells?: SummonerSpellData;
   runes?: RuneData;
@@ -84,7 +85,7 @@ type Props = {
   onSearch: (gameName: string, tagLine: string, platform: string) => void;
 };
 
-export function LiveMatchPanel({ champions, items, spells, runes, liveGame, loading, error, onSearch }: Props) {
+export function LiveMatchPanel({ champions, championSplashes, items, spells, runes, liveGame, loading, error, onSearch }: Props) {
   const [riotId, setRiotId] = useState('');
   const [platform, setPlatform] = useState('NA1');
   const [showPlatforms, setShowPlatforms] = useState(false);
@@ -178,7 +179,7 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
   return (
     <section className={showLiveGame ? 'live-panel has-game' : 'live-panel search-only'}>
       {!showLiveGame ? (
-        <HomeArtStage champions={champions} />
+        <HomeArtStage champions={champions} championSplashes={championSplashes} />
       ) : null}
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
@@ -275,8 +276,8 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
   );
 }
 
-function HomeArtStage({ champions }: { champions?: ChampionData }) {
-  const slidePool = useMemo(() => buildHomeSplashPool(champions), [champions]);
+function HomeArtStage({ champions, championSplashes }: { champions?: ChampionData; championSplashes?: ChampionSplashData }) {
+  const slidePool = useMemo(() => buildHomeSplashPool(champions, championSplashes), [champions, championSplashes]);
   const [slideState, setSlideState] = useState(() => initialHomeSlideState(fallbackHomeSplashSlides));
 
   useEffect(() => {
@@ -319,7 +320,18 @@ function HomeArtSlide({ slide, state }: { slide: HomeSplashSlide; state: 'active
   );
 }
 
-function buildHomeSplashPool(champions?: ChampionData): HomeSplashSlide[] {
+function buildHomeSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData): HomeSplashSlide[] {
+  if (championSplashes?.data.length) {
+    return championSplashes.data.map((splash, index) => {
+      const key = `${splash.championId}-${splash.skinNumber}`;
+      return {
+        src: splash.src,
+        title: splash.skinNumber === 0 ? splash.championName : splash.skinName,
+        position: homeSplashPosition(key),
+        panClass: homeSplashPan(key, index),
+      };
+    });
+  }
   const championsByName = championList(champions);
   if (!championsByName.length) {
     return fallbackHomeSplashSlides;

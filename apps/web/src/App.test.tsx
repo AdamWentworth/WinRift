@@ -11,6 +11,7 @@ vi.mock('./api/client', () => ({
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
   getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
   getChampions: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
+  getChampionSplashes: vi.fn(async () => ({ version: 'test', data: [] })),
   getItems: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
   getRunes: vi.fn(async () => ({ version: 'test', data: [] })),
   getSummonerSpells: vi.fn(async () => ({ version: 'test', data: { data: {} } })),

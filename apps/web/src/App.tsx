@@ -1,9 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { LiveMatchPanel } from './components/LiveMatchPanel';
-import { getChampions, getItems, getLiveGame, getRunes, getSummonerSpells } from './api/client';
+import { getChampions, getChampionSplashes, getItems, getLiveGame, getRunes, getSummonerSpells } from './api/client';
 
 export function App() {
   const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions });
+  const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: Infinity });
   const items = useQuery({ queryKey: ['items'], queryFn: getItems });
   const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells });
   const runes = useQuery({ queryKey: ['runes'], queryFn: getRunes });
@@ -35,6 +36,7 @@ export function App() {
       </header>
       <LiveMatchPanel
         champions={champions.data}
+        championSplashes={championSplashes.data}
         items={items.data}
         spells={spells.data}
         runes={runes.data}

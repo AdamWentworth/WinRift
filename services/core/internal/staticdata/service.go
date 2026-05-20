@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -20,6 +21,14 @@ type Service struct {
 	cache         map[string]any
 }
 
+type ChampionSplash struct {
+	ChampionID   string `json:"championId"`
+	ChampionName string `json:"championName"`
+	SkinName     string `json:"skinName"`
+	SkinNumber   int    `json:"skinNumber"`
+	Src          string `json:"src"`
+}
+
 func NewService(riot RiotClient) *Service {
 	return &Service{riot: riot, cache: map[string]any{}}
 }
@@ -30,10 +39,6 @@ func (s *Service) Get(ctx context.Context, kind, patch string) (map[string]any, 
 		"items":           "item.json",
 		"runes":           "runesReforged.json",
 		"summoner-spells": "summoner.json",
-	}
-	file, ok := fileByKind[kind]
-	if !ok {
-		return nil, fmt.Errorf("unknown static data kind")
 	}
 	version := patch
 	if version == "" {
@@ -50,6 +55,20 @@ func (s *Service) Get(ctx context.Context, kind, patch string) (map[string]any, 
 		return map[string]any{"version": version, "data": data}, nil
 	}
 	s.mu.Unlock()
+	if kind == "champion-splashes" {
+		data, err := s.ChampionSplashes(ctx, version)
+		if err != nil {
+			return nil, err
+		}
+		s.mu.Lock()
+		s.cache[key] = data
+		s.mu.Unlock()
+		return map[string]any{"version": version, "data": data}, nil
+	}
+	file, ok := fileByKind[kind]
+	if !ok {
+		return nil, fmt.Errorf("unknown static data kind")
+	}
 	data, err := s.riot.DataDragonJSON(ctx, version, file)
 	if err != nil {
 		return nil, err
@@ -78,6 +97,125 @@ func (s *Service) LatestVersion(ctx context.Context) (string, error) {
 	s.latestVersion = versions[0]
 	s.mu.Unlock()
 	return versions[0], nil
+}
+
+func (s *Service) ChampionSplashes(ctx context.Context, version string) ([]ChampionSplash, error) {
+	payload, err := s.Get(ctx, "champions", version)
+	if err != nil {
+		return nil, err
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected champion data payload")
+	}
+	rawChampions, ok := data["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected champion data shape")
+	}
+	champions := make([]ChampionSplash, 0, len(rawChampions))
+	for _, rawChampion := range rawChampions {
+		champion, ok := rawChampion.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := champion["id"].(string)
+		name, _ := champion["name"].(string)
+		if id == "" || name == "" {
+			continue
+		}
+		champions = append(champions, ChampionSplash{ChampionID: id, ChampionName: name})
+	}
+	sort.Slice(champions, func(i, j int) bool {
+		return champions[i].ChampionName < champions[j].ChampionName
+	})
+
+	results := make([][]ChampionSplash, len(champions))
+	errs := make([]error, len(champions))
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	for index, champion := range champions {
+		wg.Add(1)
+		go func(index int, champion ChampionSplash) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			splashes, err := s.championSplashes(ctx, version, champion.ChampionID, champion.ChampionName)
+			if err != nil {
+				errs[index] = err
+				return
+			}
+			results[index] = splashes
+		}(index, champion)
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	splashes := make([]ChampionSplash, 0, len(champions)*8)
+	for _, championSplashes := range results {
+		splashes = append(splashes, championSplashes...)
+	}
+	return splashes, nil
+}
+
+func (s *Service) championSplashes(ctx context.Context, version, championID, championName string) ([]ChampionSplash, error) {
+	payload, err := s.riot.DataDragonJSON(ctx, version, fmt.Sprintf("champion/%s.json", championID))
+	if err != nil {
+		return nil, err
+	}
+	data, ok := payload.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected champion detail payload for %s", championID)
+	}
+	champions, ok := data["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected champion detail data for %s", championID)
+	}
+	champion, ok := champions[championID].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("missing champion detail for %s", championID)
+	}
+	rawSkins, ok := champion["skins"].([]any)
+	if !ok {
+		return nil, fmt.Errorf("missing skins for %s", championID)
+	}
+	splashes := make([]ChampionSplash, 0, len(rawSkins))
+	for _, rawSkin := range rawSkins {
+		skin, ok := rawSkin.(map[string]any)
+		if !ok {
+			continue
+		}
+		num, ok := numberAsInt(skin["num"])
+		if !ok {
+			continue
+		}
+		skinName, _ := skin["name"].(string)
+		if skinName == "" || skinName == "default" {
+			skinName = championName
+		}
+		if isChromaVariant(skinName) {
+			continue
+		}
+		splashes = append(splashes, ChampionSplash{
+			ChampionID:   championID,
+			ChampionName: championName,
+			SkinName:     skinName,
+			SkinNumber:   num,
+			Src:          fmt.Sprintf("https://ddragon.leagueoflegends.com/cdn/img/champion/splash/%s_%d.jpg", championID, num),
+		})
+	}
+	sort.Slice(splashes, func(i, j int) bool {
+		return splashes[i].SkinNumber < splashes[j].SkinNumber
+	})
+	return splashes, nil
+}
+
+func isChromaVariant(skinName string) bool {
+	index := strings.LastIndex(skinName, " (")
+	return index > 0 && strings.HasSuffix(skinName, ")")
 }
 
 func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle, includeSupport bool) ([]uint32, error) {
@@ -112,6 +250,17 @@ func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle,
 		return ids[i] < ids[j]
 	})
 	return ids, nil
+}
+
+func numberAsInt(value any) (int, bool) {
+	switch number := value.(type) {
+	case float64:
+		return int(number), true
+	case int:
+		return number, true
+	default:
+		return 0, false
+	}
 }
 
 func isBuildItem(id uint32, item map[string]any, includeJungle, includeSupport bool) bool {

@@ -14,6 +14,19 @@ export type Champion = {
   };
 };
 
+export type ChampionSplashData = {
+  version: string;
+  data: ChampionSplash[];
+};
+
+export type ChampionSplash = {
+  championId: string;
+  championName: string;
+  skinName: string;
+  skinNumber: number;
+  src: string;
+};
+
 export type ItemData = {
   version: string;
   data: {

@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -26,6 +26,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export function getChampions() {
   return request<ChampionData>('/api/static/champions');
+}
+
+export function getChampionSplashes() {
+  return request<ChampionSplashData>('/api/static/champion-splashes');
 }
 
 export function getItems() {
