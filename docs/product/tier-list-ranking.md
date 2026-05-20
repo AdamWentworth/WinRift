@@ -26,12 +26,12 @@ This intentionally keeps winning as the center of gravity while letting populari
 
 ## Tiers
 
-The frontend maps WinRift rank into presentation tiers. `S+` is not a fixed number of champions per role. It is earned by crossing a high-performance threshold:
+The frontend maps WinRift rank into presentation tiers. `S+` is not a fixed number of champions per role, and it is not awarded from raw winrate alone. It is earned from the same composite score that drives the tier-list ordering:
 
-- `tierScore >= 72`, or
-- `54%+` winrate with at least `100` games and `48%+` Wilson confidence.
+- `tierScore >= 60`
+- fallback only when `tierScore` is unavailable: top 5% by role rank
 
-This keeps `S+` attainable when the data clearly supports it, without reserving slots or forcing every role to have the same count. After `S+`, the remaining tiers use broad percentile bands:
+This keeps `S+` attainable when the data clearly supports it, without reserving slots or forcing every role to have the same count. A champion with a flashy raw winrate still needs enough total performance signal to cross the composite threshold. After `S+`, the remaining tiers use broad percentile bands:
 
 - `S`: top 22%
 - `A`: top 40%
