@@ -51,6 +51,11 @@ button {
   margin: 0;
 }
 
+.topbar-brand {
+  flex: 0 0 auto;
+  min-width: 138px;
+}
+
 .topbar-logo {
   background: transparent;
   border: 0;
@@ -81,6 +86,75 @@ button {
 
 .live-topbar .topbar-nav {
   display: none;
+}
+
+.topbar-search {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)),
+    rgb(5 8 9 / 50%);
+  border: 1px solid rgb(130 215 255 / 18%);
+  display: grid;
+  flex: 1 1 540px;
+  gap: 8px;
+  grid-template-columns: auto minmax(180px, 1fr) auto 82px 48px;
+  margin: 0 18px;
+  max-width: 680px;
+  min-width: 260px;
+  padding: 5px 6px 5px 10px;
+}
+
+.topbar-search svg {
+  color: #8cecff;
+}
+
+.topbar-search input,
+.topbar-search select {
+  background: rgb(0 0 0 / 30%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #f4f8fb;
+  font-size: 12px;
+  font-weight: 800;
+  height: 30px;
+  min-width: 0;
+  outline: none;
+  padding: 0 9px;
+}
+
+.topbar-search input:focus,
+.topbar-search select:focus {
+  border-color: rgb(130 215 255 / 56%);
+  box-shadow: 0 0 0 2px rgb(130 215 255 / 12%);
+}
+
+.topbar-search-intent {
+  color: #9fb8c1;
+  font-size: 10px;
+  font-weight: 1000;
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.topbar-search button {
+  background:
+    linear-gradient(180deg, rgb(91 203 220 / 28%), rgb(91 203 220 / 12%)),
+    rgb(0 0 0 / 34%);
+  border: 1px solid rgb(130 215 255 / 44%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 1000;
+  height: 30px;
+  text-transform: uppercase;
+}
+
+.topbar-search button:hover,
+.topbar-search button:focus-visible {
+  border-color: #9ef4ff;
+  box-shadow: 0 0 16px rgb(130 215 255 / 18%);
+  outline: none;
 }
 
 .live-panel {
@@ -153,6 +227,179 @@ button {
   pointer-events: none;
   position: absolute;
   z-index: 1;
+}
+
+.profile-page {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.profile-card {
+  background:
+    linear-gradient(180deg, rgb(24 29 31 / 92%), rgb(9 11 12 / 94%)),
+    rgb(14 17 18);
+  border: 1px solid rgb(130 215 255 / 28%);
+  box-shadow: 0 24px 90px rgb(0 0 0 / 54%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  color: #f5fbff;
+  max-width: 610px;
+  padding: 18px;
+  position: relative;
+  width: min(610px, calc(100vw - 36px));
+  z-index: 3;
+}
+
+.profile-card::before {
+  background:
+    linear-gradient(115deg, transparent 0 28%, rgb(130 215 255 / 22%) 28.2% 28.6%, transparent 28.9%),
+    radial-gradient(ellipse at 12% 0, rgb(130 215 255 / 13%), transparent 35%),
+    radial-gradient(ellipse at 90% 100%, rgb(240 128 128 / 12%), transparent 36%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.profile-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.profile-card-header {
+  align-items: center;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  display: grid;
+  gap: 13px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+}
+
+.profile-card-header svg {
+  color: #8cecff;
+}
+
+.profile-card-header span,
+.profile-next-panel span {
+  color: #8fbfca;
+  display: block;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.profile-card-header strong {
+  color: #fff;
+  display: block;
+  font-size: 23px;
+  font-weight: 1000;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.profile-card-header em {
+  background: rgb(130 215 255 / 12%);
+  border: 1px solid rgb(130 215 255 / 24%);
+  color: #d9f8ff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 1000;
+  padding: 5px 8px;
+}
+
+.profile-message {
+  align-items: flex-start;
+  background: rgb(0 0 0 / 22%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.profile-message svg {
+  color: #8cecff;
+  flex: 0 0 auto;
+}
+
+.profile-message strong {
+  color: #fff;
+  display: block;
+  font-size: 14px;
+  font-weight: 1000;
+  margin-bottom: 4px;
+}
+
+.profile-message span,
+.profile-next-panel p {
+  color: #c1d2d8;
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.profile-alias-list > div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-top: 10px;
+}
+
+.profile-alias-list button {
+  background: rgb(0 0 0 / 28%);
+  border: 1px solid rgb(130 215 255 / 20%);
+  color: #fff;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-height: 58px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.profile-alias-list button:hover,
+.profile-alias-list button:focus-visible {
+  border-color: #8cecff;
+  outline: none;
+}
+
+.profile-alias-list button span {
+  font-size: 13px;
+  font-weight: 1000;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-alias-list button b,
+.profile-alias-list button em {
+  color: #a9c9d1;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.profile-next-panel {
+  background: linear-gradient(180deg, rgb(130 215 255 / 8%), rgb(130 215 255 / 3%));
+  border: 1px solid rgb(130 215 255 / 14%);
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+.profile-live-shell {
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  position: relative;
 }
 
 .home-art-stage {
@@ -3786,12 +4033,33 @@ button {
 
 @media (max-width: 760px) {
   .topbar {
-    height: 52px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 52px;
     padding: 0 14px;
+    row-gap: 7px;
   }
 
   .topbar-logo {
     font-size: 21px;
+  }
+
+  .topbar-brand {
+    min-width: 86px;
+  }
+
+  .topbar-search {
+    flex-basis: 100%;
+    grid-template-columns: auto minmax(0, 1fr) 70px 44px;
+    margin: 0 0 8px;
+    max-width: none;
+    min-width: 0;
+    order: 3;
+    width: 100%;
+  }
+
+  .topbar-search-intent {
+    display: none;
   }
 
   .topbar-nav {
@@ -4103,6 +4371,19 @@ button {
 }
 
 @media (max-width: 520px) {
+  .topbar {
+    padding: 8px 10px;
+  }
+
+  .topbar-search {
+    grid-template-columns: minmax(0, 1fr) 62px 42px;
+    padding-left: 6px;
+  }
+
+  .topbar-search svg {
+    display: none;
+  }
+
   .search-only .search-section {
     width: calc(100vw - 20px);
   }

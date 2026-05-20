@@ -57,6 +57,7 @@ vi.mock('./api/client', () => ({
 describe('App', () => {
   afterEach(() => {
     cleanup();
+    window.history.replaceState({}, '', '/');
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
     vi.mocked(getChampionGuide).mockReset();
@@ -121,12 +122,38 @@ describe('App', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Build Guides' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Champions' }));
 
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
     await waitFor(() => expect(getChampionGuide).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
     expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
+    queryClient.clear();
+  });
+
+  it('routes champion names from the shared search to champion pages', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Search champions or summoners'), {
+      target: { value: 'wukong' },
+    });
+    await screen.findByText('Champion: Wukong');
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+
+    await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
+    expect(window.location.pathname).toBe('/champions/MonkeyKing');
+    expect(getLiveGame).not.toHaveBeenCalled();
     queryClient.clear();
   });
 
@@ -207,7 +234,7 @@ describe('App', () => {
     fireEvent.click(screen.getByLabelText('Find live game'));
 
     await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1'));
-    await waitFor(() => expect(screen.getByDisplayValue('Sneaky#NA69')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Sneaky#NA69')).toBeInTheDocument());
     queryClient.clear();
   });
 
@@ -244,7 +271,7 @@ describe('App', () => {
     fireEvent.click(await screen.findByLabelText('Use Sneaky#NA69'));
 
     await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1'));
-    expect(screen.getByDisplayValue('Sneaky#NA69')).toBeInTheDocument();
+    expect(screen.getByText('Sneaky#NA69')).toBeInTheDocument();
     queryClient.clear();
   });
 

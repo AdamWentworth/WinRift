@@ -1,65 +1,122 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { LiveMatchPanel } from './components/LiveMatchPanel';
-import { getChampions, getChampionSplashes, getItems, getLiveGame, getRunes, getSummonerSpells } from './api/client';
+import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Search } from 'lucide-react';
+import { getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import type { Champion, ChampionData } from './api/types';
 import { BuildGuidePage } from './components/BuildGuidePage';
+import { LiveMatchPanel } from './components/LiveMatchPanel';
+import { SummonerProfilePage } from './components/SummonerProfilePage';
+import {
+  championIdFromRoute,
+  championRouteSlug,
+  findChampionByLookup,
+  parseRiotId,
+  platformLabel,
+  platforms,
+  summonerPath,
+} from './lib/lookup';
 
-type AppView = 'live' | 'guides';
+type AppRoute =
+  | { kind: 'home' }
+  | { kind: 'champion'; championSlug?: string }
+  | { kind: 'summoner'; platform?: string; gameName?: string; tagLine?: string };
 
 export function App() {
-  const [view, setView] = useState<AppView>('live');
+  const [route, setRoute] = useState<AppRoute>(() => readRoute());
   const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions });
   const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: Infinity });
   const items = useQuery({ queryKey: ['items'], queryFn: getItems });
   const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells });
   const runes = useQuery({ queryKey: ['runes'], queryFn: getRunes });
-  const liveGame = useMutation({
-    mutationFn: ({ gameName, tagLine, platform }: { gameName: string; tagLine: string; platform: string }) => getLiveGame(gameName, tagLine, platform),
-  });
 
-  const searchLiveGame = (gameName: string, tagLine: string, platform: string) => {
-    liveGame.reset();
-    liveGame.mutate({ gameName, tagLine, platform });
-  };
+  useEffect(() => {
+    const onPopState = () => setRoute(readRoute());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
-  const goHome = () => {
-    setView('live');
-    liveGame.reset();
-  };
+  const navigate = useCallback((nextRoute: AppRoute, options?: { replace?: boolean }) => {
+    const path = pathForRoute(nextRoute);
+    if (window.location.pathname !== path) {
+      if (options?.replace) {
+        window.history.replaceState({}, '', path);
+      } else {
+        window.history.pushState({}, '', path);
+      }
+    }
+    setRoute(nextRoute);
+  }, []);
 
-  const hasLiveGame = Boolean(view === 'live' && !liveGame.isError && liveGame.data);
-  const showGuides = view === 'guides';
+  const goHome = useCallback(() => navigate({ kind: 'home' }), [navigate]);
+  const activeSection = route.kind === 'champion' ? 'champions' : route.kind === 'summoner' ? 'summoners' : 'home';
+  const initialChampionId = useMemo(() => (
+    route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
+  ), [champions.data, route]);
+
+  const runUniversalSearch = useCallback((value: string, platform: string, championMatch?: Champion) => {
+    const parsed = parseRiotId(value);
+    if (!parsed.gameName) {
+      return;
+    }
+    const champion = championMatch ?? (!parsed.tagLine ? findChampionByLookup(champions.data, parsed.gameName) : undefined);
+    if (champion) {
+      navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
+      return;
+    }
+    navigate({ kind: 'summoner', platform, gameName: parsed.gameName, tagLine: parsed.tagLine || undefined });
+  }, [champions.data, navigate]);
 
   return (
-    <main className={showGuides ? 'app-shell guide-mode' : hasLiveGame ? 'app-shell live-mode' : 'app-shell'}>
-      <header className={hasLiveGame ? 'topbar live-topbar' : 'topbar'}>
-        <div>
+    <main className={route.kind === 'champion' ? 'app-shell guide-mode' : 'app-shell'}>
+      <header className="topbar">
+        <div className="topbar-brand">
           <h1>
             <button className="topbar-logo" onClick={goHome} type="button" aria-label="WinRift home">
               WinRift
             </button>
           </h1>
         </div>
+        <UniversalSearch champions={champions.data} onSubmit={runUniversalSearch} />
         <nav className="topbar-nav" aria-label="Primary">
-          <button className={view === 'live' ? 'selected' : ''} onClick={goHome} type="button">Live Lookup</button>
+          <button className={activeSection === 'home' ? 'selected' : ''} onClick={goHome} type="button">Home</button>
           <button
-            className={showGuides ? 'selected' : ''}
-            onClick={() => {
-              liveGame.reset();
-              setView('guides');
-            }}
+            className={activeSection === 'champions' ? 'selected' : ''}
+            onClick={() => navigate({ kind: 'champion' })}
             type="button"
           >
-            Build Guides
+            Champions
+          </button>
+          <button
+            className={activeSection === 'summoners' ? 'selected' : ''}
+            onClick={() => navigate({ kind: 'summoner' })}
+            type="button"
+          >
+            Summoners
           </button>
         </nav>
       </header>
-      {showGuides ? (
+
+      {route.kind === 'champion' ? (
         <BuildGuidePage
           champions={champions.data}
           items={items.data}
           spells={spells.data}
           runes={runes.data}
+          initialChampionId={initialChampionId}
+          onChampionChange={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+        />
+      ) : route.kind === 'summoner' ? (
+        <SummonerProfilePage
+          platform={route.platform}
+          gameName={route.gameName}
+          tagLine={route.tagLine}
+          champions={champions.data}
+          championSplashes={championSplashes.data}
+          items={items.data}
+          spells={spells.data}
+          runes={runes.data}
+          onUseAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine })}
+          onResolvedAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine }, { replace: true })}
         />
       ) : (
         <LiveMatchPanel
@@ -68,12 +125,66 @@ export function App() {
           items={items.data}
           spells={spells.data}
           runes={runes.data}
-          liveGame={liveGame.isError ? undefined : liveGame.data}
-          loading={liveGame.isPending}
-          error={liveGame.error}
-          onSearch={searchLiveGame}
+          loading={false}
+          onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
+          onChampionSearch={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
         />
       )}
     </main>
   );
+}
+
+function UniversalSearch({ champions, onSubmit }: { champions?: ChampionData; onSubmit: (value: string, platform: string, championMatch?: Champion) => void }) {
+  const [value, setValue] = useState('');
+  const [platform, setPlatform] = useState('NA1');
+  const parsed = parseRiotId(value);
+  const championMatch = !parsed.tagLine ? findChampionByLookup(champions, parsed.gameName) : undefined;
+  const intentLabel = championMatch ? `Champion: ${championMatch.name}` : parsed.gameName ? 'Summoner profile' : 'Champion or Riot ID';
+
+  return (
+    <form
+      className="topbar-search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(value, platform, championMatch);
+      }}
+    >
+      <Search aria-hidden="true" size={16} />
+      <input
+        aria-label="Search champions or summoners"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder="Champion or Riot ID"
+      />
+      <span className="topbar-search-intent">{intentLabel}</span>
+      <select aria-label="Default region" value={platform} onChange={(event) => setPlatform(event.target.value)}>
+        {platforms.map((candidate) => (
+          <option key={candidate.value} value={candidate.value}>{platformLabel(candidate.value)}</option>
+        ))}
+      </select>
+      <button type="submit">Go</button>
+    </form>
+  );
+}
+
+function readRoute(): AppRoute {
+  const parts = window.location.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
+  if (parts[0] === 'champions') {
+    return { kind: 'champion', championSlug: parts[1] };
+  }
+  if (parts[0] === 'summoners') {
+    return { kind: 'summoner', platform: parts[1], gameName: parts[2], tagLine: parts[3] };
+  }
+  return { kind: 'home' };
+}
+
+function pathForRoute(route: AppRoute) {
+  if (route.kind === 'champion') {
+    return route.championSlug ? `/champions/${encodeURIComponent(route.championSlug)}` : '/champions';
+  }
+  if (route.kind === 'summoner') {
+    if (!route.gameName) return '/summoners';
+    return summonerPath(route.platform ?? 'NA1', route.gameName, route.tagLine);
+  }
+  return '/';
 }

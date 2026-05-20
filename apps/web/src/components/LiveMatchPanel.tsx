@@ -1,23 +1,10 @@
 import { CircleAlert, LoaderCircle, RadioTower, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { resolveAccountAlias, searchAccountAliases } from '../api/client';
-import type { AccountAliasMatch, ChampionData, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
+import type { AccountAliasMatch, Champion, ChampionData, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
+import { findChampionByLookup, parseRiotId, platformLabel, platforms } from '../lib/lookup';
 import { championList } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
-
-const platforms = [
-  { value: 'NA1', label: 'NA', color: 'red' },
-  { value: 'EUW1', label: 'EUW', color: 'blue' },
-  { value: 'EUN1', label: 'EUNE', color: 'darkgreen' },
-  { value: 'LA1', label: 'LAN', color: 'darkorange' },
-  { value: 'LA2', label: 'LAS', color: 'firebrick' },
-  { value: 'BR1', label: 'BR', color: 'forestgreen' },
-  { value: 'TR1', label: 'TR', color: 'indigo' },
-  { value: 'RU', label: 'RU', color: 'darkred' },
-  { value: 'KR', label: 'KR', color: 'navy' },
-  { value: 'JP1', label: 'JP', color: 'crimson' },
-  { value: 'OC1', label: 'OCE', color: 'steelblue' },
-] as const;
 
 type HomeSplashSlide = {
   src: string;
@@ -83,9 +70,10 @@ type Props = {
   loading: boolean;
   error?: Error | null;
   onSearch: (gameName: string, tagLine: string, platform: string) => void;
+  onChampionSearch?: (champion: Champion) => void;
 };
 
-export function LiveMatchPanel({ champions, championSplashes, items, spells, runes, liveGame, loading, error, onSearch }: Props) {
+export function LiveMatchPanel({ champions, championSplashes, items, spells, runes, liveGame, loading, error, onSearch, onChampionSearch }: Props) {
   const [riotId, setRiotId] = useState('');
   const [platform, setPlatform] = useState('NA1');
   const [showPlatforms, setShowPlatforms] = useState(false);
@@ -140,6 +128,13 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
     const parsed = parseRiotId(riotId);
     if (!parsed.gameName) {
       setValidationError('Enter a Riot ID to search.');
+      return;
+    }
+    const championMatch = !parsed.tagLine ? findChampionByLookup(champions, parsed.gameName) : undefined;
+    if (championMatch && onChampionSearch) {
+      setValidationError('');
+      setSuggestionsOpen(false);
+      onChampionSearch(championMatch);
       return;
     }
     if (!parsed.tagLine) {
@@ -274,7 +269,7 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
   );
 }
 
-function HomeArtStage({ champions, championSplashes }: { champions?: ChampionData; championSplashes?: ChampionSplashData }) {
+export function HomeArtStage({ champions, championSplashes }: { champions?: ChampionData; championSplashes?: ChampionSplashData }) {
   const slidePool = useMemo(() => buildHomeSplashPool(champions, championSplashes), [champions, championSplashes]);
   const [slideState, setSlideState] = useState(() => initialHomeSlideState(fallbackHomeSplashSlides));
 
@@ -406,20 +401,4 @@ function lookupErrorMessage(riotId: string, message: string) {
     return `Summoner '${riotId.trim()}' is not currently in a live match`;
   }
   return message;
-}
-
-function parseRiotId(value: string) {
-  const trimmed = value.trim();
-  const separator = trimmed.lastIndexOf('#');
-  if (separator === -1) {
-    return { gameName: trimmed, tagLine: '' };
-  }
-  return {
-    gameName: trimmed.slice(0, separator).trim(),
-    tagLine: trimmed.slice(separator + 1).trim(),
-  };
-}
-
-function platformLabel(value: string) {
-  return platforms.find((candidate) => candidate.value === value)?.label ?? value;
 }

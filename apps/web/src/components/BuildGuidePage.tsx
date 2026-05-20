@@ -42,15 +42,17 @@ type Props = {
   items?: ItemData;
   spells?: SummonerSpellData;
   runes?: RuneData;
+  initialChampionId?: number;
+  onChampionChange?: (champion: Champion) => void;
 };
 
-export function BuildGuidePage({ champions, items, spells, runes }: Props) {
+export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, onChampionChange }: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
   const defaultChampionId = useMemo(() => {
     const wukong = championsByName.find((champion) => champion.id === 'MonkeyKing');
     return Number(wukong?.key ?? championsByName[0]?.key ?? 62);
   }, [championsByName]);
-  const [championId, setChampionId] = useState(defaultChampionId);
+  const [championId, setChampionId] = useState(initialChampionId ?? defaultChampionId);
   const [role, setRole] = useState('JUNGLE');
   const [rankBucket, setRankBucket] = useState('');
   const [opponentChampionId, setOpponentChampionId] = useState(0);
@@ -82,10 +84,22 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
   });
 
   useEffect(() => {
+    if (initialChampionId && championByKey(champions, initialChampionId) && initialChampionId !== championId) {
+      setChampionId(initialChampionId);
+      return;
+    }
     if (defaultChampionId && !championByKey(champions, championId)) {
       setChampionId(defaultChampionId);
     }
-  }, [champions, championId, defaultChampionId]);
+  }, [champions, championId, defaultChampionId, initialChampionId]);
+
+  const updateChampion = (value: number) => {
+    setChampionId(value);
+    const nextChampion = championByKey(champions, value);
+    if (nextChampion) {
+      onChampionChange?.(nextChampion);
+    }
+  };
 
   const guide = guideQuery.data;
   const itemSlots = itemSlotsQuery.data?.results ?? [];
@@ -148,7 +162,7 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
         role={role}
         rankBucket={rankBucket}
         opponentChampionId={opponentChampionId}
-        onChampionChange={setChampionId}
+        onChampionChange={updateChampion}
         onRoleChange={setRole}
         onRankChange={setRankBucket}
         onOpponentChange={setOpponentChampionId}
