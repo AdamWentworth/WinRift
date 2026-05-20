@@ -1,4 +1,4 @@
-import { CircleSlash, Database, Filter, Search, Shield } from 'lucide-react';
+import { Database, Filter, Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +21,7 @@ import {
 } from '../lib/staticData';
 import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { MetricTile } from './ui/MetricTile';
+import { EmptyState, PanelTitle } from './ui/Panel';
 import { RoleTabs } from './ui/RoleTabs';
 
 const ranks = [
@@ -308,7 +309,7 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
   const secondary = runes?.data.find((style) => style.id === parsed.secondaryStyleId);
   return (
     <article className="guide-card rune-guide-card">
-      <GuideSectionTitle title="Runes" detail={runeRow ? `${runeRow.winRate.toFixed(2)}% WR (${formatNumber(runeRow.games)} matches)` : loading ? 'Loading...' : 'No rune sample yet'} />
+      <PanelTitle title="Runes" detail={runeRow ? `${runeRow.winRate.toFixed(2)}% WR (${formatNumber(runeRow.games)} matches)` : loading ? 'Loading...' : 'No rune sample yet'} />
       {runeRow ? (
         <div className="guide-rune-grid">
           <RuneTreePanel style={primary} selectedRuneIds={parsed.runeIds} runes={runes} />
@@ -320,7 +321,7 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
             </div>
           </div>
         </div>
-      ) : <GuideEmpty message="Rune pages will appear once this champion has enough collected games." />}
+      ) : <EmptyState message="Rune pages will appear once this champion has enough collected games." />}
     </article>
   );
 }
@@ -360,14 +361,14 @@ function SpellGuideCard({ guide, spells, loading }: { guide?: ChampionGuideRespo
   const spellIds = signatureSpells(spellRow?.spellSignature ?? '');
   return (
     <article className="guide-card spell-guide-card">
-      <GuideSectionTitle title="Summoner Spells" detail={spellRow ? `${spellRow.winRate.toFixed(2)}% WR (${formatNumber(spellRow.games)} matches)` : loading ? 'Loading...' : 'No spell sample yet'} />
+      <PanelTitle title="Summoner Spells" detail={spellRow ? `${spellRow.winRate.toFixed(2)}% WR (${formatNumber(spellRow.games)} matches)` : loading ? 'Loading...' : 'No spell sample yet'} />
       {spellIds.length ? (
         <div className="guide-spell-pair">
           {spellIds.map((spellId) => (
             <img key={spellId} src={summonerSpellImageUrl(spells, spellId)} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} />
           ))}
         </div>
-      ) : <GuideEmpty message="Summoner spell samples will appear after collection." />}
+      ) : <EmptyState message="Summoner spell samples will appear after collection." />}
     </article>
   );
 }
@@ -375,7 +376,7 @@ function SpellGuideCard({ guide, spells, loading }: { guide?: ChampionGuideRespo
 function MatchupStrip({ title, subtitle, rows, champions, tone, loading }: { title: string; subtitle: string; rows: { opponentChampionId: number; winRate: number; games: number }[]; champions?: ChampionData; tone: 'good' | 'bad'; loading: boolean }) {
   return (
     <section className="guide-card matchup-strip">
-      <GuideSectionTitle title={title} detail={subtitle} />
+      <PanelTitle title={title} detail={subtitle} />
       <div className="guide-matchup-row">
         {rows.length ? rows.map((row) => {
           const opponent = championByKey(champions, row.opponentChampionId);
@@ -387,7 +388,7 @@ function MatchupStrip({ title, subtitle, rows, champions, tone, loading }: { tit
               <span>{formatNumber(row.games)} matches</span>
             </div>
           );
-        }) : <GuideEmpty message={loading ? 'Loading matchups...' : 'No matchup sample yet for this filter.'} />}
+        }) : <EmptyState message={loading ? 'Loading matchups...' : 'No matchup sample yet for this filter.'} />}
       </div>
     </section>
   );
@@ -399,7 +400,7 @@ function SkillGuideCard({ guide, champion, champions, loading }: { guide?: Champ
   const priority = skillPriority(skillOrder?.skillOrderSignature ?? '');
   return (
     <article className="guide-card skill-priority-card">
-      <GuideSectionTitle title="Skill Priority" detail={skillOrder ? `${skillOrder.winRate.toFixed(2)}% WR (${formatNumber(skillOrder.games)} matches)` : loading ? 'Loading...' : 'No skill sample yet'} />
+      <PanelTitle title="Skill Priority" detail={skillOrder ? `${skillOrder.winRate.toFixed(2)}% WR (${formatNumber(skillOrder.games)} matches)` : loading ? 'Loading...' : 'No skill sample yet'} />
       <div className="skill-priority-icons">
         {(priority.length ? priority : [1, 2, 3]).map((slot) => {
           const ability = spells[slot - 1];
@@ -425,7 +426,7 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
   const slots = skillSlots(skillOrder?.skillOrderSignature ?? '');
   return (
     <article className="guide-card skill-path-card">
-      <GuideSectionTitle title="Skill Path" detail={skillOrder ? `${formatNumber(skillOrder.games)} matching paths` : loading ? 'Loading...' : 'No path sample yet'} />
+      <PanelTitle title="Skill Path" detail={skillOrder ? `${formatNumber(skillOrder.games)} matching paths` : loading ? 'Loading...' : 'No path sample yet'} />
       {slots.length ? (
         <div className="skill-path-placeholder-grid">
           {[1, 2, 3, 4].map((slot) => (
@@ -439,7 +440,7 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
             </div>
           ))}
         </div>
-      ) : <GuideEmpty message={loading ? 'Loading skill path...' : `No skill path sample yet for ${championName}.`} />}
+      ) : <EmptyState message={loading ? 'Loading skill path...' : `No skill path sample yet for ${championName}.`} />}
       <p>{slots.length ? `${championName} skill order is shown from the most common collected path.` : 'This panel stays empty until real timeline data exists.'}</p>
     </article>
   );
@@ -462,7 +463,7 @@ function ItemGuideGrid({ rows, items, loading, context }: { rows: AnalyticsItemS
 function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { title: string; subtitle: string; rows: AnalyticsItemSlot[]; items?: ItemData; loading: boolean; linked?: boolean }) {
   return (
     <article className="guide-card guide-item-panel">
-      <GuideSectionTitle title={title} detail="" />
+      <PanelTitle title={title} />
       {rows.length ? (
         <div className={linked ? 'guide-item-list linked' : 'guide-item-list'}>
           {rows.map((row, index) => (
@@ -476,7 +477,7 @@ function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { tit
             </div>
           ))}
         </div>
-      ) : <GuideEmpty message={loading ? 'Loading items...' : 'No item sample yet.'} />}
+      ) : <EmptyState message={loading ? 'Loading items...' : 'No item sample yet.'} />}
       <small>{subtitle}</small>
     </article>
   );
@@ -485,7 +486,7 @@ function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { tit
 function RoleQuestCard() {
   return (
     <article className="guide-card guide-role-quest">
-      <GuideSectionTitle title="Role Quest" detail="Jungle context" />
+      <PanelTitle title="Role Quest" detail="Jungle context" />
       <p>Jungle builds include starter jungle items when they appear in the collected purchase path. This keeps jungle-specific first-slot data separate from lane builds.</p>
     </article>
   );
@@ -494,27 +495,9 @@ function RoleQuestCard() {
 function GuideMiniNote({ title, body }: { title: string; body: string }) {
   return (
     <article className="guide-card guide-mini-note">
-      <GuideSectionTitle title={title} detail="" />
+      <PanelTitle title={title} />
       <p>{body}</p>
     </article>
-  );
-}
-
-function GuideSectionTitle({ title, detail }: { title: string; detail: string }) {
-  return (
-    <header className="guide-section-title">
-      <span>{title}</span>
-      {detail ? <em>{detail}</em> : null}
-    </header>
-  );
-}
-
-function GuideEmpty({ message }: { message: string }) {
-  return (
-    <div className="guide-empty">
-      <CircleSlash size={18} />
-      <span>{message}</span>
-    </div>
   );
 }
 
