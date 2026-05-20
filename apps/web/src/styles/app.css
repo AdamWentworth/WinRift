@@ -3145,7 +3145,7 @@ button {
   border: 1px solid rgb(130 215 255 / 16%);
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(220px, 1fr) auto minmax(130px, 170px);
+  grid-template-columns: minmax(240px, 1fr) minmax(130px, 190px);
   margin-top: 16px;
   padding: 12px;
 }
@@ -3190,7 +3190,7 @@ button {
 .champion-directory-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
 }
 
 .champion-directory-card {
@@ -3241,35 +3241,9 @@ button {
   width: 52px;
 }
 
-.directory-tier {
-  background: rgb(7 9 10 / 88%);
-  border: 1px solid rgb(232 201 118 / 72%);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 1000;
-  min-width: 30px;
-  padding: 2px 7px;
-  position: absolute;
-  right: 12px;
-  text-align: center;
-  top: 12px;
-  z-index: 2;
-}
-
-.directory-tier.S {
-  border-color: #58d9ff;
-  color: #91f4ff;
-}
-
-.directory-tier.A {
-  border-color: #76ffb5;
-  color: #a5ffd0;
-}
-
-.directory-tier.C,
-.directory-tier.D {
-  border-color: #ff8b8b;
-  color: #ffd0d0;
+.champion-directory-card.neutral {
+  grid-template-rows: auto 1fr auto auto;
+  min-height: 194px;
 }
 
 .directory-card-name {
@@ -3279,7 +3253,7 @@ button {
   font-size: 20px;
   font-weight: 1000;
   line-height: 1;
-  margin-top: 62px;
+  margin-top: 0;
   text-shadow: 0 2px 6px rgb(0 0 0 / 70%);
 }
 
@@ -3294,58 +3268,6 @@ button {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
-}
-
-.directory-card-stats {
-  display: grid;
-  gap: 5px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.directory-card-stats span {
-  background: rgb(0 0 0 / 36%);
-  border: 1px solid rgb(255 255 255 / 8%);
-  min-width: 0;
-  padding: 6px 7px;
-}
-
-.directory-card-stats em,
-.directory-card-stats strong {
-  display: block;
-  font-style: normal;
-  line-height: 1;
-}
-
-.directory-card-stats em {
-  color: #9fb6bd;
-  font-size: 8px;
-  font-weight: 1000;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-}
-
-.directory-card-stats strong {
-  color: #fff;
-  font-size: 12px;
-  font-weight: 1000;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.directory-rank-chip {
-  align-items: center;
-  background: rgb(0 0 0 / 46%);
-  border: 1px solid rgb(232 201 118 / 46%);
-  bottom: 13px;
-  color: #f0d583;
-  display: inline-flex;
-  font-size: 10px;
-  font-weight: 1000;
-  gap: 4px;
-  padding: 3px 6px;
-  position: absolute;
-  right: 13px;
 }
 
 .build-guide-page {

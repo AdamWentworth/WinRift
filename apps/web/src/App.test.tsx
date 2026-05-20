@@ -111,7 +111,7 @@ describe('App', () => {
     queryClient.clear();
   });
 
-  it('opens the champion directory and links into build guides', async () => {
+  it('opens the alphabetical champion directory and links into build guides', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -128,14 +128,17 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Champions' }));
 
     await waitFor(() => expect(screen.getByText('Champion Index')).toBeInTheDocument());
-    expect(screen.getByText('Build Guides By Champion')).toBeInTheDocument();
+    expect(screen.getByText('All Champions')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Champion directory role')).not.toBeInTheDocument();
     expect(await screen.findByText('Wukong')).toBeInTheDocument();
-    expect(await screen.findByText('60.0%')).toBeInTheDocument();
-    expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
+    expect(screen.getByText('1 champions shown')).toBeInTheDocument();
+    expect(screen.queryByText('60.0%')).not.toBeInTheDocument();
+    expect(getChampionGuideIndex).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Wukong/i }));
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
     await waitFor(() => expect(getChampionGuide).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
+    expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
     queryClient.clear();
   });
 
