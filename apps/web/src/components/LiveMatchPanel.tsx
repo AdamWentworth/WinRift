@@ -177,8 +177,9 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
           <div className="lookup-console-header">
-            <span>Guides, Profiles, Live Games</span>
-            <strong>Champion &amp; Summoner Search</strong>
+            <span>Search WinRift</span>
+            <strong>Guides, Profiles, Live Games</strong>
+            <p>Champion names open build guides. Riot IDs open summoner profiles and jump into live match analysis when that player is currently in game.</p>
           </div>
         ) : null}
         <div className={validationError ? 'search-bar invalid' : 'search-bar'}>
@@ -201,7 +202,7 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
           >
             {selectedPlatform.label}
           </button>
-          <button className="search-button" onClick={search} title="Find live game" aria-label="Find live game">
+          <button className="search-button" onClick={search} title="Search WinRift" aria-label="Search WinRift">
             <Search size={19} />
             <span>{showLiveGame ? 'Find' : 'Search'}</span>
           </button>

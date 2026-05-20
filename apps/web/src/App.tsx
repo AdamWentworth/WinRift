@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
 import { BuildGuidePage } from './components/BuildGuidePage';
+import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
 import { LiveMatchPanel } from './components/LiveMatchPanel';
 import { SummonerProfilePage } from './components/SummonerProfilePage';
 import {
@@ -76,7 +77,12 @@ export function App() {
         </nav>
       </header>
 
-      {route.kind === 'champion' ? (
+      {route.kind === 'champion' && !route.championSlug ? (
+        <ChampionDirectoryPage
+          champions={champions.data}
+          onSelectChampion={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+        />
+      ) : route.kind === 'champion' ? (
         <BuildGuidePage
           champions={champions.data}
           items={items.data}

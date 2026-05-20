@@ -101,6 +101,8 @@ describe('App', () => {
     );
 
     expect(screen.getByText('WinRift')).toBeInTheDocument();
+    expect(screen.getByText('Guides, Profiles, Live Games')).toBeInTheDocument();
+    expect(screen.getByText('Champion names open build guides. Riot IDs open summoner profiles and jump into live match analysis when that player is currently in game.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111')).toBeInTheDocument();
     expect(screen.queryByLabelText('Search champions or summoners')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Build Explorer')).not.toBeInTheDocument());
@@ -109,7 +111,7 @@ describe('App', () => {
     queryClient.clear();
   });
 
-  it('opens the champion build guide page', async () => {
+  it('opens the champion directory and links into build guides', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -125,10 +127,15 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Champions' }));
 
+    await waitFor(() => expect(screen.getByText('Champion Index')).toBeInTheDocument());
+    expect(screen.getByText('Build Guides By Champion')).toBeInTheDocument();
+    expect(await screen.findByText('Wukong')).toBeInTheDocument();
+    expect(await screen.findByText('60.0%')).toBeInTheDocument();
+    expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
+    fireEvent.click(screen.getByRole('button', { name: /Wukong/i }));
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
     await waitFor(() => expect(getChampionGuide).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
-    expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
     queryClient.clear();
   });
 
@@ -150,7 +157,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'wukong' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(window.location.pathname).toBe('/champions/MonkeyKing');
@@ -176,7 +183,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Test Summoner#NA1' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(screen.getByText("Summoner 'Test Summoner#NA1' is not currently in a live match")).toBeInTheDocument());
     queryClient.clear();
@@ -199,7 +206,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Test Summoner' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(screen.getByText("Tag required. No unique saved Riot ID for 'Test Summoner'. Use Name#Tag.")).toBeInTheDocument());
     expect(resolveAccountAlias).toHaveBeenCalledWith('Test Summoner', 'NA1');
@@ -232,7 +239,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'sneaky' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1'));
     await waitFor(() => expect(screen.getByText('Sneaky#NA69')).toBeInTheDocument());
@@ -352,7 +359,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Ranked Blue#NA1' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(screen.getByText('DIAMOND II')).toBeInTheDocument());
     expect(screen.getByText('60.0%')).toBeInTheDocument();
@@ -394,13 +401,13 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Logo Blue#NA1' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(screen.getAllByText('Logo Blue').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole('button', { name: 'WinRift home' }));
 
     await waitFor(() => expect(screen.queryByText('Logo Blue')).not.toBeInTheDocument());
-    expect(screen.getByText('Champion & Summoner Search')).toBeInTheDocument();
+    expect(screen.getByText('Guides, Profiles, Live Games')).toBeInTheDocument();
     queryClient.clear();
   });
 
@@ -471,7 +478,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue Top#NA1' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => expect(getChampionRoleRates).toHaveBeenCalledWith([1, 2, 3, 4, 5, 11, 12, 13, 14, 15], 420));
     await waitFor(() => {
@@ -546,7 +553,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue Mid#NA1' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     await waitFor(() => {
       expect([...container.querySelectorAll('.blue-row .summoner-name')].map((node) => node.textContent)).toEqual([
@@ -643,7 +650,7 @@ describe('App', () => {
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue 1#NA1' },
     });
-    fireEvent.click(screen.getByLabelText('Find live game'));
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
 
     expect(await screen.findByRole('button', { name: 'Show Win Conditions mode' })).toBeInTheDocument();
     expect(getWinConditionAnalysis).not.toHaveBeenCalled();
