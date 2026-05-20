@@ -28,6 +28,7 @@ const roleLabels: Record<string, string> = {
 };
 const BUILD_MATCHUP_MIN_GAMES = 5;
 const BUILD_BASELINE_MIN_GAMES = 10;
+const BUILD_SLOT_CANDIDATE_LIMIT = 12;
 
 type Props = {
   liveGame: LiveGame;
@@ -64,6 +65,11 @@ type FocusedBuildSelection = {
   opponent: LiveParticipant;
   participantOptions: BuildParticipantOption[];
   opponentOptions: BuildParticipantOption[];
+};
+
+type BuildPathSummary = {
+  weightedWinRate: number;
+  totalGames: number;
 };
 
 export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
@@ -881,6 +887,9 @@ function FocusedBuildPanel({
   const championSample = buildSampleQuality(highestSlotSample(championItemSlots));
   const matchupScopeLabel = buildScopeLabel(matchupItemSlots);
   const championScopeLabel = buildScopeLabel(championItemSlots);
+  const matchupSummary = buildPathSummary(matchupItemSlots);
+  const championSummary = buildPathSummary(championItemSlots);
+  const matchupDelta = buildPathDelta(matchupSummary, championSummary);
   const activeParticipantKey = selectedParticipantKey || selection.participantKey;
   const activeOpponentKey = selectedOpponentKey || selection.opponentKey;
 
@@ -928,6 +937,8 @@ function FocusedBuildPanel({
           title="Matchup Build"
           description={`${champion?.name ?? selection.participant.championId} vs ${opponentChampion?.name ?? selection.opponent.championId}`}
           sample={matchupSample}
+          summary={matchupSummary}
+          comparison={matchupDelta}
           scopeLabel={matchupScopeLabel}
           side={selection.side}
           itemSlots={matchupItemSlots}
@@ -941,6 +952,8 @@ function FocusedBuildPanel({
           title="Champion Baseline"
           description={`Highest winrate ${champion?.name ?? selection.participant.championId} items overall`}
           sample={championSample}
+          summary={championSummary}
+          comparison="Champion-wide reference"
           scopeLabel={championScopeLabel}
           side={selection.side}
           itemSlots={championItemSlots}
@@ -1000,6 +1013,8 @@ function BuildResultCard({
   title,
   description,
   sample,
+  summary,
+  comparison,
   scopeLabel,
   side,
   itemSlots,
@@ -1012,6 +1027,8 @@ function BuildResultCard({
   title: string;
   description: string;
   sample: { label: string; tone: string };
+  summary?: BuildPathSummary;
+  comparison?: string;
   scopeLabel: string;
   side: TeamSide;
   itemSlots: AnalyticsItemSlot[];
@@ -1027,8 +1044,14 @@ function BuildResultCard({
         <span>
           <strong>{title}</strong>
           <em>{description}</em>
+          {summary ? (
+            <small className="build-result-summary">
+              {summary.weightedWinRate.toFixed(1)}% shown-item WR · {summary.totalGames} shown samples
+            </small>
+          ) : null}
         </span>
         <div>
+          {comparison ? <b className={comparison.includes('+') ? 'build-delta good' : comparison.includes('-') ? 'build-delta warn' : 'build-delta'}>{comparison}</b> : null}
           <b className={`build-sample-chip ${sample.tone}`}>{sample.label}</b>
           <small className="build-min-sample">{minGames}+ games/item</small>
           {scopeLabel ? <small className="build-scope-label">{scopeLabel}</small> : null}
@@ -1232,32 +1255,46 @@ function BuildSide({
     );
   }
 
-  const bestBySlot = [1, 2, 3, 4, 5, 6].map((slot) => ({
-    slot,
-    row: itemSlots.find((candidate) => candidate.itemSlot === slot),
-  }));
+  const bestBySlot = [1, 2, 3, 4, 5, 6].map((slot) => {
+    const slotRows = itemSlots.filter((candidate) => candidate.itemSlot === slot);
+    return {
+      slot,
+      row: slotRows[0],
+      commonRow: mostPlayedItemSlot(slotRows),
+    };
+  });
 
   return (
     <div className={`build-side ${side}`}>
-      {bestBySlot.map(({ slot, row }) => (
-        row ? <ItemSlotLine key={`${row.itemSlot}-${row.itemId}`} row={row} items={items} /> : <MissingItemSlotLine key={slot} slot={slot} />
+      {bestBySlot.map(({ slot, row, commonRow }) => (
+        row ? (
+          <ItemSlotLine
+            key={`${row.itemSlot}-${row.itemId}`}
+            row={row}
+            commonRow={commonRow && commonRow.itemId !== row.itemId ? commonRow : undefined}
+            items={items}
+          />
+        ) : <MissingItemSlotLine key={slot} slot={slot} />
       ))}
     </div>
   );
 }
 
-function ItemSlotLine({ row, items }: { row: AnalyticsItemSlot; items?: ItemData }) {
+function ItemSlotLine({ row, commonRow, items }: { row: AnalyticsItemSlot; commonRow?: AnalyticsItemSlot; items?: ItemData }) {
   const itemId = String(row.itemId);
   const imageUrl = itemImageUrl(items, itemId);
   const name = itemName(items, itemId);
+  const commonName = commonRow ? itemName(items, String(commonRow.itemId)) : '';
+  const commonTitle = commonRow ? ` Most played in sample: ${commonName}, ${commonRow.winRate.toFixed(1)}% over ${commonRow.games} games.` : '';
   return (
-    <div className={`item-slot-column${row.games < 5 ? ' low-sample-item' : ''}`} title={`${ordinal(row.itemSlot)} item: ${name}. ${row.winRate.toFixed(1)}% over ${row.games} games.`}>
+    <div className={`item-slot-column${row.games < 5 ? ' low-sample-item' : ''}`} title={`${ordinal(row.itemSlot)} item: ${name}. ${row.winRate.toFixed(1)}% over ${row.games} games.${commonTitle}`}>
       <span className="item-slot-number">{ordinal(row.itemSlot)}</span>
       {imageUrl ? <img src={imageUrl} alt={name} title={name} /> : <span className="item-pill">{row.itemId}</span>}
       <div className="item-slot-stats">
         <strong>{row.winRate.toFixed(1)}%</strong>
         <span>{row.games}g{row.games < 5 ? ' · thin' : ''}</span>
       </div>
+      {commonRow ? <small className="item-common-note">Most common: {commonRow.games}g</small> : null}
     </div>
   );
 }
@@ -1294,7 +1331,7 @@ function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, r
     itemContext: itemContextForParticipant(participant, role),
     patch,
     minGames: BUILD_MATCHUP_MIN_GAMES,
-    limit: 6,
+    limit: BUILD_SLOT_CANDIDATE_LIMIT,
     fallback: Boolean(patch),
   };
 }
@@ -1305,7 +1342,7 @@ function championBuildFiltersFor(participant: LiveParticipant, role: string, pat
     itemContext: itemContextForParticipant(participant, role),
     patch,
     minGames: BUILD_BASELINE_MIN_GAMES,
-    limit: 6,
+    limit: BUILD_SLOT_CANDIDATE_LIMIT,
     fallback: Boolean(patch),
   };
 }
@@ -1400,6 +1437,36 @@ function comfortFlagsForParticipant(participant: LiveParticipant) {
 
 function highestSlotSample(itemSlots: AnalyticsItemSlot[]) {
   return itemSlots.reduce((max, row) => Math.max(max, row.games), 0);
+}
+
+function buildPathSummary(itemSlots: AnalyticsItemSlot[]): BuildPathSummary | undefined {
+  const shownRows = topItemSlotRows(itemSlots);
+  const totalGames = shownRows.reduce((sum, row) => sum + row.games, 0);
+  if (totalGames <= 0) return undefined;
+  const weightedWinRate = shownRows.reduce((sum, row) => sum + (row.winRate * row.games), 0) / totalGames;
+  return { weightedWinRate, totalGames };
+}
+
+function buildPathDelta(matchup?: BuildPathSummary, baseline?: BuildPathSummary) {
+  if (!matchup || !baseline) return '';
+  const delta = matchup.weightedWinRate - baseline.weightedWinRate;
+  const sign = delta > 0 ? '+' : '';
+  return `${sign}${delta.toFixed(1)} pts vs baseline`;
+}
+
+function topItemSlotRows(itemSlots: AnalyticsItemSlot[]) {
+  return [1, 2, 3, 4, 5, 6]
+    .map((slot) => itemSlots.find((candidate) => candidate.itemSlot === slot))
+    .filter((row): row is AnalyticsItemSlot => Boolean(row));
+}
+
+function mostPlayedItemSlot(rows: AnalyticsItemSlot[]) {
+  return rows.reduce<AnalyticsItemSlot | undefined>((best, row) => {
+    if (!best) return row;
+    if (row.games !== best.games) return row.games > best.games ? row : best;
+    if (row.winRate !== best.winRate) return row.winRate > best.winRate ? row : best;
+    return row.itemId < best.itemId ? row : best;
+  }, undefined);
 }
 
 function buildSampleQuality(samples: number) {

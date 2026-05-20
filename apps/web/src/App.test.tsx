@@ -343,6 +343,19 @@ describe('App', () => {
         { teamId: 200, championId: 12, spell1Id: 11, spell2Id: 4, puuid: 'red-jungle', summonerName: 'Red Jungle', perks: {}, bot: false },
       ],
     });
+    vi.mocked(getItemSlotsBatch).mockImplementation(async (requests) => ({
+      results: requests.map((request) => ({
+        key: request.key,
+        results: request.key === 'matchup'
+          ? [
+            { championId: 3, role: 'MIDDLE', opponentChampionId: 13, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 100, wins: 6, games: 10, winRate: 60, confidence: 45 },
+            { championId: 3, role: 'MIDDLE', opponentChampionId: 13, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 101, wins: 27, games: 50, winRate: 54, confidence: 48 },
+          ]
+          : [
+            { championId: 3, role: 'MIDDLE', opponentChampionId: 0, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 100, wins: 10, games: 20, winRate: 50, confidence: 40 },
+          ],
+      })),
+    }));
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -456,14 +469,14 @@ describe('App', () => {
           championId: 3,
           opponentChampionId: 13,
           minGames: 5,
-          limit: 6,
+          limit: 12,
           fallback: false,
         }),
         expect.objectContaining({
           key: 'champion',
           championId: 3,
           minGames: 10,
-          limit: 6,
+          limit: 12,
           fallback: false,
         }),
       ]);

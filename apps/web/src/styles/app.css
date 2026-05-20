@@ -2487,6 +2487,41 @@ button {
   white-space: nowrap;
 }
 
+.build-result-summary {
+  color: #d8e3e6;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.build-delta {
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 13%);
+  color: #cdd8de;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 3px 7px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.build-delta.good {
+  background: rgb(111 207 151 / 16%);
+  border-color: rgb(111 207 151 / 36%);
+  color: #cbffdf;
+}
+
+.build-delta.warn {
+  background: rgb(240 128 128 / 16%);
+  border-color: rgb(240 128 128 / 36%);
+  color: #ffd1d1;
+}
+
 .focused-build-panel .build-side {
   min-height: 126px;
   padding: 8px;
@@ -2797,6 +2832,18 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   width: 100%;
+}
+
+.item-common-note {
+  color: #d1bb7a;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .mini-spells img {
