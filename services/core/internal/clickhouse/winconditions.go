@@ -200,9 +200,17 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 }
 
 func (r *Repository) RefreshWinConditionMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	return r.refreshWinConditionMetricsForPlatforms(ctx, patch, []string{platform}, queueID, true)
+}
+
+func (r *Repository) RefreshWinConditionMetricsForPlatforms(ctx context.Context, patch string, platforms []string, queueID uint16) error {
+	return r.refreshWinConditionMetricsForPlatforms(ctx, patch, platforms, queueID, true)
+}
+
+func (r *Repository) refreshWinConditionMetricsForPlatforms(ctx context.Context, patch string, platforms []string, queueID uint16, refreshAll bool) error {
 	patch = strings.TrimSpace(patch)
-	platform = strings.TrimSpace(platform)
-	if patch == "" || platform == "" {
+	platforms = normalizeWinConditionPlatforms(platforms)
+	if patch == "" || len(platforms) == 0 {
 		return fmt.Errorf("patch and platform are required")
 	}
 	if queueID == 0 {
@@ -213,29 +221,49 @@ func (r *Repository) RefreshWinConditionMetrics(ctx context.Context, patch, plat
 		return err
 	}
 	analyzer := winconditions.NewAnalyzer(catalog)
-	rows, err := r.QueryTeamCompositions(ctx, TeamCompositionFilters{Patch: patch, Platform: platform, QueueID: queueID})
-	if err != nil {
-		return err
-	}
-	if err := r.deleteWinConditionMetrics(ctx, patch, platform, queueID); err != nil {
-		return err
-	}
-	records := make([]winConditionTeamRecord, 0, len(rows))
-	for _, row := range rows {
-		record := winConditionTeamRecord{
-			row:     row,
-			profile: analyzer.TeamProfile(row.ChampionIDs),
+	for _, platform := range platforms {
+		rows, err := r.QueryTeamCompositions(ctx, TeamCompositionFilters{Patch: patch, Platform: platform, QueueID: queueID})
+		if err != nil {
+			return err
 		}
-		records = append(records, record)
+		if err := r.deleteWinConditionMetrics(ctx, patch, platform, queueID); err != nil {
+			return err
+		}
+		records := make([]winConditionTeamRecord, 0, len(rows))
+		for _, row := range rows {
+			record := winConditionTeamRecord{
+				row:     row,
+				profile: analyzer.TeamProfile(row.ChampionIDs),
+			}
+			records = append(records, record)
+		}
+		if err := r.insertWinConditionTeamRecords(ctx, records, analyzer.CatalogPatch()); err != nil {
+			return err
+		}
+		metrics := aggregateWinConditionRecords(records)
+		if err := r.insertWinConditionMetrics(ctx, metrics); err != nil {
+			return err
+		}
 	}
-	if err := r.insertWinConditionTeamRecords(ctx, records, analyzer.CatalogPatch()); err != nil {
-		return err
+	if refreshAll {
+		return r.refreshAllPlatformWinConditionMetrics(ctx, patch, queueID)
 	}
-	metrics := aggregateWinConditionRecords(records)
-	if err := r.insertWinConditionMetrics(ctx, metrics); err != nil {
-		return err
+	return nil
+}
+
+func normalizeWinConditionPlatforms(platforms []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(platforms))
+	for _, platform := range platforms {
+		platform = strings.ToUpper(strings.TrimSpace(platform))
+		if platform == "" || platform == "ALL" || seen[platform] {
+			continue
+		}
+		seen[platform] = true
+		out = append(out, platform)
 	}
-	return r.refreshAllPlatformWinConditionMetrics(ctx, patch, queueID)
+	sort.Strings(out)
+	return out
 }
 
 func (r *Repository) QueryWinConditionMetrics(ctx context.Context, filters WinConditionMetricFilters) ([]WinConditionMetricRow, error) {

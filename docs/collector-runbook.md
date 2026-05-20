@@ -70,6 +70,8 @@ ACCOUNT_ALIAS_ENRICHMENT_ENABLED=true
 ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS=3
 ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true
 ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10
+WIN_CONDITION_ANALYTICS_REFRESH_ENABLED=true
+WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES=15
 ```
 
 Then run:
@@ -174,6 +176,8 @@ Safety knobs:
 - `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS`: max account-alias requests per platform. These are subtracted from the same regional Riot request budget as match collection.
 - `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `item_slot_analytics` summary at startup and then after collector sweeps when the interval has elapsed.
 - `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch item-slot summary refreshes. This is ClickHouse work plus one cached Data Dragon item metadata lookup, not Riot match/league API budget.
+- `WIN_CONDITION_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `match_team_win_conditions` and `patch_win_condition_metrics` summaries at startup and then after collector sweeps when the interval has elapsed.
+- `WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch win-condition summary refreshes. This is ClickHouse/local profile work, not Riot API budget. The default is longer than item slots because it rebuilds per-platform strategy metrics and then the combined `ALL` aggregate.
 
 Rank enrichment is off by default. Turn it on only after basic match ingestion is working. When enabled, the rank lane chooses distinct participant PUUIDs from ClickHouse that do not already have a fresh `summoner_rank_snapshots` row, prioritizing players attached to the most `UNKNOWN` participant rows. Account-alias enrichment is on by default with a small cap because it improves the lookup UX and does not need to be refreshed often.
 

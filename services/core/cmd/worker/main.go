@@ -45,7 +45,7 @@ func main() {
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s win_condition_refresh_enabled=%t win_condition_refresh_interval=%s",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -60,6 +60,8 @@ func main() {
 		cfg.AccountAliasMaxRequests,
 		cfg.ItemSlotRefreshEnabled,
 		cfg.ItemSlotRefreshInterval,
+		cfg.WinConditionRefreshEnabled,
+		cfg.WinConditionRefreshInterval,
 	)
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {
@@ -72,7 +74,9 @@ func main() {
 	recordSeedRequests(ledger, seedRequestsByRegion)
 	regions := configuredRegions(platforms)
 	var lastItemSlotRefresh time.Time
+	var lastWinConditionRefresh time.Time
 	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, &lastItemSlotRefresh)
+	maybeRefreshWinConditionAnalytics(context.Background(), cfg, repo, platforms, &lastWinConditionRefresh)
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
@@ -169,6 +173,7 @@ func main() {
 		}
 
 		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, &lastItemSlotRefresh)
+		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, platforms, &lastWinConditionRefresh)
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
 		log.Printf(
 			"collector sweep complete platforms=%d active_platforms=%d requests=%d sleep=%s",
@@ -336,6 +341,33 @@ func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Serv
 		{Key: "JUNGLE", ItemIDs: jungleItems},
 		{Key: "SUPPORT", ItemIDs: supportItems},
 	}, nil
+}
+
+func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, platforms []string, lastRefresh *time.Time) {
+	if !cfg.WinConditionRefreshEnabled {
+		return
+	}
+	patch := strings.TrimSpace(cfg.CollectorCurrentPatch)
+	if patch == "" {
+		return
+	}
+	interval := cfg.WinConditionRefreshInterval
+	if interval <= 0 {
+		interval = 15 * time.Minute
+	}
+	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
+		return
+	}
+	startedAt := time.Now()
+	log.Printf("win condition analytics scheduled refresh start patch=%s queue=%d platforms=%d interval=%s", patch, analytics.RankedSoloQueueID, len(platforms), interval)
+	defer func() {
+		*lastRefresh = time.Now()
+	}()
+	if err := repo.RefreshWinConditionMetricsForPlatforms(ctx, patch, platforms, analytics.RankedSoloQueueID); err != nil {
+		log.Printf("win condition analytics scheduled refresh failed patch=%s queue=%d platforms=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(platforms), time.Since(startedAt).Round(time.Millisecond), err)
+		return
+	}
+	log.Printf("win condition analytics scheduled refresh complete patch=%s queue=%d platforms=%d duration=%s", patch, analytics.RankedSoloQueueID, len(platforms), time.Since(startedAt).Round(time.Millisecond))
 }
 
 func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, rankRequests int) collector.Result {

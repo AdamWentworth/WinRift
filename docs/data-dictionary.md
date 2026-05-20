@@ -83,6 +83,11 @@ Rollups are stored as normal rows: `platform = ALL`, `rank_bucket = ALL`, and `g
 
 `team_primary` stores the team/opponent primary-mode pair as two digits. The first digit is the team's mode and the second is the opponent's mode: `1` means primary-only and `2` means any primary state. For example, `11` means team primary vs opponent primary, `21` means team any-state alternative vs opponent primary, and `22` means alternative-vs-alternative. Live UI requests should read these compiled rows directly instead of recomputing percentages from raw team rows.
 
+Refresh options:
+
+- Worker: `WIN_CONDITION_ANALYTICS_REFRESH_ENABLED=true` with `WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES=15` refreshes the current patch automatically.
+- CLI: `patchctl -action win-conditions -patch 16.10 -platform NA1 -queue 420`
+
 ## `participants`
 
 One row per player per match.
