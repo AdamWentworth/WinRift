@@ -83,10 +83,8 @@ function RoleGlyph({ role }: { role: RoleCode | '' }) {
   if (role === 'MIDDLE') {
     return (
       <g transform="scale(1.5)">
-        <path d="M1.25 16 16 1.25 14.75 0 0 14.75z" fill="currentColor" />
-        <path d="M10.133 5.867H5.867v4.266h4.266z" fill="currentColor" opacity="0.42" />
-        <path d="M0 0v4.078L4.078 0z" fill="currentColor" opacity="0.42" />
-        <path d="M16 11.922 11.922 16H16z" fill="currentColor" opacity="0.42" />
+        <path d="M8.305 2.828L11.133 0H0v11.133l2.828-2.828V2.828zM7.695 13.172L4.867 16H16V4.867l-2.828 2.828v5.477z" fill="currentColor" opacity="0.42" />
+        <path d="M13.371 0L0 13.371v2.63h2.629L16 2.628V0z" fill="currentColor" />
       </g>
     );
   }
