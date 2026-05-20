@@ -2,6 +2,18 @@ package clickhouse
 
 import "testing"
 
+func TestRoleScopesSeparateBuildAdviceFromChampionRankings(t *testing.T) {
+	buildScope := analyticsRoleScope("TOP")
+	if buildScope.whereSQL != "role IN ('TOP', 'MIDDLE')" {
+		t.Fatalf("build scope = %q; wanted solo-lane merge", buildScope.whereSQL)
+	}
+
+	rankingScope := strictAnalyticsRoleScope("TOP")
+	if rankingScope.whereSQL != "role = ?" || len(rankingScope.args) != 1 || rankingScope.args[0] != "TOP" {
+		t.Fatalf("ranking scope = %+v; wanted strict top lane", rankingScope)
+	}
+}
+
 func TestApplyChampionTierScoresRewardsStableWinningSamples(t *testing.T) {
 	rows := applyChampionTierScores([]ChampionGuideSummary{
 		{
@@ -28,6 +40,37 @@ func TestApplyChampionTierScoresRewardsStableWinningSamples(t *testing.T) {
 
 	if rows[0].TierScore <= rows[1].TierScore {
 		t.Fatalf("stable sample score = %.2f, tiny sample score = %.2f; wanted stable sample higher", rows[0].TierScore, rows[1].TierScore)
+	}
+}
+
+func TestApplyChampionTierScoresShrinksHotSmallSamples(t *testing.T) {
+	rows := applyChampionTierScores([]ChampionGuideSummary{
+		{
+			ChampionID: 1,
+			Role:       "TOP",
+			Wins:       785,
+			Games:      1532,
+			WinRate:    0.5124,
+			Confidence: 0.487,
+			PickRate:   0.033,
+			BanRate:    0.18,
+			KDA:        2.4,
+		},
+		{
+			ChampionID: 2,
+			Role:       "TOP",
+			Wins:       39,
+			Games:      60,
+			WinRate:    0.65,
+			Confidence: 0.524,
+			PickRate:   0.0013,
+			BanRate:    0.038,
+			KDA:        2.4,
+		},
+	})
+
+	if rows[0].TierScore <= rows[1].TierScore {
+		t.Fatalf("stable score = %.2f, hot small score = %.2f; wanted broad stable row higher", rows[0].TierScore, rows[1].TierScore)
 	}
 }
 
@@ -137,6 +180,60 @@ func TestApplyChampionTierScoresWeightsSupportUtility(t *testing.T) {
 
 	if rows[0].ImpactScore <= rows[1].ImpactScore {
 		t.Fatalf("impact scores = %.2f and %.2f; wanted support utility row higher", rows[0].ImpactScore, rows[1].ImpactScore)
+	}
+}
+
+func TestApplyChampionTierScoresRewardsDurabilityWithoutDeaths(t *testing.T) {
+	rows := applyChampionTierScores([]ChampionGuideSummary{
+		{
+			ChampionID:                 1,
+			Role:                       "TOP",
+			Wins:                       52,
+			Games:                      100,
+			WinRate:                    0.52,
+			Confidence:                 0.42,
+			PickRate:                   0.08,
+			KDA:                        2.5,
+			KillParticipation:          0.48,
+			AvgDamageDealtToChampions:  18000,
+			AvgGoldEarned:              12500,
+			AvgCS:                      190,
+			AvgDamageTaken:             36000,
+			AvgDamageSelfMitigated:     20000,
+			AvgTotalTimeSpentDead:      160,
+			AvgTimePlayed:              1800,
+			AvgDamageDealtToObjectives: 5000,
+			AvgDamageDealtToStructures: 4500,
+			AvgVisionScore:             24,
+		},
+		{
+			ChampionID:                 2,
+			Role:                       "TOP",
+			Wins:                       52,
+			Games:                      100,
+			WinRate:                    0.52,
+			Confidence:                 0.42,
+			PickRate:                   0.08,
+			KDA:                        2.5,
+			KillParticipation:          0.48,
+			AvgDamageDealtToChampions:  18000,
+			AvgGoldEarned:              12500,
+			AvgCS:                      190,
+			AvgDamageTaken:             12000,
+			AvgDamageSelfMitigated:     3000,
+			AvgTotalTimeSpentDead:      160,
+			AvgTimePlayed:              1800,
+			AvgDamageDealtToObjectives: 5000,
+			AvgDamageDealtToStructures: 4500,
+			AvgVisionScore:             24,
+		},
+	})
+
+	if rows[0].SurvivabilityScore <= rows[1].SurvivabilityScore {
+		t.Fatalf("survivability scores = %.2f and %.2f; wanted damage-soaking row higher", rows[0].SurvivabilityScore, rows[1].SurvivabilityScore)
+	}
+	if rows[0].ImpactScore <= rows[1].ImpactScore {
+		t.Fatalf("impact scores = %.2f and %.2f; wanted damage-soaking row higher", rows[0].ImpactScore, rows[1].ImpactScore)
 	}
 }
 

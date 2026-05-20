@@ -283,7 +283,7 @@ func (r *Repository) queryChampionGuideSkillOrders(ctx context.Context, filters 
 	if limit <= 0 {
 		limit = 12
 	}
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	query := fmt.Sprintf(`
 		SELECT
 			skill_order_signature,

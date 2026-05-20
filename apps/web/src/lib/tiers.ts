@@ -22,7 +22,7 @@ export function championTier(summary?: TierableSummary) {
 
 export function isSPlus(summary: TierableSummary) {
 	if (typeof summary.tierScore === 'number') {
-		return summary.tierScore >= 60;
+		return summary.tierScore >= 59;
 	}
 	return Boolean(summary.roleRank && summary.roleRankTotal && summary.roleRank / summary.roleRankTotal <= 0.05);
 }

@@ -152,7 +152,7 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	if limit <= 0 {
 		limit = 250
 	}
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, baseArgs := championGuideBaseSQL(filters, roleScope, false)
 	var totalRoleGames int
 	if err := r.db.QueryRowContext(ctx, "SELECT count() "+baseSQL, baseArgs...).Scan(&totalRoleGames); err != nil {
@@ -282,7 +282,7 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 
 func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[string]string, minGames int) (ChampionGuideSummary, error) {
 	championID := strings.TrimSpace(filters["champion_id"])
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, baseArgs := championGuideBaseSQL(filters, roleScope, false)
 	var totalRoleGames int
 	if err := r.db.QueryRowContext(ctx, "SELECT count() "+baseSQL, baseArgs...).Scan(&totalRoleGames); err != nil {
@@ -372,7 +372,7 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 }
 
 func (r *Repository) queryChampionGuideDirectSummary(ctx context.Context, filters map[string]string, totalRoleGames int) (ChampionGuideSummary, error) {
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)
 	query := `
 		SELECT
@@ -509,6 +509,7 @@ type championTierReferences struct {
 	GoldEarned             float64
 	CS                     float64
 	DamageDealtToChampions float64
+	DamageAbsorption       float64
 	VisionScore            float64
 	ObjectiveContribution  float64
 	Utility                float64
@@ -529,6 +530,7 @@ func championTierReferenceValues(rows []ChampionGuideSummary) championTierRefere
 		refs.GoldEarned += row.AvgGoldEarned * rowWeight
 		refs.CS += row.AvgCS * rowWeight
 		refs.DamageDealtToChampions += row.AvgDamageDealtToChampions * rowWeight
+		refs.DamageAbsorption += damageAbsorptionContribution(row) * rowWeight
 		refs.VisionScore += row.AvgVisionScore * rowWeight
 		refs.ObjectiveContribution += objectiveContribution(row) * rowWeight
 		refs.Utility += utilityContribution(row) * rowWeight
@@ -542,6 +544,7 @@ func championTierReferenceValues(rows []ChampionGuideSummary) championTierRefere
 	refs.GoldEarned /= weight
 	refs.CS /= weight
 	refs.DamageDealtToChampions /= weight
+	refs.DamageAbsorption /= weight
 	refs.VisionScore /= weight
 	refs.ObjectiveContribution /= weight
 	refs.Utility /= weight
@@ -553,6 +556,7 @@ func applyChampionImpactScores(row *ChampionGuideSummary, refs championTierRefer
 	kdaScore := normalizedImpactScore(row.KDA, refs.KDA)
 	killParticipationScore := normalizedImpactScore(row.KillParticipation, refs.KillParticipation)
 	row.DamageScore = normalizedImpactScore(row.AvgDamageDealtToChampions, refs.DamageDealtToChampions)
+	damageAbsorptionScore := normalizedImpactScore(damageAbsorptionContribution(*row), refs.DamageAbsorption)
 	goldScore := normalizedImpactScore(row.AvgGoldEarned, refs.GoldEarned)
 	csScore := normalizedImpactScore(row.AvgCS, refs.CS)
 	row.EconomyScore = 0.65*goldScore + 0.35*csScore
@@ -560,6 +564,7 @@ func applyChampionImpactScores(row *ChampionGuideSummary, refs championTierRefer
 	row.ObjectiveScore = normalizedImpactScore(objectiveContribution(*row), refs.ObjectiveContribution)
 	row.UtilityScore = normalizedImpactScore(utilityContribution(*row), refs.Utility)
 	row.SurvivabilityScore = normalizedImpactScore(survivabilityContribution(*row), refs.Survivability)
+	row.SurvivabilityScore = clampFloat(0.68*row.SurvivabilityScore+0.32*damageAbsorptionScore, 0, 100)
 
 	kpKdaScore := 0.55*kdaScore + 0.45*killParticipationScore
 	switch strings.ToUpper(row.Role) {
@@ -569,8 +574,10 @@ func applyChampionImpactScores(row *ChampionGuideSummary, refs championTierRefer
 		row.ImpactScore = 0.20*row.ObjectiveScore + 0.18*kpKdaScore + 0.17*row.DamageScore + 0.15*row.EconomyScore + 0.12*row.VisionScore + 0.10*row.SurvivabilityScore + 0.08*row.UtilityScore
 	case "BOTTOM":
 		row.ImpactScore = 0.26*row.DamageScore + 0.20*row.EconomyScore + 0.18*kpKdaScore + 0.14*row.SurvivabilityScore + 0.12*row.ObjectiveScore + 0.06*row.UtilityScore + 0.04*row.VisionScore
-	case "TOP", "MIDDLE":
-		row.ImpactScore = 0.21*row.DamageScore + 0.17*row.EconomyScore + 0.17*kpKdaScore + 0.14*row.ObjectiveScore + 0.12*row.SurvivabilityScore + 0.10*row.UtilityScore + 0.09*row.VisionScore
+	case "TOP":
+		row.ImpactScore = 0.18*row.DamageScore + 0.16*row.EconomyScore + 0.14*kpKdaScore + 0.15*row.ObjectiveScore + 0.17*row.SurvivabilityScore + 0.10*row.UtilityScore + 0.10*row.VisionScore
+	case "MIDDLE":
+		row.ImpactScore = 0.23*row.DamageScore + 0.17*row.EconomyScore + 0.18*kpKdaScore + 0.12*row.ObjectiveScore + 0.10*row.SurvivabilityScore + 0.10*row.UtilityScore + 0.10*row.VisionScore
 	default:
 		row.ImpactScore = 0.18*row.DamageScore + 0.16*row.EconomyScore + 0.16*kpKdaScore + 0.14*row.ObjectiveScore + 0.13*row.VisionScore + 0.12*row.UtilityScore + 0.11*row.SurvivabilityScore
 	}
@@ -596,6 +603,19 @@ func survivabilityContribution(row ChampionGuideSummary) float64 {
 	}
 	mitigationRatio := row.AvgDamageSelfMitigated / row.AvgDamageTaken
 	return survivalScore + clampFloat(mitigationRatio, 0, 2)*20
+}
+
+func damageAbsorptionContribution(row ChampionGuideSummary) float64 {
+	minutes := row.AvgTimePlayed / 60
+	if minutes <= 0 {
+		minutes = 1
+	}
+	deathShare := 0.0
+	if row.AvgTimePlayed > 0 {
+		deathShare = row.AvgTotalTimeSpentDead / row.AvgTimePlayed
+	}
+	survivalFactor := 0.6 + 0.4*(1-clampFloat(deathShare, 0, 1))
+	return ((row.AvgDamageTaken + row.AvgDamageSelfMitigated*0.65) / minutes) * survivalFactor
 }
 
 func normalizedPositiveScore(value, average float64) float64 {
@@ -648,8 +668,10 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 
 	for index := range rows {
 		winRateScore := clampFloat(50+((rows[index].WinRate-0.5)*500), 0, 100)
+		winRateReliability := clampFloat(math.Sqrt(float64(rows[index].Games)/250), 0, 1)
+		winRateScore = 50 + (winRateScore-50)*winRateReliability
 		confidenceScore := clampFloat(rows[index].Confidence*100, 0, 100)
-		rows[index].WinScore = clampFloat(0.65*winRateScore+0.35*confidenceScore, 0, 100)
+		rows[index].WinScore = clampFloat(0.40*winRateScore+0.60*confidenceScore, 0, 100)
 		if maxGames > 0 {
 			rows[index].SampleScore = math.Sqrt(float64(rows[index].Games)/float64(maxGames)) * 100
 		}
@@ -657,11 +679,11 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 		rows[index].BanScore = normalizedShareScore(rows[index].BanRate, maxBanRate)
 		applyChampionImpactScores(&rows[index], refs)
 		rows[index].TierScore = clampFloat(
-			0.58*rows[index].WinScore+
-				0.14*rows[index].SampleScore+
-				0.12*rows[index].PickScore+
-				0.08*rows[index].BanScore+
-				0.08*rows[index].ImpactScore,
+			0.64*rows[index].WinScore+
+				0.12*rows[index].SampleScore+
+				0.09*rows[index].PickScore+
+				0.04*rows[index].BanScore+
+				0.11*rows[index].ImpactScore,
 			0,
 			100,
 		)
@@ -676,7 +698,7 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 	if limit <= 0 {
 		limit = 12
 	}
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	rawSQL, rawArgs := championGuideBaseSQL(filters, roleScope, true)
 	compiledWhere := `
 		FROM patch_build_metrics FINAL
@@ -769,7 +791,7 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 }
 
 func (r *Repository) queryChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)
 	order := "win_rate DESC, games DESC"
 	if toughest {
@@ -809,7 +831,7 @@ func (r *Repository) queryChampionGuideSignatures(ctx context.Context, filters m
 	if column != "rune_signature" && column != "spell_signature" {
 		return nil, nil
 	}
-	roleScope := analyticsRoleScope(filters["role"])
+	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)
 	query := `
 		SELECT

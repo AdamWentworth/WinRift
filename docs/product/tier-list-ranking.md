@@ -8,7 +8,7 @@ The backend returns a `tierScore` from `GET /api/analytics/champion-guides`. The
 
 Current score components:
 
-- `winScore`: highest weight. Blends raw winrate with Wilson lower-bound confidence so strong but fragile samples are pulled back.
+- `winScore`: highest weight. Blends sample-shrunk raw winrate with Wilson lower-bound confidence so strong but fragile samples are pulled back.
 - `sampleScore`: rewards larger stored samples inside the selected role/patch/rank scope.
 - `pickScore`: sample-relative pick presence. This captures how often the champion appears in our stored games for the selected scope.
 - `banScore`: sample-relative ban pressure from stored Match-V5 ban data.
@@ -16,19 +16,19 @@ Current score components:
 
 Current weights:
 
-- 58% win score
-- 14% sample score
-- 12% pick score
-- 8% ban score
-- 8% impact score
+- 64% win score
+- 12% sample score
+- 9% pick score
+- 4% ban score
+- 11% impact score
 
-This intentionally keeps winning as the center of gravity while letting popularity, ban respect, stability, and player impact break ties.
+Raw winrate is shrunk toward 50% until a champion reaches roughly 250 games in the selected scope, and Wilson confidence now carries most of the win score. This intentionally keeps winning as the center of gravity while making tiny hot samples less likely to outrank broad, stable performers. Popularity, stability, ban respect, and player impact then break ties. Ban rate is deliberately a smaller signal because it can represent frustration, fame, or matchup avoidance rather than actual winning strength.
 
 ## Tiers
 
 The frontend maps WinRift rank into presentation tiers. `S+` is not a fixed number of champions per role, and it is not awarded from raw winrate alone. It is earned from the same composite score that drives the tier-list ordering:
 
-- `tierScore >= 60`
+- `tierScore >= 59`
 - fallback only when `tierScore` is unavailable: top 5% by role rank
 
 This keeps `S+` attainable when the data clearly supports it, without reserving slots or forcing every role to have the same count. A champion with a flashy raw winrate still needs enough total performance signal to cross the composite threshold. After `S+`, the remaining tiers use broad percentile bands:
@@ -52,10 +52,12 @@ The current impact components are:
 - `visionScore`: final vision score.
 - `objectiveScore`: objective damage, structure damage, turret/inhibitor takedowns, dragon/baron kills, and objective steals.
 - `utilityScore`: CC time plus healing/shielding utility.
-- `survivabilityScore`: lower dead-time share plus self-mitigation relative to damage taken.
+- `survivabilityScore`: lower dead-time share, self-mitigation relative to damage taken, and damage absorbed per minute while still staying alive.
 - KDA/kill participation blend: rewards involvement without letting cleanup KDA fully dominate.
 
-Role weighting matters. Supports lean more on vision and utility; junglers lean more on objectives; marksmen lean more on damage/economy/survivability; solo lanes use a more balanced mix.
+Role weighting matters. Supports lean more on vision and utility; junglers lean more on objectives; marksmen lean more on damage/economy/survivability. Top lane now weights durable pressure more heavily than mid, while mid weights damage and fight participation more heavily.
+
+Champion guide and tier-list rankings use strict role buckets. This does not exclude flex champions from off-roles; Yasuo top still counts as top-lane Yasuo when he is actually played top. It only prevents Yasuo mid, Katarina mid, Ahri mid, Zed mid, Zoe mid, and similar games from leaking into top-lane performance math. Build matchup advice can still merge top and mid when that makes strategic sense.
 
 ## Current Limitations
 
