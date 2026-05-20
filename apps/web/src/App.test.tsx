@@ -400,7 +400,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'WinRift home' }));
 
     await waitFor(() => expect(screen.queryByText('Logo Blue')).not.toBeInTheDocument());
-    expect(screen.getByText('Champion & Summoner Lookup')).toBeInTheDocument();
+    expect(screen.getByText('Champion & Summoner Search')).toBeInTheDocument();
     queryClient.clear();
   });
 
