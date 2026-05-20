@@ -30,6 +30,7 @@ import {
 } from './live-match/types';
 import { hasSmite, idsMatch, participantKey } from './live-match/utils';
 import { StatChip } from './ui/MetricTile';
+import { StatusChip } from './ui/StatusChip';
 
 type Props = {
   liveGame: LiveGame;
@@ -336,7 +337,7 @@ function LiveChampionCard({
       {comfortFlags.length > 0 ? (
         <div className="card-context-row">
           {comfortFlags.map((flag) => (
-            <span className={`comfort-flag ${flag.tone}`} key={flag.label}>{flag.label}</span>
+            <StatusChip className="comfort-flag" key={flag.label} tone={flag.tone}>{flag.label}</StatusChip>
           ))}
         </div>
       ) : null}

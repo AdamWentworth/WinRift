@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../../api/types';
 import { MetricTile } from '../ui/MetricTile';
+import { StatusChip } from '../ui/StatusChip';
 import type { TeamSide } from './types';
 
 export function WinConditionPanel({
@@ -262,9 +263,9 @@ function EvidencePill({ metric }: { metric?: WinConditionMetric }) {
   const score = metric?.evidence?.score ?? 0;
   const level = metric?.evidence?.level ?? 'No sample';
   return (
-    <span className={`evidence-pill ${direction}`}>
+    <StatusChip className="evidence-pill" tone={direction}>
       Confidence: {level}{score > 0 ? ` ${score.toFixed(0)}/100` : ''}
-    </span>
+    </StatusChip>
   );
 }
 

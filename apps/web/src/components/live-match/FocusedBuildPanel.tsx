@@ -17,6 +17,7 @@ import {
   type TeamSide,
 } from './types';
 import { hasSmite, participantKey, sameParticipantIdentity } from './utils';
+import { StatusChip } from '../ui/StatusChip';
 
 export function FocusedBuildPanel({
   selection,
@@ -275,10 +276,10 @@ function BuildResultCard({
           ) : null}
         </span>
         <div>
-          {comparison ? <b className={comparison.includes('+') ? 'build-delta good' : comparison.includes('-') ? 'build-delta warn' : 'build-delta'}>{comparison}</b> : null}
-          <b className={`build-sample-chip ${sample.tone}`}>{sample.label}</b>
-          <small className="build-min-sample">{minGames}+ games/item</small>
-          {scopeLabel ? <small className="build-scope-label">{scopeLabel}</small> : null}
+          {comparison ? <StatusChip as="b" className="build-delta" tone={comparison.includes('+') ? 'good' : comparison.includes('-') ? 'warn' : undefined}>{comparison}</StatusChip> : null}
+          <StatusChip as="b" className="build-sample-chip" tone={sample.tone}>{sample.label}</StatusChip>
+          <StatusChip as="small" className="build-min-sample">{minGames}+ games/item</StatusChip>
+          {scopeLabel ? <StatusChip as="small" className="build-scope-label">{scopeLabel}</StatusChip> : null}
         </div>
       </header>
       <BuildSide
