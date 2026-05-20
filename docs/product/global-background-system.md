@@ -15,6 +15,7 @@ CSS lives in `apps/web/src/styles/app.css` under:
 - `.global-art-stage`
 - `.global-art-slide`
 - `globalArt*` keyframes
+- root `.app-shell.background-*` contrast profiles
 
 ## Image Sources
 
@@ -46,6 +47,31 @@ Specific champion guide pages pass `championScopeId`. When that prop is set, the
 
 This gives champion pages a stronger identity without needing separate page-specific background systems.
 
+## Contrast Profiles
+
+The root app shell adds page-aware classes, and CSS variables tune the same background component for each surface.
+
+Current classes:
+
+- `background-showcase`: home/search page. Brighter art, stronger map-line accents, and less center dimming because the main UI is a single focused console.
+- `background-directory`: champion index. Moderate dimming so the grid stays readable while still showing the broad art pool.
+- `background-champion-scope`: specific champion guide. Uses that champion's art pool with a stronger vignette so guide panels and stat cards remain the first read.
+- `background-data`: tier list and broad analytics pages. Dimmer art, lower line opacity, and heavier edge/vertical vignette.
+- `background-dense`: summoner/profile/live surfaces. The most restrained profile because live match cards and numbers are dense.
+
+The shared variables are:
+
+- `--global-art-active-opacity`
+- `--global-art-img-opacity`
+- `--global-art-brightness`
+- `--global-art-saturate`
+- `--global-art-line-opacity`
+- `--global-art-stage-top`
+- `--global-art-stage-bottom`
+- `--global-art-vignette-*`
+
+New page types should pick one of the existing profiles first. Add a new profile only when a page has a clearly different reading density.
+
 ## Motion Rules
 
 The backdrop should feel atmospheric, not busy.
@@ -69,10 +95,4 @@ Do not commit Riot splash art into the repository.
 
 ## Future Tuning
 
-Contrast tuning is intentionally a separate task. Different pages may eventually need per-page density classes, for example:
-
-- lighter art on the home page
-- dimmer art behind live-match cards
-- champion-scoped art with stronger vignette on guide pages
-
-Those adjustments should happen through root page classes or props, not by creating a second background component.
+If a page feels too loud or too muddy, adjust its `.background-*` variables before touching the slideshow logic. The animation, shuffle deck, and champion scoping should remain shared.

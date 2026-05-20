@@ -4,7 +4,7 @@ This is the next-session list from the live app rebuild work. The project is mov
 
 ## Frontend Structure
 
-Status: items 1-3 have been addressed in the current cleanup pass. Item 4 is the next frontend-structure pass.
+Status: items 1-4 have been addressed in the current cleanup pass. Item 5 is the next product/data pass.
 
 1. Split `LiveMatchups.tsx` into smaller live-match modules. It currently owns the page shell, mode rail, champion cards, build view, win-condition view, charting, and matchup helpers.
 2. Extract shared UI pieces for stat tiles, sample chips, champion rows, role selectors, and card shells so the live page, champion guide, and tier list feel consistently built instead of copied forward.

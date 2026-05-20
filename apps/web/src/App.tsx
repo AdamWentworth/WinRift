@@ -51,9 +51,10 @@ export function App() {
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
+  const appShellClassName = appShellClass(route);
 
   return (
-    <main className={route.kind === 'champion' || route.kind === 'tier-list' ? 'app-shell guide-mode' : 'app-shell'}>
+    <main className={appShellClassName}>
       <GlobalBackgroundStage
         champions={champions.data}
         championSplashes={championSplashes.data}
@@ -137,6 +138,25 @@ export function App() {
       )}
     </main>
   );
+}
+
+function appShellClass(route: AppRoute) {
+  const classes = ['app-shell'];
+  if (route.kind === 'champion' || route.kind === 'tier-list') {
+    classes.push('guide-mode');
+  }
+  if (route.kind === 'home') {
+    classes.push('page-home', 'background-showcase');
+  } else if (route.kind === 'summoner') {
+    classes.push('page-summoner', 'background-dense');
+  } else if (route.kind === 'tier-list') {
+    classes.push('page-tier-list', 'background-data');
+  } else if (route.championSlug) {
+    classes.push('page-champion-guide', 'background-champion-scope');
+  } else {
+    classes.push('page-champion-index', 'background-directory');
+  }
+  return classes.join(' ');
 }
 
 function readRoute(): AppRoute {
