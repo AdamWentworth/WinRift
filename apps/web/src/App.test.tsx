@@ -142,6 +142,35 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it('opens the role tier list and links into champion guides', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tier List' }));
+
+    await waitFor(() => expect(screen.getByText('WinRift Tier List')).toBeInTheDocument());
+    expect(screen.getByText('All Roles Rankings')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tier list role')).toBeInTheDocument();
+    await waitFor(() => expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: '', patch: '16.10', minGames: 50 })));
+    expect((await screen.findAllByText('Wukong')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('60.00%').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Wukong/i })[0]);
+    await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
+    expect(window.location.pathname).toBe('/champions/MonkeyKing');
+    queryClient.clear();
+  });
+
   it('routes champion names from the homepage search to champion pages', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {

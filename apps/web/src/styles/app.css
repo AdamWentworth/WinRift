@@ -3270,6 +3270,365 @@ button {
   white-space: nowrap;
 }
 
+.tier-list-page {
+  color: #f4f6ff;
+  margin: 0 auto;
+  max-width: 1280px;
+  min-height: calc(100vh - 77px);
+  padding: 18px 18px 44px;
+}
+
+.tier-list-hero {
+  background:
+    radial-gradient(ellipse at 18% 0, rgb(232 201 118 / 18%), transparent 36%),
+    radial-gradient(ellipse at 88% 88%, rgb(130 215 255 / 16%), transparent 42%),
+    linear-gradient(115deg, transparent 0 34%, rgb(240 128 128 / 13%) 34.2% 34.5%, transparent 34.8%),
+    linear-gradient(180deg, rgb(22 27 29 / 96%), rgb(9 11 12 / 97%));
+  border: 1px solid rgb(232 201 118 / 22%);
+  box-shadow: 0 20px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.44fr);
+  padding: 20px;
+}
+
+.tier-list-hero-copy span {
+  color: #f0d583;
+  display: block;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.tier-list-hero-copy h2 {
+  color: #fff;
+  font-size: clamp(30px, 4.6vw, 50px);
+  line-height: 0.98;
+  margin: 8px 0 10px;
+}
+
+.tier-list-hero-copy p {
+  color: #c6d7dd;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 790px;
+}
+
+.tier-list-hero-stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+.tier-list-hero-stats div {
+  background: rgb(0 0 0 / 28%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.tier-list-hero-stats span {
+  color: #93dceb;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.tier-list-hero-stats strong {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 1000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tier-filter-bar {
+  align-items: center;
+  background: rgb(12 15 16 / 78%);
+  border: 1px solid rgb(130 215 255 / 16%);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(340px, 1fr) minmax(130px, 170px) minmax(120px, 150px) minmax(130px, 170px);
+  margin-top: 16px;
+  padding: 12px;
+}
+
+.tier-role-tabs {
+  overflow-x: auto;
+}
+
+.tier-list-tools {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) minmax(280px, auto);
+  margin-top: 12px;
+}
+
+.tier-search {
+  background: rgb(12 15 16 / 78%);
+  border-color: rgb(130 215 255 / 16%);
+}
+
+.tier-list-scope {
+  align-items: center;
+  background: rgb(12 15 16 / 78%);
+  border: 1px solid rgb(130 215 255 / 16%);
+  color: #dce8f0;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-weight: 1000;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.tier-list-scope svg {
+  color: #93dceb;
+}
+
+.tier-list-scope b {
+  color: #f0d583;
+}
+
+.tier-feature-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.tier-feature-card {
+  background:
+    linear-gradient(180deg, rgb(8 10 11 / 32%), rgb(7 9 10 / 90%)),
+    var(--tier-splash),
+    linear-gradient(180deg, #202426, #080909);
+  background-position: center 24%;
+  background-size: cover;
+  border: 1px solid rgb(130 215 255 / 18%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%), 0 14px 28px rgb(0 0 0 / 26%);
+  color: #fff;
+  display: grid;
+  min-height: 168px;
+  overflow: hidden;
+  padding: 14px;
+  position: relative;
+  text-align: left;
+}
+
+.tier-feature-card::before {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 6%), rgb(0 0 0 / 52%) 48%, rgb(0 0 0 / 90%)),
+    radial-gradient(ellipse at 16% 100%, rgb(130 215 255 / 22%), transparent 42%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.tier-feature-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tier-feature-card:hover,
+.tier-feature-card:focus-visible {
+  border-color: rgb(232 201 118 / 74%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%), 0 0 0 1px rgb(232 201 118 / 24%), 0 18px 34px rgb(0 0 0 / 34%);
+  outline: none;
+}
+
+.tier-feature-card > div {
+  align-items: end;
+  align-self: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.tier-feature-card img {
+  border: 1px solid rgb(232 201 118 / 58%);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 46%);
+  height: 54px;
+  object-fit: cover;
+  width: 54px;
+}
+
+.tier-feature-card strong,
+.tier-feature-card em,
+.tier-feature-card p {
+  display: block;
+  min-width: 0;
+}
+
+.tier-feature-card strong {
+  color: #fff;
+  font-size: 23px;
+  font-weight: 1000;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 6px rgb(0 0 0 / 70%);
+  white-space: nowrap;
+}
+
+.tier-feature-card em {
+  color: #d5edf3;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 1000;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.tier-feature-card p {
+  align-self: end;
+  color: #c8d8dd;
+  font-size: 11px;
+  font-weight: 900;
+  margin: 8px 0 0;
+}
+
+.tier-badge {
+  background: linear-gradient(180deg, #23272a, #0d1011);
+  border: 1px solid rgb(232 201 118 / 72%);
+  color: #fff;
+  display: inline-grid;
+  font-size: 13px;
+  font-weight: 1000;
+  min-width: 34px;
+  padding: 2px 8px;
+  place-items: center;
+  text-align: center;
+}
+
+.tier-badge.S {
+  border-color: #58d9ff;
+  color: #91f4ff;
+}
+
+.tier-badge.A {
+  border-color: #76ffb5;
+  color: #a5ffd0;
+}
+
+.tier-badge.C,
+.tier-badge.D {
+  border-color: #ff8b8b;
+  color: #ffd0d0;
+}
+
+.tier-table-card {
+  background: rgb(12 15 16 / 78%);
+  border: 1px solid rgb(130 215 255 / 16%);
+  margin-top: 14px;
+  overflow: hidden;
+}
+
+.tier-table-header,
+.tier-table-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 70px minmax(220px, 1fr) repeat(5, minmax(88px, 0.45fr));
+}
+
+.tier-table-header {
+  background: linear-gradient(180deg, rgb(34 39 42 / 96%), rgb(18 21 23 / 96%));
+  border-bottom: 1px solid rgb(255 255 255 / 9%);
+  color: #9fb6bd;
+  font-size: 10px;
+  font-weight: 1000;
+  padding: 10px 14px;
+  text-transform: uppercase;
+}
+
+.tier-table-body {
+  display: grid;
+}
+
+.tier-table-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+  color: #fff;
+  min-height: 62px;
+  padding: 8px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.tier-table-row:hover,
+.tier-table-row:focus-visible {
+  background: linear-gradient(90deg, rgb(130 215 255 / 10%), rgb(232 201 118 / 7%));
+  outline: none;
+}
+
+.tier-table-row > span {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 1000;
+  min-width: 0;
+}
+
+.tier-champion-cell {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.tier-champion-cell img {
+  border: 1px solid rgb(130 215 255 / 34%);
+  height: 42px;
+  object-fit: cover;
+  width: 42px;
+}
+
+.tier-champion-cell strong,
+.tier-champion-cell em {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tier-champion-cell strong {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 1000;
+}
+
+.tier-champion-cell em {
+  color: #9fb6bd;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+.tier-empty-state,
+.tier-empty-row {
+  background: rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  color: #c8d8dd;
+  font-size: 13px;
+  font-weight: 900;
+  padding: 18px;
+}
+
+.tier-empty-state {
+  grid-column: 1 / -1;
+}
+
 .build-guide-page {
   color: #f4f6ff;
   margin: 0 auto;
@@ -4092,6 +4451,32 @@ button {
     grid-template-columns: 1fr 1fr;
   }
 
+  .tier-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tier-filter-bar .guide-filter-label,
+  .tier-role-tabs {
+    grid-column: 1 / -1;
+  }
+
+  .tier-list-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-table-card {
+    overflow-x: auto;
+  }
+
+  .tier-table-header,
+  .tier-table-row {
+    min-width: 880px;
+  }
+
   .guide-filter-label,
   .guide-role-tabs,
   .guide-select-control.matchup {
@@ -4185,17 +4570,35 @@ button {
   }
 
   .topbar-nav {
+    flex: 1 1 auto;
     gap: 5px;
+    justify-content: flex-end;
+    min-width: 0;
+    overflow-x: auto;
   }
 
   .topbar-nav button {
+    flex: 0 0 auto;
     font-size: 10px;
-    min-width: 72px;
+    min-width: 68px;
     padding: 0 8px;
   }
 
   .build-guide-page {
     padding: 10px 8px 28px;
+  }
+
+  .tier-list-page {
+    padding: 10px 8px 28px;
+  }
+
+  .tier-list-hero,
+  .tier-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-list-hero-copy h2 {
+    font-size: 28px;
   }
 
   .champion-directory-page {
@@ -4273,6 +4676,10 @@ button {
 
   .guide-role-tabs button {
     min-width: 78px;
+  }
+
+  .tier-role-tabs button {
+    min-width: 92px;
   }
 
   .skill-path-placeholder-grid div {

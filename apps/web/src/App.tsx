@@ -5,6 +5,7 @@ import { BuildGuidePage } from './components/BuildGuidePage';
 import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
 import { LiveMatchPanel } from './components/LiveMatchPanel';
 import { SummonerProfilePage } from './components/SummonerProfilePage';
+import { TierListPage } from './components/TierListPage';
 import {
   championIdFromRoute,
   championRouteSlug,
@@ -13,6 +14,7 @@ import {
 
 type AppRoute =
   | { kind: 'home' }
+  | { kind: 'tier-list' }
   | { kind: 'champion'; championSlug?: string }
   | { kind: 'summoner'; platform?: string; gameName?: string; tagLine?: string };
 
@@ -43,13 +45,13 @@ export function App() {
   }, []);
 
   const goHome = useCallback(() => navigate({ kind: 'home' }), [navigate]);
-  const activeSection = route.kind === 'champion' ? 'champions' : route.kind === 'summoner' ? 'summoners' : 'home';
+  const activeSection = route.kind === 'champion' ? 'champions' : route.kind === 'tier-list' ? 'tier-list' : route.kind === 'summoner' ? 'summoners' : 'home';
   const initialChampionId = useMemo(() => (
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
 
   return (
-    <main className={route.kind === 'champion' ? 'app-shell guide-mode' : 'app-shell'}>
+    <main className={route.kind === 'champion' || route.kind === 'tier-list' ? 'app-shell guide-mode' : 'app-shell'}>
       <header className="topbar">
         <div className="topbar-brand">
           <h1>
@@ -68,6 +70,13 @@ export function App() {
             Champions
           </button>
           <button
+            className={activeSection === 'tier-list' ? 'selected' : ''}
+            onClick={() => navigate({ kind: 'tier-list' })}
+            type="button"
+          >
+            Tier List
+          </button>
+          <button
             className={activeSection === 'summoners' ? 'selected' : ''}
             onClick={() => navigate({ kind: 'summoner' })}
             type="button"
@@ -77,7 +86,12 @@ export function App() {
         </nav>
       </header>
 
-      {route.kind === 'champion' && !route.championSlug ? (
+      {route.kind === 'tier-list' ? (
+        <TierListPage
+          champions={champions.data}
+          onSelectChampion={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+        />
+      ) : route.kind === 'champion' && !route.championSlug ? (
         <ChampionDirectoryPage
           champions={champions.data}
           onSelectChampion={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
@@ -125,6 +139,9 @@ function readRoute(): AppRoute {
   if (parts[0] === 'champions') {
     return { kind: 'champion', championSlug: parts[1] };
   }
+  if (parts[0] === 'tier-list') {
+    return { kind: 'tier-list' };
+  }
   if (parts[0] === 'summoners') {
     return { kind: 'summoner', platform: parts[1], gameName: parts[2], tagLine: parts[3] };
   }
@@ -134,6 +151,9 @@ function readRoute(): AppRoute {
 function pathForRoute(route: AppRoute) {
   if (route.kind === 'champion') {
     return route.championSlug ? `/champions/${encodeURIComponent(route.championSlug)}` : '/champions';
+  }
+  if (route.kind === 'tier-list') {
+    return '/tier-list';
   }
   if (route.kind === 'summoner') {
     if (!route.gameName) return '/summoners';
