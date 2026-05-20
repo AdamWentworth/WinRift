@@ -177,8 +177,8 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
           <div className="lookup-console-header">
-            <span>Summoner Search</span>
-            <strong>Live Match Lookup</strong>
+            <span>WinRift Search</span>
+            <strong>Champion &amp; Summoner Lookup</strong>
           </div>
         ) : null}
         <div className={validationError ? 'search-bar invalid' : 'search-bar'}>
