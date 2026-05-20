@@ -45,11 +45,13 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
+	mux.HandleFunc("POST /api/analytics/item-slots/batch", s.analyticsItemSlotsBatch)
 	mux.HandleFunc("GET /api/analytics/champion-roles", s.analyticsChampionRoles)
 	mux.HandleFunc("POST /api/analytics/win-conditions", s.analyticsWinConditions)
 	mux.HandleFunc("GET /api/analytics/win-conditions/diagnostics", s.analyticsWinConditionDiagnostics)
 	mux.HandleFunc("GET /api/static/{kind}", s.staticData)
 	mux.HandleFunc("POST /api/dev/collector/seed", s.seedCollector)
+	mux.HandleFunc("POST /api/dev/analytics/item-slots/refresh", s.refreshItemSlotAnalytics)
 	return s.cors(mux)
 }
 
@@ -219,39 +221,108 @@ func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 
 func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	itemContext := strings.ToUpper(query.Get("itemContext"))
-	filters := map[string]string{
-		"champion_id":          query.Get("championId"),
-		"role":                 strings.ToUpper(query.Get("role")),
-		"opponent_champion_id": query.Get("opponentChampionId"),
-		"patch":                query.Get("patch"),
-		"rank_bucket":          strings.ToUpper(query.Get("rankBucket")),
+	request := itemSlotAnalyticsRequest{
+		ChampionID:         uint16(queryInt(query.Get("championId"), 0)),
+		Role:               strings.ToUpper(query.Get("role")),
+		ItemContext:        strings.ToUpper(query.Get("itemContext")),
+		OpponentChampionID: uint16(queryInt(query.Get("opponentChampionId"), 0)),
+		Patch:              query.Get("patch"),
+		RankBucket:         strings.ToUpper(query.Get("rankBucket")),
+		MinGames:           queryInt(query.Get("minGames"), 1),
+		Limit:              queryInt(query.Get("limit"), 6),
+		Fallback:           queryBool(query.Get("fallback")),
 	}
-	minGames := queryInt(query.Get("minGames"), 1)
-	limit := queryInt(query.Get("limit"), 6)
-	useFallback := queryBool(query.Get("fallback"))
-	includeJungle := itemContext == "JUNGLE" || filters["role"] == "JUNGLE"
-	includeSupport := itemContext == "SUPPORT" || filters["role"] == "UTILITY"
-	buildItemIDs, err := s.static.BuildItemIDs(r.Context(), "", includeJungle, includeSupport)
+	scopedRows, err := s.queryScopedItemSlots(r.Context(), request)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	scopedRows := []scopedItemSlotRow{}
-	if useFallback {
-		scopedRows, err = s.queryItemSlotFallbacks(r.Context(), filters, buildItemIDs, minGames, limit)
-	} else {
-		rows, queryErr := s.repo.QueryItemSlots(r.Context(), filters, buildItemIDs, minGames, limit)
-		if queryErr != nil {
-			err = queryErr
-		} else {
-			scopedRows = scopedItemSlotRows(rows, itemSlotScope{Key: "requested", Label: "Requested sample"})
+	writeJSON(w, http.StatusOK, map[string]any{"results": itemSlotRowsResponse(scopedRows)})
+}
+
+func (s Server) analyticsItemSlotsBatch(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Requests []itemSlotAnalyticsRequest `json:"requests"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if len(body.Requests) > 20 {
+		writeError(w, http.StatusBadRequest, "too many item-slot requests")
+		return
+	}
+	results := make([]map[string]any, 0, len(body.Requests))
+	for _, request := range body.Requests {
+		scopedRows, err := s.queryScopedItemSlots(r.Context(), request)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
 		}
+		results = append(results, map[string]any{
+			"key":     request.Key,
+			"results": itemSlotRowsResponse(scopedRows),
+		})
 	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+type itemSlotAnalyticsRequest struct {
+	Key                string `json:"key"`
+	ChampionID         uint16 `json:"championId"`
+	Role               string `json:"role"`
+	ItemContext        string `json:"itemContext"`
+	OpponentChampionID uint16 `json:"opponentChampionId"`
+	Patch              string `json:"patch"`
+	RankBucket         string `json:"rankBucket"`
+	MinGames           int    `json:"minGames"`
+	Limit              int    `json:"limit"`
+	Fallback           bool   `json:"fallback"`
+}
+
+func (request itemSlotAnalyticsRequest) filters() map[string]string {
+	filters := map[string]string{
+		"role":        strings.ToUpper(request.Role),
+		"patch":       strings.TrimSpace(request.Patch),
+		"rank_bucket": strings.ToUpper(strings.TrimSpace(request.RankBucket)),
+	}
+	if request.ChampionID > 0 {
+		filters["champion_id"] = strconv.Itoa(int(request.ChampionID))
+	}
+	if request.OpponentChampionID > 0 {
+		filters["opponent_champion_id"] = strconv.Itoa(int(request.OpponentChampionID))
+	}
+	return filters
+}
+
+func (s Server) queryScopedItemSlots(ctx context.Context, request itemSlotAnalyticsRequest) ([]scopedItemSlotRow, error) {
+	filters := request.filters()
+	minGames := request.MinGames
+	if minGames <= 0 {
+		minGames = 1
+	}
+	limit := request.Limit
+	if limit <= 0 {
+		limit = 6
+	}
+	itemContext := normalizedItemContext(request.ItemContext, filters["role"])
+	includeJungle := itemContext == "JUNGLE"
+	includeSupport := itemContext == "SUPPORT"
+	buildItemIDs, err := s.static.BuildItemIDs(ctx, "", includeJungle, includeSupport)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
+	if request.Fallback {
+		return s.queryItemSlotFallbacks(ctx, filters, itemContext, buildItemIDs, minGames, limit)
+	}
+	rows, err := s.repo.QueryItemSlots(ctx, filters, itemContext, buildItemIDs, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scopedItemSlotRows(rows, itemSlotScope{Key: "requested", Label: "Requested sample"}), nil
+}
+
+func itemSlotRowsResponse(scopedRows []scopedItemSlotRow) []map[string]any {
 	results := make([]map[string]any, 0, len(scopedRows))
 	for _, scoped := range scopedRows {
 		row := scoped.Row
@@ -263,7 +334,7 @@ func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 			"sampleScope": scoped.Scope.Key, "sampleScopeLabel": scoped.Scope.Label, "fallback": scoped.Scope.Fallback,
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+	return results
 }
 
 type itemSlotScope struct {
@@ -278,12 +349,12 @@ type scopedItemSlotRow struct {
 	Scope itemSlotScope
 }
 
-func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, buildItemIDs []uint32, minGames, limit int) ([]scopedItemSlotRow, error) {
+func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, itemContext string, buildItemIDs []uint32, minGames, limit int) ([]scopedItemSlotRow, error) {
 	scopes := itemSlotFallbackScopes(filters)
 	out := []scopedItemSlotRow{}
 	coveredSlots := map[uint8]bool{}
 	for _, scope := range scopes {
-		rows, err := s.repo.QueryItemSlots(ctx, scope.Filters, buildItemIDs, minGames, limit)
+		rows, err := s.repo.QueryItemSlots(ctx, scope.Filters, itemContext, buildItemIDs, minGames, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -299,6 +370,23 @@ func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]s
 		}
 	}
 	return out, nil
+}
+
+func normalizedItemContext(itemContext, role string) string {
+	switch strings.ToUpper(strings.TrimSpace(itemContext)) {
+	case "JUNGLE":
+		return "JUNGLE"
+	case "SUPPORT", "UTILITY":
+		return "SUPPORT"
+	}
+	switch strings.ToUpper(strings.TrimSpace(role)) {
+	case "JUNGLE":
+		return "JUNGLE"
+	case "UTILITY":
+		return "SUPPORT"
+	default:
+		return "DEFAULT"
+	}
 }
 
 func itemSlotFallbackScopes(filters map[string]string) []itemSlotScope {
@@ -633,6 +721,103 @@ func (s Server) seedCollector(w http.ResponseWriter, r *http.Request) {
 		"rankEnrichmentEnabled": s.cfg.RankEnrichmentEnabled,
 		"errors":                errorsOut,
 	})
+}
+
+func (s Server) refreshItemSlotAnalytics(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.IsDevelopment() {
+		writeError(w, http.StatusNotFound, "not available")
+		return
+	}
+	var body struct {
+		Patch   string   `json:"patch"`
+		Patches []string `json:"patches"`
+		QueueID int      `json:"queueId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	patches := body.Patches
+	if body.Patch != "" {
+		patches = append(patches, body.Patch)
+	}
+	if len(patches) == 0 {
+		if s.cfg.CollectorCurrentPatch != "" {
+			patches = append(patches, s.cfg.CollectorCurrentPatch)
+		}
+		patches = append(patches, analytics.PatchWindow(s.cfg.CollectorCurrentPatch, s.cfg.CollectorPatchRetention)...)
+	}
+	patches = uniqueStrings(patches)
+	queueID := uint16(body.QueueID)
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	contexts, err := s.itemSlotRefreshContexts(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	refreshed := []string{}
+	for _, patch := range patches {
+		patch = strings.TrimSpace(patch)
+		if patch == "" {
+			continue
+		}
+		log.Printf("item slot analytics refresh start patch=%s queue=%d contexts=%d", patch, queueID, len(contexts))
+		if err := s.repo.RefreshItemSlotAnalytics(r.Context(), patch, queueID, contexts); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		refreshed = append(refreshed, patch)
+		log.Printf("item slot analytics refresh complete patch=%s queue=%d contexts=%d", patch, queueID, len(contexts))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"patches":  refreshed,
+		"queueId":  queueID,
+		"contexts": itemSlotRefreshContextKeys(contexts),
+	})
+}
+
+func (s Server) itemSlotRefreshContexts(ctx context.Context) ([]clickhouse.ItemSlotAnalyticsContext, error) {
+	defaultItems, err := s.static.BuildItemIDs(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleItems, err := s.static.BuildItemIDs(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	supportItems, err := s.static.BuildItemIDs(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
+	return []clickhouse.ItemSlotAnalyticsContext{
+		{Key: "DEFAULT", ItemIDs: defaultItems},
+		{Key: "JUNGLE", ItemIDs: jungleItems},
+		{Key: "SUPPORT", ItemIDs: supportItems},
+	}, nil
+}
+
+func itemSlotRefreshContextKeys(contexts []clickhouse.ItemSlotAnalyticsContext) []string {
+	keys := make([]string, 0, len(contexts))
+	for _, context := range contexts {
+		keys = append(keys, context.Key)
+	}
+	return keys
+}
+
+func uniqueStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func (s Server) defaultPlatform(value string) string {

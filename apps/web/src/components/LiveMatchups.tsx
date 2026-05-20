@@ -1,8 +1,8 @@
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { GripVertical, Network, Swords } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { AnalyticsItemSlot, BuildFilters, ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData, WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../api/types';
-import { getChampionRoleRates, getItemSlots, getWinConditionAnalysis } from '../api/client';
+import { getChampionRoleRates, getItemSlotsBatch, getWinConditionAnalysis } from '../api/client';
 import {
   championByKey,
   championImageUrl,
@@ -142,20 +142,19 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     return requests;
   }, [pairs, patchBucket, showBuildMode]);
 
-  const statQueries = useQueries({
-    queries: statRequests.map((request) => ({
-      queryKey: ['live-board-item-slots', request.filters],
-      queryFn: () => getItemSlots(request.filters),
-      staleTime: 30_000,
-    })),
+  const itemSlotBatchQuery = useQuery({
+    queryKey: ['live-board-item-slots-batch', statRequests],
+    queryFn: () => getItemSlotsBatch(statRequests.map((request) => ({ key: request.key, ...request.filters }))),
+    enabled: showBuildMode && statRequests.length > 0,
+    staleTime: 30_000,
   });
 
   const statsByKey = new Map<string, { loading: boolean; itemSlots: AnalyticsItemSlot[] }>();
-  statRequests.forEach((request, index) => {
-    const query = statQueries[index];
+  const batchResultsByKey = new Map((itemSlotBatchQuery.data?.results ?? []).map((result) => [result.key, result.results]));
+  statRequests.forEach((request) => {
     statsByKey.set(request.key, {
-      loading: query?.isLoading ?? false,
-      itemSlots: query?.data?.results ?? [],
+      loading: itemSlotBatchQuery.isLoading,
+      itemSlots: batchResultsByKey.get(request.key) ?? [],
     });
   });
 

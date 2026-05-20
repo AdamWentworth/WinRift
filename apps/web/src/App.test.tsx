@@ -8,6 +8,7 @@ import type { LiveGame } from './api/types';
 vi.mock('./api/client', () => ({
   getBuilds: vi.fn(async () => ({ results: [] })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
+  getItemSlotsBatch: vi.fn(async () => ({ results: [] })),
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
   getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
   getChampions: vi.fn(async () => ({ version: 'test', data: { data: {} } })),

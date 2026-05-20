@@ -121,6 +121,19 @@ export type AnalyticsItemSlotResponse = {
   results: AnalyticsItemSlot[];
 };
 
+export type AnalyticsItemSlotBatchRequest = BuildFilters & {
+  key: string;
+};
+
+export type AnalyticsItemSlotBatchResult = {
+  key: string;
+  results: AnalyticsItemSlot[];
+};
+
+export type AnalyticsItemSlotBatchResponse = {
+  results: AnalyticsItemSlotBatchResult[];
+};
+
 export type ChampionRoleRate = {
   championId: number;
   role: string;

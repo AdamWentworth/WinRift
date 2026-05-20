@@ -106,6 +106,37 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ALTER TABLE patch_win_condition_metrics ADD COLUMN IF NOT EXISTS win_rate_percent Float64 AFTER games
 	`, `
 		ALTER TABLE patch_win_condition_metrics ADD COLUMN IF NOT EXISTS confidence_percent Float64 AFTER win_rate_percent
+	`, `
+		CREATE TABLE IF NOT EXISTS item_slot_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			item_context LowCardinality(String),
+			champion_id UInt16,
+			role LowCardinality(String),
+			opponent_champion_id UInt16,
+			rank_bucket LowCardinality(String),
+			item_slot UInt8,
+			item_id UInt32,
+			wins UInt64,
+			games UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_slot,
+			item_id
+		)
 	`}
 	for _, statement := range statements {
 		if _, err := r.db.ExecContext(ctx, statement); err != nil {

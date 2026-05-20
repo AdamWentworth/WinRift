@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -68,6 +68,10 @@ export function getItemSlots(filters: BuildFilters) {
   if (filters.limit) params.set('limit', String(filters.limit));
   if (filters.fallback) params.set('fallback', 'true');
   return request<AnalyticsItemSlotResponse>(`/api/analytics/item-slots?${params.toString()}`);
+}
+
+export function getItemSlotsBatch(requests: AnalyticsItemSlotBatchRequest[]) {
+  return post<AnalyticsItemSlotBatchResponse>('/api/analytics/item-slots/batch', { requests });
 }
 
 export function getChampionRoleRates(championIds: number[], queueId: number) {

@@ -50,6 +50,11 @@ type ItemSlotRow struct {
 	Confidence         float64
 }
 
+type ItemSlotAnalyticsContext struct {
+	Key     string
+	ItemIDs []uint32
+}
+
 type PatchSnapshot struct {
 	Patch            string
 	Platform         string
@@ -282,13 +287,86 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 	return out, rows.Err()
 }
 
-func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
+func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
 	if minGames <= 0 {
 		minGames = 1
 	}
 	if limit <= 0 {
 		limit = 25
 	}
+	itemContext = normalizedItemContext(itemContext)
+	rows, err := r.queryItemSlotsSummary(ctx, filters, itemContext, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) > 0 {
+		return rows, nil
+	}
+	hasSummary, err := r.ItemSlotAnalyticsHasData(ctx, itemContext)
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryItemSlotsLiveScan(ctx, filters, allowedItemIDs, minGames, limit)
+}
+
+func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]ItemSlotRow, error) {
+	patchBucketExpr := "'ALL'"
+	rankBucketExpr := "'ALL'"
+	if filters["patch"] != "" {
+		patchBucketExpr = "patch"
+	}
+	if filters["rank_bucket"] != "" {
+		rankBucketExpr = "rank_bucket"
+	}
+	roleScope := analyticsRoleScope(filters["role"])
+	query := fmt.Sprintf(`
+		SELECT
+			champion_id,
+			%s AS role_bucket,
+			opponent_champion_id,
+			%s AS patch_bucket,
+			%s AS rank_bucket,
+			item_slot,
+			item_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM item_slot_analytics FINAL
+		WHERE item_context = ?
+			AND item_id > 0`, roleScope.selectExpr, patchBucketExpr, rankBucketExpr)
+	args := []any{itemContext}
+	if filters["champion_id"] != "" {
+		query += " AND champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filters["opponent_champion_id"] != "" {
+		query += " AND opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		query += " AND patch = ?"
+		args = append(args, filters["patch"])
+	}
+	if filters["rank_bucket"] != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filters["rank_bucket"])
+	}
+	query += `
+		GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, item_slot, item_id
+		HAVING games >= ?
+		ORDER BY item_slot ASC, win_rate DESC, games DESC`
+	args = append(args, minGames)
+	return r.scanItemSlotRows(ctx, query, args, limit)
+}
+
+func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[string]string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
 	if len(allowedItemIDs) == 0 {
 		return nil, nil
 	}
@@ -302,6 +380,30 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 		rankBucketExpr = "rank_value"
 	}
 	roleScope := analyticsRoleScope(filters["role"])
+	rawFilters := ""
+	compiledFilters := ""
+	args := []any{}
+	if filters["champion_id"] != "" {
+		rawFilters += " AND pm.champion_id = ?"
+		compiledFilters += " AND champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if roleScope.whereSQL != "" {
+		rawFilters += " AND " + qualifyRoleWhereSQL(roleScope.whereSQL, "pm.role")
+		compiledFilters += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filters["opponent_champion_id"] != "" {
+		rawFilters += " AND pm.opponent_champion_id = ?"
+		compiledFilters += " AND opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		rawFilters += " AND pm.patch = ?"
+		compiledFilters += " AND patch = ?"
+		args = append(args, filters["patch"])
+	}
+	compiledArgs := append([]any{}, args...)
 	query := fmt.Sprintf(`
 		WITH raw_item_purchases AS
 		(
@@ -336,6 +438,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 				ON s.platform = pm.platform AND s.puuid = pm.puuid
 			WHERE tie.event_type = 'ITEM_PURCHASED'
 				AND tie.item_id IN (%s)
+				%s
 			GROUP BY
 				pm.match_id,
 				pm.participant_id,
@@ -373,6 +476,8 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 				wins,
 				games
 			FROM patch_build_metrics FINAL
+			WHERE 1 = 1
+				%s
 		),
 		compiled_item_slots AS
 		(
@@ -406,24 +511,8 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 			UNION ALL
 			SELECT * FROM compiled_item_slots WHERE item_slot <= 6
 		)
-		WHERE item_id > 0`, itemList, itemList, roleScope.selectExpr, patchBucketExpr, rankBucketExpr)
-	args := []any{}
-	if filters["champion_id"] != "" {
-		query += " AND champion_id = ?"
-		args = append(args, filters["champion_id"])
-	}
-	if roleScope.whereSQL != "" {
-		query += " AND " + roleScope.whereSQL
-		args = append(args, roleScope.args...)
-	}
-	if filters["opponent_champion_id"] != "" {
-		query += " AND opponent_champion_id = ?"
-		args = append(args, filters["opponent_champion_id"])
-	}
-	if filters["patch"] != "" {
-		query += " AND patch_value = ?"
-		args = append(args, filters["patch"])
-	}
+		WHERE item_id > 0`, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, patchBucketExpr, rankBucketExpr)
+	args = append(args, compiledArgs...)
 	if filters["rank_bucket"] != "" {
 		query += " AND rank_value = ?"
 		args = append(args, filters["rank_bucket"])
@@ -433,7 +522,10 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 		HAVING games >= ?
 		ORDER BY item_slot ASC, win_rate DESC, games DESC`
 	args = append(args, minGames)
+	return r.scanItemSlotRows(ctx, query, args, limit)
+}
 
+func (r *Repository) scanItemSlotRows(ctx context.Context, query string, args []any, limit int) ([]ItemSlotRow, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -452,6 +544,141 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 		return nil, err
 	}
 	return trimItemSlotRows(out, limit), nil
+}
+
+func (r *Repository) ItemSlotAnalyticsHasData(ctx context.Context, itemContext string) (bool, error) {
+	var count uint64
+	err := r.db.QueryRowContext(ctx, "SELECT count() FROM item_slot_analytics WHERE item_context = ? LIMIT 1", normalizedItemContext(itemContext)).Scan(&count)
+	return count > 0, err
+}
+
+func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string, queueID uint16, contexts []ItemSlotAnalyticsContext) error {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		return fmt.Errorf("patch is required")
+	}
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	for _, itemContext := range contexts {
+		key := normalizedItemContext(itemContext.Key)
+		if len(itemContext.ItemIDs) == 0 {
+			continue
+		}
+		if _, err := r.db.ExecContext(
+			ctx,
+			`ALTER TABLE item_slot_analytics DELETE WHERE patch = ? AND queue_id = ? AND item_context = ? SETTINGS mutations_sync = 2`,
+			patch,
+			queueID,
+			key,
+		); err != nil {
+			return err
+		}
+		itemList := uint32ListSQL(itemContext.ItemIDs)
+		_, err := r.db.ExecContext(
+			ctx,
+			fmt.Sprintf(`
+				INSERT INTO item_slot_analytics
+				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games)
+				WITH raw_item_purchases AS
+				(
+					SELECT
+						pm.match_id AS match_id,
+						pm.participant_id AS participant_id,
+						pm.patch AS patch,
+						pm.queue_id AS queue_id,
+						pm.champion_id AS champion_id,
+						pm.role AS role,
+						pm.opponent_champion_id AS opponent_champion_id,
+						multiIf(
+							s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+							pm.rank_bucket
+						) AS rank_bucket,
+						pm.win AS win,
+						tie.item_id AS item_id,
+						min(tie.timestamp_ms) AS first_purchase_ms
+					FROM participant_matchups AS pm FINAL
+					INNER JOIN timeline_item_events AS tie FINAL
+						ON pm.match_id = tie.match_id
+						AND pm.participant_id = tie.participant_id
+					LEFT JOIN
+					(
+						SELECT
+							platform,
+							puuid,
+							argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+						FROM summoner_rank_snapshots FINAL
+						WHERE queue_type = 'RANKED_SOLO_5x5'
+						GROUP BY platform, puuid
+					) AS s
+						ON s.platform = pm.platform AND s.puuid = pm.puuid
+					WHERE pm.patch = ?
+						AND pm.queue_id = ?
+						AND tie.event_type = 'ITEM_PURCHASED'
+						AND tie.item_id IN (%s)
+					GROUP BY
+						pm.match_id,
+						pm.participant_id,
+						pm.patch,
+						pm.queue_id,
+						pm.champion_id,
+						pm.role,
+						pm.opponent_champion_id,
+						rank_bucket,
+						pm.win,
+						tie.item_id
+				),
+				raw_item_slots AS
+				(
+					SELECT
+						patch,
+						'ALL' AS platform,
+						queue_id,
+						? AS item_context,
+						champion_id,
+						role,
+						opponent_champion_id,
+						rank_bucket,
+						toUInt8(row_number() OVER (PARTITION BY match_id, participant_id ORDER BY first_purchase_ms, item_id)) AS item_slot,
+						item_id,
+						win
+					FROM raw_item_purchases
+				)
+				SELECT
+					patch,
+					platform,
+					queue_id,
+					item_context,
+					champion_id,
+					role,
+					opponent_champion_id,
+					rank_bucket,
+					item_slot,
+					item_id,
+					toUInt64(sum(win)) AS wins,
+					toUInt64(count()) AS games
+				FROM raw_item_slots
+				WHERE item_slot <= 6
+				GROUP BY
+					patch,
+					platform,
+					queue_id,
+					item_context,
+					champion_id,
+					role,
+					opponent_champion_id,
+					rank_bucket,
+					item_slot,
+					item_id`, itemList),
+			patch,
+			queueID,
+			key,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) MarkPatchCollecting(ctx context.Context, patch, platform string, queueID uint16) error {
@@ -547,6 +774,7 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch FROM timeline_objective_events
 			UNION ALL SELECT patch FROM patch_build_metrics
 			UNION ALL SELECT patch FROM patch_item_timing_metrics
+			UNION ALL SELECT patch FROM item_slot_analytics
 			UNION ALL SELECT patch FROM patch_power_curve_metrics
 			UNION ALL SELECT patch FROM match_team_win_conditions
 			UNION ALL SELECT patch FROM patch_win_condition_metrics
@@ -588,6 +816,7 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "timeline_objective_events", column: "patch"},
 		{table: "patch_build_metrics", column: "patch"},
 		{table: "patch_item_timing_metrics", column: "patch"},
+		{table: "item_slot_analytics", column: "patch"},
 		{table: "patch_power_curve_metrics", column: "patch"},
 		{table: "match_team_win_conditions", column: "patch"},
 		{table: "patch_win_condition_metrics", column: "patch"},
@@ -905,6 +1134,21 @@ func uint32ListSQL(values []uint32) string {
 		return "0"
 	}
 	return strings.Join(parts, ",")
+}
+
+func normalizedItemContext(value string) string {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "JUNGLE":
+		return "JUNGLE"
+	case "SUPPORT", "UTILITY":
+		return "SUPPORT"
+	default:
+		return "DEFAULT"
+	}
+}
+
+func qualifyRoleWhereSQL(whereSQL, qualifiedColumn string) string {
+	return strings.ReplaceAll(whereSQL, "role", qualifiedColumn)
 }
 
 func trimItemSlotRows(rows []ItemSlotRow, limit int) []ItemSlotRow {
