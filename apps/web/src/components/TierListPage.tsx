@@ -7,6 +7,7 @@ import type { Champion, ChampionData, ChampionGuideSummary } from '../api/types'
 import { normalizeLookup } from '../lib/lookup';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championSplashUrl } from '../lib/staticData';
+import { championTier } from '../lib/tiers';
 import { ChampionIdentity } from './ui/ChampionIdentity';
 import { MetricTile } from './ui/MetricTile';
 import { RoleTabs } from './ui/RoleTabs';
@@ -77,7 +78,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           champion,
           score: winriftScore(summary),
           summary,
-          tier: tierForSummary(summary),
+          tier: championTier(summary),
         };
       })
       .filter((row) => {
@@ -240,18 +241,6 @@ function patchBucket(version?: string) {
 
 function winriftScore(summary: ChampionGuideSummary) {
   return summary.tierScore ?? summary.confidence ?? 0;
-}
-
-function tierForSummary(summary: ChampionGuideSummary) {
-	if (!summary.roleRank || !summary.roleRankTotal) return '?';
-	const percentile = summary.roleRank / summary.roleRankTotal;
-	if (summary.roleRank === 1) return 'S+';
-	if (percentile <= 0.03) return 'S+';
-	if (percentile <= 0.1) return 'S';
-  if (percentile <= 0.25) return 'A';
-  if (percentile <= 0.55) return 'B';
-  if (percentile <= 0.78) return 'C';
-  return 'D';
 }
 
 function tierClassName(tier: string) {

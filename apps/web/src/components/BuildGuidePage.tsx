@@ -20,6 +20,7 @@ import {
   summonerSpellName,
 } from '../lib/staticData';
 import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
+import { championTier } from '../lib/tiers';
 import { MetricTile } from './ui/MetricTile';
 import { EmptyState, PanelCard, PanelTitle } from './ui/Panel';
 import { RoleTabs } from './ui/RoleTabs';
@@ -569,16 +570,7 @@ function patchBucket(version?: string) {
 }
 
 function guideTier(guide?: ChampionGuideResponse) {
-  const summary = guide?.summary;
-  if (!summary?.games) return '?';
-  if (summary.roleRank === 1) return 'S+';
-  if (summary.roleRank && summary.roleRankTotal && summary.roleRank / summary.roleRankTotal <= 0.03) return 'S+';
-  if (summary.roleRank && summary.roleRankTotal && summary.roleRank / summary.roleRankTotal <= 0.1) return 'S';
-  if (summary.games >= 250 && summary.winRate >= 53) return 'S';
-  if (summary.games >= 100 && summary.winRate >= 51.5) return 'A';
-  if (summary.winRate >= 50) return 'B';
-  if (summary.winRate >= 48) return 'C';
-  return 'D';
+  return championTier(guide?.summary);
 }
 
 function guideTierClassName(tier: string) {

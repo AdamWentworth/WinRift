@@ -26,13 +26,23 @@ This intentionally keeps winning as the center of gravity while letting populari
 
 ## Tiers
 
-The frontend maps rank percentile to:
+The frontend maps WinRift rank into presentation tiers. `S+` is intentionally a visible elite band rather than a single unreachable edge case. It uses role-aware caps inspired by what players expect from public tier-list surfaces, then scales down when our stored sample is thin.
 
-- `S+`: rank 1 in the selected scope, plus any other champions in the top 3%
-- `S`: top 10%
-- `A`: top 25%
-- `B`: top 55%
-- `C`: top 78%
+Current `S+` caps:
+
+- Top: up to 5 champions
+- Jungle: up to 6 champions
+- Mid: up to 8 champions
+- Bot: up to 2 champions
+- Support: up to 9 champions
+- All roles: up to 12 champions
+
+The actual `S+` count is capped at 18% of the selected scope, so tiny samples do not label half the page as elite. After `S+`, the remaining tiers use broad percentile bands:
+
+- `S`: top 22%
+- `A`: top 40%
+- `B`: top 65%
+- `C`: top 85%
 - `D`: remaining rows
 
 The tier label is a presentation bucket. The backend `tierScore` is the actual sortable number.
