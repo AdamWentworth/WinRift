@@ -178,9 +178,7 @@ export function LiveMatchPanel({ champions, championSplashes, items, spells, run
 
   return (
     <section className={showLiveGame ? 'live-panel has-game' : 'live-panel search-only'}>
-      {!showLiveGame ? (
-        <HomeArtStage champions={champions} championSplashes={championSplashes} />
-      ) : null}
+      <HomeArtStage champions={champions} championSplashes={championSplashes} />
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
           <div className="lookup-console-header">
