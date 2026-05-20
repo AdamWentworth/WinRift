@@ -68,6 +68,8 @@ RANK_SNAPSHOT_TTL_HOURS=24
 RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
 ACCOUNT_ALIAS_ENRICHMENT_ENABLED=true
 ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS=3
+ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true
+ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10
 ```
 
 Then run:
@@ -114,7 +116,7 @@ Do not use profile-less stop/down commands as the canonical shutdown path when t
 make status
 ```
 
-At startup, the worker resolves env seeds into `collector_frontier` and stores their Riot ID aliases. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, runs an account-alias lane for stored participant PUUIDs that do not yet have a saved `gameName#tagLine`, and records Riot requests in a rolling regional budget ledger. Live lookups can also nudge low-sample live participants into `collector_frontier` with `source='live-backfill'`, letting champion-specific card stats improve in the background without blocking the lookup. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
+At startup, the worker resolves env seeds into `collector_frontier` and stores their Riot ID aliases. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, runs an account-alias lane for stored participant PUUIDs that do not yet have a saved `gameName#tagLine`, periodically refreshes the current patch item-slot analytics read model, and records Riot requests in a rolling regional budget ledger. Live lookups can also nudge low-sample live participants into `collector_frontier` with `source='live-backfill'`, letting champion-specific card stats improve in the background without blocking the lookup. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
 
 Patch retention is intentionally tied to `COLLECTOR_CURRENT_PATCH`. For example, `COLLECTOR_CURRENT_PATCH=16.11` with `COLLECTOR_PATCH_RETENTION_COUNT=2` stores `16.11` and `16.10`; when it is bumped to `16.12`, the active window becomes `16.12` and `16.11`, so `16.10` is no longer eligible and can be pruned on startup if `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true`.
 
@@ -170,6 +172,8 @@ Safety knobs:
 - `RANK_SNAPSHOT_TTL_HOURS`: freshness window before a rank snapshot can be refreshed.
 - `ACCOUNT_ALIAS_ENRICHMENT_ENABLED`: when true, the worker runs a separate account-alias lane after the match/rank lanes. It resolves stored participant PUUIDs into Riot ID aliases and saves them in `riot_account_aliases` for tagless frontend lookup.
 - `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS`: max account-alias requests per platform. These are subtracted from the same regional Riot request budget as match collection.
+- `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `item_slot_analytics` summary at startup and then after collector sweeps when the interval has elapsed.
+- `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch item-slot summary refreshes. This is ClickHouse work plus one cached Data Dragon item metadata lookup, not Riot match/league API budget.
 
 Rank enrichment is off by default. Turn it on only after basic match ingestion is working. When enabled, the rank lane chooses distinct participant PUUIDs from ClickHouse that do not already have a fresh `summoner_rank_snapshots` row, prioritizing players attached to the most `UNKNOWN` participant rows. Account-alias enrichment is on by default with a small cap because it improves the lookup UX and does not need to be refreshed often.
 

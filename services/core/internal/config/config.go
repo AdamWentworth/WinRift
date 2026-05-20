@@ -53,6 +53,8 @@ type Config struct {
 	LiveBackfillDelay             time.Duration
 	AccountAliasEnrichmentEnabled bool
 	AccountAliasMaxRequests       int
+	ItemSlotRefreshEnabled        bool
+	ItemSlotRefreshInterval       time.Duration
 }
 
 func Load() Config {
@@ -102,6 +104,8 @@ func Load() Config {
 		LiveBackfillDelay:             time.Duration(envInt("LIVE_BACKFILL_DELAY_SECONDS", 0)) * time.Second,
 		AccountAliasEnrichmentEnabled: envBool("ACCOUNT_ALIAS_ENRICHMENT_ENABLED", true),
 		AccountAliasMaxRequests:       envInt("ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS", 3),
+		ItemSlotRefreshEnabled:        envBool("ITEM_SLOT_ANALYTICS_REFRESH_ENABLED", true),
+		ItemSlotRefreshInterval:       time.Duration(envInt("ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
 	}
 }
 

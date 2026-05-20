@@ -15,6 +15,7 @@ import (
 	"winrift/services/core/internal/collector"
 	"winrift/services/core/internal/config"
 	"winrift/services/core/internal/riot"
+	"winrift/services/core/internal/staticdata"
 )
 
 func main() {
@@ -40,10 +41,11 @@ func main() {
 	}
 
 	matchCollector := collector.New(riotClient, repo)
+	staticService := staticdata.NewService(riotClient)
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -56,6 +58,8 @@ func main() {
 		cfg.RankEnrichmentMaxRequests,
 		cfg.AccountAliasEnrichmentEnabled,
 		cfg.AccountAliasMaxRequests,
+		cfg.ItemSlotRefreshEnabled,
+		cfg.ItemSlotRefreshInterval,
 	)
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {
@@ -67,6 +71,8 @@ func main() {
 	ledger := newRegionRequestLedger(cfg)
 	recordSeedRequests(ledger, seedRequestsByRegion)
 	regions := configuredRegions(platforms)
+	var lastItemSlotRefresh time.Time
+	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, &lastItemSlotRefresh)
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
@@ -162,6 +168,7 @@ func main() {
 			}
 		}
 
+		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, &lastItemSlotRefresh)
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
 		log.Printf(
 			"collector sweep complete platforms=%d active_platforms=%d requests=%d sleep=%s",
@@ -277,6 +284,58 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 		passResult.RateLimited,
 	)
 	return passResult
+}
+
+func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, staticService *staticdata.Service, repo *clickhouse.Repository, lastRefresh *time.Time) {
+	if !cfg.ItemSlotRefreshEnabled {
+		return
+	}
+	patch := strings.TrimSpace(cfg.CollectorCurrentPatch)
+	if patch == "" {
+		return
+	}
+	interval := cfg.ItemSlotRefreshInterval
+	if interval <= 0 {
+		interval = 10 * time.Minute
+	}
+	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
+		return
+	}
+	startedAt := time.Now()
+	log.Printf("item slot analytics scheduled refresh start patch=%s queue=%d interval=%s", patch, analytics.RankedSoloQueueID, interval)
+	defer func() {
+		*lastRefresh = time.Now()
+	}()
+	contexts, err := itemSlotRefreshContexts(ctx, staticService)
+	if err != nil {
+		log.Printf("item slot analytics scheduled refresh skipped patch=%s err=%v", patch, err)
+		return
+	}
+	if err := repo.RefreshItemSlotAnalytics(ctx, patch, analytics.RankedSoloQueueID, contexts); err != nil {
+		log.Printf("item slot analytics scheduled refresh failed patch=%s queue=%d contexts=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(contexts), time.Since(startedAt).Round(time.Millisecond), err)
+		return
+	}
+	log.Printf("item slot analytics scheduled refresh complete patch=%s queue=%d contexts=%d duration=%s", patch, analytics.RankedSoloQueueID, len(contexts), time.Since(startedAt).Round(time.Millisecond))
+}
+
+func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Service) ([]clickhouse.ItemSlotAnalyticsContext, error) {
+	defaultItems, err := staticService.BuildItemIDs(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleItems, err := staticService.BuildItemIDs(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	supportItems, err := staticService.BuildItemIDs(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
+	return []clickhouse.ItemSlotAnalyticsContext{
+		{Key: "DEFAULT", ItemIDs: defaultItems},
+		{Key: "JUNGLE", ItemIDs: jungleItems},
+		{Key: "SUPPORT", ItemIDs: supportItems},
+	}, nil
 }
 
 func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, rankRequests int) collector.Result {

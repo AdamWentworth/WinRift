@@ -55,6 +55,7 @@ The live API reads this table first. If it is empty, the API can fall back to th
 
 Refresh options:
 
+- Worker: `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true` with `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10` refreshes the current patch automatically.
 - Local/dev API: `POST /api/dev/analytics/item-slots/refresh`
 - CLI: `patchctl -action item-slots -patch 16.10 -queue 420`
 
