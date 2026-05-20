@@ -46,6 +46,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/account/aliases", s.accountAliases)
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
+	mux.HandleFunc("GET /api/analytics/champion-guides", s.analyticsChampionGuideIndex)
 	mux.HandleFunc("GET /api/analytics/champion-guide", s.analyticsChampionGuide)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
 	mux.HandleFunc("POST /api/analytics/item-slots/batch", s.analyticsItemSlotsBatch)
@@ -226,6 +227,23 @@ func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
+func (s Server) analyticsChampionGuideIndex(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	filters := map[string]string{
+		"role":        strings.ToUpper(query.Get("role")),
+		"patch":       query.Get("patch"),
+		"rank_bucket": strings.ToUpper(query.Get("rankBucket")),
+	}
+	minGames := queryInt(query.Get("minGames"), 1)
+	limit := queryInt(query.Get("limit"), 250)
+	rows, err := s.repo.QueryChampionGuideIndex(r.Context(), filters, minGames, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"results": championGuideSummariesResponse(rows)})
+}
+
 func (s Server) analyticsChampionGuide(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	filters := map[string]string{
@@ -390,6 +408,14 @@ func championGuideSummaryResponse(row clickhouse.ChampionGuideSummary) map[strin
 		"roleRank":      row.RoleRank,
 		"roleRankTotal": row.RoleRankTotal,
 	}
+}
+
+func championGuideSummariesResponse(rows []clickhouse.ChampionGuideSummary) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, championGuideSummaryResponse(row))
+	}
+	return results
 }
 
 func championGuideMatchupRowsResponse(rows []clickhouse.ChampionGuideMatchupRow) []map[string]any {

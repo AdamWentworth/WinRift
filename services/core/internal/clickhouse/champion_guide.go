@@ -48,6 +48,79 @@ type ChampionGuideData struct {
 	TopSpells        []ChampionGuideSignatureRow
 }
 
+func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideSummary, error) {
+	if minGames <= 0 {
+		minGames = 1
+	}
+	if limit <= 0 {
+		limit = 250
+	}
+	roleScope := analyticsRoleScope(filters["role"])
+	baseSQL, baseArgs := championGuideBaseSQL(filters, roleScope, false)
+	var totalRoleGames int
+	if err := r.db.QueryRowContext(ctx, "SELECT count() "+baseSQL, baseArgs...).Scan(&totalRoleGames); err != nil {
+		return nil, err
+	}
+	query := `
+		SELECT
+			champion_id,
+			sum(win) AS wins,
+			count() AS games,
+			wins / games AS win_rate
+		` + baseSQL + `
+		GROUP BY champion_id
+		HAVING games >= ?
+		ORDER BY games DESC, champion_id ASC`
+	args := append(append([]any{}, baseArgs...), minGames)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ChampionGuideSummary{}
+	for rows.Next() {
+		var row ChampionGuideSummary
+		if err := rows.Scan(&row.ChampionID, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, err
+		}
+		row.Role = roleLabel(filters["role"])
+		row.PatchBucket = patchBucketLabel(filters["patch"])
+		row.RankBucket = rankBucketLabel(filters["rank_bucket"])
+		if row.Games > 0 {
+			row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		}
+		if totalRoleGames > 0 {
+			row.PickRate = float64(row.Games) / float64(totalRoleGames)
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Confidence != out[j].Confidence {
+			return out[i].Confidence > out[j].Confidence
+		}
+		if out[i].WinRate != out[j].WinRate {
+			return out[i].WinRate > out[j].WinRate
+		}
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		return out[i].ChampionID < out[j].ChampionID
+	})
+	totalRanked := len(out)
+	for index := range out {
+		out[index].RoleRank = index + 1
+		out[index].RoleRankTotal = totalRanked
+	}
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]string, minGames, limit int) (ChampionGuideData, error) {
 	if minGames <= 0 {
 		minGames = 5

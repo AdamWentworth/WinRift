@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getChampionGuide, getChampionRoleRates, getItemSlotsBatch, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getItemSlotsBatch, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 vi.mock('./api/client', () => ({
@@ -13,6 +13,11 @@ vi.mock('./api/client', () => ({
     bestMatchups: [],
     topRunes: [],
     topSpells: [],
+  })),
+  getChampionGuideIndex: vi.fn(async () => ({
+    results: [
+      { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+    ],
   })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
   getItemSlotsBatch: vi.fn(async () => ({ results: [] })),
@@ -54,6 +59,7 @@ describe('App', () => {
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
     vi.mocked(getChampionGuide).mockReset();
+    vi.mocked(getChampionGuideIndex).mockReset();
     vi.mocked(getItemSlotsBatch).mockReset();
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
@@ -65,6 +71,11 @@ describe('App', () => {
       bestMatchups: [],
       topRunes: [],
       topSpells: [],
+    });
+    vi.mocked(getChampionGuideIndex).mockResolvedValue({
+      results: [
+        { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+      ],
     });
     vi.mocked(getItemSlotsBatch).mockResolvedValue({ results: [] });
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
@@ -110,9 +121,10 @@ describe('App', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Build Guides' }));
 
-    await waitFor(() => expect(screen.getByText(/WinRift build guide for ranked Solo\/Duo/i)).toBeInTheDocument());
-    expect(screen.getByText('Recommended')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
+    expect(screen.getByText('Current Sample')).toBeInTheDocument();
     await waitFor(() => expect(getChampionGuide).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
+    expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
     queryClient.clear();
   });
 

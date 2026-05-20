@@ -2879,8 +2879,9 @@ button {
 
 .guide-mode {
   background:
-    radial-gradient(ellipse at 50% -10%, rgb(68 124 220 / 18%), transparent 44%),
-    linear-gradient(180deg, #09091f 0%, #090820 52%, #050513 100%);
+    radial-gradient(ellipse at 50% 18%, rgb(116 202 214 / 14%), transparent 42%),
+    linear-gradient(115deg, transparent 0 33.6%, rgb(130 215 255 / 14%) 34% 34.42%, transparent 34.8% 64%, rgb(240 128 128 / 10%) 64.32% 64.75%, transparent 65.1%),
+    linear-gradient(180deg, #202426 0%, #171a1c 72%, #080909 100%);
 }
 
 .build-guide-page {
@@ -2893,13 +2894,13 @@ button {
 
 .guide-hero {
   background:
-    linear-gradient(90deg, rgb(5 6 24 / 92%), rgb(10 12 44 / 72) 38%, rgb(10 12 44 / 42) 72%, rgb(5 6 24 / 88%)),
+    linear-gradient(90deg, rgb(10 12 13 / 95%), rgb(19 25 27 / 82) 43%, rgb(19 25 27 / 52) 72%, rgb(10 12 13 / 88%)),
     var(--guide-splash),
-    linear-gradient(135deg, #11123b, #060613);
+    linear-gradient(135deg, #202426, #080909);
   background-position: center 34%;
   background-size: cover;
-  border: 1px solid rgb(86 113 255 / 20%);
-  box-shadow: 0 20px 70px rgb(0 0 0 / 34%);
+  border: 1px solid rgb(130 215 255 / 26%);
+  box-shadow: 0 20px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 8%);
   display: flex;
   justify-content: space-between;
   min-height: 180px;
@@ -2910,8 +2911,9 @@ button {
 
 .guide-hero::before {
   background:
-    radial-gradient(ellipse at 72% 28%, rgb(64 112 255 / 22%), transparent 34%),
-    linear-gradient(115deg, transparent 0 23%, rgb(68 115 255 / 24%) 23.2% 23.5%, transparent 23.8% 72%, rgb(255 199 93 / 18%) 72.2% 72.5%, transparent 72.8%);
+    radial-gradient(ellipse at 74% 22%, rgb(130 215 255 / 18%), transparent 34%),
+    linear-gradient(115deg, transparent 0 23%, rgb(130 215 255 / 24%) 23.2% 23.5%, transparent 23.8% 72%, rgb(240 128 128 / 18%) 72.2% 72.5%, transparent 72.8%),
+    linear-gradient(180deg, rgb(255 255 255 / 4%), transparent 36%, rgb(0 0 0 / 20%));
   content: "";
   inset: 0;
   pointer-events: none;
@@ -2928,11 +2930,11 @@ button {
 }
 
 .guide-champion-card {
-  border: 2px solid #2f74ff;
-  box-shadow: 0 0 0 1px rgb(255 255 255 / 24%), 0 12px 34px rgb(0 0 0 / 45%);
-  height: 92px;
+  border: 1px solid rgb(130 215 255 / 78%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 15%), 0 12px 34px rgb(0 0 0 / 48%), 0 0 24px rgb(130 215 255 / 12%);
+  height: 96px;
   position: relative;
-  width: 92px;
+  width: 96px;
 }
 
 .guide-champion-card img {
@@ -2943,8 +2945,8 @@ button {
 }
 
 .guide-tier {
-  background: #07133a;
-  border: 1px solid #2f74ff;
+  background: linear-gradient(180deg, #222629, #0f1112);
+  border: 1px solid rgb(232 201 118 / 72%);
   color: #fff;
   font-size: 13px;
   font-weight: 1000;
@@ -2979,6 +2981,16 @@ button {
   min-width: 0;
 }
 
+.guide-kicker {
+  color: #93dceb;
+  display: block;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: 0;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
 .guide-title-block h2 {
   color: #fff;
   font-size: clamp(28px, 4vw, 42px);
@@ -2987,12 +2999,18 @@ button {
 }
 
 .guide-title-block h2 span {
-  color: #c6d0ee;
-  font-weight: 500;
+  color: #fff;
+  font-weight: 1000;
+}
+
+.guide-title-block h2 em {
+  color: #b9d6dd;
+  font-style: normal;
+  font-weight: 650;
 }
 
 .guide-title-block p {
-  color: #c8d3f4;
+  color: #c8d8dd;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
@@ -3006,8 +3024,8 @@ button {
 }
 
 .guide-ability-icon {
-  background: rgb(7 9 35 / 82%);
-  border: 1px solid rgb(85 102 180 / 42%);
+  background: rgb(7 9 10 / 82%);
+  border: 1px solid rgb(130 215 255 / 22%);
   display: grid;
   height: 38px;
   place-items: center;
@@ -3023,7 +3041,7 @@ button {
 }
 
 .guide-ability-icon b {
-  background: rgb(9 12 35 / 94%);
+  background: rgb(11 14 15 / 94%);
   border: 1px solid rgb(255 255 255 / 12%);
   bottom: -6px;
   color: #fff;
@@ -3036,22 +3054,49 @@ button {
   transform: translateX(-50%);
 }
 
-.guide-hero-chip {
+.guide-hero-aside {
   align-self: flex-start;
-  background: rgb(25 22 58 / 88%);
-  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(11 14 15 / 72%);
+  border: 1px solid rgb(130 215 255 / 18%);
   color: #fff;
-  font-size: 13px;
-  font-weight: 1000;
-  padding: 10px 14px;
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  padding: 12px 14px;
   position: relative;
   z-index: 1;
 }
 
+.guide-hero-aside span,
+.guide-hero-aside b,
+.guide-hero-aside em {
+  display: block;
+  font-style: normal;
+  font-weight: 1000;
+  line-height: 1.1;
+}
+
+.guide-hero-aside span {
+  color: #93dceb;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.guide-hero-aside b {
+  color: #fff;
+  font-size: 16px;
+}
+
+.guide-hero-aside em {
+  color: #c8d8dd;
+  font-size: 11px;
+}
+
 .guide-filter-bar {
   align-items: center;
-  background: #111230;
-  border: 1px solid rgb(82 91 160 / 28%);
+  background: rgb(12 15 16 / 78%);
+  border: 1px solid rgb(130 215 255 / 16%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%);
   display: grid;
   gap: 10px;
   grid-template-columns: auto minmax(170px, 1fr) auto minmax(130px, 170px) minmax(180px, 1fr);
@@ -3061,7 +3106,7 @@ button {
 
 .guide-filter-label {
   align-items: center;
-  color: #eef2ff;
+  color: #edf7fa;
   display: flex;
   font-size: 13px;
   font-weight: 1000;
@@ -3071,9 +3116,9 @@ button {
 
 .guide-select-control {
   align-items: center;
-  background: #191a42;
-  border: 1px solid rgb(255 255 255 / 8%);
-  color: #8990be;
+  background: rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  color: #94acb3;
   display: grid;
   gap: 2px;
   grid-template-columns: 1fr;
@@ -3101,7 +3146,7 @@ button {
 }
 
 .guide-select-control select option {
-  background: #111230;
+  background: #15191a;
   color: #fff;
 }
 
@@ -3111,7 +3156,7 @@ button {
 }
 
 .guide-role-tabs {
-  background: #191a42;
+  background: rgb(0 0 0 / 24%);
   border: 1px solid rgb(255 255 255 / 8%);
   display: flex;
   min-height: 42px;
@@ -3121,7 +3166,7 @@ button {
 .guide-role-tabs button {
   background: transparent;
   border: 0;
-  color: #aeb6df;
+  color: #adc1c7;
   font-size: 12px;
   font-weight: 1000;
   min-width: 64px;
@@ -3131,25 +3176,28 @@ button {
 .guide-role-tabs button.selected,
 .guide-role-tabs button:hover,
 .guide-role-tabs button:focus-visible {
-  background: #2f74ff;
+  background: linear-gradient(180deg, rgb(130 215 255 / 28%), rgb(130 215 255 / 12%));
+  border: 1px solid rgb(130 215 255 / 46%);
   color: #fff;
   outline: none;
 }
 
 .guide-stat-strip {
-  background: #111230;
-  border: 1px solid rgb(82 91 160 / 28%);
+  background: transparent;
+  border: 0;
   display: grid;
+  gap: 8px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   margin-top: 12px;
-  padding: 11px 0;
+  padding: 0;
 }
 
 .guide-stat {
-  border-left: 1px solid rgb(111 119 199 / 26%);
+  background: rgb(12 15 16 / 78%);
+  border: 1px solid rgb(130 215 255 / 12%);
   min-width: 0;
-  padding: 0 14px;
-  text-align: center;
+  padding: 10px 12px;
+  text-align: left;
 }
 
 .guide-stat:first-child {
@@ -3157,7 +3205,7 @@ button {
 }
 
 .guide-stat span {
-  color: #aeb6df;
+  color: #94acb3;
   display: block;
   font-size: 10px;
   font-weight: 900;
@@ -3175,31 +3223,96 @@ button {
 }
 
 .guide-stat.tier strong {
-  color: #3d82ff;
+  color: #93dceb;
 }
 
-.guide-recommended-tab {
+.guide-coverage-strip {
+  align-items: stretch;
+  background: rgb(12 15 16 / 72%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(150px, 0.8fr) repeat(4, minmax(0, 1fr));
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.guide-coverage-title,
+.guide-coverage-stat {
+  background: rgb(0 0 0 / 18%);
+  border: 1px solid rgb(255 255 255 / 6%);
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.guide-coverage-title {
   align-items: center;
-  background: linear-gradient(180deg, #262752, #1d1e45);
-  border: 1px solid rgb(255 198 74 / 58%);
-  border-bottom-color: rgb(82 91 160 / 28%);
-  display: inline-flex;
+  color: #93dceb;
+  display: flex;
+  font-size: 11px;
+  font-weight: 1000;
+  gap: 7px;
+  text-transform: uppercase;
+}
+
+.guide-coverage-stat span,
+.guide-coverage-stat strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-coverage-stat span {
+  color: #94acb3;
+  font-size: 9px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.guide-coverage-stat strong {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 1000;
+  margin-top: 2px;
+}
+
+.guide-context-banner {
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgb(130 215 255 / 16%), transparent 42%, rgb(240 128 128 / 9%)),
+    rgb(12 15 16 / 84%);
+  border: 1px solid rgb(130 215 255 / 18%);
+  display: flex;
   gap: 10px;
   margin-top: 18px;
   min-height: 40px;
   padding: 0 12px;
 }
 
-.guide-recommended-tab span,
-.guide-recommended-tab b {
+.guide-context-banner span,
+.guide-context-banner b,
+.guide-context-banner em {
   color: #fff;
   font-size: 13px;
   font-weight: 1000;
 }
 
-.guide-recommended-tab b {
-  color: #aeb6df;
+.guide-context-banner span {
+  color: #93dceb;
+  text-transform: uppercase;
+}
+
+.guide-context-banner b {
+  color: #fff;
+}
+
+.guide-context-banner em {
+  color: #94acb3;
+  font-style: normal;
   font-weight: 800;
+  margin-left: auto;
 }
 
 .guide-primary-grid {
@@ -3214,9 +3327,10 @@ button {
 
 .guide-card {
   background:
-    linear-gradient(180deg, rgb(31 32 70 / 96%), rgb(23 24 55 / 96%)),
-    #171837;
-  border: 1px solid rgb(82 91 160 / 28%);
+    linear-gradient(180deg, rgb(25 30 32 / 92%), rgb(13 16 17 / 96%)),
+    #151819;
+  border: 1px solid rgb(130 215 255 / 13%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%);
   min-width: 0;
   overflow: hidden;
   padding: 18px;
@@ -3224,7 +3338,7 @@ button {
 
 .guide-section-title {
   align-items: baseline;
-  border-left: 3px solid #2f74ff;
+  border-left: 3px solid #93dceb;
   display: flex;
   gap: 10px;
   margin-bottom: 16px;
@@ -3240,7 +3354,7 @@ button {
 }
 
 .guide-section-title em {
-  color: #777caa;
+  color: #8da3aa;
   font-size: 13px;
   font-style: normal;
   font-weight: 800;
@@ -3262,7 +3376,7 @@ button {
 
 .guide-rune-tree-title {
   align-items: center;
-  background: #101133;
+  background: rgb(0 0 0 / 24%);
   display: flex;
   gap: 10px;
   min-height: 48px;
@@ -3286,7 +3400,7 @@ button {
 
 .guide-rune-slot {
   align-items: center;
-  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
   display: flex;
   gap: 15px;
   min-height: 58px;
@@ -3300,12 +3414,12 @@ button {
 }
 
 .guide-rune-slot img.selected {
-  filter: drop-shadow(0 0 8px rgb(47 116 255 / 92%)) saturate(1.12);
+  filter: drop-shadow(0 0 8px rgb(147 220 235 / 82%)) saturate(1.12);
   transform: scale(1.08);
 }
 
 .guide-stat-shards {
-  background: #101133;
+  background: rgb(0 0 0 / 24%);
   display: flex;
   gap: 12px;
   grid-column: 1 / -1;
@@ -3327,8 +3441,8 @@ button {
 }
 
 .guide-stat-shards b {
-  background: rgb(47 116 255 / 18%);
-  border: 1px solid rgb(47 116 255 / 34%);
+  background: rgb(130 215 255 / 12%);
+  border: 1px solid rgb(130 215 255 / 28%);
   padding: 3px 8px;
 }
 
@@ -3372,7 +3486,7 @@ button {
 }
 
 .guide-matchup-tile {
-  background: #101133;
+  background: rgb(0 0 0 / 24%);
   border: 1px solid rgb(255 255 255 / 8%);
   min-height: 118px;
   min-width: 104px;
@@ -3466,8 +3580,8 @@ button {
 .skill-path-placeholder-grid b,
 .skill-path-placeholder-grid span {
   align-items: center;
-  background: #101133;
-  color: #7380bc;
+  background: rgb(0 0 0 / 24%);
+  color: #829aa2;
   display: flex;
   font-size: 10px;
   font-weight: 1000;
@@ -3476,7 +3590,7 @@ button {
 }
 
 .skill-path-placeholder-grid span.lit {
-  background: #2f74ff;
+  background: #4aaebb;
   color: #fff;
 }
 
@@ -3554,8 +3668,8 @@ button {
 
 .guide-role-quest {
   background:
-    linear-gradient(90deg, rgb(23 24 55 / 98%), rgb(18 20 49 / 78)),
-    linear-gradient(135deg, rgb(47 116 255 / 16%), transparent 50%);
+    linear-gradient(90deg, rgb(17 21 22 / 98%), rgb(14 17 18 / 78)),
+    linear-gradient(135deg, rgb(130 215 255 / 12%), transparent 50%);
   margin-top: 12px;
 }
 
@@ -3716,12 +3830,12 @@ button {
     margin-top: 3px;
   }
 
-  .guide-hero-chip {
-    display: inline-block;
+  .guide-hero-aside {
     margin-top: 14px;
   }
 
   .guide-stat-strip,
+  .guide-coverage-strip,
   .guide-filter-bar,
   .guide-rune-grid,
   .guide-item-grid {

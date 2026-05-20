@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionGuideResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -65,6 +65,16 @@ export function getChampionGuide(filters: BuildFilters) {
   params.set('minGames', String(filters.minGames));
   if (filters.limit) params.set('limit', String(filters.limit));
   return request<ChampionGuideResponse>(`/api/analytics/champion-guide?${params.toString()}`);
+}
+
+export function getChampionGuideIndex(filters: BuildFilters) {
+  const params = new URLSearchParams();
+  if (filters.role) params.set('role', filters.role);
+  if (filters.patch) params.set('patch', filters.patch);
+  if (filters.rankBucket) params.set('rankBucket', filters.rankBucket);
+  params.set('minGames', String(filters.minGames ?? 1));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  return request<ChampionGuideIndexResponse>(`/api/analytics/champion-guides?${params.toString()}`);
 }
 
 export function getItemSlots(filters: BuildFilters) {

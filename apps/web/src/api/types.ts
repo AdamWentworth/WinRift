@@ -192,6 +192,10 @@ export type ChampionGuideResponse = {
   topSpells: ChampionGuideSpells[];
 };
 
+export type ChampionGuideIndexResponse = {
+  results: ChampionGuideSummary[];
+};
+
 export type ChampionRoleRate = {
   championId: number;
   role: string;

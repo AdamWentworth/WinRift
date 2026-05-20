@@ -1,9 +1,9 @@
-import { CircleSlash, Filter, Search, Shield } from 'lucide-react';
+import { CircleSlash, Database, Filter, Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getChampionGuide, getItemSlots } from '../api/client';
-import type { AnalyticsItemSlot, Champion, ChampionData, ChampionGuideResponse, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
+import { getChampionGuide, getChampionGuideIndex, getItemSlots } from '../api/client';
+import type { AnalyticsItemSlot, Champion, ChampionData, ChampionGuideResponse, ChampionGuideSummary, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
   championByKey,
@@ -93,6 +93,22 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
   const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
   const titleRole = roles.find((candidate) => candidate.value === role)?.label ?? role;
   const sampleContext = opponent ? `${champion?.name ?? championId} vs ${opponent.name}` : `${champion?.name ?? championId} overall`;
+  const guideIndexQuery = useQuery({
+    queryKey: ['champion-guide-index', role, patch, rankBucket],
+    queryFn: () => getChampionGuideIndex({ role, patch, rankBucket, minGames: 1, limit: 250 }),
+    enabled: Boolean(patch),
+    staleTime: 5 * 60 * 1000,
+  });
+  const guideIndex = guideIndexQuery.data?.results ?? [];
+  const coverageByChampionId = useMemo(() => {
+    const map = new Map<number, ChampionGuideSummary>();
+    for (const summary of guideIndex) {
+      map.set(summary.championId, summary);
+    }
+    return map;
+  }, [guideIndex]);
+  const currentCoverage = coverageByChampionId.get(championId);
+  const coveredGames = guideIndex.reduce((total, summary) => total + summary.games, 0);
 
   return (
     <section className="build-guide-page">
@@ -103,8 +119,9 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
             {champion ? <img src={championImageUrl(champions, championId)} alt={champion.name} /> : null}
           </div>
           <div className="guide-title-block">
+            <span className="guide-kicker">WinRift Build Atlas</span>
             <h2>
-              {champion?.name ?? 'Champion'} <span>Build for {titleRole}, {rankLabel}</span>
+              <span>{champion?.name ?? 'Champion'}</span> <em>{titleRole} patterns</em>
             </h2>
             <div className="guide-ability-row">
               <AbilityIcon champions={champions} ability={champion?.passive} label="P" />
@@ -113,15 +130,20 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
               ))}
             </div>
             <p>
-              WinRift build guide for ranked Solo/Duo. This page uses collected match data to show rune, spell, item, and matchup patterns for patch {patch || 'current'}.
+              A collected-match readout for ranked Solo/Duo: matchup-aware items, rune patterns, spell pairs, and where the sample is still thin.
             </p>
           </div>
         </div>
-        <div className="guide-hero-chip">Patch {patch || champions?.version || 'current'}</div>
+        <div className="guide-hero-aside">
+          <span>Patch {patch || champions?.version || 'current'}</span>
+          <b>{rankLabel}</b>
+          <em>{formatNumber(currentCoverage?.games ?? 0)} role games</em>
+        </div>
       </div>
 
       <GuideFilters
         champions={championsByName}
+        coverage={coverageByChampionId}
         championId={championId}
         role={role}
         rankBucket={rankBucket}
@@ -133,10 +155,20 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
       />
 
       <GuideStats guide={guide} loading={guideQuery.isLoading} />
+      <GuideCoverage
+        loading={guideIndexQuery.isLoading}
+        championCount={guideIndex.length}
+        totalGames={coveredGames}
+        selectedGames={currentCoverage?.games ?? 0}
+        role={titleRole}
+        rankLabel={rankLabel}
+        patch={patch}
+      />
 
-      <div className="guide-recommended-tab">
-        <span>Recommended</span>
+      <div className="guide-context-banner">
+        <span>Current Sample</span>
         <b>{sampleContext}</b>
+        <em>{opponent ? 'matchup-filtered where possible, then widened carefully' : 'champion-wide until a matchup is selected'}</em>
       </div>
 
       <div className="guide-primary-grid">
@@ -168,6 +200,7 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
 
 function GuideFilters({
   champions,
+  coverage,
   championId,
   role,
   rankBucket,
@@ -178,6 +211,7 @@ function GuideFilters({
   onOpponentChange,
 }: {
   champions: Champion[];
+  coverage: Map<number, ChampionGuideSummary>;
   championId: number;
   role: string;
   rankBucket: string;
@@ -196,9 +230,14 @@ function GuideFilters({
       <label className="guide-select-control">
         <span>Champion</span>
         <select value={championId} onChange={(event) => onChampionChange(Number(event.target.value))}>
-          {champions.map((champion) => (
-            <option key={champion.key} value={champion.key}>{champion.name}</option>
-          ))}
+          {champions.map((champion) => {
+            const games = coverage.get(Number(champion.key))?.games ?? 0;
+            return (
+              <option key={champion.key} value={champion.key}>
+                {champion.name}{games ? ` (${formatNumber(games)})` : ''}
+              </option>
+            );
+          })}
         </select>
       </label>
       <div className="guide-role-tabs" aria-label="Role">
@@ -225,6 +264,30 @@ function GuideFilters({
           ))}
         </select>
       </label>
+    </div>
+  );
+}
+
+function GuideCoverage({ loading, championCount, totalGames, selectedGames, role, rankLabel, patch }: { loading: boolean; championCount: number; totalGames: number; selectedGames: number; role: string; rankLabel: string; patch: string }) {
+  return (
+    <div className="guide-coverage-strip">
+      <div className="guide-coverage-title">
+        <Database size={15} />
+        <span>Stored Coverage</span>
+      </div>
+      <GuideCoverageStat label="Champions with data" value={loading ? '...' : formatNumber(championCount)} />
+      <GuideCoverageStat label={`${role} games indexed`} value={loading ? '...' : formatNumber(totalGames)} />
+      <GuideCoverageStat label="Selected champion" value={loading ? '...' : formatNumber(selectedGames)} />
+      <GuideCoverageStat label="Scope" value={`${patch || 'all patches'} / ${rankLabel}`} />
+    </div>
+  );
+}
+
+function GuideCoverageStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="guide-coverage-stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
