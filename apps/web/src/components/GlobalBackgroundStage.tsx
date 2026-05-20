@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ChampionData, ChampionSplashData } from '../api/types';
 import { championByKey, championList } from '../lib/staticData';
 
-type BackgroundArtSlide = {
+type GlobalBackgroundSlide = {
   src: string;
   title: string;
   position: string;
   panClass: string;
 };
 
-const fallbackBackgroundSlides: BackgroundArtSlide[] = [
+const fallbackGlobalBackgroundSlides: GlobalBackgroundSlide[] = [
   {
     src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Akali_0.jpg',
     title: 'Akali',
@@ -48,10 +48,10 @@ const fallbackBackgroundSlides: BackgroundArtSlide[] = [
   },
 ];
 
-type BackgroundSlideState = {
-  deck: BackgroundArtSlide[];
-  active: BackgroundArtSlide;
-  previous?: BackgroundArtSlide;
+type GlobalBackgroundSlideState = {
+  deck: GlobalBackgroundSlide[];
+  active: GlobalBackgroundSlide;
+  previous?: GlobalBackgroundSlide;
   nextIndex: number;
   cycle: number;
 };
@@ -59,15 +59,15 @@ type BackgroundSlideState = {
 type Props = {
   champions?: ChampionData;
   championSplashes?: ChampionSplashData;
-  championId?: number;
+  championScopeId?: number;
 };
 
-export function BackgroundArtStage({ champions, championSplashes, championId }: Props) {
-  const slidePool = useMemo(() => buildBackgroundSplashPool(champions, championSplashes, championId), [champions, championId, championSplashes]);
-  const [slideState, setSlideState] = useState(() => initialBackgroundSlideState(fallbackBackgroundSlides));
+export function GlobalBackgroundStage({ champions, championSplashes, championScopeId }: Props) {
+  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId), [champions, championScopeId, championSplashes]);
+  const [slideState, setSlideState] = useState(() => initialGlobalBackgroundSlideState(fallbackGlobalBackgroundSlides));
 
   useEffect(() => {
-    setSlideState(initialBackgroundSlideState(slidePool));
+    setSlideState(initialGlobalBackgroundSlideState(slidePool));
   }, [slidePool]);
 
   useEffect(() => {
@@ -75,21 +75,21 @@ export function BackgroundArtStage({ champions, championSplashes, championId }: 
       return undefined;
     }
     const interval = window.setInterval(() => {
-      setSlideState((current) => nextBackgroundSlideState(current, slidePool));
+      setSlideState((current) => nextGlobalBackgroundSlideState(current, slidePool));
     }, 10500);
     return () => window.clearInterval(interval);
   }, [slidePool]);
 
   return (
-    <div className="home-art-stage" aria-hidden="true">
+    <div className="global-art-stage" aria-hidden="true">
       {slideState.previous ? (
-        <BackgroundArtSlide
+        <GlobalBackgroundArtSlide
           key={`previous-${slideState.cycle}-${slideState.previous.src}`}
           slide={slideState.previous}
           state="exiting"
         />
       ) : null}
-      <BackgroundArtSlide
+      <GlobalBackgroundArtSlide
         key={`active-${slideState.cycle}-${slideState.active.src}`}
         slide={slideState.active}
         state="active"
@@ -98,16 +98,16 @@ export function BackgroundArtStage({ champions, championSplashes, championId }: 
   );
 }
 
-function BackgroundArtSlide({ slide, state }: { slide: BackgroundArtSlide; state: 'active' | 'exiting' }) {
+function GlobalBackgroundArtSlide({ slide, state }: { slide: GlobalBackgroundSlide; state: 'active' | 'exiting' }) {
   return (
-    <div className={`home-art-slide ${state} ${slide.panClass}`}>
+    <div className={`global-art-slide ${state} ${slide.panClass}`}>
       <img src={slide.src} alt="" title={slide.title} style={{ objectPosition: slide.position }} />
     </div>
   );
 }
 
-function buildBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championId?: number): BackgroundArtSlide[] {
-  const scopedChampion = championId ? championByKey(champions, championId) : undefined;
+function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number): GlobalBackgroundSlide[] {
+  const scopedChampion = championScopeId ? championByKey(champions, championScopeId) : undefined;
   if (scopedChampion) {
     const scopedSplashes = championSplashes?.data.filter((splash) => splash.championId === scopedChampion.id) ?? [];
     if (scopedSplashes.length) {
@@ -116,8 +116,8 @@ function buildBackgroundSplashPool(champions?: ChampionData, championSplashes?: 
     return [{
       src: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${scopedChampion.id}_0.jpg`,
       title: scopedChampion.name,
-      position: backgroundSplashPosition(scopedChampion.id),
-      panClass: backgroundSplashPan(scopedChampion.id, 0),
+      position: globalBackgroundSplashPosition(scopedChampion.id),
+      panClass: globalBackgroundSplashPan(scopedChampion.id, 0),
     }];
   }
   if (championSplashes?.data.length) {
@@ -125,43 +125,43 @@ function buildBackgroundSplashPool(champions?: ChampionData, championSplashes?: 
   }
   const championsByName = championList(champions);
   if (!championsByName.length) {
-    return fallbackBackgroundSlides;
+    return fallbackGlobalBackgroundSlides;
   }
   return championsByName.map((champion, index) => ({
     src: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg`,
     title: champion.name,
-    position: backgroundSplashPosition(champion.id),
-    panClass: backgroundSplashPan(champion.id, index),
+    position: globalBackgroundSplashPosition(champion.id),
+    panClass: globalBackgroundSplashPan(champion.id, index),
   }));
 }
 
-function mapSplashSlides(splashes: ChampionSplashData['data']): BackgroundArtSlide[] {
+function mapSplashSlides(splashes: ChampionSplashData['data']): GlobalBackgroundSlide[] {
   return splashes.map((splash, index) => {
     const key = `${splash.championId}-${splash.skinNumber}`;
     return {
       src: splash.src,
       title: splash.skinNumber === 0 ? splash.championName : splash.skinName,
-      position: backgroundSplashPosition(key),
-      panClass: backgroundSplashPan(key, index),
+      position: globalBackgroundSplashPosition(key),
+      panClass: globalBackgroundSplashPan(key, index),
     };
   });
 }
 
-function initialBackgroundSlideState(slides: BackgroundArtSlide[]): BackgroundSlideState {
-  const deck = shuffleBackgroundSlides(slides);
+function initialGlobalBackgroundSlideState(slides: GlobalBackgroundSlide[]): GlobalBackgroundSlideState {
+  const deck = shuffleGlobalBackgroundSlides(slides);
   return {
     deck,
-    active: deck[0] ?? fallbackBackgroundSlides[0],
+    active: deck[0] ?? fallbackGlobalBackgroundSlides[0],
     nextIndex: deck.length > 1 ? 1 : 0,
     cycle: 0,
   };
 }
 
-function nextBackgroundSlideState(current: BackgroundSlideState, slidePool: BackgroundArtSlide[]): BackgroundSlideState {
+function nextGlobalBackgroundSlideState(current: GlobalBackgroundSlideState, slidePool: GlobalBackgroundSlide[]): GlobalBackgroundSlideState {
   let deck = current.deck;
   let nextIndex = current.nextIndex;
   if (nextIndex >= deck.length) {
-    deck = shuffleBackgroundSlides(slidePool, current.active.src);
+    deck = shuffleGlobalBackgroundSlides(slidePool, current.active.src);
     nextIndex = 0;
   }
   const active = deck[nextIndex] ?? current.active;
@@ -174,7 +174,7 @@ function nextBackgroundSlideState(current: BackgroundSlideState, slidePool: Back
   };
 }
 
-function shuffleBackgroundSlides(slides: BackgroundArtSlide[], avoidFirstSrc?: string): BackgroundArtSlide[] {
+function shuffleGlobalBackgroundSlides(slides: GlobalBackgroundSlide[], avoidFirstSrc?: string): GlobalBackgroundSlide[] {
   const shuffled = [...slides];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
@@ -187,12 +187,12 @@ function shuffleBackgroundSlides(slides: BackgroundArtSlide[], avoidFirstSrc?: s
   return shuffled;
 }
 
-function backgroundSplashPosition(championId: string) {
+function globalBackgroundSplashPosition(championId: string) {
   const positions = ['center 34%', 'center 38%', 'center 42%', '44% 38%', '56% 38%', '50% 46%'];
   return positions[hashText(championId) % positions.length];
 }
 
-function backgroundSplashPan(championId: string, index: number) {
+function globalBackgroundSplashPan(championId: string, index: number) {
   const pans = ['pan-east', 'pan-west', 'pan-rise', 'pan-fall', 'pan-northeast', 'pan-southwest'];
   return pans[(hashText(championId) + index) % pans.length];
 }

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
-import { BackgroundArtStage } from './components/BackgroundArtStage';
+import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
 import { BuildGuidePage } from './components/BuildGuidePage';
 import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
 import { LiveMatchPanel } from './components/LiveMatchPanel';
@@ -50,14 +50,14 @@ export function App() {
   const initialChampionId = useMemo(() => (
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
-  const backgroundChampionId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
+  const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
 
   return (
     <main className={route.kind === 'champion' || route.kind === 'tier-list' ? 'app-shell guide-mode' : 'app-shell'}>
-      <BackgroundArtStage
+      <GlobalBackgroundStage
         champions={champions.data}
         championSplashes={championSplashes.data}
-        championId={backgroundChampionId}
+        championScopeId={backgroundChampionScopeId}
       />
       <header className="topbar">
         <div className="topbar-brand">

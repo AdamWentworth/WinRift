@@ -4,9 +4,11 @@ This is the next-session list from the live app rebuild work. The project is mov
 
 ## Frontend Structure
 
+Status: items 1-3 have been addressed in the current cleanup pass. Item 4 is the next frontend-structure pass.
+
 1. Split `LiveMatchups.tsx` into smaller live-match modules. It currently owns the page shell, mode rail, champion cards, build view, win-condition view, charting, and matchup helpers.
 2. Extract shared UI pieces for stat tiles, sample chips, champion rows, role selectors, and card shells so the live page, champion guide, and tier list feel consistently built instead of copied forward.
-3. Rename and document `BackgroundArtStage` as a global background system, including the champion-filtered mode for champion pages.
+3. Document `GlobalBackgroundStage` as the global background system, including the champion-filtered mode for champion pages.
 4. Tune the global background contrast by page type so the art is atmospheric without making dense data screens harder to read.
 
 ## Product Surfaces

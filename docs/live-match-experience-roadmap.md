@@ -168,7 +168,7 @@ Recent refinements:
 
 ## Static Art And Deployment Notes
 
-The global background slideshow uses Riot/Data Dragon art through URL references, not checked-in image files.
+The global background slideshow uses Riot/Data Dragon art through URL references, not checked-in image files. The canonical implementation note is `docs/product/global-background-system.md`.
 
 UI policy:
 
