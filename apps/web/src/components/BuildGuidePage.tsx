@@ -21,6 +21,7 @@ import {
 } from '../lib/staticData';
 import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { MetricTile } from './ui/MetricTile';
+import { RoleTabs } from './ui/RoleTabs';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -248,14 +249,7 @@ function GuideFilters({
           })}
         </select>
       </label>
-      <div className="guide-role-tabs" aria-label="Role">
-        {ROLE_OPTIONS.map((candidate) => (
-          <button key={candidate.value} className={candidate.value === role ? 'selected' : ''} onClick={() => onRoleChange(candidate.value)} type="button">
-            <RoleIcon role={candidate.value} />
-            <span>{candidate.label}</span>
-          </button>
-        ))}
-      </div>
+      <RoleTabs options={ROLE_OPTIONS} value={role} onChange={onRoleChange} />
       <label className="guide-select-control compact">
         <span>Rank</span>
         <select value={rankBucket} onChange={(event) => onRankChange(event.target.value)}>

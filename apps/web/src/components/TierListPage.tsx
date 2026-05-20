@@ -8,6 +8,7 @@ import { normalizeLookup } from '../lib/lookup';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championImageUrl, championSplashUrl } from '../lib/staticData';
 import { MetricTile } from './ui/MetricTile';
+import { RoleTabs } from './ui/RoleTabs';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -107,14 +108,13 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           <Filter size={17} />
           <span>Filters</span>
         </div>
-        <div className="guide-role-tabs tier-role-tabs" aria-label="Tier list role">
-          {ROLE_OPTIONS_WITH_ALL.map((candidate) => (
-            <button key={candidate.value || 'ALL'} className={candidate.value === role ? 'selected' : ''} onClick={() => setRole(candidate.value)} type="button">
-              <RoleIcon role={candidate.value} />
-              <span>{candidate.label}</span>
-            </button>
-          ))}
-        </div>
+        <RoleTabs
+          ariaLabel="Tier list role"
+          className="guide-role-tabs tier-role-tabs"
+          options={ROLE_OPTIONS_WITH_ALL}
+          value={role}
+          onChange={setRole}
+        />
         <label className="guide-select-control compact">
           <span>Rank</span>
           <select value={rankBucket} onChange={(event) => setRankBucket(event.target.value)}>
