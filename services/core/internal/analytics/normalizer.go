@@ -24,8 +24,10 @@ type NormalizedMatch struct {
 	Matchups                  []MatchupRow
 	TimelineParticipantFrames []TimelineParticipantFrameRow
 	TimelineItemEvents        []TimelineItemEventRow
+	TimelineSkillEvents       []TimelineSkillEventRow
 	TimelineCombatEvents      []TimelineCombatEventRow
 	TimelineObjectiveEvents   []TimelineObjectiveEventRow
+	ChampionBans              []ChampionBanRow
 }
 
 type RankSnapshot struct {
@@ -143,6 +145,18 @@ type TimelineItemEventRow struct {
 	AfterID       uint32
 }
 
+type TimelineSkillEventRow struct {
+	MatchID       string
+	Platform      string
+	Patch         string
+	QueueID       uint16
+	TimestampMS   uint32
+	ParticipantID uint8
+	SkillSlot     uint8
+	SkillOrder    uint8
+	LevelUpType   string
+}
+
 type TimelineCombatEventRow struct {
 	MatchID                 string
 	Platform                string
@@ -156,6 +170,16 @@ type TimelineCombatEventRow struct {
 	ShutdownBounty          uint32
 	PositionX               int32
 	PositionY               int32
+}
+
+type ChampionBanRow struct {
+	MatchID    string
+	Platform   string
+	Patch      string
+	QueueID    uint16
+	TeamID     uint16
+	ChampionID uint16
+	PickTurn   uint8
 }
 
 type TimelineObjectiveEventRow struct {
@@ -194,6 +218,18 @@ type matchInfo struct {
 	MapID              int                `json:"mapId"`
 	QueueID            int                `json:"queueId"`
 	Participants       []matchParticipant `json:"participants"`
+	Teams              []matchTeam        `json:"teams"`
+}
+
+type matchTeam struct {
+	TeamID uint16    `json:"teamId"`
+	Bans   []teamBan `json:"bans"`
+	Win    bool      `json:"win"`
+}
+
+type teamBan struct {
+	ChampionID int `json:"championId"`
+	PickTurn   int `json:"pickTurn"`
 }
 
 type matchParticipant struct {
@@ -280,6 +316,8 @@ type timelineEvent struct {
 	AssistingParticipantIDs []int            `json:"assistingParticipantIds"`
 	Bounty                  int              `json:"bounty"`
 	ShutdownBounty          int              `json:"shutdownBounty"`
+	SkillSlot               int              `json:"skillSlot"`
+	LevelUpType             string           `json:"levelUpType"`
 	TeamID                  int              `json:"teamId"`
 	MonsterType             string           `json:"monsterType"`
 	MonsterSubType          string           `json:"monsterSubType"`
@@ -380,8 +418,10 @@ func NormalizeMatchWithRankBuckets(rawMatch, rawTimeline []byte, platform, rankB
 	normalized.Matchups = BuildMatchupRows(normalized.Participants)
 	normalized.TimelineParticipantFrames = BuildTimelineParticipantFrames(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
 	normalized.TimelineItemEvents = BuildTimelineItemEvents(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
+	normalized.TimelineSkillEvents = BuildTimelineSkillEvents(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
 	normalized.TimelineCombatEvents = BuildTimelineCombatEvents(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
 	normalized.TimelineObjectiveEvents = BuildTimelineObjectiveEvents(timeline, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
+	normalized.ChampionBans = BuildChampionBans(payload, matchID, strings.ToUpper(platform), patch, uint16(payload.Info.QueueID))
 	return normalized, nil
 }
 
@@ -676,6 +716,71 @@ func BuildTimelineItemEvents(timeline timelinePayload, matchID, platform, patch 
 	return rows
 }
 
+func BuildTimelineSkillEvents(timeline timelinePayload, matchID, platform, patch string, queueID uint16) []TimelineSkillEventRow {
+	type skillEvent struct {
+		timestampMS   uint32
+		participantID uint8
+		skillSlot     uint8
+		levelUpType   string
+	}
+	events := []skillEvent{}
+	for _, frame := range timeline.Info.Frames {
+		for _, event := range frame.Events {
+			if event.Type != "SKILL_LEVEL_UP" {
+				continue
+			}
+			timestamp := event.Timestamp
+			if timestamp == 0 {
+				timestamp = frame.Timestamp
+			}
+			if event.ParticipantID <= 0 || event.SkillSlot <= 0 {
+				continue
+			}
+			events = append(events, skillEvent{
+				timestampMS:   uint32NonNegative(timestamp),
+				participantID: uint8NonNegative(event.ParticipantID),
+				skillSlot:     uint8NonNegative(event.SkillSlot),
+				levelUpType:   event.LevelUpType,
+			})
+		}
+	}
+	sort.Slice(events, func(i, j int) bool {
+		if events[i].participantID != events[j].participantID {
+			return events[i].participantID < events[j].participantID
+		}
+		if events[i].timestampMS != events[j].timestampMS {
+			return events[i].timestampMS < events[j].timestampMS
+		}
+		return events[i].skillSlot < events[j].skillSlot
+	})
+	orders := map[uint8]uint8{}
+	rows := make([]TimelineSkillEventRow, 0, len(events))
+	for _, event := range events {
+		orders[event.participantID]++
+		rows = append(rows, TimelineSkillEventRow{
+			MatchID:       matchID,
+			Platform:      platform,
+			Patch:         patch,
+			QueueID:       queueID,
+			TimestampMS:   event.timestampMS,
+			ParticipantID: event.participantID,
+			SkillSlot:     event.skillSlot,
+			SkillOrder:    orders[event.participantID],
+			LevelUpType:   event.levelUpType,
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].MatchID != rows[j].MatchID {
+			return rows[i].MatchID < rows[j].MatchID
+		}
+		if rows[i].ParticipantID != rows[j].ParticipantID {
+			return rows[i].ParticipantID < rows[j].ParticipantID
+		}
+		return rows[i].SkillOrder < rows[j].SkillOrder
+	})
+	return rows
+}
+
 func BuildTimelineCombatEvents(timeline timelinePayload, matchID, platform, patch string, queueID uint16) []TimelineCombatEventRow {
 	rows := []TimelineCombatEventRow{}
 	for _, frame := range timeline.Info.Frames {
@@ -700,6 +805,27 @@ func BuildTimelineCombatEvents(timeline timelinePayload, matchID, platform, patc
 				ShutdownBounty:          uint32NonNegative(event.ShutdownBounty),
 				PositionX:               int32(event.Position.X),
 				PositionY:               int32(event.Position.Y),
+			})
+		}
+	}
+	return rows
+}
+
+func BuildChampionBans(payload matchPayload, matchID, platform, patch string, queueID uint16) []ChampionBanRow {
+	rows := []ChampionBanRow{}
+	for _, team := range payload.Info.Teams {
+		for _, ban := range team.Bans {
+			if ban.ChampionID <= 0 {
+				continue
+			}
+			rows = append(rows, ChampionBanRow{
+				MatchID:    matchID,
+				Platform:   platform,
+				Patch:      patch,
+				QueueID:    queueID,
+				TeamID:     team.TeamID,
+				ChampionID: uint16NonNegative(ban.ChampionID),
+				PickTurn:   uint8NonNegative(ban.PickTurn),
 			})
 		}
 	}

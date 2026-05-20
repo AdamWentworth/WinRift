@@ -3187,7 +3187,7 @@ button {
   border: 0;
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-top: 12px;
   padding: 0;
 }
@@ -3558,6 +3558,10 @@ button {
 .skill-priority-icons img {
   height: 36px;
   width: 36px;
+}
+
+.skill-priority-icons .muted-skill img {
+  filter: grayscale(1) opacity(0.42);
 }
 
 .skill-priority-icons b {

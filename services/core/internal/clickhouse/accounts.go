@@ -107,6 +107,74 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 	`, `
 		ALTER TABLE patch_win_condition_metrics ADD COLUMN IF NOT EXISTS confidence_percent Float64 AFTER win_rate_percent
 	`, `
+		CREATE TABLE IF NOT EXISTS timeline_skill_events
+		(
+			match_id String,
+			platform LowCardinality(String),
+			patch LowCardinality(String),
+			queue_id UInt16,
+			timestamp_ms UInt32,
+			participant_id UInt8,
+			skill_slot UInt8,
+			skill_order UInt8,
+			level_up_type LowCardinality(String),
+			ingested_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(ingested_at)
+		ORDER BY (match_id, participant_id, skill_order)
+	`, `
+		CREATE TABLE IF NOT EXISTS champion_bans
+		(
+			match_id String,
+			platform LowCardinality(String),
+			patch LowCardinality(String),
+			queue_id UInt16,
+			team_id UInt16,
+			champion_id UInt16,
+			pick_turn UInt8,
+			ingested_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(ingested_at)
+		ORDER BY (match_id, team_id, pick_turn, champion_id)
+	`, `
+		CREATE TABLE IF NOT EXISTS champion_skill_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			champion_id UInt16,
+			role LowCardinality(String),
+			rank_bucket LowCardinality(String),
+			skill_order_signature String,
+			wins UInt64,
+			games UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			skill_order_signature
+		)
+	`, `
+		CREATE TABLE IF NOT EXISTS champion_ban_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			champion_id UInt16,
+			bans UInt64,
+			games UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY (patch, platform, queue_id, champion_id)
+	`, `
 		CREATE TABLE IF NOT EXISTS item_slot_analytics
 		(
 			patch LowCardinality(String),

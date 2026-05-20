@@ -153,9 +153,11 @@ export type ChampionGuideSummary = {
   rankBucket: string;
   wins: number;
   games: number;
+  bans: number;
   winRate: number;
   confidence: number;
   pickRate: number;
+  banRate: number;
   roleRank: number;
   roleRankTotal: number;
 };
@@ -184,12 +186,21 @@ export type ChampionGuideSpells = {
   confidence: number;
 };
 
+export type ChampionGuideSkillOrder = {
+  skillOrderSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+};
+
 export type ChampionGuideResponse = {
   summary: ChampionGuideSummary;
   toughestMatchups: ChampionGuideMatchup[];
   bestMatchups: ChampionGuideMatchup[];
   topRunes: ChampionGuideRune[];
   topSpells: ChampionGuideSpells[];
+  topSkillOrders: ChampionGuideSkillOrder[];
 };
 
 export type ChampionGuideIndexResponse = {

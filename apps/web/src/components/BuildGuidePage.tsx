@@ -185,8 +185,8 @@ export function BuildGuidePage({ champions, items, spells, runes }: Props) {
       <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={guideQuery.isLoading} />
 
       <div className="guide-skill-items-row">
-        <SkillGuideCard champion={champion} champions={champions} />
-        <SkillPathPlaceholder championName={champion?.name ?? 'this champion'} />
+        <SkillGuideCard guide={guide} champion={champion} champions={champions} loading={guideQuery.isLoading} />
+        <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
       </div>
 
       <ItemGuideGrid rows={itemSlots} items={items} loading={itemSlotsQuery.isLoading} context={opponent ? `Filtered into ${opponent.name}` : 'Champion-wide build path'} />
@@ -300,6 +300,7 @@ function GuideStats({ guide, loading }: { guide?: ChampionGuideResponse; loading
       <GuideStat label="Win Rate" value={summary?.games ? `${summary.winRate.toFixed(2)}%` : '--'} />
       <GuideStat label="Rank" value={summary?.roleRank ? `${summary.roleRank} / ${summary.roleRankTotal}` : '--'} />
       <GuideStat label="Pick Rate" value={summary?.games ? `${summary.pickRate.toFixed(2)}%` : '--'} />
+      <GuideStat label="Ban Rate" value={summary?.banRate ? `${summary.banRate.toFixed(2)}%` : '--'} />
       <GuideStat label="Confidence" value={summary?.games ? `${summary.confidence.toFixed(1)}%` : '--'} />
       <GuideStat label="Matches" value={formatNumber(summary?.games ?? 0)} />
     </div>
@@ -407,37 +408,54 @@ function MatchupStrip({ title, subtitle, rows, champions, tone, loading }: { tit
   );
 }
 
-function SkillGuideCard({ champion, champions }: { champion?: Champion; champions?: ChampionData }) {
+function SkillGuideCard({ guide, champion, champions, loading }: { guide?: ChampionGuideResponse; champion?: Champion; champions?: ChampionData; loading: boolean }) {
   const spells = champion?.spells ?? [];
+  const skillOrder = guide?.topSkillOrders?.[0];
+  const priority = skillPriority(skillOrder?.skillOrderSignature ?? '');
   return (
     <article className="guide-card skill-priority-card">
-      <GuideSectionTitle title="Skill Priority" detail="Ability stats are not normalized yet" />
+      <GuideSectionTitle title="Skill Priority" detail={skillOrder ? `${skillOrder.winRate.toFixed(2)}% WR (${formatNumber(skillOrder.games)} matches)` : loading ? 'Loading...' : 'No skill sample yet'} />
       <div className="skill-priority-icons">
-        {spells.slice(0, 3).map((ability, index) => (
-          <span key={ability.id}>
-            <img src={championAbilityImageUrl(champions, ability.image?.full, 'spell')} alt={ability.name} title={ability.name} />
-            <b>{['Q', 'W', 'E'][index]}</b>
-          </span>
-        ))}
+        {(priority.length ? priority : [1, 2, 3]).map((slot) => {
+          const ability = spells[slot - 1];
+          return (
+            <span key={slot} className={priority.length ? '' : 'muted-skill'}>
+              {ability ? <img src={championAbilityImageUrl(champions, ability.image?.full, 'spell')} alt={ability.name} title={ability.name} /> : null}
+              <b>{skillLabel(slot)}</b>
+            </span>
+          );
+        })}
       </div>
-      <p>We can add this once timeline skill-level events are normalized into a summary table.</p>
+      {skillOrder ? (
+        <p>Derived from Match-V5 timeline skill-level events in collected ranked games.</p>
+      ) : (
+        <p>{loading ? 'Checking collected timelines.' : 'Skill order will appear after guide analytics refreshes for this champion.'}</p>
+      )}
     </article>
   );
 }
 
-function SkillPathPlaceholder({ championName }: { championName: string }) {
+function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuideResponse; championName: string; loading: boolean }) {
+  const skillOrder = guide?.topSkillOrders?.[0];
+  const slots = skillSlots(skillOrder?.skillOrderSignature ?? '');
   return (
     <article className="guide-card skill-path-card">
-      <GuideSectionTitle title="Skill Path" detail="Future read model" />
-      <div className="skill-path-placeholder-grid">
-        {['Q', 'W', 'E', 'R'].map((spell) => (
-          <div key={spell}>
-            <b>{spell}</b>
-            {Array.from({ length: 18 }, (_, index) => <span key={index} className={index % 5 === 0 ? 'lit' : ''}>{index % 5 === 0 ? index + 1 : ''}</span>)}
-          </div>
-        ))}
-      </div>
-      <p>{championName} skill-order analytics are intentionally marked as pending, not guessed.</p>
+      <GuideSectionTitle title="Skill Path" detail={skillOrder ? `${formatNumber(skillOrder.games)} matching paths` : loading ? 'Loading...' : 'No path sample yet'} />
+      {slots.length ? (
+        <div className="skill-path-placeholder-grid">
+          {[1, 2, 3, 4].map((slot) => (
+            <div key={slot}>
+              <b>{skillLabel(slot)}</b>
+              {Array.from({ length: 18 }, (_, index) => {
+                const level = index + 1;
+                const active = slots[index] === slot;
+                return <span key={level} className={active ? 'lit' : ''}>{active ? level : ''}</span>;
+              })}
+            </div>
+          ))}
+        </div>
+      ) : <GuideEmpty message={loading ? 'Loading skill path...' : `No skill path sample yet for ${championName}.`} />}
+      <p>{slots.length ? `${championName} skill order is shown from the most common collected path.` : 'This panel stays empty until real timeline data exists.'}</p>
     </article>
   );
 }
@@ -564,4 +582,31 @@ function statPerkLabel(id: number) {
     5013: 'Tenacity',
   };
   return labels[id] ?? String(id);
+}
+
+function skillSlots(signature: string) {
+  return signature
+    .split('-')
+    .map((part) => Number(part))
+    .filter((slot) => slot >= 1 && slot <= 4);
+}
+
+function skillPriority(signature: string) {
+  const slots = skillSlots(signature).filter((slot) => slot >= 1 && slot <= 3);
+  const counts = [1, 2, 3].map((slot) => ({
+    slot,
+    count: slots.filter((candidate) => candidate === slot).length,
+    firstIndex: slots.indexOf(slot) === -1 ? 99 : slots.indexOf(slot),
+  }));
+  return counts
+    .filter((row) => row.count > 0)
+    .sort((a, b) => {
+      if (a.count !== b.count) return b.count - a.count;
+      return a.firstIndex - b.firstIndex;
+    })
+    .map((row) => row.slot);
+}
+
+function skillLabel(slot: number) {
+  return ['?', 'Q', 'W', 'E', 'R'][slot] ?? '?';
 }

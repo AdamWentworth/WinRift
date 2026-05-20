@@ -56,6 +56,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/static/{kind}", s.staticData)
 	mux.HandleFunc("POST /api/dev/collector/seed", s.seedCollector)
 	mux.HandleFunc("POST /api/dev/analytics/item-slots/refresh", s.refreshItemSlotAnalytics)
+	mux.HandleFunc("POST /api/dev/analytics/champion-guides/refresh", s.refreshChampionGuideAnalytics)
 	return s.cors(mux)
 }
 
@@ -391,6 +392,7 @@ func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
 		"bestMatchups":     championGuideMatchupRowsResponse(guide.BestMatchups),
 		"topRunes":         championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
 		"topSpells":        championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
+		"topSkillOrders":   championGuideSkillOrderRowsResponse(guide.TopSkillOrders),
 	}
 }
 
@@ -402,9 +404,11 @@ func championGuideSummaryResponse(row clickhouse.ChampionGuideSummary) map[strin
 		"rankBucket":    row.RankBucket,
 		"wins":          row.Wins,
 		"games":         row.Games,
+		"bans":          row.Bans,
 		"winRate":       round(row.WinRate * 100),
 		"confidence":    round(row.Confidence * 100),
 		"pickRate":      round(row.PickRate * 100),
+		"banRate":       round(row.BanRate * 100),
 		"roleRank":      row.RoleRank,
 		"roleRankTotal": row.RoleRankTotal,
 	}
@@ -441,6 +445,20 @@ func championGuideSignatureRowsResponse(rows []clickhouse.ChampionGuideSignature
 			"games":      row.Games,
 			"winRate":    round(row.WinRate * 100),
 			"confidence": round(row.Confidence * 100),
+		})
+	}
+	return results
+}
+
+func championGuideSkillOrderRowsResponse(rows []clickhouse.ChampionGuideSkillOrderRow) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"skillOrderSignature": row.Signature,
+			"wins":                row.Wins,
+			"games":               row.Games,
+			"winRate":             round(row.WinRate * 100),
+			"confidence":          round(row.Confidence * 100),
 		})
 	}
 	return results
@@ -884,6 +902,72 @@ func (s Server) refreshItemSlotAnalytics(w http.ResponseWriter, r *http.Request)
 		"patches":  refreshed,
 		"queueId":  queueID,
 		"contexts": itemSlotRefreshContextKeys(contexts),
+	})
+}
+
+func (s Server) refreshChampionGuideAnalytics(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.IsDevelopment() {
+		writeError(w, http.StatusNotFound, "not available")
+		return
+	}
+	var body struct {
+		Patch    string   `json:"patch"`
+		Patches  []string `json:"patches"`
+		QueueID  int      `json:"queueId"`
+		Backfill bool     `json:"backfill"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	patches := body.Patches
+	if body.Patch != "" {
+		patches = append(patches, body.Patch)
+	}
+	if len(patches) == 0 {
+		if s.cfg.CollectorCurrentPatch != "" {
+			patches = append(patches, s.cfg.CollectorCurrentPatch)
+		}
+		patches = append(patches, analytics.PatchWindow(s.cfg.CollectorCurrentPatch, s.cfg.CollectorPatchRetention)...)
+	}
+	patches = uniqueStrings(patches)
+	queueID := uint16(body.QueueID)
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	results := []map[string]any{}
+	for _, patch := range patches {
+		patch = strings.TrimSpace(patch)
+		if patch == "" {
+			continue
+		}
+		startedAt := time.Now()
+		result := map[string]any{"patch": patch}
+		if body.Backfill {
+			log.Printf("champion guide event backfill start patch=%s queue=%d", patch, queueID)
+			backfill, err := s.repo.BackfillChampionGuideEvents(r.Context(), patch, queueID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			result["matches"] = backfill.Matches
+			result["skillEvents"] = backfill.SkillEvents
+			result["bans"] = backfill.Bans
+			log.Printf("champion guide event backfill complete patch=%s queue=%d matches=%d skill_events=%d bans=%d duration=%s", patch, queueID, backfill.Matches, backfill.SkillEvents, backfill.Bans, time.Since(startedAt).Round(time.Millisecond))
+		}
+		log.Printf("champion guide analytics refresh start patch=%s queue=%d", patch, queueID)
+		if err := s.repo.RefreshChampionGuideDerivedAnalytics(r.Context(), patch, queueID); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result["durationMs"] = time.Since(startedAt).Milliseconds()
+		results = append(results, result)
+		log.Printf("champion guide analytics refresh complete patch=%s queue=%d duration=%s", patch, queueID, time.Since(startedAt).Round(time.Millisecond))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"patches": patches,
+		"queueId": queueID,
+		"results": results,
 	})
 }
 

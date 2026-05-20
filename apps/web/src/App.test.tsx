@@ -8,15 +8,16 @@ import type { LiveGame } from './api/types';
 vi.mock('./api/client', () => ({
   getBuilds: vi.fn(async () => ({ results: [] })),
   getChampionGuide: vi.fn(async () => ({
-    summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+    summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
     toughestMatchups: [],
     bestMatchups: [],
     topRunes: [],
     topSpells: [],
+    topSkillOrders: [],
   })),
   getChampionGuideIndex: vi.fn(async () => ({
     results: [
-      { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+      { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
     ],
   })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
@@ -66,15 +67,16 @@ describe('App', () => {
     vi.mocked(searchAccountAliases).mockReset();
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
     vi.mocked(getChampionGuide).mockResolvedValue({
-      summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+      summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
       toughestMatchups: [],
       bestMatchups: [],
       topRunes: [],
       topSpells: [],
+      topSkillOrders: [],
     });
     vi.mocked(getChampionGuideIndex).mockResolvedValue({
       results: [
-        { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, winRate: 60, confidence: 40, pickRate: 2.2, roleRank: 1, roleRankTotal: 12 },
+        { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
       ],
     });
     vi.mocked(getItemSlotsBatch).mockResolvedValue({ results: [] });

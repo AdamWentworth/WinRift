@@ -55,6 +55,8 @@ type Config struct {
 	AccountAliasMaxRequests       int
 	ItemSlotRefreshEnabled        bool
 	ItemSlotRefreshInterval       time.Duration
+	ChampionGuideRefreshEnabled   bool
+	ChampionGuideRefreshInterval  time.Duration
 	WinConditionRefreshEnabled    bool
 	WinConditionRefreshInterval   time.Duration
 }
@@ -108,6 +110,8 @@ func Load() Config {
 		AccountAliasMaxRequests:       envInt("ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS", 3),
 		ItemSlotRefreshEnabled:        envBool("ITEM_SLOT_ANALYTICS_REFRESH_ENABLED", true),
 		ItemSlotRefreshInterval:       time.Duration(envInt("ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
+		ChampionGuideRefreshEnabled:   envBool("CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED", true),
+		ChampionGuideRefreshInterval:  time.Duration(envInt("CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
 		WinConditionRefreshEnabled:    envBool("WIN_CONDITION_ANALYTICS_REFRESH_ENABLED", true),
 		WinConditionRefreshInterval:   time.Duration(envInt("WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES", 15)) * time.Minute,
 	}

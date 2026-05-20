@@ -17,9 +17,11 @@ type ChampionGuideSummary struct {
 	RankBucket    string
 	Wins          int
 	Games         int
+	Bans          int
 	WinRate       float64
 	Confidence    float64
 	PickRate      float64
+	BanRate       float64
 	RoleRank      int
 	RoleRankTotal int
 }
@@ -40,12 +42,21 @@ type ChampionGuideSignatureRow struct {
 	Confidence float64
 }
 
+type ChampionGuideSkillOrderRow struct {
+	Signature  string
+	Wins       int
+	Games      int
+	WinRate    float64
+	Confidence float64
+}
+
 type ChampionGuideData struct {
 	Summary          ChampionGuideSummary
 	ToughestMatchups []ChampionGuideMatchupRow
 	BestMatchups     []ChampionGuideMatchupRow
 	TopRunes         []ChampionGuideSignatureRow
 	TopSpells        []ChampionGuideSignatureRow
+	TopSkillOrders   []ChampionGuideSkillOrderRow
 }
 
 func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideSummary, error) {
@@ -115,6 +126,16 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 		out[index].RoleRank = index + 1
 		out[index].RoleRankTotal = totalRanked
 	}
+	banRates, err := r.queryChampionBanRates(ctx, filters)
+	if err != nil {
+		return nil, err
+	}
+	for index := range out {
+		if banRate, ok := banRates[out[index].ChampionID]; ok {
+			out[index].Bans = banRate.Bans
+			out[index].BanRate = banRate.BanRate
+		}
+	}
 	if len(out) > limit {
 		out = out[:limit]
 	}
@@ -148,12 +169,25 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 	if err != nil {
 		return ChampionGuideData{}, err
 	}
+	skills, err := r.queryChampionGuideSkillOrders(ctx, filters, minGames, limit)
+	if err != nil {
+		return ChampionGuideData{}, err
+	}
+	banRates, err := r.queryChampionBanRates(ctx, filters)
+	if err != nil {
+		return ChampionGuideData{}, err
+	}
+	if banRate, ok := banRates[summary.ChampionID]; ok {
+		summary.Bans = banRate.Bans
+		summary.BanRate = banRate.BanRate
+	}
 	return ChampionGuideData{
 		Summary:          summary,
 		ToughestMatchups: toughest,
 		BestMatchups:     best,
 		TopRunes:         runes,
 		TopSpells:        spells,
+		TopSkillOrders:   skills,
 	}, nil
 }
 

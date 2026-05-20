@@ -143,6 +143,11 @@ func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.
 			return err
 		}
 	}
+	for _, row := range normalized.TimelineSkillEvents {
+		if err := r.insertTimelineSkillEvent(ctx, row); err != nil {
+			return err
+		}
+	}
 	for _, row := range normalized.TimelineCombatEvents {
 		if err := r.insertTimelineCombatEvent(ctx, row); err != nil {
 			return err
@@ -150,6 +155,11 @@ func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.
 	}
 	for _, row := range normalized.TimelineObjectiveEvents {
 		if err := r.insertTimelineObjectiveEvent(ctx, row); err != nil {
+			return err
+		}
+	}
+	for _, row := range normalized.ChampionBans {
+		if err := r.insertChampionBan(ctx, row); err != nil {
 			return err
 		}
 	}
@@ -724,8 +734,10 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 		`ALTER TABLE build_analytics_mv DELETE WHERE patch_bucket = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_participant_frames DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_item_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_skill_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_combat_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 	}
 	for _, statement := range statements {
 		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
@@ -770,11 +782,15 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch_bucket AS patch FROM build_analytics_mv
 			UNION ALL SELECT patch FROM timeline_participant_frames
 			UNION ALL SELECT patch FROM timeline_item_events
+			UNION ALL SELECT patch FROM timeline_skill_events
 			UNION ALL SELECT patch FROM timeline_combat_events
 			UNION ALL SELECT patch FROM timeline_objective_events
+			UNION ALL SELECT patch FROM champion_bans
 			UNION ALL SELECT patch FROM patch_build_metrics
 			UNION ALL SELECT patch FROM patch_item_timing_metrics
 			UNION ALL SELECT patch FROM item_slot_analytics
+			UNION ALL SELECT patch FROM champion_skill_analytics
+			UNION ALL SELECT patch FROM champion_ban_analytics
 			UNION ALL SELECT patch FROM patch_power_curve_metrics
 			UNION ALL SELECT patch FROM match_team_win_conditions
 			UNION ALL SELECT patch FROM patch_win_condition_metrics
@@ -812,11 +828,15 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "build_analytics_mv", column: "patch_bucket"},
 		{table: "timeline_participant_frames", column: "patch"},
 		{table: "timeline_item_events", column: "patch"},
+		{table: "timeline_skill_events", column: "patch"},
 		{table: "timeline_combat_events", column: "patch"},
 		{table: "timeline_objective_events", column: "patch"},
+		{table: "champion_bans", column: "patch"},
 		{table: "patch_build_metrics", column: "patch"},
 		{table: "patch_item_timing_metrics", column: "patch"},
 		{table: "item_slot_analytics", column: "patch"},
+		{table: "champion_skill_analytics", column: "patch"},
+		{table: "champion_ban_analytics", column: "patch"},
 		{table: "patch_power_curve_metrics", column: "patch"},
 		{table: "match_team_win_conditions", column: "patch"},
 		{table: "patch_win_condition_metrics", column: "patch"},
@@ -1092,6 +1112,15 @@ func (r *Repository) insertTimelineItemEvent(ctx context.Context, row analytics.
 	return err
 }
 
+func (r *Repository) insertTimelineSkillEvent(ctx context.Context, row analytics.TimelineSkillEventRow) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO timeline_skill_events (match_id, platform, patch, queue_id, timestamp_ms, participant_id, skill_slot, skill_order, level_up_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TimestampMS, row.ParticipantID, row.SkillSlot, row.SkillOrder, row.LevelUpType,
+	)
+	return err
+}
+
 func (r *Repository) insertTimelineCombatEvent(ctx context.Context, row analytics.TimelineCombatEventRow) error {
 	_, err := r.db.ExecContext(
 		ctx,
@@ -1106,6 +1135,15 @@ func (r *Repository) insertTimelineObjectiveEvent(ctx context.Context, row analy
 		ctx,
 		`INSERT INTO timeline_objective_events (match_id, platform, patch, queue_id, timestamp_ms, event_type, killer_id, team_id, monster_type, monster_sub_type, building_type, tower_type, lane_type, position_x, position_y) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TimestampMS, row.EventType, row.KillerID, row.TeamID, row.MonsterType, row.MonsterSubType, row.BuildingType, row.TowerType, row.LaneType, row.PositionX, row.PositionY,
+	)
+	return err
+}
+
+func (r *Repository) insertChampionBan(ctx context.Context, row analytics.ChampionBanRow) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO champion_bans (match_id, platform, patch, queue_id, team_id, champion_id, pick_turn) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		row.MatchID, row.Platform, row.Patch, row.QueueID, row.TeamID, row.ChampionID, row.PickTurn,
 	)
 	return err
 }
