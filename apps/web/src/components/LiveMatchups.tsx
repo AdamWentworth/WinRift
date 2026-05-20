@@ -388,7 +388,7 @@ function MatchHeader({
   const redAverage = averageRankLabel(redTeam);
   const searchedName = searchedParticipant?.riotId || searchedParticipant?.summonerName || 'Live player';
   return (
-    <header className="match-header">
+    <header className={`match-header ${yourSide}-side`}>
       <div className="match-header-main">
         <div className="match-kicker">{queueLabel(liveGame.gameQueueConfigId)} · {liveGame.platform}</div>
         <h2>{searchedName}</h2>
@@ -920,7 +920,7 @@ function LiveChampionCard({
         <img className="ranked-card-icon" src={rankIconUrl(participant.rank)} alt={participant.rank ? rankLabel(participant.rank) : 'Rank unavailable'} />
         <div className="player-title">
           <div className="player-role-chip">{roleLabels[role] ?? role ?? 'Role'}</div>
-          <div className="summoner-name">{playerName}</div>
+          <div className="summoner-name" title={playerName}>{playerName}</div>
           <div className="champion-name">{championName}</div>
         </div>
       </div>
