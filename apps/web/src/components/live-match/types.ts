@@ -1,4 +1,4 @@
-import type { AnalyticsItemSlot, ChampionRoleRate, LiveParticipant } from '../../api/types';
+import type { ChampionRoleRate, LiveParticipant } from '../../api/types';
 import { ROLE_OPTIONS } from '../../lib/roles';
 
 export const roles: string[] = ROLE_OPTIONS.map((role) => role.value);
@@ -38,10 +38,4 @@ export type FocusedBuildSelection = {
 export type BuildPathSummary = {
   weightedWinRate: number;
   totalGames: number;
-};
-
-export type ItemSlotWithCommon = {
-  slot: number;
-  row?: AnalyticsItemSlot;
-  commonRow?: AnalyticsItemSlot;
 };
