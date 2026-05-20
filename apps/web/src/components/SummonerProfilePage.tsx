@@ -3,9 +3,8 @@ import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleAlert, LoaderCircle, RadioTower } from 'lucide-react';
 import { getLiveGame, resolveAccountAlias } from '../api/client';
-import type { AccountAliasMatch, ChampionData, ChampionSplashData, ItemData, RuneData, SummonerSpellData } from '../api/types';
+import type { AccountAliasMatch, ChampionData, ItemData, RuneData, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
-import { HomeArtStage } from './LiveMatchPanel';
 import { LiveMatchups } from './LiveMatchups';
 
 type Props = {
@@ -13,7 +12,6 @@ type Props = {
   gameName?: string;
   tagLine?: string;
   champions?: ChampionData;
-  championSplashes?: ChampionSplashData;
   items?: ItemData;
   spells?: SummonerSpellData;
   runes?: RuneData;
@@ -26,7 +24,6 @@ export function SummonerProfilePage({
   gameName,
   tagLine,
   champions,
-  championSplashes,
   items,
   spells,
   runes,
@@ -69,7 +66,6 @@ export function SummonerProfilePage({
   if (liveQuery.data) {
     return (
       <section className="profile-live-shell live-panel has-game">
-        <HomeArtStage champions={champions} championSplashes={championSplashes} />
         <LiveMatchups
           liveGame={liveQuery.data}
           champions={champions}
@@ -89,7 +85,6 @@ export function SummonerProfilePage({
 
   return (
     <section className="profile-page">
-      <HomeArtStage champions={champions} championSplashes={championSplashes} />
       <div className="profile-card">
         <div className="profile-card-header">
           <RadioTower size={24} />

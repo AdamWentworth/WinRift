@@ -168,13 +168,20 @@ Recent refinements:
 
 ## Static Art And Deployment Notes
 
-The home background slideshow uses Riot/Data Dragon art through URL references, not checked-in image files.
+The global background slideshow uses Riot/Data Dragon art through URL references, not checked-in image files.
+
+UI policy:
+
+- Every primary page should render above the shared animated art background.
+- General pages use the full champion/skin splash manifest.
+- Specific champion guide pages use only that champion's base splash, skins, and related Data Dragon splash art.
+- Page panels can add dark overlays and local hero images, but they should not replace the shared background policy with unrelated decoration.
 
 Current flow:
 
 - The API serves `GET /api/static/champion-splashes`.
 - That endpoint reads Data Dragon champion metadata, expands champions into base-skin plus skin splash URLs, filters chroma/variant rows that do not have standalone splash files, and caches the resulting manifest in API memory.
-- The web app randomizes across that manifest and the browser loads the selected image directly from Data Dragon's CDN.
+- The web app randomizes across that manifest and the browser loads the selected image directly from Data Dragon's CDN. When a champion id is provided, the slideshow first filters the manifest to that champion's skins.
 - The repo stores only code and URL-generating logic. It does not store Riot artwork.
 
 This is the right default for development and early self-hosted deployment because it avoids thousands of large binary files in git and avoids local disk growth.

@@ -40,6 +40,8 @@ button {
     radial-gradient(ellipse at 50% -20%, rgb(121 197 207 / 12%), transparent 46%),
     linear-gradient(180deg, #303234 0%, #242628 72%, #101112 100%);
   min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
 }
 
 .topbar {
@@ -53,6 +55,8 @@ button {
   height: 77px;
   justify-content: space-between;
   padding: 0 22px;
+  position: relative;
+  z-index: 5;
 }
 
 .topbar h1 {
@@ -102,11 +106,10 @@ button {
 }
 
 .live-panel.has-game {
-  background:
-    radial-gradient(ellipse at 50% 46%, rgb(116 202 214 / 10%), transparent 38%),
-    linear-gradient(180deg, #202426 0%, #171a1c 72%, #080909 100%);
+  background: transparent;
   overflow: hidden;
   position: relative;
+  z-index: 2;
 }
 
 .live-panel.has-game::before,
@@ -135,13 +138,12 @@ button {
 
 .search-only {
   align-items: center;
-  background:
-    radial-gradient(ellipse at 50% 46%, rgb(116 202 214 / 10%), transparent 38%),
-    linear-gradient(180deg, #202426 0%, #171a1c 72%, #080909 100%);
+  background: transparent;
   display: flex;
   justify-content: center;
   overflow: hidden;
   position: relative;
+  z-index: 2;
 }
 
 .search-only::before {
@@ -177,6 +179,7 @@ button {
   overflow: hidden;
   padding: 28px;
   position: relative;
+  z-index: 2;
 }
 
 .profile-card {
@@ -340,6 +343,7 @@ button {
   min-height: calc(100vh - 77px);
   overflow: hidden;
   position: relative;
+  z-index: 2;
 }
 
 .home-art-stage {
@@ -3116,6 +3120,8 @@ button {
   max-width: 1280px;
   min-height: calc(100vh - 77px);
   padding: 18px 18px 44px;
+  position: relative;
+  z-index: 2;
 }
 
 .champion-directory-hero {
@@ -3314,6 +3320,8 @@ button {
   max-width: 1280px;
   min-height: calc(100vh - 77px);
   padding: 18px 18px 44px;
+  position: relative;
+  z-index: 2;
 }
 
 .tier-list-hero {
@@ -3679,6 +3687,8 @@ button {
   max-width: 1220px;
   min-height: calc(100vh - 77px);
   padding: 18px 18px 42px;
+  position: relative;
+  z-index: 2;
 }
 
 .guide-hero {

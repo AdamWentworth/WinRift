@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import { BackgroundArtStage } from './components/BackgroundArtStage';
 import { BuildGuidePage } from './components/BuildGuidePage';
 import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
 import { LiveMatchPanel } from './components/LiveMatchPanel';
@@ -49,9 +50,15 @@ export function App() {
   const initialChampionId = useMemo(() => (
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
+  const backgroundChampionId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
 
   return (
     <main className={route.kind === 'champion' || route.kind === 'tier-list' ? 'app-shell guide-mode' : 'app-shell'}>
+      <BackgroundArtStage
+        champions={champions.data}
+        championSplashes={championSplashes.data}
+        championId={backgroundChampionId}
+      />
       <header className="topbar">
         <div className="topbar-brand">
           <h1>
@@ -111,7 +118,6 @@ export function App() {
           gameName={route.gameName}
           tagLine={route.tagLine}
           champions={champions.data}
-          championSplashes={championSplashes.data}
           items={items.data}
           spells={spells.data}
           runes={runes.data}
@@ -121,7 +127,6 @@ export function App() {
       ) : (
         <LiveMatchPanel
           champions={champions.data}
-          championSplashes={championSplashes.data}
           items={items.data}
           spells={spells.data}
           runes={runes.data}
