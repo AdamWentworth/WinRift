@@ -18,6 +18,25 @@ const platforms = [
   { value: 'OC1', label: 'OCE', color: 'steelblue' },
 ] as const;
 
+const homeSplashSlides = [
+  {
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg',
+    position: 'center 24%',
+  },
+  {
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_0.jpg',
+    position: 'center 20%',
+  },
+  {
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg',
+    position: 'center 28%',
+  },
+  {
+    src: 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg',
+    position: 'center 18%',
+  },
+] as const;
+
 type Props = {
   champions?: ChampionData;
   items?: ItemData;
@@ -122,6 +141,15 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
 
   return (
     <section className={showLiveGame ? 'live-panel has-game' : 'live-panel search-only'}>
+      {!showLiveGame ? (
+        <div className="home-art-stage" aria-hidden="true">
+          {homeSplashSlides.map((slide) => (
+            <div className="home-art-slide" key={slide.src}>
+              <img src={slide.src} alt="" style={{ objectPosition: slide.position }} />
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
           <div className="lookup-console-header">

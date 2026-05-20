@@ -61,10 +61,8 @@ button {
 .search-only {
   align-items: center;
   background:
-    linear-gradient(115deg, transparent 0 35%, rgb(130 215 255 / 7%) 35.2% 35.8%, transparent 36% 64%, rgb(240 128 128 / 7%) 64.2% 64.8%, transparent 65%),
-    linear-gradient(24deg, transparent 0 40%, rgb(255 255 255 / 4%) 40.2% 40.5%, transparent 41%),
-    radial-gradient(ellipse at 50% 44%, rgb(116 202 214 / 10%), transparent 38%),
-    linear-gradient(180deg, #303234 0%, #2c2e30 72%, #111 100%);
+    radial-gradient(ellipse at 50% 46%, rgb(116 202 214 / 10%), transparent 38%),
+    linear-gradient(180deg, #202426 0%, #171a1c 72%, #080909 100%);
   display: flex;
   justify-content: center;
   overflow: hidden;
@@ -73,23 +71,141 @@ button {
 
 .search-only::before {
   background:
-    linear-gradient(90deg, transparent 0 22%, rgb(255 255 255 / 4%) 22.1% 22.25%, transparent 22.4% 77%, rgb(255 255 255 / 4%) 77.1% 77.25%, transparent 77.4%),
-    linear-gradient(0deg, transparent 0 16%, rgb(255 255 255 / 3%) 16.1% 16.25%, transparent 16.4% 83%, rgb(255 255 255 / 3%) 83.1% 83.25%, transparent 83.4%);
+    linear-gradient(115deg, transparent 0 34%, rgb(130 215 255 / 14%) 34.2% 34.6%, transparent 35% 64%, rgb(240 128 128 / 13%) 64.2% 64.6%, transparent 65%),
+    linear-gradient(24deg, transparent 0 41%, rgb(255 255 255 / 7%) 41.2% 41.45%, transparent 41.8%),
+    linear-gradient(90deg, transparent 0 22%, rgb(255 255 255 / 4%) 22.1% 22.25%, transparent 22.4% 77%, rgb(255 255 255 / 4%) 77.1% 77.25%, transparent 77.4%);
   content: "";
   inset: 77px 0 0;
-  opacity: 0.65;
+  opacity: 0.85;
   pointer-events: none;
   position: absolute;
+  z-index: 1;
 }
 
 .search-only::after {
   background:
-    linear-gradient(90deg, rgb(0 0 0 / 28%), transparent 24%, transparent 76%, rgb(0 0 0 / 28%)),
-    linear-gradient(180deg, transparent 0 70%, rgb(0 0 0 / 26%));
+    radial-gradient(ellipse at 50% 42%, transparent 0 28%, rgb(0 0 0 / 14%) 68%),
+    linear-gradient(90deg, rgb(0 0 0 / 62%), rgb(0 0 0 / 8%) 34%, rgb(0 0 0 / 8%) 66%, rgb(0 0 0 / 62%)),
+    linear-gradient(180deg, rgb(0 0 0 / 22%) 0%, transparent 24%, rgb(0 0 0 / 48%) 86%, rgb(0 0 0 / 82%));
   content: "";
   inset: 77px 0 0;
   pointer-events: none;
   position: absolute;
+  z-index: 1;
+}
+
+.home-art-stage {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 20%), rgb(0 0 0 / 44%)),
+    url("https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg") center 24% / cover;
+  inset: 77px 0 0;
+  overflow: hidden;
+  perspective: 1400px;
+  pointer-events: none;
+  position: absolute;
+  transform-style: preserve-3d;
+  z-index: 0;
+}
+
+.home-art-stage::before,
+.home-art-stage::after {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.home-art-stage::before {
+  background:
+    radial-gradient(ellipse at 50% 44%, rgb(255 255 255 / 10%), transparent 22%),
+    linear-gradient(115deg, transparent 0 34%, rgb(101 225 255 / 18%) 34.2% 34.55%, transparent 34.9%),
+    linear-gradient(295deg, transparent 0 34%, rgb(255 121 121 / 16%) 34.2% 34.55%, transparent 34.9%);
+  mix-blend-mode: screen;
+  opacity: 0.72;
+}
+
+.home-art-stage::after {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 36%), rgb(0 0 0 / 4%) 38%, rgb(0 0 0 / 58%)),
+    linear-gradient(90deg, rgb(0 0 0 / 58%), transparent 36%, transparent 64%, rgb(0 0 0 / 58%));
+}
+
+.home-art-slide {
+  animation: homeArtCycle 36s infinite;
+  filter: saturate(1.08) contrast(1.08);
+  inset: -8%;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  transform: translate3d(0, 0, -90px) rotateX(2deg) scale(1.12);
+  transform-origin: center;
+  will-change: opacity, transform, filter;
+}
+
+.home-art-slide:nth-child(2) {
+  animation-delay: 9s;
+}
+
+.home-art-slide:nth-child(3) {
+  animation-delay: 18s;
+}
+
+.home-art-slide:nth-child(4) {
+  animation-delay: 27s;
+}
+
+.home-art-slide img {
+  animation: homeArtDrift 36s ease-in-out infinite;
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.94;
+  transform: scale(1.04);
+  width: 100%;
+}
+
+.home-art-slide:nth-child(2) img {
+  animation-delay: 9s;
+}
+
+.home-art-slide:nth-child(3) img {
+  animation-delay: 18s;
+}
+
+.home-art-slide:nth-child(4) img {
+  animation-delay: 27s;
+}
+
+@keyframes homeArtCycle {
+  0% {
+    filter: saturate(1.1) contrast(1.1) blur(0);
+    opacity: 1;
+    transform: translate3d(0, 0, 40px) rotateX(0.5deg) scale(1.06);
+  }
+  23% {
+    filter: saturate(1.1) contrast(1.1) blur(0);
+    opacity: 1;
+    transform: translate3d(1.2%, -0.8%, 60px) rotateX(0deg) scale(1.08);
+  }
+  31% {
+    filter: saturate(0.85) contrast(1.02) blur(1px);
+    opacity: 0;
+    transform: translate3d(2%, -1%, -110px) rotateX(-1deg) scale(1.16);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes homeArtDrift {
+  0%,
+  100% {
+    transform: translate3d(-1.2%, 0, 0) scale(1.08);
+  }
+  50% {
+    transform: translate3d(1.2%, -1.4%, 0) scale(1.12);
+  }
 }
 
 .has-game .search-section {
@@ -111,14 +227,15 @@ button {
 
 .lookup-console {
   background:
-    radial-gradient(ellipse at 28% 0, rgb(130 215 255 / 13%), transparent 48%),
-    radial-gradient(ellipse at 78% 100%, rgb(240 128 128 / 10%), transparent 46%),
-    linear-gradient(180deg, rgb(35 38 40 / 96%), rgb(20 22 24 / 98%)),
+    radial-gradient(ellipse at 28% 0, rgb(130 215 255 / 14%), transparent 48%),
+    radial-gradient(ellipse at 78% 100%, rgb(240 128 128 / 12%), transparent 46%),
+    linear-gradient(180deg, rgb(35 38 40 / 82%), rgb(15 17 19 / 88%)),
     #202020;
   border: 1px solid rgb(255 255 255 / 10%);
+  backdrop-filter: blur(7px) saturate(1.1);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 8%),
-    0 18px 36px rgb(0 0 0 / 30%);
+    0 24px 52px rgb(0 0 0 / 42%);
   padding: 18px;
   position: relative;
   z-index: 1;
