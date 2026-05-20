@@ -12,29 +12,50 @@ import (
 )
 
 type ChampionGuideSummary struct {
-	ChampionID    uint16
-	Role          string
-	PatchBucket   string
-	RankBucket    string
-	Wins          int
-	Games         int
-	Bans          int
-	WinRate       float64
-	Confidence    float64
-	PickRate      float64
-	BanRate       float64
-	AvgKills      float64
-	AvgDeaths     float64
-	AvgAssists    float64
-	KDA           float64
-	TierScore     float64
-	WinScore      float64
-	SampleScore   float64
-	PickScore     float64
-	BanScore      float64
-	ImpactScore   float64
-	RoleRank      int
-	RoleRankTotal int
+	ChampionID                 uint16
+	Role                       string
+	PatchBucket                string
+	RankBucket                 string
+	Wins                       int
+	Games                      int
+	Bans                       int
+	WinRate                    float64
+	Confidence                 float64
+	PickRate                   float64
+	BanRate                    float64
+	AvgKills                   float64
+	AvgDeaths                  float64
+	AvgAssists                 float64
+	KDA                        float64
+	AvgGoldEarned              float64
+	AvgCS                      float64
+	AvgDamageDealtToChampions  float64
+	AvgDamageTaken             float64
+	AvgDamageSelfMitigated     float64
+	AvgDamageDealtToObjectives float64
+	AvgDamageDealtToStructures float64
+	AvgVisionScore             float64
+	AvgTimeCCingOthers         float64
+	AvgTeamUtility             float64
+	AvgStructureTakedowns      float64
+	AvgObjectiveTakedowns      float64
+	AvgTotalTimeSpentDead      float64
+	AvgTimePlayed              float64
+	KillParticipation          float64
+	TierScore                  float64
+	WinScore                   float64
+	SampleScore                float64
+	PickScore                  float64
+	BanScore                   float64
+	ImpactScore                float64
+	DamageScore                float64
+	EconomyScore               float64
+	VisionScore                float64
+	ObjectiveScore             float64
+	UtilityScore               float64
+	SurvivabilityScore         float64
+	RoleRank                   int
+	RoleRankTotal              int
 }
 
 type ChampionGuideMatchupRow struct {
@@ -70,6 +91,50 @@ type ChampionGuideData struct {
 	TopSkillOrders   []ChampionGuideSkillOrderRow
 }
 
+type championGuidePerformance struct {
+	Kills                      int
+	Deaths                     int
+	Assists                    int
+	AvgGoldEarned              float64
+	AvgCS                      float64
+	AvgDamageDealtToChampions  float64
+	AvgDamageTaken             float64
+	AvgDamageSelfMitigated     float64
+	AvgDamageDealtToObjectives float64
+	AvgDamageDealtToStructures float64
+	AvgVisionScore             float64
+	AvgTimeCCingOthers         float64
+	AvgTeamUtility             float64
+	AvgStructureTakedowns      float64
+	AvgObjectiveTakedowns      float64
+	AvgTotalTimeSpentDead      float64
+	AvgTimePlayed              float64
+	KillParticipation          float64
+}
+
+func (performance *championGuidePerformance) scanTargets() []any {
+	return []any{
+		&performance.Kills,
+		&performance.Deaths,
+		&performance.Assists,
+		&performance.AvgGoldEarned,
+		&performance.AvgCS,
+		&performance.AvgDamageDealtToChampions,
+		&performance.AvgDamageTaken,
+		&performance.AvgDamageSelfMitigated,
+		&performance.AvgDamageDealtToObjectives,
+		&performance.AvgDamageDealtToStructures,
+		&performance.AvgVisionScore,
+		&performance.AvgTimeCCingOthers,
+		&performance.AvgTeamUtility,
+		&performance.AvgStructureTakedowns,
+		&performance.AvgObjectiveTakedowns,
+		&performance.AvgTotalTimeSpentDead,
+		&performance.AvgTimePlayed,
+		&performance.KillParticipation,
+	}
+}
+
 func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideSummary, error) {
 	if minGames <= 0 {
 		minGames = 1
@@ -91,7 +156,22 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 			wins / games AS win_rate,
 			sum(kills) AS kills,
 			sum(deaths) AS deaths,
-			sum(assists) AS assists
+			sum(assists) AS assists,
+			avg(gold_earned) AS avg_gold_earned,
+			avg(total_minions_killed + neutral_minions_killed) AS avg_cs,
+			avg(total_damage_dealt_to_champions) AS avg_damage_dealt_to_champions,
+			avg(total_damage_taken) AS avg_damage_taken,
+			avg(damage_self_mitigated) AS avg_damage_self_mitigated,
+			avg(damage_dealt_to_objectives) AS avg_damage_dealt_to_objectives,
+			avg(damage_dealt_to_turrets + damage_dealt_to_buildings) AS avg_damage_dealt_to_structures,
+			avg(vision_score) AS avg_vision_score,
+			avg(time_ccing_others) AS avg_time_ccing_others,
+			avg(total_heal + total_heals_on_teammates + total_damage_shielded_on_teammates) AS avg_team_utility,
+			avg(turret_takedowns + inhibitor_takedowns) AS avg_structure_takedowns,
+			avg(dragon_kills + baron_kills + objectives_stolen) AS avg_objective_takedowns,
+			avg(total_time_spent_dead) AS avg_total_time_spent_dead,
+			avg(time_played) AS avg_time_played,
+			avg(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation
 		` + baseSQL + `
 		GROUP BY champion_id
 		HAVING games >= ?
@@ -106,11 +186,12 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	out := []ChampionGuideSummary{}
 	for rows.Next() {
 		var row ChampionGuideSummary
-		var kills, deaths, assists int
-		if err := rows.Scan(&row.ChampionID, &row.Wins, &row.Games, &row.WinRate, &kills, &deaths, &assists); err != nil {
+		var performance championGuidePerformance
+		scanTargets := append([]any{&row.ChampionID, &row.Wins, &row.Games, &row.WinRate}, performance.scanTargets()...)
+		if err := rows.Scan(scanTargets...); err != nil {
 			return nil, err
 		}
-		applyCombatAverages(&row, kills, deaths, assists)
+		applyPerformanceAverages(&row, performance)
 		row.Role = roleLabel(filters["role"])
 		row.PatchBucket = patchBucketLabel(filters["patch"])
 		row.RankBucket = rankBucketLabel(filters["rank_bucket"])
@@ -201,7 +282,22 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 			wins / games AS win_rate,
 			sum(kills) AS kills,
 			sum(deaths) AS deaths,
-			sum(assists) AS assists
+			sum(assists) AS assists,
+			avg(gold_earned) AS avg_gold_earned,
+			avg(total_minions_killed + neutral_minions_killed) AS avg_cs,
+			avg(total_damage_dealt_to_champions) AS avg_damage_dealt_to_champions,
+			avg(total_damage_taken) AS avg_damage_taken,
+			avg(damage_self_mitigated) AS avg_damage_self_mitigated,
+			avg(damage_dealt_to_objectives) AS avg_damage_dealt_to_objectives,
+			avg(damage_dealt_to_turrets + damage_dealt_to_buildings) AS avg_damage_dealt_to_structures,
+			avg(vision_score) AS avg_vision_score,
+			avg(time_ccing_others) AS avg_time_ccing_others,
+			avg(total_heal + total_heals_on_teammates + total_damage_shielded_on_teammates) AS avg_team_utility,
+			avg(turret_takedowns + inhibitor_takedowns) AS avg_structure_takedowns,
+			avg(dragon_kills + baron_kills + objectives_stolen) AS avg_objective_takedowns,
+			avg(total_time_spent_dead) AS avg_total_time_spent_dead,
+			avg(time_played) AS avg_time_played,
+			avg(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation
 		` + baseSQL + `
 		GROUP BY champion_id
 		HAVING games >= ?
@@ -223,11 +319,12 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 	}
 	for rows.Next() {
 		var candidate ChampionGuideSummary
-		var kills, deaths, assists int
-		if err := rows.Scan(&candidate.ChampionID, &candidate.Wins, &candidate.Games, &candidate.WinRate, &kills, &deaths, &assists); err != nil {
+		var performance championGuidePerformance
+		scanTargets := append([]any{&candidate.ChampionID, &candidate.Wins, &candidate.Games, &candidate.WinRate}, performance.scanTargets()...)
+		if err := rows.Scan(scanTargets...); err != nil {
 			return ChampionGuideSummary{}, err
 		}
-		applyCombatAverages(&candidate, kills, deaths, assists)
+		applyPerformanceAverages(&candidate, performance)
 		if candidate.Games > 0 {
 			candidate.Confidence = analytics.WilsonLowerBound(candidate.Wins, candidate.Games, 1.96)
 		}
@@ -270,7 +367,22 @@ func (r *Repository) queryChampionGuideDirectSummary(ctx context.Context, filter
 			wins / games AS win_rate,
 			sum(kills) AS kills,
 			sum(deaths) AS deaths,
-			sum(assists) AS assists
+			sum(assists) AS assists,
+			avg(gold_earned) AS avg_gold_earned,
+			avg(total_minions_killed + neutral_minions_killed) AS avg_cs,
+			avg(total_damage_dealt_to_champions) AS avg_damage_dealt_to_champions,
+			avg(total_damage_taken) AS avg_damage_taken,
+			avg(damage_self_mitigated) AS avg_damage_self_mitigated,
+			avg(damage_dealt_to_objectives) AS avg_damage_dealt_to_objectives,
+			avg(damage_dealt_to_turrets + damage_dealt_to_buildings) AS avg_damage_dealt_to_structures,
+			avg(vision_score) AS avg_vision_score,
+			avg(time_ccing_others) AS avg_time_ccing_others,
+			avg(total_heal + total_heals_on_teammates + total_damage_shielded_on_teammates) AS avg_team_utility,
+			avg(turret_takedowns + inhibitor_takedowns) AS avg_structure_takedowns,
+			avg(dragon_kills + baron_kills + objectives_stolen) AS avg_objective_takedowns,
+			avg(total_time_spent_dead) AS avg_total_time_spent_dead,
+			avg(time_played) AS avg_time_played,
+			avg(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation
 		` + baseSQL + `
 		GROUP BY champion_id
 		LIMIT 1`
@@ -282,15 +394,16 @@ func (r *Repository) queryChampionGuideDirectSummary(ctx context.Context, filter
 	if parsed, ok := parseUint16Filter(filters["champion_id"]); ok {
 		summary.ChampionID = parsed
 	}
-	var kills, deaths, assists int
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&summary.ChampionID, &summary.Wins, &summary.Games, &summary.WinRate, &kills, &deaths, &assists)
+	var performance championGuidePerformance
+	scanTargets := append([]any{&summary.ChampionID, &summary.Wins, &summary.Games, &summary.WinRate}, performance.scanTargets()...)
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(scanTargets...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return summary, nil
 		}
 		return ChampionGuideSummary{}, err
 	}
-	applyCombatAverages(&summary, kills, deaths, assists)
+	applyPerformanceAverages(&summary, performance)
 	if summary.Games > 0 {
 		summary.Confidence = analytics.WilsonLowerBound(summary.Wins, summary.Games, 1.96)
 	}
@@ -343,17 +456,159 @@ func (r *Repository) rankChampionGuideSummaries(ctx context.Context, filters map
 }
 
 func applyCombatAverages(row *ChampionGuideSummary, kills, deaths, assists int) {
+	applyPerformanceAverages(row, championGuidePerformance{Kills: kills, Deaths: deaths, Assists: assists})
+}
+
+func applyPerformanceAverages(row *ChampionGuideSummary, performance championGuidePerformance) {
 	if row.Games <= 0 {
 		return
 	}
-	row.AvgKills = float64(kills) / float64(row.Games)
-	row.AvgDeaths = float64(deaths) / float64(row.Games)
-	row.AvgAssists = float64(assists) / float64(row.Games)
-	if deaths > 0 {
-		row.KDA = float64(kills+assists) / float64(deaths)
-		return
+	row.AvgKills = float64(performance.Kills) / float64(row.Games)
+	row.AvgDeaths = float64(performance.Deaths) / float64(row.Games)
+	row.AvgAssists = float64(performance.Assists) / float64(row.Games)
+	if performance.Deaths > 0 {
+		row.KDA = float64(performance.Kills+performance.Assists) / float64(performance.Deaths)
+	} else {
+		row.KDA = float64(performance.Kills + performance.Assists)
 	}
-	row.KDA = float64(kills + assists)
+	row.AvgGoldEarned = performance.AvgGoldEarned
+	row.AvgCS = performance.AvgCS
+	row.AvgDamageDealtToChampions = performance.AvgDamageDealtToChampions
+	row.AvgDamageTaken = performance.AvgDamageTaken
+	row.AvgDamageSelfMitigated = performance.AvgDamageSelfMitigated
+	row.AvgDamageDealtToObjectives = performance.AvgDamageDealtToObjectives
+	row.AvgDamageDealtToStructures = performance.AvgDamageDealtToStructures
+	row.AvgVisionScore = performance.AvgVisionScore
+	row.AvgTimeCCingOthers = performance.AvgTimeCCingOthers
+	row.AvgTeamUtility = performance.AvgTeamUtility
+	row.AvgStructureTakedowns = performance.AvgStructureTakedowns
+	row.AvgObjectiveTakedowns = performance.AvgObjectiveTakedowns
+	row.AvgTotalTimeSpentDead = performance.AvgTotalTimeSpentDead
+	row.AvgTimePlayed = performance.AvgTimePlayed
+	row.KillParticipation = performance.KillParticipation
+}
+
+type championTierReferences struct {
+	KDA                    float64
+	KillParticipation      float64
+	GoldEarned             float64
+	CS                     float64
+	DamageDealtToChampions float64
+	VisionScore            float64
+	ObjectiveContribution  float64
+	Utility                float64
+	Survivability          float64
+}
+
+func championTierReferenceValues(rows []ChampionGuideSummary) championTierReferences {
+	var refs championTierReferences
+	var weight float64
+	for _, row := range rows {
+		if row.Games <= 0 {
+			continue
+		}
+		rowWeight := float64(row.Games)
+		weight += rowWeight
+		refs.KDA += row.KDA * rowWeight
+		refs.KillParticipation += row.KillParticipation * rowWeight
+		refs.GoldEarned += row.AvgGoldEarned * rowWeight
+		refs.CS += row.AvgCS * rowWeight
+		refs.DamageDealtToChampions += row.AvgDamageDealtToChampions * rowWeight
+		refs.VisionScore += row.AvgVisionScore * rowWeight
+		refs.ObjectiveContribution += objectiveContribution(row) * rowWeight
+		refs.Utility += utilityContribution(row) * rowWeight
+		refs.Survivability += survivabilityContribution(row) * rowWeight
+	}
+	if weight <= 0 {
+		return refs
+	}
+	refs.KDA /= weight
+	refs.KillParticipation /= weight
+	refs.GoldEarned /= weight
+	refs.CS /= weight
+	refs.DamageDealtToChampions /= weight
+	refs.VisionScore /= weight
+	refs.ObjectiveContribution /= weight
+	refs.Utility /= weight
+	refs.Survivability /= weight
+	return refs
+}
+
+func applyChampionImpactScores(row *ChampionGuideSummary, refs championTierReferences) {
+	kdaScore := normalizedImpactScore(row.KDA, refs.KDA)
+	killParticipationScore := normalizedImpactScore(row.KillParticipation, refs.KillParticipation)
+	row.DamageScore = normalizedImpactScore(row.AvgDamageDealtToChampions, refs.DamageDealtToChampions)
+	goldScore := normalizedImpactScore(row.AvgGoldEarned, refs.GoldEarned)
+	csScore := normalizedImpactScore(row.AvgCS, refs.CS)
+	row.EconomyScore = 0.65*goldScore + 0.35*csScore
+	row.VisionScore = normalizedImpactScore(row.AvgVisionScore, refs.VisionScore)
+	row.ObjectiveScore = normalizedImpactScore(objectiveContribution(*row), refs.ObjectiveContribution)
+	row.UtilityScore = normalizedImpactScore(utilityContribution(*row), refs.Utility)
+	row.SurvivabilityScore = normalizedImpactScore(survivabilityContribution(*row), refs.Survivability)
+
+	kpKdaScore := 0.55*kdaScore + 0.45*killParticipationScore
+	switch strings.ToUpper(row.Role) {
+	case "UTILITY":
+		row.ImpactScore = 0.22*row.VisionScore + 0.18*row.UtilityScore + 0.16*kpKdaScore + 0.12*row.SurvivabilityScore + 0.10*row.ObjectiveScore + 0.10*row.DamageScore + 0.12*row.EconomyScore
+	case "JUNGLE":
+		row.ImpactScore = 0.20*row.ObjectiveScore + 0.18*kpKdaScore + 0.17*row.DamageScore + 0.15*row.EconomyScore + 0.12*row.VisionScore + 0.10*row.SurvivabilityScore + 0.08*row.UtilityScore
+	case "BOTTOM":
+		row.ImpactScore = 0.26*row.DamageScore + 0.20*row.EconomyScore + 0.18*kpKdaScore + 0.14*row.SurvivabilityScore + 0.12*row.ObjectiveScore + 0.06*row.UtilityScore + 0.04*row.VisionScore
+	case "TOP", "MIDDLE":
+		row.ImpactScore = 0.21*row.DamageScore + 0.17*row.EconomyScore + 0.17*kpKdaScore + 0.14*row.ObjectiveScore + 0.12*row.SurvivabilityScore + 0.10*row.UtilityScore + 0.09*row.VisionScore
+	default:
+		row.ImpactScore = 0.18*row.DamageScore + 0.16*row.EconomyScore + 0.16*kpKdaScore + 0.14*row.ObjectiveScore + 0.13*row.VisionScore + 0.12*row.UtilityScore + 0.11*row.SurvivabilityScore
+	}
+	row.ImpactScore = clampFloat(row.ImpactScore, 0, 100)
+}
+
+func objectiveContribution(row ChampionGuideSummary) float64 {
+	return row.AvgDamageDealtToObjectives + row.AvgDamageDealtToStructures + row.AvgStructureTakedowns*750 + row.AvgObjectiveTakedowns*900
+}
+
+func utilityContribution(row ChampionGuideSummary) float64 {
+	return row.AvgTimeCCingOthers*40 + row.AvgTeamUtility
+}
+
+func survivabilityContribution(row ChampionGuideSummary) float64 {
+	deathShare := 0.0
+	if row.AvgTimePlayed > 0 {
+		deathShare = row.AvgTotalTimeSpentDead / row.AvgTimePlayed
+	}
+	survivalScore := (1 - clampFloat(deathShare, 0, 1)) * 100
+	if row.AvgDamageTaken <= 0 {
+		return survivalScore
+	}
+	mitigationRatio := row.AvgDamageSelfMitigated / row.AvgDamageTaken
+	return survivalScore + clampFloat(mitigationRatio, 0, 2)*20
+}
+
+func normalizedPositiveScore(value, average float64) float64 {
+	if average <= 0 || value <= 0 {
+		return 50
+	}
+	return clampFloat(50+((value-average)/average)*35, 0, 100)
+}
+
+func normalizedImpactScore(value, average float64) float64 {
+	return normalizedPositiveScore(value, average)
+}
+
+func normalizedShareScore(value, maxValue float64) float64 {
+	if maxValue <= 0 {
+		return 50
+	}
+	return clampFloat(math.Sqrt(value/maxValue)*100, 0, 100)
+}
+
+func clampFloat(value, minValue, maxValue float64) float64 {
+	if value < minValue {
+		return minValue
+	}
+	if value > maxValue {
+		return maxValue
+	}
+	return value
 }
 
 func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary {
@@ -363,8 +618,6 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 	maxGames := 0
 	maxPickRate := 0.0
 	maxBanRate := 0.0
-	totalKDAWeight := 0
-	weightedKDA := 0.0
 	for _, row := range rows {
 		if row.Games > maxGames {
 			maxGames = row.Games
@@ -375,15 +628,8 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 		if row.BanRate > maxBanRate {
 			maxBanRate = row.BanRate
 		}
-		if row.Games > 0 && row.KDA > 0 {
-			totalKDAWeight += row.Games
-			weightedKDA += row.KDA * float64(row.Games)
-		}
 	}
-	averageKDA := 0.0
-	if totalKDAWeight > 0 {
-		averageKDA = weightedKDA / float64(totalKDAWeight)
-	}
+	refs := championTierReferenceValues(rows)
 
 	for index := range rows {
 		winRateScore := clampFloat(50+((rows[index].WinRate-0.5)*500), 0, 100)
@@ -394,7 +640,7 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 		}
 		rows[index].PickScore = normalizedShareScore(rows[index].PickRate, maxPickRate)
 		rows[index].BanScore = normalizedShareScore(rows[index].BanRate, maxBanRate)
-		rows[index].ImpactScore = normalizedImpactScore(rows[index].KDA, averageKDA)
+		applyChampionImpactScores(&rows[index], refs)
 		rows[index].TierScore = clampFloat(
 			0.58*rows[index].WinScore+
 				0.14*rows[index].SampleScore+
@@ -406,30 +652,6 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 		)
 	}
 	return rows
-}
-
-func normalizedShareScore(value, maxValue float64) float64 {
-	if maxValue <= 0 {
-		return 50
-	}
-	return clampFloat(math.Sqrt(value/maxValue)*100, 0, 100)
-}
-
-func normalizedImpactScore(kda, averageKDA float64) float64 {
-	if averageKDA <= 0 || kda <= 0 {
-		return 50
-	}
-	return clampFloat(50+((kda-averageKDA)/averageKDA)*35, 0, 100)
-}
-
-func clampFloat(value, minValue, maxValue float64) float64 {
-	if value < minValue {
-		return minValue
-	}
-	if value > maxValue {
-		return maxValue
-	}
-	return value
 }
 
 func (r *Repository) queryChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
@@ -541,8 +763,41 @@ func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScop
 				pm.win,
 				pm.kills,
 				pm.deaths,
-				pm.assists
+				pm.assists,
+				multiIf(pp.gold_earned > 0, pp.gold_earned, pm.gold_earned) AS gold_earned,
+				multiIf(pp.gold_spent > 0, pp.gold_spent, pm.gold_spent) AS gold_spent,
+				multiIf(pp.total_minions_killed > 0, pp.total_minions_killed, pm.total_minions_killed) AS total_minions_killed,
+				multiIf(pp.neutral_minions_killed > 0, pp.neutral_minions_killed, pm.neutral_minions_killed) AS neutral_minions_killed,
+				multiIf(pp.total_damage_dealt_to_champions > 0, pp.total_damage_dealt_to_champions, pm.total_damage_dealt_to_champions) AS total_damage_dealt_to_champions,
+				multiIf(pp.physical_damage_dealt_to_champions > 0, pp.physical_damage_dealt_to_champions, pm.physical_damage_dealt_to_champions) AS physical_damage_dealt_to_champions,
+				multiIf(pp.magic_damage_dealt_to_champions > 0, pp.magic_damage_dealt_to_champions, pm.magic_damage_dealt_to_champions) AS magic_damage_dealt_to_champions,
+				multiIf(pp.true_damage_dealt_to_champions > 0, pp.true_damage_dealt_to_champions, pm.true_damage_dealt_to_champions) AS true_damage_dealt_to_champions,
+				multiIf(pp.total_damage_taken > 0, pp.total_damage_taken, pm.total_damage_taken) AS total_damage_taken,
+				multiIf(pp.damage_self_mitigated > 0, pp.damage_self_mitigated, pm.damage_self_mitigated) AS damage_self_mitigated,
+				multiIf(pp.damage_dealt_to_objectives > 0, pp.damage_dealt_to_objectives, pm.damage_dealt_to_objectives) AS damage_dealt_to_objectives,
+				multiIf(pp.damage_dealt_to_turrets > 0, pp.damage_dealt_to_turrets, pm.damage_dealt_to_turrets) AS damage_dealt_to_turrets,
+				multiIf(pp.damage_dealt_to_buildings > 0, pp.damage_dealt_to_buildings, pm.damage_dealt_to_buildings) AS damage_dealt_to_buildings,
+				multiIf(pp.vision_score > 0, pp.vision_score, pm.vision_score) AS vision_score,
+				multiIf(pp.wards_placed > 0, pp.wards_placed, pm.wards_placed) AS wards_placed,
+				multiIf(pp.wards_killed > 0, pp.wards_killed, pm.wards_killed) AS wards_killed,
+				multiIf(pp.detector_wards_placed > 0, pp.detector_wards_placed, pm.detector_wards_placed) AS detector_wards_placed,
+				multiIf(pp.time_ccing_others > 0, pp.time_ccing_others, pm.time_ccing_others) AS time_ccing_others,
+				multiIf(pp.total_heal > 0, pp.total_heal, pm.total_heal) AS total_heal,
+				multiIf(pp.total_heals_on_teammates > 0, pp.total_heals_on_teammates, pm.total_heals_on_teammates) AS total_heals_on_teammates,
+				multiIf(pp.total_damage_shielded_on_teammates > 0, pp.total_damage_shielded_on_teammates, pm.total_damage_shielded_on_teammates) AS total_damage_shielded_on_teammates,
+				multiIf(pp.turret_takedowns > 0, pp.turret_takedowns, pm.turret_takedowns) AS turret_takedowns,
+				multiIf(pp.inhibitor_takedowns > 0, pp.inhibitor_takedowns, pm.inhibitor_takedowns) AS inhibitor_takedowns,
+				multiIf(pp.dragon_kills > 0, pp.dragon_kills, pm.dragon_kills) AS dragon_kills,
+				multiIf(pp.baron_kills > 0, pp.baron_kills, pm.baron_kills) AS baron_kills,
+				multiIf(pp.objectives_stolen > 0, pp.objectives_stolen, pm.objectives_stolen) AS objectives_stolen,
+				multiIf(pp.total_time_spent_dead > 0, pp.total_time_spent_dead, pm.total_time_spent_dead) AS total_time_spent_dead,
+				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played,
+				sum(pm.kills) OVER (PARTITION BY pm.match_id, pm.team_id) AS team_kills
 			FROM participant_matchups AS pm FINAL
+			LEFT JOIN participant_performance AS pp FINAL
+				ON pp.match_id = pm.match_id
+				AND pp.platform = pm.platform
+				AND pp.participant_id = pm.participant_id
 			LEFT JOIN
 			(
 				SELECT

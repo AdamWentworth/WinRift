@@ -12,7 +12,7 @@ Current score components:
 - `sampleScore`: rewards larger stored samples inside the selected role/patch/rank scope.
 - `pickScore`: sample-relative pick presence. This captures how often the champion appears in our stored games for the selected scope.
 - `banScore`: sample-relative ban pressure from stored Match-V5 ban data.
-- `impactScore`: role-scope-relative KDA impact from stored participant K/D/A.
+- `impactScore`: role-scope-relative player impact from stored participant performance stats. The current backend blends KDA, kill participation, champion damage, economy, vision, objective pressure, utility, and survivability with role-specific weights.
 
 Current weights:
 
@@ -37,18 +37,42 @@ The frontend maps rank percentile to:
 
 The tier label is a presentation bucket. The backend `tierScore` is the actual sortable number.
 
+## Impact Normalization
+
+Match-V5 final participant fields are normalized into `participants` for new ingestion and into `participant_performance` for retained raw-match backfills. Champion guide queries use `participant_performance` when it exists and fall back to participant columns otherwise.
+
+The current impact components are:
+
+- `damageScore`: final champion damage relative to the selected role scope.
+- `economyScore`: gold earned plus total CS.
+- `visionScore`: final vision score.
+- `objectiveScore`: objective damage, structure damage, turret/inhibitor takedowns, dragon/baron kills, and objective steals.
+- `utilityScore`: CC time plus healing/shielding utility.
+- `survivabilityScore`: lower dead-time share plus self-mitigation relative to damage taken.
+- KDA/kill participation blend: rewards involvement without letting cleanup KDA fully dominate.
+
+Role weighting matters. Supports lean more on vision and utility; junglers lean more on objectives; marksmen lean more on damage/economy/survivability; solo lanes use a more balanced mix.
+
 ## Current Limitations
 
-`impactScore` currently uses KDA because K/D/A is normalized into the participant table. It does not yet include final damage, CS, gold, vision, objective damage, or kill participation.
-
-We already store timeline power snapshots for gold, CS, jungle CS, champion damage, and damage taken. That data is useful, but it is currently oriented around 10/15/20 minute power curves rather than final-game champion tiering.
+These stats are still correlations, not isolated champion power. Better champions attract better players, some champions farm more because of role/function, and losing teams naturally have worse damage/economy/vision. The score is useful for ranking stored performance patterns, but it should stay labeled as WinRift's internal read rather than objective truth.
 
 Future improvement:
 
-- Normalize final participant stats from Match-V5 into `participants` or a companion `participant_scores` table.
-- Include role-relative damage, CS/gold, vision, objective contribution, and kill participation.
-- Keep each signal role-relative. A support's useful impact shape is not the same as a marksman's or jungler's.
-- Validate the formula against future sample growth before presenting the score as anything more than WinRift's internal ranking.
+- Validate the role weights against larger samples and adjust by patch.
+- Consider per-minute normalization for short games versus long games.
+- Add lane matchup difficulty and team-composition context.
+- Consider separate early/mid/late impact scores from timeline snapshots.
+- Consider pick-ban presence by rank and region once the sample is large enough.
+
+Other signals worth considering later:
+
+- matchup-adjusted winrate, so champions are not rewarded only for farming favorable pairings
+- damage share and gold share, not just raw damage/gold
+- objective participation by team context, especially for junglers and roam supports
+- death timing, since one late death can matter more than three low-stakes early deaths
+- lane-dominance proxies from 10/15 minute gold, XP, CS, and damage deltas
+- player-mastery bias, since niche champions often have higher one-trick concentration
 
 ## Product Language
 

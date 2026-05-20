@@ -127,6 +127,9 @@ func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.
 		if err := r.insertParticipant(ctx, row); err != nil {
 			return err
 		}
+		if err := r.insertParticipantPerformance(ctx, row); err != nil {
+			return err
+		}
 	}
 	for _, row := range normalized.Matchups {
 		if err := r.insertMatchup(ctx, row); err != nil {
@@ -731,6 +734,7 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 		`ALTER TABLE raw_matches DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE participants DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE participant_matchups DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE participant_performance DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE build_analytics_mv DELETE WHERE patch_bucket = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_participant_frames DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_item_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
@@ -779,6 +783,7 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch FROM raw_timelines
 			UNION ALL SELECT patch FROM participants
 			UNION ALL SELECT patch FROM participant_matchups
+			UNION ALL SELECT patch FROM participant_performance
 			UNION ALL SELECT patch_bucket AS patch FROM build_analytics_mv
 			UNION ALL SELECT patch FROM timeline_participant_frames
 			UNION ALL SELECT patch FROM timeline_item_events
@@ -825,6 +830,7 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "raw_matches", column: "patch"},
 		{table: "participants", column: "patch"},
 		{table: "participant_matchups", column: "patch"},
+		{table: "participant_performance", column: "patch"},
 		{table: "build_analytics_mv", column: "patch_bucket"},
 		{table: "timeline_participant_frames", column: "patch"},
 		{table: "timeline_item_events", column: "patch"},
@@ -1087,6 +1093,11 @@ func (r *Repository) insertParticipant(ctx context.Context, row analytics.Partic
 	return err
 }
 
+func (r *Repository) insertParticipantPerformance(ctx context.Context, row analytics.ParticipantRow) error {
+	_, err := r.db.ExecContext(ctx, participantPerformanceInsertSQL, participantPerformanceArgs(row)...)
+	return err
+}
+
 func (r *Repository) insertMatchup(ctx context.Context, row analytics.MatchupRow) error {
 	args := participantArgs(row.ParticipantRow)
 	args = append(args, row.OpponentParticipantID, row.OpponentChampionID, row.OpponentRole)
@@ -1148,16 +1159,62 @@ func (r *Repository) insertChampionBan(ctx context.Context, row analytics.Champi
 	return err
 }
 
-const participantColumns = `match_id, platform, patch, queue_id, participant_id, puuid, team_id, champion_id, champion_name, role, win, kills, deaths, assists, item0, item1, item2, item3, item4, item5, trinket_item, summoner_spell1, summoner_spell2, primary_rune_tree, secondary_rune_tree, keystone, rune_signature, spell_signature, final_items_signature, core2_signature, core3_signature, rank_bucket`
+const participantColumns = `match_id, platform, patch, queue_id, participant_id, puuid, team_id, champion_id, champion_name, role, win, kills, deaths, assists, gold_earned, gold_spent, total_minions_killed, neutral_minions_killed, total_damage_dealt_to_champions, physical_damage_dealt_to_champions, magic_damage_dealt_to_champions, true_damage_dealt_to_champions, total_damage_taken, damage_self_mitigated, damage_dealt_to_objectives, damage_dealt_to_turrets, damage_dealt_to_buildings, vision_score, wards_placed, wards_killed, detector_wards_placed, time_ccing_others, total_heal, total_heals_on_teammates, total_damage_shielded_on_teammates, turret_takedowns, inhibitor_takedowns, dragon_kills, baron_kills, objectives_stolen, total_time_spent_dead, time_played, item0, item1, item2, item3, item4, item5, trinket_item, summoner_spell1, summoner_spell2, primary_rune_tree, secondary_rune_tree, keystone, rune_signature, spell_signature, final_items_signature, core2_signature, core3_signature, rank_bucket`
 
-const participantPlaceholders = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
+const participantPlaceholders = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
 
 const participantInsertSQL = `INSERT INTO participants (` + participantColumns + `) VALUES (` + participantPlaceholders + `)`
 
 const matchupInsertSQL = `INSERT INTO participant_matchups (` + participantColumns + `, opponent_participant_id, opponent_champion_id, opponent_role) VALUES (` + participantPlaceholders + `, ?, ?, ?)`
 
+const participantPerformanceColumns = `match_id, platform, patch, queue_id, participant_id, champion_id, role, gold_earned, gold_spent, total_minions_killed, neutral_minions_killed, total_damage_dealt_to_champions, physical_damage_dealt_to_champions, magic_damage_dealt_to_champions, true_damage_dealt_to_champions, total_damage_taken, damage_self_mitigated, damage_dealt_to_objectives, damage_dealt_to_turrets, damage_dealt_to_buildings, vision_score, wards_placed, wards_killed, detector_wards_placed, time_ccing_others, total_heal, total_heals_on_teammates, total_damage_shielded_on_teammates, turret_takedowns, inhibitor_takedowns, dragon_kills, baron_kills, objectives_stolen, total_time_spent_dead, time_played`
+
+const participantPerformancePlaceholders = `?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?`
+
+const participantPerformanceInsertSQL = `INSERT INTO participant_performance (` + participantPerformanceColumns + `) VALUES (` + participantPerformancePlaceholders + `)`
+
 func participantArgs(row analytics.ParticipantRow) []any {
-	return []any{row.MatchID, row.Platform, row.Patch, row.QueueID, row.ParticipantID, row.PUUID, row.TeamID, row.ChampionID, row.ChampionName, row.Role, row.Win, row.Kills, row.Deaths, row.Assists, row.Item0, row.Item1, row.Item2, row.Item3, row.Item4, row.Item5, row.TrinketItem, row.SummonerSpell1, row.SummonerSpell2, row.PrimaryRuneTree, row.SecondaryRuneTree, row.Keystone, row.RuneSignature, row.SpellSignature, row.FinalItemsSignature, row.Core2Signature, row.Core3Signature, row.RankBucket}
+	return []any{row.MatchID, row.Platform, row.Patch, row.QueueID, row.ParticipantID, row.PUUID, row.TeamID, row.ChampionID, row.ChampionName, row.Role, row.Win, row.Kills, row.Deaths, row.Assists, row.GoldEarned, row.GoldSpent, row.TotalMinionsKilled, row.NeutralMinionsKilled, row.TotalDamageDealtToChampions, row.PhysicalDamageDealtToChampions, row.MagicDamageDealtToChampions, row.TrueDamageDealtToChampions, row.TotalDamageTaken, row.DamageSelfMitigated, row.DamageDealtToObjectives, row.DamageDealtToTurrets, row.DamageDealtToBuildings, row.VisionScore, row.WardsPlaced, row.WardsKilled, row.DetectorWardsPlaced, row.TimeCCingOthers, row.TotalHeal, row.TotalHealsOnTeammates, row.TotalDamageShieldedOnTeammates, row.TurretTakedowns, row.InhibitorTakedowns, row.DragonKills, row.BaronKills, row.ObjectivesStolen, row.TotalTimeSpentDead, row.TimePlayed, row.Item0, row.Item1, row.Item2, row.Item3, row.Item4, row.Item5, row.TrinketItem, row.SummonerSpell1, row.SummonerSpell2, row.PrimaryRuneTree, row.SecondaryRuneTree, row.Keystone, row.RuneSignature, row.SpellSignature, row.FinalItemsSignature, row.Core2Signature, row.Core3Signature, row.RankBucket}
+}
+
+func participantPerformanceArgs(row analytics.ParticipantRow) []any {
+	return []any{
+		row.MatchID,
+		row.Platform,
+		row.Patch,
+		row.QueueID,
+		row.ParticipantID,
+		row.ChampionID,
+		row.Role,
+		row.GoldEarned,
+		row.GoldSpent,
+		row.TotalMinionsKilled,
+		row.NeutralMinionsKilled,
+		row.TotalDamageDealtToChampions,
+		row.PhysicalDamageDealtToChampions,
+		row.MagicDamageDealtToChampions,
+		row.TrueDamageDealtToChampions,
+		row.TotalDamageTaken,
+		row.DamageSelfMitigated,
+		row.DamageDealtToObjectives,
+		row.DamageDealtToTurrets,
+		row.DamageDealtToBuildings,
+		row.VisionScore,
+		row.WardsPlaced,
+		row.WardsKilled,
+		row.DetectorWardsPlaced,
+		row.TimeCCingOthers,
+		row.TotalHeal,
+		row.TotalHealsOnTeammates,
+		row.TotalDamageShieldedOnTeammates,
+		row.TurretTakedowns,
+		row.InhibitorTakedowns,
+		row.DragonKills,
+		row.BaronKills,
+		row.ObjectivesStolen,
+		row.TotalTimeSpentDead,
+		row.TimePlayed,
+	}
 }
 
 func uint32ListSQL(values []uint32) string {

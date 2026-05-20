@@ -15,15 +15,16 @@ import (
 )
 
 func main() {
-	action := flag.String("action", "", "one of: collecting, compile, win-conditions, item-slots, delete-raw")
+	action := flag.String("action", "", "one of: collecting, compile, win-conditions, item-slots, champion-guides, delete-raw")
 	patch := flag.String("patch", "", "patch bucket, for example 16.10")
 	platform := flag.String("platform", "NA1", "platform route")
 	queueID := flag.Int("queue", 420, "queue id")
 	retainDays := flag.Int("retain-days", 30, "raw retention window after compile")
+	backfill := flag.Bool("backfill", false, "backfill retained raw payload data before refreshing derived analytics")
 	flag.Parse()
 
 	if *action == "" || *patch == "" {
-		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|win-conditions|delete-raw -patch 16.10 [-platform NA1] [-queue 420] [-retain-days 30]")
+		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|win-conditions|item-slots|champion-guides|delete-raw -patch 16.10 [-platform NA1] [-queue 420] [-retain-days 30] [-backfill]")
 		os.Exit(2)
 	}
 
@@ -52,6 +53,16 @@ func main() {
 			break
 		}
 		err = repo.RefreshItemSlotAnalytics(ctx, *patch, uint16(*queueID), contexts)
+	case "champion-guides":
+		if *backfill {
+			if _, err = repo.BackfillParticipantPerformance(ctx, *patch, uint16(*queueID)); err != nil {
+				break
+			}
+			if _, err = repo.BackfillChampionGuideEvents(ctx, *patch, uint16(*queueID)); err != nil {
+				break
+			}
+		}
+		err = repo.RefreshChampionGuideDerivedAnalytics(ctx, *patch, uint16(*queueID))
 	case "delete-raw":
 		err = repo.DeleteRawPatchData(ctx, *patch, normalizedPlatform, uint16(*queueID))
 	default:

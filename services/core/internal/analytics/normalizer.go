@@ -72,38 +72,66 @@ type RawTimeline struct {
 }
 
 type ParticipantRow struct {
-	MatchID             string
-	Platform            string
-	Patch               string
-	QueueID             uint16
-	ParticipantID       uint8
-	PUUID               string
-	TeamID              uint16
-	ChampionID          uint16
-	ChampionName        string
-	Role                string
-	Win                 uint8
-	Kills               uint16
-	Deaths              uint16
-	Assists             uint16
-	Item0               uint32
-	Item1               uint32
-	Item2               uint32
-	Item3               uint32
-	Item4               uint32
-	Item5               uint32
-	TrinketItem         uint32
-	SummonerSpell1      uint16
-	SummonerSpell2      uint16
-	PrimaryRuneTree     uint16
-	SecondaryRuneTree   uint16
-	Keystone            uint16
-	RuneSignature       string
-	SpellSignature      string
-	FinalItemsSignature string
-	Core2Signature      string
-	Core3Signature      string
-	RankBucket          string
+	MatchID                        string
+	Platform                       string
+	Patch                          string
+	QueueID                        uint16
+	ParticipantID                  uint8
+	PUUID                          string
+	TeamID                         uint16
+	ChampionID                     uint16
+	ChampionName                   string
+	Role                           string
+	Win                            uint8
+	Kills                          uint16
+	Deaths                         uint16
+	Assists                        uint16
+	GoldEarned                     uint32
+	GoldSpent                      uint32
+	TotalMinionsKilled             uint32
+	NeutralMinionsKilled           uint32
+	TotalDamageDealtToChampions    uint32
+	PhysicalDamageDealtToChampions uint32
+	MagicDamageDealtToChampions    uint32
+	TrueDamageDealtToChampions     uint32
+	TotalDamageTaken               uint32
+	DamageSelfMitigated            uint32
+	DamageDealtToObjectives        uint32
+	DamageDealtToTurrets           uint32
+	DamageDealtToBuildings         uint32
+	VisionScore                    uint32
+	WardsPlaced                    uint32
+	WardsKilled                    uint32
+	DetectorWardsPlaced            uint32
+	TimeCCingOthers                uint32
+	TotalHeal                      uint32
+	TotalHealsOnTeammates          uint32
+	TotalDamageShieldedOnTeammates uint32
+	TurretTakedowns                uint32
+	InhibitorTakedowns             uint32
+	DragonKills                    uint32
+	BaronKills                     uint32
+	ObjectivesStolen               uint32
+	TotalTimeSpentDead             uint32
+	TimePlayed                     uint32
+	Item0                          uint32
+	Item1                          uint32
+	Item2                          uint32
+	Item3                          uint32
+	Item4                          uint32
+	Item5                          uint32
+	TrinketItem                    uint32
+	SummonerSpell1                 uint16
+	SummonerSpell2                 uint16
+	PrimaryRuneTree                uint16
+	SecondaryRuneTree              uint16
+	Keystone                       uint16
+	RuneSignature                  string
+	SpellSignature                 string
+	FinalItemsSignature            string
+	Core2Signature                 string
+	Core3Signature                 string
+	RankBucket                     string
 }
 
 type MatchupRow struct {
@@ -233,30 +261,58 @@ type teamBan struct {
 }
 
 type matchParticipant struct {
-	ParticipantID      int    `json:"participantId"`
-	PUUID              string `json:"puuid"`
-	TeamID             int    `json:"teamId"`
-	ChampionID         int    `json:"championId"`
-	ChampionName       string `json:"championName"`
-	TeamPosition       string `json:"teamPosition"`
-	IndividualPosition string `json:"individualPosition"`
-	Lane               string `json:"lane"`
-	Win                bool   `json:"win"`
-	Kills              int    `json:"kills"`
-	Deaths             int    `json:"deaths"`
-	Assists            int    `json:"assists"`
-	Item0              int    `json:"item0"`
-	Item1              int    `json:"item1"`
-	Item2              int    `json:"item2"`
-	Item3              int    `json:"item3"`
-	Item4              int    `json:"item4"`
-	Item5              int    `json:"item5"`
-	Item6              int    `json:"item6"`
-	Summoner1ID        int    `json:"summoner1Id"`
-	Summoner2ID        int    `json:"summoner2Id"`
-	Spell1ID           int    `json:"spell1Id"`
-	Spell2ID           int    `json:"spell2Id"`
-	Perks              perks  `json:"perks"`
+	ParticipantID                  int    `json:"participantId"`
+	PUUID                          string `json:"puuid"`
+	TeamID                         int    `json:"teamId"`
+	ChampionID                     int    `json:"championId"`
+	ChampionName                   string `json:"championName"`
+	TeamPosition                   string `json:"teamPosition"`
+	IndividualPosition             string `json:"individualPosition"`
+	Lane                           string `json:"lane"`
+	Win                            bool   `json:"win"`
+	Kills                          int    `json:"kills"`
+	Deaths                         int    `json:"deaths"`
+	Assists                        int    `json:"assists"`
+	GoldEarned                     int    `json:"goldEarned"`
+	GoldSpent                      int    `json:"goldSpent"`
+	TotalMinionsKilled             int    `json:"totalMinionsKilled"`
+	NeutralMinionsKilled           int    `json:"neutralMinionsKilled"`
+	TotalDamageDealtToChampions    int    `json:"totalDamageDealtToChampions"`
+	PhysicalDamageDealtToChampions int    `json:"physicalDamageDealtToChampions"`
+	MagicDamageDealtToChampions    int    `json:"magicDamageDealtToChampions"`
+	TrueDamageDealtToChampions     int    `json:"trueDamageDealtToChampions"`
+	TotalDamageTaken               int    `json:"totalDamageTaken"`
+	DamageSelfMitigated            int    `json:"damageSelfMitigated"`
+	DamageDealtToObjectives        int    `json:"damageDealtToObjectives"`
+	DamageDealtToTurrets           int    `json:"damageDealtToTurrets"`
+	DamageDealtToBuildings         int    `json:"damageDealtToBuildings"`
+	VisionScore                    int    `json:"visionScore"`
+	WardsPlaced                    int    `json:"wardsPlaced"`
+	WardsKilled                    int    `json:"wardsKilled"`
+	DetectorWardsPlaced            int    `json:"detectorWardsPlaced"`
+	TimeCCingOthers                int    `json:"timeCCingOthers"`
+	TotalHeal                      int    `json:"totalHeal"`
+	TotalHealsOnTeammates          int    `json:"totalHealsOnTeammates"`
+	TotalDamageShieldedOnTeammates int    `json:"totalDamageShieldedOnTeammates"`
+	TurretTakedowns                int    `json:"turretTakedowns"`
+	InhibitorTakedowns             int    `json:"inhibitorTakedowns"`
+	DragonKills                    int    `json:"dragonKills"`
+	BaronKills                     int    `json:"baronKills"`
+	ObjectivesStolen               int    `json:"objectivesStolen"`
+	TotalTimeSpentDead             int    `json:"totalTimeSpentDead"`
+	TimePlayed                     int    `json:"timePlayed"`
+	Item0                          int    `json:"item0"`
+	Item1                          int    `json:"item1"`
+	Item2                          int    `json:"item2"`
+	Item3                          int    `json:"item3"`
+	Item4                          int    `json:"item4"`
+	Item5                          int    `json:"item5"`
+	Item6                          int    `json:"item6"`
+	Summoner1ID                    int    `json:"summoner1Id"`
+	Summoner2ID                    int    `json:"summoner2Id"`
+	Spell1ID                       int    `json:"spell1Id"`
+	Spell2ID                       int    `json:"spell2Id"`
+	Perks                          perks  `json:"perks"`
 }
 
 type perks struct {
@@ -380,38 +436,66 @@ func NormalizeMatchWithRankBuckets(rawMatch, rawTimeline []byte, platform, rankB
 			participantRankBucket = strings.ToUpper(bucket)
 		}
 		row := ParticipantRow{
-			MatchID:             matchID,
-			Platform:            strings.ToUpper(platform),
-			Patch:               patch,
-			QueueID:             uint16(payload.Info.QueueID),
-			ParticipantID:       uint8(participantID),
-			PUUID:               participant.PUUID,
-			TeamID:              uint16(participant.TeamID),
-			ChampionID:          uint16(participant.ChampionID),
-			ChampionName:        participant.ChampionName,
-			Role:                NormalizeRole(participant),
-			Win:                 boolToUint8(participant.Win),
-			Kills:               uint16(participant.Kills),
-			Deaths:              uint16(participant.Deaths),
-			Assists:             uint16(participant.Assists),
-			Item0:               uint32(participant.Item0),
-			Item1:               uint32(participant.Item1),
-			Item2:               uint32(participant.Item2),
-			Item3:               uint32(participant.Item3),
-			Item4:               uint32(participant.Item4),
-			Item5:               uint32(participant.Item5),
-			TrinketItem:         uint32(participant.Item6),
-			SummonerSpell1:      uint16(firstNonZero(participant.Summoner1ID, participant.Spell1ID)),
-			SummonerSpell2:      uint16(firstNonZero(participant.Summoner2ID, participant.Spell2ID)),
-			PrimaryRuneTree:     uint16(PrimaryTree(participant.Perks)),
-			SecondaryRuneTree:   uint16(SecondaryTree(participant.Perks)),
-			Keystone:            uint16(Keystone(participant.Perks)),
-			RuneSignature:       RuneSignature(participant.Perks),
-			SpellSignature:      SpellSignature(firstNonZero(participant.Summoner1ID, participant.Spell1ID), firstNonZero(participant.Summoner2ID, participant.Spell2ID)),
-			FinalItemsSignature: finalSignature,
-			Core2Signature:      core2,
-			Core3Signature:      core3,
-			RankBucket:          participantRankBucket,
+			MatchID:                        matchID,
+			Platform:                       strings.ToUpper(platform),
+			Patch:                          patch,
+			QueueID:                        uint16(payload.Info.QueueID),
+			ParticipantID:                  uint8(participantID),
+			PUUID:                          participant.PUUID,
+			TeamID:                         uint16(participant.TeamID),
+			ChampionID:                     uint16(participant.ChampionID),
+			ChampionName:                   participant.ChampionName,
+			Role:                           NormalizeRole(participant),
+			Win:                            boolToUint8(participant.Win),
+			Kills:                          uint16(participant.Kills),
+			Deaths:                         uint16(participant.Deaths),
+			Assists:                        uint16(participant.Assists),
+			GoldEarned:                     uint32NonNegative(participant.GoldEarned),
+			GoldSpent:                      uint32NonNegative(participant.GoldSpent),
+			TotalMinionsKilled:             uint32NonNegative(participant.TotalMinionsKilled),
+			NeutralMinionsKilled:           uint32NonNegative(participant.NeutralMinionsKilled),
+			TotalDamageDealtToChampions:    uint32NonNegative(participant.TotalDamageDealtToChampions),
+			PhysicalDamageDealtToChampions: uint32NonNegative(participant.PhysicalDamageDealtToChampions),
+			MagicDamageDealtToChampions:    uint32NonNegative(participant.MagicDamageDealtToChampions),
+			TrueDamageDealtToChampions:     uint32NonNegative(participant.TrueDamageDealtToChampions),
+			TotalDamageTaken:               uint32NonNegative(participant.TotalDamageTaken),
+			DamageSelfMitigated:            uint32NonNegative(participant.DamageSelfMitigated),
+			DamageDealtToObjectives:        uint32NonNegative(participant.DamageDealtToObjectives),
+			DamageDealtToTurrets:           uint32NonNegative(participant.DamageDealtToTurrets),
+			DamageDealtToBuildings:         uint32NonNegative(participant.DamageDealtToBuildings),
+			VisionScore:                    uint32NonNegative(participant.VisionScore),
+			WardsPlaced:                    uint32NonNegative(participant.WardsPlaced),
+			WardsKilled:                    uint32NonNegative(participant.WardsKilled),
+			DetectorWardsPlaced:            uint32NonNegative(participant.DetectorWardsPlaced),
+			TimeCCingOthers:                uint32NonNegative(participant.TimeCCingOthers),
+			TotalHeal:                      uint32NonNegative(participant.TotalHeal),
+			TotalHealsOnTeammates:          uint32NonNegative(participant.TotalHealsOnTeammates),
+			TotalDamageShieldedOnTeammates: uint32NonNegative(participant.TotalDamageShieldedOnTeammates),
+			TurretTakedowns:                uint32NonNegative(participant.TurretTakedowns),
+			InhibitorTakedowns:             uint32NonNegative(participant.InhibitorTakedowns),
+			DragonKills:                    uint32NonNegative(participant.DragonKills),
+			BaronKills:                     uint32NonNegative(participant.BaronKills),
+			ObjectivesStolen:               uint32NonNegative(participant.ObjectivesStolen),
+			TotalTimeSpentDead:             uint32NonNegative(participant.TotalTimeSpentDead),
+			TimePlayed:                     uint32NonNegative(firstNonZero(participant.TimePlayed, int(payload.Info.GameDuration))),
+			Item0:                          uint32(participant.Item0),
+			Item1:                          uint32(participant.Item1),
+			Item2:                          uint32(participant.Item2),
+			Item3:                          uint32(participant.Item3),
+			Item4:                          uint32(participant.Item4),
+			Item5:                          uint32(participant.Item5),
+			TrinketItem:                    uint32(participant.Item6),
+			SummonerSpell1:                 uint16(firstNonZero(participant.Summoner1ID, participant.Spell1ID)),
+			SummonerSpell2:                 uint16(firstNonZero(participant.Summoner2ID, participant.Spell2ID)),
+			PrimaryRuneTree:                uint16(PrimaryTree(participant.Perks)),
+			SecondaryRuneTree:              uint16(SecondaryTree(participant.Perks)),
+			Keystone:                       uint16(Keystone(participant.Perks)),
+			RuneSignature:                  RuneSignature(participant.Perks),
+			SpellSignature:                 SpellSignature(firstNonZero(participant.Summoner1ID, participant.Spell1ID), firstNonZero(participant.Summoner2ID, participant.Spell2ID)),
+			FinalItemsSignature:            finalSignature,
+			Core2Signature:                 core2,
+			Core3Signature:                 core3,
+			RankBucket:                     participantRankBucket,
 		}
 		normalized.Participants = append(normalized.Participants, row)
 	}

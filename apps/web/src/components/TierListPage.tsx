@@ -96,7 +96,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           <span>WinRift Tier List</span>
           <h2>{selectedRole} Rankings</h2>
           <p>
-            A multi-signal read on champion strength from collected ranked Solo/Duo games: winrate, confidence, sample size, pick/ban pressure, and role-relative KDA impact.
+            A multi-signal read on champion strength from collected ranked Solo/Duo games: winrate, confidence, sample size, pick/ban pressure, and role-relative match impact.
           </p>
         </div>
         <div className="tier-list-hero-stats">

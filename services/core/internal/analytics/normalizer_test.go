@@ -35,6 +35,9 @@ func TestNormalizeLegacyMatchFixture(t *testing.T) {
 	if first.SpellSignature != "4-12" {
 		t.Fatalf("spell signature = %q", first.SpellSignature)
 	}
+	if first.GoldEarned == 0 || first.TotalDamageDealtToChampions == 0 || first.VisionScore == 0 || first.TimePlayed == 0 {
+		t.Fatalf("expected final participant performance fields to be normalized: %+v", first)
+	}
 }
 
 func TestShouldIngestFixture(t *testing.T) {

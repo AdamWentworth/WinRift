@@ -92,9 +92,15 @@ Refresh options:
 
 One row per player per match.
 
-Important columns: champion, role, team, win, KDA, six final item slots, trinket, summoner spells, rune trees, keystone, rune signature, spell signature, final item signature, core item signatures, rank bucket.
+Important columns: champion, role, team, win, KDA, final gold, CS, champion damage, damage taken/mitigated, objective/structure damage, vision, wards, CC time, healing/shielding utility, objective takedowns, time dead, six final item slots, trinket, summoner spells, rune trees, keystone, rune signature, spell signature, final item signature, core item signatures, rank bucket.
 
 `rank_bucket` is the player's ranked tier grouping, for example `IRON`, `GOLD`, `DIAMOND`, or `MASTER+`. Match-V5 does not include rank, so rows ingest as `UNKNOWN` unless rank enrichment is enabled and a fresh `summoner_rank_snapshots` row is available or fetched.
+
+## `participant_performance`
+
+One row per player per match containing final-game performance fields extracted from Match-V5. New ingestion writes these fields to both `participants` and this companion table. Retained raw payloads can backfill this table without re-inserting historical participant rows.
+
+Important columns: final gold, final CS, champion damage, objective/structure damage, vision, wards, CC time, healing/shielding utility, objective takedowns, time dead, and time played.
 
 ## `participant_matchups`
 

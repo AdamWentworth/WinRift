@@ -175,6 +175,48 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ENGINE = ReplacingMergeTree(compiled_at)
 		ORDER BY (patch, platform, queue_id, champion_id)
 	`, `
+		CREATE TABLE IF NOT EXISTS participant_performance
+		(
+			match_id String,
+			platform LowCardinality(String),
+			patch LowCardinality(String),
+			queue_id UInt16,
+			participant_id UInt8,
+			champion_id UInt16,
+			role LowCardinality(String),
+			gold_earned UInt32,
+			gold_spent UInt32,
+			total_minions_killed UInt32,
+			neutral_minions_killed UInt32,
+			total_damage_dealt_to_champions UInt32,
+			physical_damage_dealt_to_champions UInt32,
+			magic_damage_dealt_to_champions UInt32,
+			true_damage_dealt_to_champions UInt32,
+			total_damage_taken UInt32,
+			damage_self_mitigated UInt32,
+			damage_dealt_to_objectives UInt32,
+			damage_dealt_to_turrets UInt32,
+			damage_dealt_to_buildings UInt32,
+			vision_score UInt32,
+			wards_placed UInt32,
+			wards_killed UInt32,
+			detector_wards_placed UInt32,
+			time_ccing_others UInt32,
+			total_heal UInt32,
+			total_heals_on_teammates UInt32,
+			total_damage_shielded_on_teammates UInt32,
+			turret_takedowns UInt32,
+			inhibitor_takedowns UInt32,
+			dragon_kills UInt32,
+			baron_kills UInt32,
+			objectives_stolen UInt32,
+			total_time_spent_dead UInt32,
+			time_played UInt32,
+			ingested_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(ingested_at)
+		ORDER BY (match_id, participant_id)
+	`, `
 		CREATE TABLE IF NOT EXISTS item_slot_analytics
 		(
 			patch LowCardinality(String),
@@ -209,6 +251,52 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 	for _, statement := range statements {
 		if _, err := r.db.ExecContext(ctx, statement); err != nil {
 			return err
+		}
+	}
+	return r.ensureParticipantPerformanceColumns(ctx)
+}
+
+func (r *Repository) ensureParticipantPerformanceColumns(ctx context.Context) error {
+	columns := []struct {
+		name     string
+		dataType string
+		after    string
+	}{
+		{"gold_earned", "UInt32", "assists"},
+		{"gold_spent", "UInt32", "gold_earned"},
+		{"total_minions_killed", "UInt32", "gold_spent"},
+		{"neutral_minions_killed", "UInt32", "total_minions_killed"},
+		{"total_damage_dealt_to_champions", "UInt32", "neutral_minions_killed"},
+		{"physical_damage_dealt_to_champions", "UInt32", "total_damage_dealt_to_champions"},
+		{"magic_damage_dealt_to_champions", "UInt32", "physical_damage_dealt_to_champions"},
+		{"true_damage_dealt_to_champions", "UInt32", "magic_damage_dealt_to_champions"},
+		{"total_damage_taken", "UInt32", "true_damage_dealt_to_champions"},
+		{"damage_self_mitigated", "UInt32", "total_damage_taken"},
+		{"damage_dealt_to_objectives", "UInt32", "damage_self_mitigated"},
+		{"damage_dealt_to_turrets", "UInt32", "damage_dealt_to_objectives"},
+		{"damage_dealt_to_buildings", "UInt32", "damage_dealt_to_turrets"},
+		{"vision_score", "UInt32", "damage_dealt_to_buildings"},
+		{"wards_placed", "UInt32", "vision_score"},
+		{"wards_killed", "UInt32", "wards_placed"},
+		{"detector_wards_placed", "UInt32", "wards_killed"},
+		{"time_ccing_others", "UInt32", "detector_wards_placed"},
+		{"total_heal", "UInt32", "time_ccing_others"},
+		{"total_heals_on_teammates", "UInt32", "total_heal"},
+		{"total_damage_shielded_on_teammates", "UInt32", "total_heals_on_teammates"},
+		{"turret_takedowns", "UInt32", "total_damage_shielded_on_teammates"},
+		{"inhibitor_takedowns", "UInt32", "turret_takedowns"},
+		{"dragon_kills", "UInt32", "inhibitor_takedowns"},
+		{"baron_kills", "UInt32", "dragon_kills"},
+		{"objectives_stolen", "UInt32", "baron_kills"},
+		{"total_time_spent_dead", "UInt32", "objectives_stolen"},
+		{"time_played", "UInt32", "total_time_spent_dead"},
+	}
+	for _, table := range []string{"participants", "participant_matchups"} {
+		for _, column := range columns {
+			statement := "ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS " + column.name + " " + column.dataType + " AFTER " + column.after
+			if _, err := r.db.ExecContext(ctx, statement); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

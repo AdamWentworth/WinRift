@@ -398,29 +398,50 @@ func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
 
 func championGuideSummaryResponse(row clickhouse.ChampionGuideSummary) map[string]any {
 	return map[string]any{
-		"championId":    row.ChampionID,
-		"role":          row.Role,
-		"patchBucket":   row.PatchBucket,
-		"rankBucket":    row.RankBucket,
-		"wins":          row.Wins,
-		"games":         row.Games,
-		"bans":          row.Bans,
-		"winRate":       round(row.WinRate * 100),
-		"confidence":    round(row.Confidence * 100),
-		"pickRate":      round(row.PickRate * 100),
-		"banRate":       round(row.BanRate * 100),
-		"avgKills":      round(row.AvgKills),
-		"avgDeaths":     round(row.AvgDeaths),
-		"avgAssists":    round(row.AvgAssists),
-		"kda":           round(row.KDA),
-		"tierScore":     round(row.TierScore),
-		"winScore":      round(row.WinScore),
-		"sampleScore":   round(row.SampleScore),
-		"pickScore":     round(row.PickScore),
-		"banScore":      round(row.BanScore),
-		"impactScore":   round(row.ImpactScore),
-		"roleRank":      row.RoleRank,
-		"roleRankTotal": row.RoleRankTotal,
+		"championId":                 row.ChampionID,
+		"role":                       row.Role,
+		"patchBucket":                row.PatchBucket,
+		"rankBucket":                 row.RankBucket,
+		"wins":                       row.Wins,
+		"games":                      row.Games,
+		"bans":                       row.Bans,
+		"winRate":                    round(row.WinRate * 100),
+		"confidence":                 round(row.Confidence * 100),
+		"pickRate":                   round(row.PickRate * 100),
+		"banRate":                    round(row.BanRate * 100),
+		"avgKills":                   round(row.AvgKills),
+		"avgDeaths":                  round(row.AvgDeaths),
+		"avgAssists":                 round(row.AvgAssists),
+		"kda":                        round(row.KDA),
+		"avgGoldEarned":              round(row.AvgGoldEarned),
+		"avgCs":                      round(row.AvgCS),
+		"avgDamageDealtToChampions":  round(row.AvgDamageDealtToChampions),
+		"avgDamageTaken":             round(row.AvgDamageTaken),
+		"avgDamageSelfMitigated":     round(row.AvgDamageSelfMitigated),
+		"avgDamageDealtToObjectives": round(row.AvgDamageDealtToObjectives),
+		"avgDamageDealtToStructures": round(row.AvgDamageDealtToStructures),
+		"avgVisionScore":             round(row.AvgVisionScore),
+		"avgTimeCcingOthers":         round(row.AvgTimeCCingOthers),
+		"avgTeamUtility":             round(row.AvgTeamUtility),
+		"avgStructureTakedowns":      round(row.AvgStructureTakedowns),
+		"avgObjectiveTakedowns":      round(row.AvgObjectiveTakedowns),
+		"avgTotalTimeSpentDead":      round(row.AvgTotalTimeSpentDead),
+		"avgTimePlayed":              round(row.AvgTimePlayed),
+		"killParticipation":          round(row.KillParticipation * 100),
+		"tierScore":                  round(row.TierScore),
+		"winScore":                   round(row.WinScore),
+		"sampleScore":                round(row.SampleScore),
+		"pickScore":                  round(row.PickScore),
+		"banScore":                   round(row.BanScore),
+		"impactScore":                round(row.ImpactScore),
+		"damageScore":                round(row.DamageScore),
+		"economyScore":               round(row.EconomyScore),
+		"visionScore":                round(row.VisionScore),
+		"objectiveScore":             round(row.ObjectiveScore),
+		"utilityScore":               round(row.UtilityScore),
+		"survivabilityScore":         round(row.SurvivabilityScore),
+		"roleRank":                   row.RoleRank,
+		"roleRankTotal":              row.RoleRankTotal,
 	}
 }
 
@@ -954,6 +975,14 @@ func (s Server) refreshChampionGuideAnalytics(w http.ResponseWriter, r *http.Req
 		startedAt := time.Now()
 		result := map[string]any{"patch": patch}
 		if body.Backfill {
+			log.Printf("participant performance backfill start patch=%s queue=%d", patch, queueID)
+			performanceBackfill, err := s.repo.BackfillParticipantPerformance(r.Context(), patch, queueID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			result["performanceRows"] = performanceBackfill.Rows
+			log.Printf("participant performance backfill complete patch=%s queue=%d rows=%d duration=%s", patch, queueID, performanceBackfill.Rows, time.Since(startedAt).Round(time.Millisecond))
 			log.Printf("champion guide event backfill start patch=%s queue=%d", patch, queueID)
 			backfill, err := s.repo.BackfillChampionGuideEvents(r.Context(), patch, queueID)
 			if err != nil {
