@@ -694,10 +694,10 @@ button {
   align-items: start;
   display: grid;
   gap: 10px;
-  grid-template-columns: 76px minmax(0, 1500px);
+  grid-template-columns: 112px minmax(0, 1500px);
   justify-content: center;
   margin: 0 auto;
-  max-width: 1586px;
+  max-width: 1622px;
 }
 
 .live-mode-content {
@@ -731,8 +731,8 @@ button {
   display: grid;
   gap: 6px;
   justify-items: center;
-  min-height: 76px;
-  padding: 8px 6px;
+  min-height: 84px;
+  padding: 9px 8px;
   text-align: center;
   transition: border-color 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease;
 }
@@ -771,7 +771,7 @@ button {
 .live-mode-button strong {
   font-size: 10px;
   font-weight: 900;
-  line-height: 1;
+  line-height: 1.05;
   text-transform: uppercase;
 }
 
