@@ -62,11 +62,11 @@ export function RoleIcon({ role: laneRole, title, className = '', ...props }: Ro
 function RoleGlyph({ role }: { role: RoleCode | '' }) {
   if (role === 'TOP') {
     return (
-      <>
-        <path d="M5 19V5h14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
-        <path d="M8 16 19 5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.45" opacity="0.65" />
-        <path d="M5 19h6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" opacity="0.55" />
-      </>
+      <g transform="scale(1.5)">
+        <path d="M0 0v14.75l2.828-2.829V2.828h9.094L14.75 0z" fill="currentColor" />
+        <path d="M16 16V1.25L13.172 4.08v9.093H4.078L1.25 16z" fill="currentColor" opacity="0.42" />
+        <path d="M10.133 5.867H5.867v4.266h4.266z" fill="currentColor" opacity="0.42" />
+      </g>
     );
   }
   if (role === 'JUNGLE') {
@@ -82,12 +82,11 @@ function RoleGlyph({ role }: { role: RoleCode | '' }) {
   }
   if (role === 'MIDDLE') {
     return (
-      <>
-        <path d="M5 19 19 5" stroke="currentColor" strokeLinecap="round" strokeWidth="2.2" />
-        <path d="m12 7.2 4.8 4.8-4.8 4.8L7.2 12 12 7.2Z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.7" opacity="0.72" />
-        <path d="M5 14v5h5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" opacity="0.5" />
-        <path d="M14 5h5v5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" opacity="0.5" />
-      </>
+      <g transform="scale(1.5)">
+        <path d="M0 16 16 0h-4L0 12z" fill="currentColor" />
+        <path d="M16 16 0 0h4l12 12z" fill="currentColor" opacity="0.28" />
+        <path d="M10.133 5.867H5.867v4.266h4.266z" fill="currentColor" opacity="0.62" />
+      </g>
     );
   }
   if (role === 'BOTTOM') {
