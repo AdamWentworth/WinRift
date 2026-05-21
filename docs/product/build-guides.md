@@ -20,6 +20,7 @@ The current version can show:
 
 Backend contracts:
 
+- `GET /api/analytics/build-advice`: unified build payload for one champion, optional opponent, role, patch, and rank scope. It returns matchup item slots, champion-wide baseline item slots, top build signatures, runes, spells, item paths, sample quality, and fallback notes in one response.
 - `GET /api/analytics/champion-guides`: index of champion summaries for the current role/patch/rank scope. This powers champion coverage and lets the UI expose every champion we have stored data for.
 - `GET /api/analytics/champion-guide`: focused champion guide payload for one champion and role.
 - `GET /api/analytics/item-slots`: slot-level item read model with matchup-aware fallback.
@@ -32,6 +33,7 @@ Known gaps:
 - Tier-list impact is still a correlation-heavy score. It now uses final participant performance fields, but those signals should be validated as the corpus grows. See `docs/product/tier-list-ranking.md`.
 - Item paths use timeline-derived first-three completed item signatures where available, then final inventory signatures for the completed build. Final inventory order is still Riot inventory order, not guaranteed purchase order.
 - Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin.
+- The build-advice endpoint is the preferred contract for future profile/live/champion build UI work. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.
 - Skill paths are real timeline-derived paths, but they are still aggregated by champion/role/rank/patch rather than matchup-specific skill paths.
 
 The build guide page should remain a reference surface. Live match mode can point users toward contextual matchup stats, while guide mode lets users explore champion-wide and matchup-specific patterns calmly before queueing.

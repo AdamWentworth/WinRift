@@ -121,13 +121,14 @@ The live page should not ask ClickHouse to replay timeline item history while a 
 
 Current direction:
 
-- The web app sends one batch request for all ten live build cards.
+- The preferred contract is `GET /api/analytics/build-advice`, which returns exact matchup slots, champion-wide baseline slots, top build signatures, runes, spells, item paths, sample quality labels, and fallback notes for one focused champion/opponent pair.
+- The web app can still use batch item-slot requests for older compact live panels, but new build surfaces should prefer the unified build-advice payload.
 - The API reads `item_slot_analytics` first.
 - The expensive timeline scan remains only as a safety fallback when the read model has not been populated yet.
 - The worker refreshes the current patch read model on startup and then on a short interval after collector sweeps. The default is ten minutes.
 - Manual refresh remains available after patch changes or backfills with `POST /api/dev/analytics/item-slots/refresh` locally, or `patchctl -action item-slots -patch <patch> -queue 420` in ops scripts.
 
-This keeps the player-facing response path simple: compact aggregate rows in, formatted build cards out.
+This keeps the player-facing response path simple: compact aggregate rows in, one formatted build-advice payload out.
 
 ### Causal Guardrails
 

@@ -146,6 +146,48 @@ export type AnalyticsItemSlotBatchResponse = {
   results: AnalyticsItemSlotBatchResult[];
 };
 
+export type BuildAdviceSample = {
+  maxGames: number;
+  optionCount: number;
+  fallbackUsed: boolean;
+  scopeLabels: string[];
+  sampleQuality: string;
+  sampleQualityLabel: string;
+};
+
+export type BuildAdviceSection = {
+  available?: boolean;
+  itemSlots: AnalyticsItemSlot[];
+  topBuilds: AnalyticsBuild[];
+  sample: BuildAdviceSample;
+  sampleMode: string;
+};
+
+export type BuildAdviceChampionSection = BuildAdviceSection & {
+  topRunes: ChampionGuideRune[];
+  topSpells: ChampionGuideSpells[];
+  topItemPaths: ChampionGuideItemPath[];
+  summary: ChampionGuideSummary;
+  strictRoleUsed: boolean;
+};
+
+export type BuildAdviceResponse = {
+  filters: {
+    championId: number;
+    role: string;
+    opponentChampionId: number;
+    patch: string;
+    rankBucket: string;
+    itemContext: string;
+    minGames: number;
+    championMinGames: number;
+    limit: number;
+  };
+  matchup: BuildAdviceSection;
+  champion: BuildAdviceChampionSection;
+  notes: string[];
+};
+
 export type ChampionGuideSummary = {
   championId: number;
   role: string;

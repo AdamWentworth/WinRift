@@ -109,3 +109,40 @@ func TestItemSlotFallbackScopesExpandWithoutDuplicates(t *testing.T) {
 		t.Fatalf("all champion filters = %+v, want patch and opponent dropped", got[3].Filters)
 	}
 }
+
+func TestItemSlotFallbackCompleteRequiresEverySlotToReachLimit(t *testing.T) {
+	covered := map[uint8]int{1: 2, 2: 2, 3: 2, 4: 2, 5: 2}
+	if itemSlotFallbackComplete(covered, 2) {
+		t.Fatal("fallback should not be complete without slot 6")
+	}
+	covered[6] = 1
+	if itemSlotFallbackComplete(covered, 2) {
+		t.Fatal("fallback should not be complete until slot 6 reaches the requested option limit")
+	}
+	covered[6] = 2
+	if !itemSlotFallbackComplete(covered, 2) {
+		t.Fatal("fallback should be complete when all six slots reach the requested option limit")
+	}
+}
+
+func TestBuildAdviceSampleQualityLabels(t *testing.T) {
+	cases := []struct {
+		games int
+		key   string
+		label string
+	}{
+		{0, "none", "No sample"},
+		{3, "tiny", "Tiny sample"},
+		{10, "early", "Early sample"},
+		{30, "moderate", "Moderate sample"},
+		{100, "strong", "Strong sample"},
+	}
+	for _, tc := range cases {
+		if got := buildAdviceSampleQuality(tc.games); got != tc.key {
+			t.Fatalf("quality(%d) = %q, want %q", tc.games, got, tc.key)
+		}
+		if got := buildAdviceSampleQualityLabel(tc.games); got != tc.label {
+			t.Fatalf("quality label(%d) = %q, want %q", tc.games, got, tc.label)
+		}
+	}
+}

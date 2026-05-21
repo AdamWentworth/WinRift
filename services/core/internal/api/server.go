@@ -48,6 +48,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/summoner/profile", s.summonerProfile)
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
+	mux.HandleFunc("GET /api/analytics/build-advice", s.analyticsBuildAdvice)
 	mux.HandleFunc("GET /api/analytics/champion-guides", s.analyticsChampionGuideIndex)
 	mux.HandleFunc("GET /api/analytics/champion-guide", s.analyticsChampionGuide)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
@@ -273,17 +274,125 @@ func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	results := make([]map[string]any, 0, len(rows))
-	for _, row := range rows {
-		results = append(results, map[string]any{
-			"championId": row.ChampionID, "role": row.Role, "opponentChampionId": row.OpponentChampionID,
-			"patchBucket": row.PatchBucket, "rankBucket": row.RankBucket,
-			"finalItemsSignature": row.FinalItemsSignature, "core2Signature": row.Core2Signature, "core3Signature": row.Core3Signature,
-			"runeSignature": row.RuneSignature, "spellSignature": row.SpellSignature,
-			"wins": row.Wins, "games": row.Games, "winRate": round(row.WinRate * 100), "confidence": round(row.Confidence * 100),
-		})
+	writeJSON(w, http.StatusOK, map[string]any{"results": buildRowsResponse(rows)})
+}
+
+func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	championID := uint16(queryInt(query.Get("championId"), 0))
+	if championID == 0 {
+		writeError(w, http.StatusBadRequest, "championId is required")
+		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+	role := strings.ToUpper(query.Get("role"))
+	opponentChampionID := uint16(queryInt(query.Get("opponentChampionId"), 0))
+	patch := strings.TrimSpace(query.Get("patch"))
+	rankBucket := strings.ToUpper(query.Get("rankBucket"))
+	minGames := queryInt(query.Get("minGames"), defaultItemSlotMinGames)
+	if minGames <= 0 {
+		minGames = defaultItemSlotMinGames
+	}
+	championMinGames := queryInt(query.Get("championMinGames"), max(minGames, 10))
+	optionLimit := queryInt(query.Get("limit"), 4)
+	if optionLimit <= 0 {
+		optionLimit = 4
+	}
+	if optionLimit > 12 {
+		optionLimit = 12
+	}
+	itemContext := normalizedItemContext(strings.ToUpper(query.Get("itemContext")), role)
+	matchupRequest := itemSlotAnalyticsRequest{
+		Key:                "matchup",
+		ChampionID:         championID,
+		Role:               role,
+		ItemContext:        itemContext,
+		OpponentChampionID: opponentChampionID,
+		Patch:              patch,
+		RankBucket:         rankBucket,
+		MinGames:           minGames,
+		Limit:              optionLimit,
+		Fallback:           true,
+	}
+	championRequest := matchupRequest
+	championRequest.Key = "champion"
+	championRequest.OpponentChampionID = 0
+	championRequest.MinGames = championMinGames
+
+	matchupSlots := []scopedItemSlotRow{}
+	var err error
+	if opponentChampionID > 0 {
+		matchupSlots, err = s.queryScopedItemSlots(r.Context(), matchupRequest)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	championSlots, err := s.queryScopedItemSlots(r.Context(), championRequest)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	buildFilters := map[string]string{
+		"champion_id":          strconv.Itoa(int(championID)),
+		"role":                 role,
+		"opponent_champion_id": "",
+		"patch":                patch,
+		"rank_bucket":          rankBucket,
+	}
+	matchupBuilds := []clickhouse.BuildRow{}
+	if opponentChampionID > 0 {
+		buildFilters["opponent_champion_id"] = strconv.Itoa(int(opponentChampionID))
+		matchupBuilds, err = s.repo.QueryBuilds(r.Context(), buildFilters, minGames, 8)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	championFilters := cloneStringMap(buildFilters)
+	championFilters["opponent_champion_id"] = ""
+	championBuilds, err := s.repo.QueryBuilds(r.Context(), championFilters, championMinGames, 8)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	guide, err := s.repo.QueryChampionGuide(r.Context(), championFilters, championMinGames, 8)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	notes := buildAdviceNotes(opponentChampionID > 0, matchupSlots, championSlots)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"filters": map[string]any{
+			"championId":         championID,
+			"role":               role,
+			"opponentChampionId": opponentChampionID,
+			"patch":              patch,
+			"rankBucket":         rankBucket,
+			"itemContext":        itemContext,
+			"minGames":           minGames,
+			"championMinGames":   championMinGames,
+			"limit":              optionLimit,
+		},
+		"matchup": map[string]any{
+			"available":  opponentChampionID > 0,
+			"itemSlots":  itemSlotRowsResponse(matchupSlots),
+			"topBuilds":  buildRowsResponse(matchupBuilds),
+			"sample":     buildAdviceSampleResponse(matchupSlots),
+			"sampleMode": "champion_matchup",
+		},
+		"champion": map[string]any{
+			"itemSlots":      itemSlotRowsResponse(championSlots),
+			"topBuilds":      buildRowsResponse(championBuilds),
+			"topRunes":       championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
+			"topSpells":      championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
+			"topItemPaths":   championGuideItemPathRowsResponse(guide.TopItemPaths),
+			"summary":        championGuideSummaryResponse(guide.Summary),
+			"sample":         buildAdviceSampleResponse(championSlots),
+			"sampleMode":     "champion_overall",
+			"strictRoleUsed": role != "",
+		},
+		"notes": notes,
+	})
 }
 
 func (s Server) analyticsChampionGuideIndex(w http.ResponseWriter, r *http.Request) {
@@ -447,6 +556,107 @@ func itemSlotRowsResponse(scopedRows []scopedItemSlotRow) []map[string]any {
 	return results
 }
 
+func buildRowsResponse(rows []clickhouse.BuildRow) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"championId":           row.ChampionID,
+			"role":                 row.Role,
+			"opponentChampionId":   row.OpponentChampionID,
+			"patchBucket":          row.PatchBucket,
+			"rankBucket":           row.RankBucket,
+			"finalItemsSignature":  row.FinalItemsSignature,
+			"core2Signature":       row.Core2Signature,
+			"core3Signature":       row.Core3Signature,
+			"runeSignature":        row.RuneSignature,
+			"spellSignature":       row.SpellSignature,
+			"wins":                 row.Wins,
+			"games":                row.Games,
+			"winRate":              round(row.WinRate * 100),
+			"confidence":           round(row.Confidence * 100),
+			"sampleQuality":        buildAdviceSampleQuality(row.Games),
+			"sampleQualityLabel":   buildAdviceSampleQualityLabel(row.Games),
+			"confidencePercentage": round(row.Confidence * 100),
+		})
+	}
+	return results
+}
+
+func buildAdviceSampleResponse(rows []scopedItemSlotRow) map[string]any {
+	maxGames := 0
+	optionCount := len(rows)
+	fallback := false
+	scopeLabels := []string{}
+	seenLabels := map[string]bool{}
+	for _, scoped := range rows {
+		if scoped.Row.Games > maxGames {
+			maxGames = scoped.Row.Games
+		}
+		if scoped.Scope.Fallback {
+			fallback = true
+		}
+		if scoped.Scope.Label != "" && !seenLabels[scoped.Scope.Label] {
+			seenLabels[scoped.Scope.Label] = true
+			scopeLabels = append(scopeLabels, scoped.Scope.Label)
+		}
+	}
+	return map[string]any{
+		"maxGames":           maxGames,
+		"optionCount":        optionCount,
+		"fallbackUsed":       fallback,
+		"scopeLabels":        scopeLabels,
+		"sampleQuality":      buildAdviceSampleQuality(maxGames),
+		"sampleQualityLabel": buildAdviceSampleQualityLabel(maxGames),
+	}
+}
+
+func buildAdviceSampleQuality(games int) string {
+	switch {
+	case games >= 100:
+		return "strong"
+	case games >= 30:
+		return "moderate"
+	case games >= 10:
+		return "early"
+	case games > 0:
+		return "tiny"
+	default:
+		return "none"
+	}
+}
+
+func buildAdviceSampleQualityLabel(games int) string {
+	switch buildAdviceSampleQuality(games) {
+	case "strong":
+		return "Strong sample"
+	case "moderate":
+		return "Moderate sample"
+	case "early":
+		return "Early sample"
+	case "tiny":
+		return "Tiny sample"
+	default:
+		return "No sample"
+	}
+}
+
+func buildAdviceNotes(hasOpponent bool, matchupSlots, championSlots []scopedItemSlotRow) []string {
+	notes := []string{}
+	if hasOpponent && len(matchupSlots) == 0 {
+		notes = append(notes, "No matchup-specific build sample met the requested threshold yet.")
+	}
+	if hasOpponent && buildAdviceSampleResponse(matchupSlots)["fallbackUsed"] == true {
+		notes = append(notes, "Some matchup slots use broader fallback data where exact samples are thin.")
+	}
+	if len(championSlots) == 0 {
+		notes = append(notes, "No champion-wide build sample met the requested threshold yet.")
+	}
+	if len(notes) == 0 {
+		notes = append(notes, "Build advice is compiled from stored ranked Solo/Duo games and refreshed summary tables.")
+	}
+	return notes
+}
+
 func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
 	return map[string]any{
 		"summary":          championGuideSummaryResponse(guide.Summary),
@@ -588,24 +798,36 @@ type scopedItemSlotRow struct {
 func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, itemContext string, buildItemIDs []uint32, minGames, limit int) ([]scopedItemSlotRow, error) {
 	scopes := itemSlotFallbackScopes(filters)
 	out := []scopedItemSlotRow{}
-	coveredSlots := map[uint8]bool{}
+	coveredSlots := map[uint8]int{}
 	for _, scope := range scopes {
 		rows, err := s.repo.QueryItemSlots(ctx, scope.Filters, itemContext, buildItemIDs, minGames, limit)
 		if err != nil {
 			return nil, err
 		}
 		for _, row := range rows {
-			if coveredSlots[row.ItemSlot] {
+			if coveredSlots[row.ItemSlot] >= limit {
 				continue
 			}
 			out = append(out, scopedItemSlotRow{Row: row, Scope: scope})
-			coveredSlots[row.ItemSlot] = true
-			if len(coveredSlots) >= 6 {
+			coveredSlots[row.ItemSlot]++
+			if itemSlotFallbackComplete(coveredSlots, limit) {
 				return out, nil
 			}
 		}
 	}
 	return out, nil
+}
+
+func itemSlotFallbackComplete(coveredSlots map[uint8]int, limit int) bool {
+	if limit <= 0 {
+		limit = 1
+	}
+	for slot := uint8(1); slot <= 6; slot++ {
+		if coveredSlots[slot] < limit {
+			return false
+		}
+	}
+	return true
 }
 
 func normalizedItemContext(itemContext, role string) string {
