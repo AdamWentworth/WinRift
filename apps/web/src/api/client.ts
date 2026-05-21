@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerProfile, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -115,6 +115,11 @@ export function resolveAccountAlias(gameName: string, platform: string) {
 export function searchAccountAliases(gameName: string, platform: string, limit = 6) {
   const params = new URLSearchParams({ gameName, platform, limit: String(limit) });
   return request<AccountAliasSearchResponse>(`/api/account/aliases?${params.toString()}`);
+}
+
+export function getSummonerProfile(gameName: string, tagLine: string, platform: string) {
+  const params = new URLSearchParams({ gameName, tagLine, platform });
+  return request<SummonerProfile>(`/api/summoner/profile?${params.toString()}`);
 }
 
 export function getLiveGame(gameName: string, tagLine: string, platform: string) {

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getItemSlotsBatch, getLiveGame, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getItemSlotsBatch, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 vi.mock('./api/client', () => ({
@@ -51,6 +51,12 @@ vi.mock('./api/client', () => ({
   getRunes: vi.fn(async () => ({ version: 'test', data: [] })),
   getSummonerSpells: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
   getLiveGame: vi.fn(),
+  getSummonerProfile: vi.fn(async () => ({
+    account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Test Summoner', tagLine: 'NA1' },
+    summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0, avgKills: 0, avgDeaths: 0, avgAssists: 0, kda: 0, winRate: 0 },
+    topChampions: [],
+    recentMatches: [],
+  })),
   resolveAccountAlias: vi.fn(async () => ({ status: 'not_found' })),
   searchAccountAliases: vi.fn(async () => ({ matches: [] })),
 }));
@@ -60,6 +66,7 @@ describe('App', () => {
     cleanup();
     window.history.replaceState({}, '', '/');
     vi.mocked(getLiveGame).mockReset();
+    vi.mocked(getSummonerProfile).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
     vi.mocked(getChampionGuide).mockReset();
     vi.mocked(getChampionGuideIndex).mockReset();
@@ -84,6 +91,12 @@ describe('App', () => {
     });
     vi.mocked(getItemSlotsBatch).mockResolvedValue({ results: [] });
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
+    vi.mocked(getSummonerProfile).mockResolvedValue({
+      account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Test Summoner', tagLine: 'NA1' },
+      summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0, avgKills: 0, avgDeaths: 0, avgAssists: 0, kda: 0, winRate: 0 },
+      topChampions: [],
+      recentMatches: [],
+    });
     vi.mocked(resolveAccountAlias).mockResolvedValue({ status: 'not_found' });
     vi.mocked(searchAccountAliases).mockResolvedValue({ matches: [] });
   });

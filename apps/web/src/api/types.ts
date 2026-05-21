@@ -392,6 +392,24 @@ export type AccountAliasMatch = {
   tagLine: string;
 };
 
+export type SummonerProfileSummary = {
+  puuid: string;
+  platform: string;
+  queueId: number;
+  games: number;
+  wins: number;
+  losses: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  kda: number;
+  winRate: number;
+  lastSeen?: string;
+};
+
 export type RankedRecord = {
   queueType: string;
   tier: string;
@@ -422,6 +440,29 @@ export type ChampionRecord = {
   avgAssists: number;
   kda: number;
   winRate: number;
+};
+
+export type SummonerRecentMatch = {
+  matchId: string;
+  platform: string;
+  patch: string;
+  queueId: number;
+  championId: number;
+  role: string;
+  win: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  gameStartTimestamp: number;
+  durationSeconds: number;
+};
+
+export type SummonerProfile = {
+  account: AccountAliasMatch;
+  rank?: RankedRecord;
+  summary: SummonerProfileSummary;
+  topChampions: ChampionRecord[];
+  recentMatches: SummonerRecentMatch[];
 };
 
 export type LiveParticipant = {

@@ -44,6 +44,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/account/resolve", s.resolveAccount)
 	mux.HandleFunc("GET /api/account/alias", s.accountAlias)
 	mux.HandleFunc("GET /api/account/aliases", s.accountAliases)
+	mux.HandleFunc("GET /api/summoner/profile", s.summonerProfile)
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
 	mux.HandleFunc("GET /api/analytics/champion-guides", s.analyticsChampionGuideIndex)
@@ -154,6 +155,56 @@ func (s Server) accountAliases(w http.ResponseWriter, r *http.Request) {
 		matches = append(matches, accountAliasResponse(alias))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"matches": matches})
+}
+
+func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	gameName := strings.TrimSpace(query.Get("gameName"))
+	tagLine := strings.TrimSpace(query.Get("tagLine"))
+	platform := s.defaultPlatform(query.Get("platform"))
+	if gameName == "" || tagLine == "" {
+		writeError(w, http.StatusBadRequest, "gameName and tagLine are required")
+		return
+	}
+	alias, err := s.repo.FindAccountAlias(r.Context(), platform, gameName, tagLine)
+	if err != nil {
+		if clickhouse.IsNoRows(err) {
+			writeError(w, http.StatusNotFound, "Summoner profile not found in stored aliases")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	queueID := uint16(analytics.RankedSoloQueueID)
+	stats, err := s.repo.SummonerProfileStats(r.Context(), alias.Platform, alias.PUUID, queueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	topChampions, err := s.repo.SummonerTopChampions(r.Context(), alias.Platform, alias.PUUID, queueID, 8)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	recentMatches, err := s.repo.SummonerRecentMatches(r.Context(), alias.Platform, alias.PUUID, queueID, 10)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response := map[string]any{
+		"account":       accountAliasResponse(alias),
+		"summary":       summonerProfileStatsResponse(stats),
+		"topChampions":  championPerformanceRowsResponse(topChampions),
+		"recentMatches": summonerRecentMatchesResponse(recentMatches),
+	}
+	rank, err := s.repo.LatestRankSnapshot(r.Context(), alias.Platform, alias.PUUID, "RANKED_SOLO_5x5")
+	if err == nil {
+		response["rank"] = rankSnapshotResponse(rank)
+	} else if !clickhouse.IsNoRows(err) {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s Server) liveGame(w http.ResponseWriter, r *http.Request) {
@@ -1426,6 +1477,55 @@ func championPerformanceResponse(performance clickhouse.ChampionPerformance) map
 		"kda":        round(performance.KDA),
 		"winRate":    round(performance.WinRate * 100),
 	}
+}
+
+func championPerformanceRowsResponse(rows []clickhouse.ChampionPerformance) []map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, championPerformanceResponse(row))
+	}
+	return out
+}
+
+func summonerProfileStatsResponse(stats clickhouse.SummonerProfileStats) map[string]any {
+	return map[string]any{
+		"puuid":      stats.PUUID,
+		"platform":   stats.Platform,
+		"queueId":    stats.QueueID,
+		"games":      stats.Games,
+		"wins":       stats.Wins,
+		"losses":     stats.Losses,
+		"kills":      stats.Kills,
+		"deaths":     stats.Deaths,
+		"assists":    stats.Assists,
+		"avgKills":   round(stats.AvgKills),
+		"avgDeaths":  round(stats.AvgDeaths),
+		"avgAssists": round(stats.AvgAssists),
+		"kda":        round(stats.KDA),
+		"winRate":    round(stats.WinRate * 100),
+		"lastSeen":   stats.LastSeen,
+	}
+}
+
+func summonerRecentMatchesResponse(rows []clickhouse.SummonerRecentMatch) []map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, map[string]any{
+			"matchId":            row.MatchID,
+			"platform":           row.Platform,
+			"patch":              row.Patch,
+			"queueId":            row.QueueID,
+			"championId":         row.ChampionID,
+			"role":               row.Role,
+			"win":                row.Win,
+			"kills":              row.Kills,
+			"deaths":             row.Deaths,
+			"assists":            row.Assists,
+			"gameStartTimestamp": row.GameStartTimestamp,
+			"durationSeconds":    row.DurationSeconds,
+		})
+	}
+	return out
 }
 
 func intFromAny(value any) int {

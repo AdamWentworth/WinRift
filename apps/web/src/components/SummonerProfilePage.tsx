@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CircleAlert, LoaderCircle, RadioTower } from 'lucide-react';
-import { getLiveGame, resolveAccountAlias } from '../api/client';
-import type { AccountAliasMatch, ChampionData, ItemData, RuneData, SummonerSpellData } from '../api/types';
+import { CircleAlert, History, LoaderCircle, RadioTower, Shield, Trophy } from 'lucide-react';
+import { getLiveGame, getSummonerProfile, resolveAccountAlias } from '../api/client';
+import type { AccountAliasMatch, ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
+import { championByKey, championImageUrl, rankIconUrl, rankLabel } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
+import { RoleIcon, roleLabel } from '../lib/roles';
 
 type Props = {
   platform?: string;
@@ -55,6 +57,13 @@ export function SummonerProfilePage({
     enabled: Boolean(resolvedGameName && resolvedTagLine),
     retry: false,
     staleTime: 15_000,
+  });
+  const profileQuery = useQuery({
+    queryKey: ['summoner-profile-stored', resolvedPlatform, resolvedGameName, resolvedTagLine],
+    queryFn: () => getSummonerProfile(resolvedGameName!, resolvedTagLine!, resolvedPlatform),
+    enabled: Boolean(resolvedGameName && resolvedTagLine && !liveQuery.isFetching && !liveQuery.data),
+    retry: false,
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -144,14 +153,142 @@ export function SummonerProfilePage({
           />
         ) : null}
 
+        {profileQuery.isLoading ? (
+          <ProfileMessage
+            icon={<LoaderCircle size={17} className="spin-icon" />}
+            title="Loading stored profile"
+            body={`Checking collected ranked Solo/Duo data for ${exactRiotId}.`}
+          />
+        ) : null}
+
+        {profileQuery.data ? (
+          <StoredProfile profile={profileQuery.data} champions={champions} />
+        ) : null}
+
+        {profileQuery.error ? (
+          <ProfileMessage
+            icon={<CircleAlert size={17} />}
+            title="No stored profile yet"
+            body="I can check live status for this Riot ID, but I do not have enough stored match data tied to this alias yet. The collector will fill this in when it reaches their matches."
+          />
+        ) : null}
+
         {gameName ? (
           <div className="profile-next-panel">
-            <span>Coming Next</span>
-            <p>This page is the natural home for saved ranked record, champion history, and recent-match summaries. For now it acts as the clean landing point before jumping into live match analysis.</p>
+            <span>Profile Scope</span>
+            <p>These stats come from WinRift's stored ranked Solo/Duo matches and cached rank snapshots. Live-game lookup still jumps into the match room when the player is currently in game.</p>
           </div>
         ) : null}
       </div>
     </section>
+  );
+}
+
+function StoredProfile({ profile, champions }: { profile: SummonerProfile; champions?: ChampionData }) {
+  const rank = profile.rank;
+  const summary = profile.summary;
+  return (
+    <div className="profile-data-grid">
+      <section className="profile-panel profile-rank-panel">
+        <PanelHeading icon={<Shield size={16} />} title="Ranked Solo/Duo" />
+        <div className="profile-rank-read">
+          <img src={rankIconUrl(rank)} alt={rank ? rankLabel(rank) : 'Rank unavailable'} />
+          <div>
+            <strong>{rank ? rankLabel(rank) : 'Rank Unknown'}</strong>
+            <span>{rank ? `${rank.leaguePoints} LP · ${formatNumber(rank.totalGames)} ranked games` : 'No cached rank snapshot yet'}</span>
+          </div>
+        </div>
+        {rank ? (
+          <div className="profile-metric-row">
+            <ProfileMetric label="Winrate" value={`${rank.winRate.toFixed(1)}%`} />
+            <ProfileMetric label="Wins" value={formatNumber(rank.wins)} />
+            <ProfileMetric label="Losses" value={formatNumber(rank.losses)} />
+          </div>
+        ) : null}
+      </section>
+
+      <section className="profile-panel">
+        <PanelHeading icon={<Trophy size={16} />} title="Stored Match Form" />
+        <div className="profile-metric-row">
+          <ProfileMetric label="Games" value={formatNumber(summary.games)} />
+          <ProfileMetric label="Winrate" value={`${summary.winRate.toFixed(1)}%`} />
+          <ProfileMetric label="KDA" value={summary.kda ? summary.kda.toFixed(2) : '--'} />
+        </div>
+        <div className="profile-kda-line">
+          {summary.avgKills.toFixed(1)} / {summary.avgDeaths.toFixed(1)} / {summary.avgAssists.toFixed(1)} average across collected ranked games
+        </div>
+      </section>
+
+      <section className="profile-panel profile-wide-panel">
+        <PanelHeading icon={<Trophy size={16} />} title="Champion Comfort" />
+        {profile.topChampions.length ? (
+          <div className="profile-champion-list">
+            {profile.topChampions.map((record) => (
+              <ChampionComfortRow key={record.championId} record={record} champions={champions} />
+            ))}
+          </div>
+        ) : (
+          <p className="profile-empty-text">No stored champion games for this profile yet.</p>
+        )}
+      </section>
+
+      <section className="profile-panel profile-wide-panel">
+        <PanelHeading icon={<History size={16} />} title="Recent Stored Matches" />
+        {profile.recentMatches.length ? (
+          <div className="profile-match-list">
+            {profile.recentMatches.map((match) => (
+              <RecentMatchRow key={`${match.matchId}:${match.championId}`} match={match} champions={champions} />
+            ))}
+          </div>
+        ) : (
+          <p className="profile-empty-text">Recent matches will appear once stored games are attached to this alias.</p>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function PanelHeading({ icon, title }: { icon: ReactNode; title: string }) {
+  return (
+    <div className="profile-panel-heading">
+      {icon}
+      <span>{title}</span>
+    </div>
+  );
+}
+
+function ProfileMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="profile-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ChampionComfortRow({ record, champions }: { record: ChampionRecord; champions?: ChampionData }) {
+  const champion = championByKey(champions, record.championId);
+  return (
+    <div className="profile-champion-row">
+      <img src={championImageUrl(champions, record.championId)} alt={champion?.name ?? String(record.championId)} />
+      <div>
+        <strong>{champion?.name ?? `Champion ${record.championId}`}</strong>
+        <span>{formatNumber(record.games)} games · {record.winRate.toFixed(1)}% WR · {record.kda.toFixed(2)} KDA</span>
+      </div>
+    </div>
+  );
+}
+
+function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; champions?: ChampionData }) {
+  const champion = championByKey(champions, match.championId);
+  return (
+    <div className={`profile-match-row ${match.win ? 'win' : 'loss'}`}>
+      <img src={championImageUrl(champions, match.championId)} alt={champion?.name ?? String(match.championId)} />
+      <div>
+        <strong>{match.win ? 'Win' : 'Loss'} · {champion?.name ?? `Champion ${match.championId}`}</strong>
+        <span><RoleIcon role={match.role} /> {roleLabel(match.role)} · {match.kills}/{match.deaths}/{match.assists} · Patch {match.patch}</span>
+      </div>
+    </div>
   );
 }
 
@@ -173,4 +310,8 @@ function profileLiveError(riotId: string, message: string) {
     return `Summoner '${riotId.trim()}' is not currently in a live match`;
   }
   return message;
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('en-US').format(value);
 }
