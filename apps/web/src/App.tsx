@@ -21,6 +21,7 @@ type AppRoute =
 
 export function App() {
   const [route, setRoute] = useState<AppRoute>(() => readRoute());
+  const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
   const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions });
   const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: Infinity });
   const items = useQuery({ queryKey: ['items'], queryFn: getItems });
@@ -51,7 +52,14 @@ export function App() {
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
+  const backgroundChampionScopeIds = route.kind === 'summoner' ? summonerBackgroundChampionIds : undefined;
   const appShellClassName = appShellClass(route);
+
+  useEffect(() => {
+    if (route.kind !== 'summoner') {
+      setSummonerBackgroundChampionIds([]);
+    }
+  }, [route.kind]);
 
   return (
     <main className={appShellClassName}>
@@ -59,6 +67,7 @@ export function App() {
         champions={champions.data}
         championSplashes={championSplashes.data}
         championScopeId={backgroundChampionScopeId}
+        championScopeIds={backgroundChampionScopeIds}
       />
       <header className="topbar">
         <div className="topbar-brand">
@@ -124,6 +133,7 @@ export function App() {
           runes={runes.data}
           onUseAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine })}
           onResolvedAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine }, { replace: true })}
+          onBackgroundChampionScopeChange={setSummonerBackgroundChampionIds}
         />
       ) : (
         <LiveMatchPanel

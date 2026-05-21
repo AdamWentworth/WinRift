@@ -567,6 +567,49 @@ button {
   white-space: nowrap;
 }
 
+.profile-freshness-banner {
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 0 0, rgb(140 236 255 / 12%), transparent 56%),
+    linear-gradient(90deg, rgb(0 0 0 / 34%), rgb(0 0 0 / 16%));
+  border: 1px solid rgb(255 255 255 / 10%);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.profile-freshness-banner.fresh {
+  border-color: rgb(140 236 255 / 30%);
+}
+
+.profile-freshness-banner.recent {
+  border-color: rgb(211 198 120 / 28%);
+}
+
+.profile-freshness-banner.stale,
+.profile-freshness-banner.empty {
+  border-color: rgb(255 128 139 / 26%);
+}
+
+.profile-freshness-banner span {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.profile-freshness-banner p {
+  color: #c7dce2;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 0;
+  min-width: 0;
+}
+
 .profile-section-tabs {
   background: rgb(0 0 0 / 24%);
   border: 1px solid rgb(130 215 255 / 16%);
@@ -647,6 +690,48 @@ button {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+}
+
+.profile-tab-controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.profile-tab-search {
+  align-items: center;
+  background: rgb(0 0 0 / 24%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  display: flex;
+  gap: 7px;
+  min-height: 28px;
+  min-width: 180px;
+  padding: 4px 8px;
+}
+
+.profile-tab-search span {
+  color: #8fbfca;
+  font-size: 9px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.profile-tab-search input {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  min-width: 0;
+  outline: none;
+  width: 120px;
+}
+
+.profile-tab-search input::placeholder {
+  color: #6f8f98;
 }
 
 .profile-tab-actions button,
@@ -900,6 +985,31 @@ button {
   font-weight: 1000;
 }
 
+.profile-empty-state {
+  background:
+    radial-gradient(ellipse at 0 0, rgb(130 215 255 / 10%), transparent 52%),
+    rgb(0 0 0 / 22%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  color: #c7dce2;
+  padding: 14px;
+}
+
+.profile-empty-state strong {
+  color: #fff;
+  display: block;
+  font-size: 13px;
+  font-weight: 1000;
+  margin-bottom: 5px;
+}
+
+.profile-empty-state span {
+  color: #bdd2d8;
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 .profile-champion-list,
 .profile-match-list,
 .profile-build-list {
@@ -931,6 +1041,10 @@ button {
 
 .profile-build-row {
   grid-template-columns: minmax(160px, 0.8fr) minmax(250px, 1.4fr) minmax(190px, 0.8fr) minmax(210px, 0.7fr);
+}
+
+.profile-match-row {
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(210px, 0.7fr);
 }
 
 .profile-build-identity {
@@ -1038,11 +1152,38 @@ button {
   border-left: 3px solid #ff858e;
 }
 
-.profile-match-row span {
+.profile-match-result-badge {
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #fff;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 1000;
+  justify-content: center;
+  min-width: 44px;
+  padding: 5px 7px;
+  text-transform: uppercase;
+}
+
+.profile-match-result-badge.win {
+  background: rgb(83 206 255 / 14%);
+  border-color: rgb(128 220 255 / 34%);
+  color: #9eeaff;
+}
+
+.profile-match-result-badge.loss {
+  background: rgb(255 101 112 / 14%);
+  border-color: rgb(255 133 142 / 34%);
+  color: #ffadb4;
+}
+
+.profile-match-row .profile-match-meta {
   align-items: center;
   display: flex;
   gap: 5px;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-match-row .role-icon {
@@ -5744,14 +5885,23 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .profile-tab-actions {
+  .profile-tab-actions,
+  .profile-tab-controls {
     justify-content: flex-start;
+  }
+
+  .profile-tab-search {
+    width: 100%;
   }
 
   .profile-champion-row,
   .profile-match-row,
   .profile-build-row {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-match-row > div:not(.profile-row-stats) {
+    grid-column: 1 / -1;
   }
 
   .profile-build-identity,
@@ -6132,6 +6282,14 @@ button {
   .profile-card-header em {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+
+  .profile-freshness-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-freshness-banner span {
+    white-space: normal;
   }
 
   .profile-row-stats {

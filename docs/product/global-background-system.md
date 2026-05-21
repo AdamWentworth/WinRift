@@ -36,14 +36,17 @@ Fallback order:
 
 ## Scoping Rules
 
-General pages use the full art pool:
+Broad pages use the full art pool:
 
 - Home
-- Summoner/profile/live pages
 - Champions index
 - Tier list
 
 Specific champion guide pages pass `championScopeId`. When that prop is set, the background pool is filtered to that champion's base splash and skins. If the skin manifest is unavailable, the component falls back to that champion's base splash.
+
+Summoner profile pages pass `championScopeIds` after the stored profile loads. That pool is built from recent stored matches first, then top champion comfort rows. The result is still atmospheric and dimmed, but it feels tied to the summoner rather than random global art.
+
+Live match pages currently keep the dense generic profile unless we later choose to scope them to live participants.
 
 This gives champion pages a stronger identity without needing separate page-specific background systems.
 

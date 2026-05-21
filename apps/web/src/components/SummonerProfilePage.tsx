@@ -49,6 +49,7 @@ type Props = {
   runes?: RuneData;
   onUseAlias: (alias: AccountAliasMatch) => void;
   onResolvedAlias?: (alias: AccountAliasMatch) => void;
+  onBackgroundChampionScopeChange?: (championIds: number[]) => void;
 };
 
 export function SummonerProfilePage({
@@ -61,6 +62,7 @@ export function SummonerProfilePage({
   runes,
   onUseAlias,
   onResolvedAlias,
+  onBackgroundChampionScopeChange,
 }: Props) {
   const [section, setSection] = useState<ProfileSection>('overview');
   const [liveViewDismissed, setLiveViewDismissed] = useState(false);
@@ -108,6 +110,20 @@ export function SummonerProfilePage({
       onResolvedAlias?.(foundAlias);
     }
   }, [foundAlias, onResolvedAlias]);
+
+  const profileBackgroundChampionIds = useMemo(() => (
+    profileQuery.data ? profileBackgroundChampionPool(profileQuery.data) : []
+  ), [profileQuery.data]);
+
+  useEffect(() => {
+    onBackgroundChampionScopeChange?.([]);
+  }, [onBackgroundChampionScopeChange, resolvedPlatform, resolvedGameName, resolvedTagLine]);
+
+  useEffect(() => {
+    if (profileBackgroundChampionIds.length) {
+      onBackgroundChampionScopeChange?.(profileBackgroundChampionIds);
+    }
+  }, [onBackgroundChampionScopeChange, profileBackgroundChampionIds]);
 
   if (liveQuery.data && !liveViewDismissed) {
     return (
@@ -286,14 +302,17 @@ function StoredProfile({
   const rank = profile.rank;
   const summary = profile.summary;
   const bestChampion = profile.topChampions[0];
+  const freshness = profileFreshness(summary);
   return (
     <div className="profile-data-stack">
       <div className="profile-snapshot-strip">
         <ProfileSnapshot icon={<Shield size={16} />} label="Solo/Duo" value={rank ? rankLabel(rank) : 'Rank Unknown'} detail={rank ? `${rank.leaguePoints} LP · ${rank.winRate.toFixed(1)}% WR` : 'No cached rank snapshot'} />
         <ProfileSnapshot icon={<Trophy size={16} />} label="Stored Form" value={`${summary.winRate.toFixed(1)}% WR`} detail={`${formatNumber(summary.games)} games · ${summary.kda ? summary.kda.toFixed(2) : '--'} KDA`} />
         <ProfileSnapshot icon={<Trophy size={16} />} label="Main Champion" value={bestChampion ? championName(champions, bestChampion.championId) : 'No Sample'} detail={bestChampion ? `${formatNumber(bestChampion.games)} games · ${bestChampion.winRate.toFixed(1)}% WR` : 'Collector has not reached champion history'} />
-        <ProfileSnapshot icon={<CalendarDays size={16} />} label="Last Stored" value={formatProfileDate(summary.lastSeen)} detail={`${formatProfileDate(summary.firstSeen)} first seen`} />
+        <ProfileSnapshot icon={<CalendarDays size={16} />} label="Last Stored" value={formatProfileDate(summary.lastSeen)} detail={freshness.snapshotDetail} />
       </div>
+
+      <ProfileFreshnessBanner freshness={freshness} />
 
       <div className="profile-section-tabs" aria-label="Summoner profile sections">
         {profileSections.map((candidate) => (
@@ -395,7 +414,7 @@ function ChampionHighlights({ champions, records }: { champions?: ChampionData; 
           })}
         </div>
       ) : (
-        <p className="profile-empty-text">Champion highlights will appear once stored games are attached to this alias.</p>
+        <ProfileEmptyState title="No champion highlights yet" body="Champion highlights will appear once stored games are attached to this alias." />
       )}
     </section>
   );
@@ -403,21 +422,29 @@ function ChampionHighlights({ champions, records }: { champions?: ChampionData; 
 
 function ChampionPoolTab({ champions, records }: { champions?: ChampionData; records: ChampionRecord[] }) {
   const [sort, setSort] = useState<ChampionSort>('games');
-  const sortedRecords = useMemo(() => sortChampionRecords(records, sort, champions), [champions, records, sort]);
-  const bestWinrate = sortedByWinRate(records)[0];
+  const [query, setQuery] = useState('');
+  const filteredRecords = useMemo(() => filterChampionRecords(records, query, champions), [champions, query, records]);
+  const sortedRecords = useMemo(() => sortChampionRecords(filteredRecords, sort, champions), [champions, filteredRecords, sort]);
+  const bestWinrate = sortedByWinRate(filteredRecords)[0];
   return (
     <section className="profile-panel profile-wide-panel profile-tab-panel">
       <div className="profile-tab-header">
         <PanelHeading icon={<Trophy size={16} />} title="Champion Pool" />
-        <div className="profile-tab-actions" aria-label="Champion pool sorting">
-          <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
-          <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />
-          <ProfileToggle label="KDA" selected={sort === 'kda'} onClick={() => setSort('kda')} />
+        <div className="profile-tab-controls">
+          <label className="profile-tab-search">
+            <span>Filter</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Champion name" />
+          </label>
+          <div className="profile-tab-actions" aria-label="Champion pool sorting">
+            <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
+            <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />
+            <ProfileToggle label="KDA" selected={sort === 'kda'} onClick={() => setSort('kda')} />
+          </div>
         </div>
       </div>
       <div className="profile-tab-summary">
-        <ProfileMetric label="Champions" value={formatNumber(records.length)} />
-        <ProfileMetric label="Tracked Games" value={formatNumber(records.reduce((sum, record) => sum + record.games, 0))} />
+        <ProfileMetric label="Shown Champions" value={`${formatNumber(filteredRecords.length)} / ${formatNumber(records.length)}`} />
+        <ProfileMetric label="Tracked Games" value={formatNumber(filteredRecords.reduce((sum, record) => sum + record.games, 0))} />
         <ProfileMetric label="Best WR" value={bestWinrate ? `${championName(champions, bestWinrate.championId)} ${bestWinrate.winRate.toFixed(1)}%` : '--'} />
       </div>
       {sortedRecords.length ? (
@@ -427,7 +454,7 @@ function ChampionPoolTab({ champions, records }: { champions?: ChampionData; rec
           ))}
         </div>
       ) : (
-        <p className="profile-empty-text">No stored champion games for this profile yet.</p>
+        <ProfileEmptyState title={records.length ? 'No champions match that filter' : 'No champion sample yet'} body={records.length ? 'Clear the filter or try another champion name.' : 'The collector has not attached stored ranked champion games to this alias yet.'} />
       )}
     </section>
   );
@@ -493,7 +520,10 @@ function BuildsUsedTab({
           ))}
         </div>
       ) : (
-        <p className="profile-empty-text">No stored build paths match these filters yet.</p>
+        <ProfileEmptyState
+          title={builds.length ? 'No build paths match these filters' : 'No build paths yet'}
+          body={builds.length ? 'Try a different role filter or switch back to all roles.' : 'Build usage appears after this summoner has stored ranked games with complete item paths.'}
+        />
       )}
     </section>
   );
@@ -538,7 +568,10 @@ function MatchHistoryTab({ champions, matches }: { champions?: ChampionData; mat
           ))}
         </div>
       ) : (
-        <p className="profile-empty-text">No stored matches match these filters yet.</p>
+        <ProfileEmptyState
+          title={matches.length ? 'No matches match these filters' : 'No recent stored matches yet'}
+          body={matches.length ? 'Relax the result or role filter to bring games back into view.' : 'Recent match cards appear once the collector reaches this player in ranked Solo/Duo data.'}
+        />
       )}
     </section>
   );
@@ -561,6 +594,31 @@ function ProfileSnapshot({ detail, icon, label, value }: { detail: string; icon:
         <strong>{value}</strong>
         <em>{detail}</em>
       </div>
+    </div>
+  );
+}
+
+type ProfileFreshness = {
+  tone: 'fresh' | 'recent' | 'stale' | 'empty';
+  label: string;
+  body: string;
+  snapshotDetail: string;
+};
+
+function ProfileFreshnessBanner({ freshness }: { freshness: ProfileFreshness }) {
+  return (
+    <div className={`profile-freshness-banner ${freshness.tone}`}>
+      <span>{freshness.label}</span>
+      <p>{freshness.body}</p>
+    </div>
+  );
+}
+
+function ProfileEmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="profile-empty-state">
+      <strong>{title}</strong>
+      <span>{body}</span>
     </div>
   );
 }
@@ -657,17 +715,19 @@ function ChampionComfortRow({ record, champions }: { record: ChampionRecord; cha
 
 function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; champions?: ChampionData }) {
   const champion = championByKey(champions, match.championId);
+  const championLabel = champion?.name ?? `Champion ${match.championId}`;
   return (
     <div className={`profile-match-row ${match.win ? 'win' : 'loss'}`}>
       <img src={championImageUrl(champions, match.championId)} alt={champion?.name ?? String(match.championId)} />
+      <span className={`profile-match-result-badge ${match.win ? 'win' : 'loss'}`}>{match.win ? 'Win' : 'Loss'}</span>
       <div>
-        <strong>{match.win ? 'Win' : 'Loss'} · {champion?.name ?? `Champion ${match.championId}`}</strong>
-        <span><RoleIcon role={match.role} /> {roleLabel(match.role)} · {match.kills}/{match.deaths}/{match.assists} · Patch {match.patch} · {formatGameDate(match.gameStartTimestamp)} · {formatDuration(match.durationSeconds)}</span>
+        <strong>{championLabel}</strong>
+        <span className="profile-match-meta"><RoleIcon role={match.role} /> {roleLabel(match.role)} · Patch {match.patch} · {formatGameDate(match.gameStartTimestamp)} · {formatDuration(match.durationSeconds)}</span>
       </div>
       <div className="profile-row-stats">
-        <ProfileMiniStat label="Result" value={match.win ? 'Win' : 'Loss'} tone={match.win ? 'win' : 'loss'} />
         <ProfileMiniStat label="KDA" value={`${match.kills}/${match.deaths}/${match.assists}`} />
         <ProfileMiniStat label="Role" value={roleLabel(match.role)} />
+        <ProfileMiniStat label="Duration" value={formatDuration(match.durationSeconds)} />
       </div>
     </div>
   );
@@ -800,6 +860,17 @@ function championName(champions: ChampionData | undefined, championId: number) {
   return championByKey(champions, championId)?.name ?? `Champion ${championId}`;
 }
 
+function filterChampionRecords(records: ChampionRecord[], query: string, champions: ChampionData | undefined) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return records;
+  }
+  return records.filter((record) => {
+    const name = championName(champions, record.championId).toLowerCase();
+    return name.includes(normalizedQuery) || String(record.championId).includes(normalizedQuery);
+  });
+}
+
 function sortChampionRecords(records: ChampionRecord[], sort: ChampionSort, champions: ChampionData | undefined) {
   return [...records].sort((a, b) => {
     if (sort === 'winrate') {
@@ -833,6 +904,77 @@ function formatProfileDate(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime()) || date.getFullYear() <= 1970) return '--';
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
+function profileFreshness(summary: SummonerProfile['summary']): ProfileFreshness {
+  const days = daysSinceDate(summary.lastSeen);
+  const firstSeen = formatProfileDate(summary.firstSeen);
+  const lastSeen = formatProfileDate(summary.lastSeen);
+  if (days === undefined) {
+    return {
+      tone: 'empty',
+      label: 'No stored window yet',
+      body: 'The collector has not attached retained ranked games to this profile yet. Live lookup can still work if the player is in game.',
+      snapshotDetail: 'No retained games yet',
+    };
+  }
+  const relativeLastSeen = relativeDayLabel(days);
+  const sampleText = `${formatNumber(summary.games)} stored ${summary.games === 1 ? 'game' : 'games'}`;
+  const firstSeenDetail = firstSeen !== '--' ? ` · first ${firstSeen}` : '';
+  if (days <= 2) {
+    return {
+      tone: 'fresh',
+      label: 'Fresh stored sample',
+      body: `Last stored game was ${relativeLastSeen}. This profile is using ${sampleText}${firstSeen !== '--' ? ` since ${firstSeen}` : ''}.`,
+      snapshotDetail: `${relativeLastSeen}${firstSeenDetail}`,
+    };
+  }
+  if (days <= 14) {
+    return {
+      tone: 'recent',
+      label: 'Recent stored sample',
+      body: `Last stored game was ${relativeLastSeen}. Treat form and champion comfort as recent stored history, not live-season truth.`,
+      snapshotDetail: `${relativeLastSeen}${firstSeenDetail}`,
+    };
+  }
+  return {
+    tone: 'stale',
+    label: 'Aging stored sample',
+    body: `Last stored game was ${relativeLastSeen} on ${lastSeen}. This profile may lag behind the player's current form until the collector sees newer games.`,
+    snapshotDetail: `${relativeLastSeen}${firstSeenDetail}`,
+  };
+}
+
+function profileBackgroundChampionPool(profile: SummonerProfile) {
+  const championIds: number[] = [];
+  const addChampion = (championId: number) => {
+    if (championId && !championIds.includes(championId)) {
+      championIds.push(championId);
+    }
+  };
+  profile.recentMatches.slice(0, 10).forEach((match) => addChampion(match.championId));
+  profile.topChampions.slice(0, 10).forEach((record) => addChampion(record.championId));
+  return championIds.slice(0, 10);
+}
+
+function daysSinceDate(value?: string) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date.getFullYear() <= 1970) {
+    return undefined;
+  }
+  const now = Date.now();
+  const diff = now - date.getTime();
+  if (diff < 0) {
+    return 0;
+  }
+  return Math.floor(diff / 86_400_000);
+}
+
+function relativeDayLabel(days: number) {
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return `${formatNumber(days)} days ago`;
 }
 
 function formatGameDate(timestamp: number) {

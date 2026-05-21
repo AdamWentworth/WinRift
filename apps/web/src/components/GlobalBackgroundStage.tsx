@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ChampionData, ChampionSplashData } from '../api/types';
+import type { Champion, ChampionData, ChampionSplashData } from '../api/types';
 import { championByKey, championList } from '../lib/staticData';
 
 type GlobalBackgroundSlide = {
@@ -60,10 +60,12 @@ type Props = {
   champions?: ChampionData;
   championSplashes?: ChampionSplashData;
   championScopeId?: number;
+  championScopeIds?: number[];
 };
 
-export function GlobalBackgroundStage({ champions, championSplashes, championScopeId }: Props) {
-  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId), [champions, championScopeId, championSplashes]);
+export function GlobalBackgroundStage({ champions, championSplashes, championScopeId, championScopeIds }: Props) {
+  const scopeKey = championScopeIds?.join(':') ?? '';
+  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId, championScopeIds), [champions, championScopeId, championSplashes, scopeKey]);
   const [slideState, setSlideState] = useState(() => initialGlobalBackgroundSlideState(fallbackGlobalBackgroundSlides));
 
   useEffect(() => {
@@ -106,7 +108,7 @@ function GlobalBackgroundArtSlide({ slide, state }: { slide: GlobalBackgroundSli
   );
 }
 
-function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number): GlobalBackgroundSlide[] {
+function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number, championScopeIds?: number[]): GlobalBackgroundSlide[] {
   const scopedChampion = championScopeId ? championByKey(champions, championScopeId) : undefined;
   if (scopedChampion) {
     const scopedSplashes = championSplashes?.data.filter((splash) => splash.championId === scopedChampion.id) ?? [];
@@ -119,6 +121,22 @@ function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplas
       position: globalBackgroundSplashPosition(scopedChampion.id),
       panClass: globalBackgroundSplashPan(scopedChampion.id, 0),
     }];
+  }
+  const scopedChampions = uniqueNumbers(championScopeIds ?? [])
+    .map((championId) => championByKey(champions, championId))
+    .filter((champion): champion is Champion => Boolean(champion));
+  if (scopedChampions.length) {
+    const scopedChampionIds = new Set(scopedChampions.map((champion) => champion.id));
+    const scopedSplashes = championSplashes?.data.filter((splash) => scopedChampionIds.has(splash.championId)) ?? [];
+    if (scopedSplashes.length) {
+      return mapSplashSlides(scopedSplashes);
+    }
+    return scopedChampions.map((champion, index) => ({
+      src: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion.id}_0.jpg`,
+      title: champion.name,
+      position: globalBackgroundSplashPosition(champion.id),
+      panClass: globalBackgroundSplashPan(champion.id, index),
+    }));
   }
   if (championSplashes?.data.length) {
     return mapSplashSlides(championSplashes.data);
@@ -203,4 +221,15 @@ function hashText(value: string) {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash;
+}
+
+function uniqueNumbers(values: number[]) {
+  const seen = new Set<number>();
+  return values.filter((value) => {
+    if (!value || seen.has(value)) {
+      return false;
+    }
+    seen.add(value);
+    return true;
+  });
 }
