@@ -63,6 +63,28 @@ Champion guide and tier-list rankings use strict role buckets. This does not exc
 
 These stats are still correlations, not isolated champion power. Better champions attract better players, some champions farm more because of role/function, and losing teams naturally have worse damage/economy/vision. The score is useful for ranking stored performance patterns, but it should stay labeled as WinRift's internal read rather than objective truth.
 
+## Follow-Up Notes
+
+The current tier-list pass is good enough for MVP, but it should be revisited after the stored corpus is much larger.
+
+Things that feel solid:
+
+- strict role buckets for champion rankings, while still letting flex champions count in the role they actually played
+- S+ as a score threshold instead of a fixed quota
+- sample-shrunk winrate plus Wilson confidence, so tiny hot samples do not dominate
+- lower ban-rate weight, because ban rate can reflect frustration or popularity as much as champion strength
+- top-lane durability pressure as part of impact, especially damage taken/mitigated while not dying
+
+Things to validate later:
+
+- Whether `tierScore >= 59` remains the right S+ display threshold once each role has far more games.
+- Whether the current role weights produce sensible leaderboards by role across multiple patches.
+- Whether durable top-lane pressure is over- or under-valued compared with splitpush pressure, lane leads, and objective pressure.
+- Whether impact should use per-minute fields everywhere instead of final totals.
+- Whether low-pick one-trick champions need a mastery-bias caveat or a separate niche-strength label.
+- Whether ban rate should be capped, log-scaled, or split into "respect ban" versus "annoyance ban" once we have more context.
+- Whether matchup-adjusted winrate should become the main rank signal instead of global role winrate.
+
 Future improvement:
 
 - Validate the role weights against larger samples and adjust by patch.

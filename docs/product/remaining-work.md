@@ -13,7 +13,7 @@ Status: items 1-5 have been addressed in the current cleanup pass. Item 6 is the
 
 ## Product Surfaces
 
-5. Improve the tier-list ranking formula. Current data is useful, but tiering should eventually include sample size, pick rate, winrate confidence, ban signal, and role population. First pass complete; see `docs/product/tier-list-ranking.md`.
+5. Improve the tier-list ranking formula. Current data is useful, but tiering should eventually include sample size, pick rate, winrate confidence, ban signal, and role population. Current pass complete: ranking now uses strict role buckets, sample-shrunk winrate, Wilson confidence, smaller ban weight, role-relative impact, and top-lane durability pressure. Follow-up notes are captured in `docs/product/tier-list-ranking.md`.
 6. Expand champion guide backend data for skill order, matchup counters, rune paths, summoner spell pairs, and item-path summaries. First pass complete: skill orders, matchups, rune/spell signatures, ban rates, item slots, and full item-path summaries are now available.
 7. Add a future summoner profile page that can show stored match history, live-game redirect state, aliases, champion comfort, and ranked form.
 8. Refine live-match modes so Match, Builds, and Win Conditions each have a clear job and do not silently load hidden heavy analytics.
