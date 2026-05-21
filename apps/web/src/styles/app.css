@@ -253,11 +253,11 @@ button {
 }
 
 .profile-page {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
   justify-content: center;
   min-height: calc(100vh - 77px);
-  overflow: hidden;
+  overflow: visible;
   padding: 28px;
   position: relative;
   z-index: 2;
@@ -491,11 +491,11 @@ button {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 14px;
 }
 
 .profile-overview-grid {
   align-items: stretch;
+  min-height: 420px;
 }
 
 .profile-data-stack {
