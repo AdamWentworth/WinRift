@@ -1,22 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, CircleAlert, History, LoaderCircle, RadioTower, Shield, Trophy } from 'lucide-react';
+import { CalendarDays, CircleAlert, History, LoaderCircle, Package, RadioTower, Shield, Trophy } from 'lucide-react';
 import { getLiveGame, getSummonerProfile, resolveAccountAlias } from '../api/client';
-import type { AccountAliasMatch, ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../api/types';
+import type { AccountAliasMatch, ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerBuildRecord, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
-import { championByKey, championImageUrl, profileIconUrl, rankIconUrl, rankLabel } from '../lib/staticData';
+import {
+  championByKey,
+  championImageUrl,
+  itemImageUrl,
+  itemName,
+  parseRuneSignature,
+  profileIconUrl,
+  rankIconUrl,
+  rankLabel,
+  runeImageUrl,
+  runeName,
+  runeStyleImageUrl,
+  runeStyleName,
+  signatureItems,
+  signatureSpells,
+  summonerSpellImageUrl,
+  summonerSpellName,
+} from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
 import { RoleIcon, roleLabel } from '../lib/roles';
 
-type ProfileSection = 'overview' | 'champions' | 'matches';
+type ProfileSection = 'overview' | 'champions' | 'builds' | 'matches';
 type ChampionSort = 'games' | 'winrate' | 'kda';
+type BuildSort = 'games' | 'winrate' | 'champion';
 type MatchResultFilter = 'all' | 'wins' | 'losses';
 type MatchRoleFilter = 'ALL' | 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY';
 
 const profileSections: { key: ProfileSection; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'champions', label: 'Champion Stats' },
+  { key: 'builds', label: 'Builds Used' },
   { key: 'matches', label: 'Match History' },
 ];
 
@@ -43,6 +62,8 @@ export function SummonerProfilePage({
   onUseAlias,
   onResolvedAlias,
 }: Props) {
+  const [section, setSection] = useState<ProfileSection>('overview');
+  const [liveViewDismissed, setLiveViewDismissed] = useState(false);
   const aliasQuery = useQuery({
     queryKey: ['summoner-profile-alias', platform, gameName],
     queryFn: () => resolveAccountAlias(gameName!, platform),
@@ -72,10 +93,15 @@ export function SummonerProfilePage({
   const profileQuery = useQuery({
     queryKey: ['summoner-profile-stored', resolvedPlatform, resolvedGameName, resolvedTagLine],
     queryFn: () => getSummonerProfile(resolvedGameName!, resolvedTagLine!, resolvedPlatform),
-    enabled: Boolean(resolvedGameName && resolvedTagLine && !liveQuery.isFetching && !liveQuery.data),
+    enabled: Boolean(resolvedGameName && resolvedTagLine && !liveQuery.isFetching),
     retry: false,
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    setSection('overview');
+    setLiveViewDismissed(false);
+  }, [resolvedPlatform, resolvedGameName, resolvedTagLine]);
 
   useEffect(() => {
     if (foundAlias) {
@@ -83,9 +109,15 @@ export function SummonerProfilePage({
     }
   }, [foundAlias, onResolvedAlias]);
 
-  if (liveQuery.data) {
+  if (liveQuery.data && !liveViewDismissed) {
     return (
       <section className="profile-live-shell live-panel has-game">
+        <div className="profile-live-toolbar">
+          <button type="button" onClick={() => setLiveViewDismissed(true)}>
+            View Profile
+          </button>
+          <span>{exactRiotId} is currently in game</span>
+        </div>
         <LiveMatchups
           liveGame={liveQuery.data}
           champions={champions}
@@ -120,6 +152,31 @@ export function SummonerProfilePage({
           </div>
           <em>{platformLabel(resolvedPlatform)}{summonerLevel ? ` · Level ${formatNumber(summonerLevel)}` : ''}</em>
         </div>
+
+        {resolvedGameName && resolvedTagLine ? (
+          <div className="profile-action-row">
+            <button
+              className={`profile-action-button ${liveQuery.data ? 'live' : ''}`}
+              disabled={!liveQuery.data}
+              onClick={() => setLiveViewDismissed(false)}
+              type="button"
+            >
+              <RadioTower size={16} />
+              <span>Live Match</span>
+              <em>{liveQuery.data ? 'Live now' : liveQuery.isLoading ? 'Checking...' : 'Not live'}</em>
+            </button>
+            <button
+              className={`profile-action-button ${section === 'builds' ? 'selected' : ''}`}
+              disabled={!profileQuery.data}
+              onClick={() => setSection('builds')}
+              type="button"
+            >
+              <Package size={16} />
+              <span>Builds Used</span>
+              <em>{profileQuery.data?.topBuilds?.length ? `${formatNumber(profileQuery.data.topBuilds.length)} stored paths` : 'Stored match paths'}</em>
+            </button>
+          </div>
+        ) : null}
 
         {!gameName ? (
           <ProfileMessage
@@ -179,7 +236,15 @@ export function SummonerProfilePage({
         ) : null}
 
         {profileQuery.data ? (
-          <StoredProfile profile={profileQuery.data} champions={champions} />
+          <StoredProfile
+            profile={profileQuery.data}
+            champions={champions}
+            items={items}
+            spells={spells}
+            runes={runes}
+            section={section}
+            onSectionChange={setSection}
+          />
         ) : null}
 
         {profileQuery.error ? (
@@ -201,10 +266,25 @@ export function SummonerProfilePage({
   );
 }
 
-function StoredProfile({ profile, champions }: { profile: SummonerProfile; champions?: ChampionData }) {
+function StoredProfile({
+  profile,
+  champions,
+  items,
+  spells,
+  runes,
+  section,
+  onSectionChange,
+}: {
+  profile: SummonerProfile;
+  champions?: ChampionData;
+  items?: ItemData;
+  spells?: SummonerSpellData;
+  runes?: RuneData;
+  section: ProfileSection;
+  onSectionChange: (section: ProfileSection) => void;
+}) {
   const rank = profile.rank;
   const summary = profile.summary;
-  const [section, setSection] = useState<ProfileSection>('overview');
   const bestChampion = profile.topChampions[0];
   return (
     <div className="profile-data-stack">
@@ -217,7 +297,7 @@ function StoredProfile({ profile, champions }: { profile: SummonerProfile; champ
 
       <div className="profile-section-tabs" aria-label="Summoner profile sections">
         {profileSections.map((candidate) => (
-          <button className={section === candidate.key ? 'selected' : ''} key={candidate.key} onClick={() => setSection(candidate.key)} type="button">
+          <button className={section === candidate.key ? 'selected' : ''} key={candidate.key} onClick={() => onSectionChange(candidate.key)} type="button">
             {candidate.label}
           </button>
         ))}
@@ -229,6 +309,16 @@ function StoredProfile({ profile, champions }: { profile: SummonerProfile; champ
 
       {section === 'champions' ? (
         <ChampionPoolTab champions={champions} records={profile.topChampions} />
+      ) : null}
+
+      {section === 'builds' ? (
+        <BuildsUsedTab
+          builds={profile.topBuilds ?? []}
+          champions={champions}
+          items={items}
+          spells={spells}
+          runes={runes}
+        />
       ) : null}
 
       {section === 'matches' ? (
@@ -338,6 +428,72 @@ function ChampionPoolTab({ champions, records }: { champions?: ChampionData; rec
         </div>
       ) : (
         <p className="profile-empty-text">No stored champion games for this profile yet.</p>
+      )}
+    </section>
+  );
+}
+
+function BuildsUsedTab({
+  builds,
+  champions,
+  items,
+  spells,
+  runes,
+}: {
+  builds: SummonerBuildRecord[];
+  champions?: ChampionData;
+  items?: ItemData;
+  spells?: SummonerSpellData;
+  runes?: RuneData;
+}) {
+  const [sort, setSort] = useState<BuildSort>('games');
+  const [roleFilter, setRoleFilter] = useState<MatchRoleFilter>('ALL');
+  const filteredBuilds = useMemo(() => builds.filter((build) => roleFilter === 'ALL' || build.role === roleFilter), [builds, roleFilter]);
+  const sortedBuilds = useMemo(() => sortBuildRecords(filteredBuilds, sort, champions), [champions, filteredBuilds, sort]);
+  const totalGames = filteredBuilds.reduce((sum, build) => sum + build.games, 0);
+  const wins = filteredBuilds.reduce((sum, build) => sum + build.wins, 0);
+  const uniqueChampions = new Set(filteredBuilds.map((build) => build.championId)).size;
+  return (
+    <section className="profile-panel profile-wide-panel profile-tab-panel profile-builds-tab">
+      <div className="profile-tab-header">
+        <PanelHeading icon={<Package size={16} />} title="Builds Used" />
+        <div className="profile-tab-actions" aria-label="Summoner build sorting">
+          <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
+          <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />
+          <ProfileToggle label="Champion" selected={sort === 'champion'} onClick={() => setSort('champion')} />
+        </div>
+      </div>
+      <div className="profile-role-filter" aria-label="Summoner build role filters">
+        {(['ALL', 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as MatchRoleFilter[]).map((role) => (
+          <button key={role} className={roleFilter === role ? 'selected' : ''} onClick={() => setRoleFilter(role)} type="button">
+            {role === 'ALL' ? 'All Roles' : <><RoleIcon role={role} /> {roleLabel(role)}</>}
+          </button>
+        ))}
+      </div>
+      <div className="profile-tab-summary">
+        <ProfileMetric label="Build Paths" value={formatNumber(filteredBuilds.length)} />
+        <ProfileMetric label="Tracked Games" value={formatNumber(totalGames)} />
+        <ProfileMetric label="Winrate" value={totalGames ? `${((wins / totalGames) * 100).toFixed(1)}%` : '--'} />
+        <ProfileMetric label="Champions" value={formatNumber(uniqueChampions)} />
+      </div>
+      <p className="profile-context-note">
+        This is usage history from stored ranked games for this summoner, not generalized build advice.
+      </p>
+      {sortedBuilds.length ? (
+        <div className="profile-build-list">
+          {sortedBuilds.map((build) => (
+            <BuildUsageRow
+              key={`${build.championId}:${build.role}:${build.finalItemsSignature}:${build.core2Signature}:${build.core3Signature}:${build.runeSignature}:${build.spellSignature}`}
+              build={build}
+              champions={champions}
+              items={items}
+              spells={spells}
+              runes={runes}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="profile-empty-text">No stored build paths match these filters yet.</p>
       )}
     </section>
   );
@@ -517,6 +673,96 @@ function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; cham
   );
 }
 
+function BuildUsageRow({
+  build,
+  champions,
+  items,
+  spells,
+  runes,
+}: {
+  build: SummonerBuildRecord;
+  champions?: ChampionData;
+  items?: ItemData;
+  spells?: SummonerSpellData;
+  runes?: RuneData;
+}) {
+  const champion = championByKey(champions, build.championId);
+  const coreItems = signatureItems(build.core3Signature || build.core2Signature);
+  const finalItems = signatureItems(build.finalItemsSignature);
+  const displayedCore = coreItems.length ? coreItems : finalItems.slice(0, 3);
+  const parsedRunes = parseRuneSignature(build.runeSignature);
+  const primaryRuneStyleSrc = runeStyleImageUrl(runes, parsedRunes.primaryStyleId);
+  const runeIds = parsedRunes.runeIds.slice(0, 4);
+  const spellIds = signatureSpells(build.spellSignature);
+  return (
+    <div className="profile-build-row">
+      <div className="profile-build-identity">
+        <img src={championImageUrl(champions, build.championId)} alt={champion?.name ?? String(build.championId)} />
+        <div>
+          <strong>{champion?.name ?? `Champion ${build.championId}`}</strong>
+          <span><RoleIcon role={build.role} /> {roleLabel(build.role)}</span>
+        </div>
+      </div>
+      <div className="profile-build-paths">
+        <div className="profile-build-path">
+          <em>Core</em>
+          <ItemIconList itemIds={displayedCore} items={items} />
+        </div>
+        <div className="profile-build-path">
+          <em>Final</em>
+          <ItemIconList itemIds={finalItems} items={items} />
+        </div>
+      </div>
+      <div className="profile-build-loadout">
+        <div>
+          <em>Runes</em>
+          <div className="profile-build-icon-row">
+            {primaryRuneStyleSrc ? (
+              <img src={primaryRuneStyleSrc} alt={runeStyleName(runes, parsedRunes.primaryStyleId)} title={runeStyleName(runes, parsedRunes.primaryStyleId)} />
+            ) : null}
+            {runeIds.map((runeId) => {
+              const src = runeImageUrl(runes, runeId);
+              return src ? <img key={runeId} src={src} alt={runeName(runes, runeId)} title={runeName(runes, runeId)} /> : null;
+            })}
+          </div>
+        </div>
+        <div>
+          <em>Spells</em>
+          <div className="profile-build-icon-row">
+            {spellIds.map((spellId) => {
+              const src = summonerSpellImageUrl(spells, spellId);
+              return src ? <img key={spellId} src={src} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} /> : null;
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="profile-row-stats">
+        <ProfileMiniStat label="Games" value={formatNumber(build.games)} />
+        <ProfileMiniStat label="WR" value={`${build.winRate.toFixed(1)}%`} />
+        <ProfileMiniStat label="KDA" value={build.kda.toFixed(2)} />
+      </div>
+    </div>
+  );
+}
+
+function ItemIconList({ itemIds, items }: { itemIds: string[]; items?: ItemData }) {
+  if (!itemIds.length) {
+    return <span className="profile-build-empty-path">No item path</span>;
+  }
+  return (
+    <div className="profile-build-icon-row">
+      {itemIds.slice(0, 6).map((itemId, index) => {
+        const src = itemImageUrl(items, itemId);
+        return src ? (
+          <img key={`${itemId}:${index}`} src={src} alt={itemName(items, itemId)} title={itemName(items, itemId)} />
+        ) : (
+          <span key={`${itemId}:${index}`} className="profile-build-item-fallback">{itemId}</span>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProfileMiniStat({ label, tone, value }: { label: string; tone?: 'win' | 'loss'; value: string }) {
   return (
     <span className={`profile-mini-stat${tone ? ` ${tone}` : ''}`}>
@@ -561,6 +807,18 @@ function sortChampionRecords(records: ChampionRecord[], sort: ChampionSort, cham
     }
     if (sort === 'kda') {
       return b.kda - a.kda || b.games - a.games || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
+    }
+    return b.games - a.games || b.winRate - a.winRate || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
+  });
+}
+
+function sortBuildRecords(records: SummonerBuildRecord[], sort: BuildSort, champions: ChampionData | undefined) {
+  return [...records].sort((a, b) => {
+    if (sort === 'winrate') {
+      return b.winRate - a.winRate || b.games - a.games || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
+    }
+    if (sort === 'champion') {
+      return championName(champions, a.championId).localeCompare(championName(champions, b.championId)) || b.games - a.games;
     }
     return b.games - a.games || b.winRate - a.winRate || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
   });

@@ -514,6 +514,29 @@ export type SummonerRecentMatch = {
   durationSeconds: number;
 };
 
+export type SummonerBuildRecord = {
+  platform: string;
+  queueId: number;
+  championId: number;
+  role: string;
+  finalItemsSignature: string;
+  core2Signature: string;
+  core3Signature: string;
+  runeSignature: string;
+  spellSignature: string;
+  games: number;
+  wins: number;
+  losses: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  avgKills: number;
+  avgDeaths: number;
+  avgAssists: number;
+  kda: number;
+  winRate: number;
+};
+
 export type SummonerProfile = {
   account: AccountAliasMatch;
   summoner?: SummonerAccountSnapshot;
@@ -521,6 +544,7 @@ export type SummonerProfile = {
   summary: SummonerProfileSummary;
   topChampions: ChampionRecord[];
   recentMatches: SummonerRecentMatch[];
+  topBuilds?: SummonerBuildRecord[];
 };
 
 export type LiveParticipant = {

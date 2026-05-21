@@ -195,12 +195,18 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	topBuilds, err := s.repo.SummonerBuilds(r.Context(), alias.Platform, alias.PUUID, queueID, 36)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	summonerSnapshot := s.summonerAccountSnapshot(r.Context(), alias.Platform, alias.PUUID)
 	response := map[string]any{
 		"account":       accountAliasResponse(alias),
 		"summary":       summonerProfileStatsResponse(stats),
 		"topChampions":  championPerformanceRowsResponse(topChampions),
 		"recentMatches": summonerRecentMatchesResponse(recentMatches),
+		"topBuilds":     summonerBuildRowsResponse(topBuilds),
 	}
 	if summonerSnapshot != nil {
 		response["summoner"] = summonerAccountSnapshotResponse(*summonerSnapshot)
@@ -1888,6 +1894,35 @@ func summonerRecentMatchesResponse(rows []clickhouse.SummonerRecentMatch) []map[
 			"assists":            row.Assists,
 			"gameStartTimestamp": row.GameStartTimestamp,
 			"durationSeconds":    row.DurationSeconds,
+		})
+	}
+	return out
+}
+
+func summonerBuildRowsResponse(rows []clickhouse.SummonerBuildRecord) []map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, map[string]any{
+			"platform":            row.Platform,
+			"queueId":             row.QueueID,
+			"championId":          row.ChampionID,
+			"role":                row.Role,
+			"finalItemsSignature": row.FinalItemsSignature,
+			"core2Signature":      row.Core2Signature,
+			"core3Signature":      row.Core3Signature,
+			"runeSignature":       row.RuneSignature,
+			"spellSignature":      row.SpellSignature,
+			"games":               row.Games,
+			"wins":                row.Wins,
+			"losses":              row.Losses,
+			"kills":               row.Kills,
+			"deaths":              row.Deaths,
+			"assists":             row.Assists,
+			"avgKills":            round(row.AvgKills),
+			"avgDeaths":           round(row.AvgDeaths),
+			"avgAssists":          round(row.AvgAssists),
+			"kda":                 round(row.KDA),
+			"winRate":             round(row.WinRate * 100),
 		})
 	}
 	return out

@@ -43,6 +43,30 @@ type SummonerRecentMatch struct {
 	DurationSeconds    uint32
 }
 
+type SummonerBuildRecord struct {
+	Platform            string
+	PUUID               string
+	QueueID             uint16
+	ChampionID          uint16
+	Role                string
+	FinalItemsSignature string
+	Core2Signature      string
+	Core3Signature      string
+	RuneSignature       string
+	SpellSignature      string
+	Games               int
+	Wins                int
+	Losses              int
+	Kills               int
+	Deaths              int
+	Assists             int
+	AvgKills            float64
+	AvgDeaths           float64
+	AvgAssists          float64
+	KDA                 float64
+	WinRate             float64
+}
+
 type SummonerProfileRefreshResult struct {
 	ProfileRows  int
 	ChampionRows int
@@ -443,6 +467,83 @@ func (r *Repository) SummonerRecentMatches(ctx context.Context, platform, puuid 
 	return out, rows.Err()
 }
 
+func (r *Repository) SummonerBuilds(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerBuildRecord, error) {
+	if limit <= 0 {
+		limit = 24
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			count() AS games,
+			sum(win) AS wins,
+			sum(kills) AS kills,
+			sum(deaths) AS deaths,
+			sum(assists) AS assists
+		FROM participants FINAL
+		WHERE platform = ? AND puuid = ? AND queue_id = ?
+			AND champion_id > 0
+			AND (final_items_signature != '' OR core3_signature != '')
+		GROUP BY
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature
+		ORDER BY games DESC, wins / games DESC, champion_id ASC
+		LIMIT ?`,
+		platform,
+		puuid,
+		queueID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SummonerBuildRecord{}
+	for rows.Next() {
+		var row SummonerBuildRecord
+		var games, wins, kills, deaths, assists uint64
+		if err := rows.Scan(
+			&row.ChampionID,
+			&row.Role,
+			&row.FinalItemsSignature,
+			&row.Core2Signature,
+			&row.Core3Signature,
+			&row.RuneSignature,
+			&row.SpellSignature,
+			&games,
+			&wins,
+			&kills,
+			&deaths,
+			&assists,
+		); err != nil {
+			return nil, err
+		}
+		row.PUUID = puuid
+		row.Platform = platform
+		row.QueueID = queueID
+		row.Games = int(games)
+		row.Wins = int(wins)
+		row.Losses = int(games - wins)
+		row.Kills = int(kills)
+		row.Deaths = int(deaths)
+		row.Assists = int(assists)
+		applySummonerBuildAverages(&row)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func IsNoRows(err error) bool {
 	return errors.Is(err, sql.ErrNoRows)
 }
@@ -474,5 +575,20 @@ func applyChampionPerformanceAverages(performance *ChampionPerformance) {
 		performance.KDA = float64(performance.Kills+performance.Assists) / float64(performance.Deaths)
 	} else {
 		performance.KDA = float64(performance.Kills + performance.Assists)
+	}
+}
+
+func applySummonerBuildAverages(build *SummonerBuildRecord) {
+	if build.Games <= 0 {
+		return
+	}
+	build.AvgKills = float64(build.Kills) / float64(build.Games)
+	build.AvgDeaths = float64(build.Deaths) / float64(build.Games)
+	build.AvgAssists = float64(build.Assists) / float64(build.Games)
+	build.WinRate = float64(build.Wins) / float64(build.Games)
+	if build.Deaths > 0 {
+		build.KDA = float64(build.Kills+build.Assists) / float64(build.Deaths)
+	} else {
+		build.KDA = float64(build.Kills + build.Assists)
 	}
 }

@@ -94,6 +94,7 @@ vi.mock('./api/client', () => ({
     account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Test Summoner', tagLine: 'NA1' },
     summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0, avgKills: 0, avgDeaths: 0, avgAssists: 0, kda: 0, winRate: 0 },
     topChampions: [],
+    topBuilds: [],
     recentMatches: [],
   })),
   resolveAccountAlias: vi.fn(async () => ({ status: 'not_found' })),
@@ -113,6 +114,7 @@ describe('App', () => {
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
+    vi.mocked(getLiveGame).mockRejectedValue(new Error('Player is not currently in a live game'));
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
     vi.mocked(getChampionGuide).mockResolvedValue({
       summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
@@ -134,6 +136,7 @@ describe('App', () => {
       account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Test Summoner', tagLine: 'NA1' },
       summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0, avgKills: 0, avgDeaths: 0, avgAssists: 0, kda: 0, winRate: 0 },
       topChampions: [],
+      topBuilds: [],
       recentMatches: [],
     });
     vi.mocked(resolveAccountAlias).mockResolvedValue({ status: 'not_found' });
@@ -370,6 +373,65 @@ describe('App', () => {
 
     await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1'));
     expect(screen.getByText('Sneaky#NA69')).toBeInTheDocument();
+    queryClient.clear();
+  });
+
+  it('shows summoner-owned build paths on the profile page', async () => {
+    vi.mocked(getSummonerProfile).mockResolvedValueOnce({
+      account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Profile Test', tagLine: 'NA1' },
+      summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 3, wins: 2, losses: 1, kills: 18, deaths: 9, assists: 21, avgKills: 6, avgDeaths: 3, avgAssists: 7, kda: 4.33, winRate: 66.67 },
+      topChampions: [],
+      recentMatches: [],
+      topBuilds: [
+        {
+          platform: 'NA1',
+          queueId: 420,
+          championId: 62,
+          role: 'JUNGLE',
+          finalItemsSignature: '100-101-102-103-104-105',
+          core2Signature: '100-101',
+          core3Signature: '100-101-102',
+          runeSignature: '',
+          spellSignature: '4-11',
+          games: 3,
+          wins: 2,
+          losses: 1,
+          kills: 18,
+          deaths: 9,
+          assists: 21,
+          avgKills: 6,
+          avgDeaths: 3,
+          avgAssists: 7,
+          kda: 4.33,
+          winRate: 66.67,
+        },
+      ],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
+      target: { value: 'Profile Test#NA1' },
+    });
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
+
+    await waitFor(() => expect(screen.getByText('Profile Test#NA1')).toBeInTheDocument());
+    await screen.findByText('Stored Form');
+    fireEvent.click(screen.getByRole('button', { name: /^Builds Used$/i }));
+    expect(await screen.findByText('This is usage history from stored ranked games for this summoner, not generalized build advice.')).toBeInTheDocument();
+    expect(screen.getAllByText('Wukong').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('66.7%').length).toBeGreaterThan(0);
+    expect(screen.getByText('4.33')).toBeInTheDocument();
     queryClient.clear();
   });
 
