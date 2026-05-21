@@ -14,6 +14,8 @@ The profile page currently shows:
 - champion comfort rows
 - recent stored matches
 
+The page structure takes product-level inspiration from established profile tools: a high-signal profile summary first, then separate sections for overview, champion stats, and match history. WinRift should keep its own visual language and emphasize stored-sample transparency rather than copying another site's layout one-to-one.
+
 ## Backend Shape
 
 The frontend should not aggregate a summoner's whole stored history on every request. The profile endpoint now prefers compact read models:

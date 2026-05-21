@@ -182,12 +182,12 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	topChampions, err := s.repo.SummonerTopChampions(r.Context(), alias.Platform, alias.PUUID, queueID, 8)
+	topChampions, err := s.repo.SummonerTopChampions(r.Context(), alias.Platform, alias.PUUID, queueID, 24)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	recentMatches, err := s.repo.SummonerRecentMatches(r.Context(), alias.Platform, alias.PUUID, queueID, 10)
+	recentMatches, err := s.repo.SummonerRecentMatches(r.Context(), alias.Platform, alias.PUUID, queueID, 20)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

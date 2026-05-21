@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, CircleAlert, History, LoaderCircle, RadioTower, Shield, Trophy } from 'lucide-react';
@@ -8,6 +8,14 @@ import { platformLabel } from '../lib/lookup';
 import { championByKey, championImageUrl, rankIconUrl, rankLabel } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
 import { RoleIcon, roleLabel } from '../lib/roles';
+
+type ProfileSection = 'overview' | 'champions' | 'matches';
+
+const profileSections: { key: ProfileSection; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'champions', label: 'Champion Stats' },
+  { key: 'matches', label: 'Match History' },
+];
 
 type Props = {
   platform?: string;
@@ -187,76 +195,144 @@ export function SummonerProfilePage({
 function StoredProfile({ profile, champions }: { profile: SummonerProfile; champions?: ChampionData }) {
   const rank = profile.rank;
   const summary = profile.summary;
+  const [section, setSection] = useState<ProfileSection>('overview');
+  const bestChampion = profile.topChampions[0];
   return (
-    <div className="profile-data-grid">
-      <section className="profile-panel profile-rank-panel">
-        <PanelHeading icon={<Shield size={16} />} title="Ranked Solo/Duo" />
-        <div className="profile-rank-read">
-          <img src={rankIconUrl(rank)} alt={rank ? rankLabel(rank) : 'Rank unavailable'} />
-          <div>
-            <strong>{rank ? rankLabel(rank) : 'Rank Unknown'}</strong>
-            <span>{rank ? `${rank.leaguePoints} LP · ${formatNumber(rank.totalGames)} ranked games` : 'No cached rank snapshot yet'}</span>
-          </div>
-        </div>
-        {rank ? (
-          <div className="profile-metric-row">
-            <ProfileMetric label="Winrate" value={`${rank.winRate.toFixed(1)}%`} />
-            <ProfileMetric label="Wins" value={formatNumber(rank.wins)} />
-            <ProfileMetric label="Losses" value={formatNumber(rank.losses)} />
-          </div>
-        ) : null}
-      </section>
+    <div className="profile-data-stack">
+      <div className="profile-snapshot-strip">
+        <ProfileSnapshot icon={<Shield size={16} />} label="Solo/Duo" value={rank ? rankLabel(rank) : 'Rank Unknown'} detail={rank ? `${rank.leaguePoints} LP · ${rank.winRate.toFixed(1)}% WR` : 'No cached rank snapshot'} />
+        <ProfileSnapshot icon={<Trophy size={16} />} label="Stored Form" value={`${summary.winRate.toFixed(1)}% WR`} detail={`${formatNumber(summary.games)} games · ${summary.kda ? summary.kda.toFixed(2) : '--'} KDA`} />
+        <ProfileSnapshot icon={<Trophy size={16} />} label="Main Champion" value={bestChampion ? championName(champions, bestChampion.championId) : 'No Sample'} detail={bestChampion ? `${formatNumber(bestChampion.games)} games · ${bestChampion.winRate.toFixed(1)}% WR` : 'Collector has not reached champion history'} />
+        <ProfileSnapshot icon={<CalendarDays size={16} />} label="Last Stored" value={formatProfileDate(summary.lastSeen)} detail={`${formatProfileDate(summary.firstSeen)} first seen`} />
+      </div>
 
-      <section className="profile-panel">
-        <PanelHeading icon={<Trophy size={16} />} title="Stored Match Form" />
-        <div className="profile-metric-row">
-          <ProfileMetric label="Games" value={formatNumber(summary.games)} />
-          <ProfileMetric label="Winrate" value={`${summary.winRate.toFixed(1)}%`} />
-          <ProfileMetric label="KDA" value={summary.kda ? summary.kda.toFixed(2) : '--'} />
-        </div>
-        <div className="profile-kda-line">
-          {summary.avgKills.toFixed(1)} / {summary.avgDeaths.toFixed(1)} / {summary.avgAssists.toFixed(1)} average across collected ranked games
-        </div>
-      </section>
+      <div className="profile-section-tabs" aria-label="Summoner profile sections">
+        {profileSections.map((candidate) => (
+          <button className={section === candidate.key ? 'selected' : ''} key={candidate.key} onClick={() => setSection(candidate.key)} type="button">
+            {candidate.label}
+          </button>
+        ))}
+      </div>
 
-      <section className="profile-panel profile-window-panel">
-        <PanelHeading icon={<CalendarDays size={16} />} title="Stored Data Window" />
-        <div className="profile-metric-row">
-          <ProfileMetric label="First Seen" value={formatProfileDate(summary.firstSeen)} />
-          <ProfileMetric label="Last Seen" value={formatProfileDate(summary.lastSeen)} />
-          <ProfileMetric label="Sample" value={`${formatNumber(summary.games)} games`} />
+      {section === 'overview' ? (
+        <div className="profile-data-grid">
+          <RankedPanel rank={rank} />
+          <FormPanel summary={summary} />
+          <DataWindowPanel summary={summary} />
+          <ChampionComfortPanel champions={champions} records={profile.topChampions.slice(0, 6)} title="Champion Comfort" />
+          <RecentMatchesPanel champions={champions} matches={profile.recentMatches.slice(0, 8)} title="Recent Stored Matches" />
         </div>
-        <div className="profile-kda-line">
-          Profile summaries are compact read-model rows refreshed from retained ranked Solo/Duo matches.
-        </div>
-      </section>
+      ) : null}
 
-      <section className="profile-panel profile-wide-panel">
-        <PanelHeading icon={<Trophy size={16} />} title="Champion Comfort" />
-        {profile.topChampions.length ? (
-          <div className="profile-champion-list">
-            {profile.topChampions.map((record) => (
-              <ChampionComfortRow key={record.championId} record={record} champions={champions} />
-            ))}
-          </div>
-        ) : (
-          <p className="profile-empty-text">No stored champion games for this profile yet.</p>
-        )}
-      </section>
+      {section === 'champions' ? (
+        <ChampionComfortPanel champions={champions} records={profile.topChampions} title="Champion Stats" wide />
+      ) : null}
 
-      <section className="profile-panel profile-wide-panel">
-        <PanelHeading icon={<History size={16} />} title="Recent Stored Matches" />
-        {profile.recentMatches.length ? (
-          <div className="profile-match-list">
-            {profile.recentMatches.map((match) => (
-              <RecentMatchRow key={`${match.matchId}:${match.championId}`} match={match} champions={champions} />
-            ))}
-          </div>
-        ) : (
-          <p className="profile-empty-text">Recent matches will appear once stored games are attached to this alias.</p>
-        )}
-      </section>
+      {section === 'matches' ? (
+        <RecentMatchesPanel champions={champions} matches={profile.recentMatches} title="Match History" wide />
+      ) : null}
     </div>
+  );
+}
+
+function ProfileSnapshot({ detail, icon, label, value }: { detail: string; icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="profile-snapshot-card">
+      {icon}
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <em>{detail}</em>
+      </div>
+    </div>
+  );
+}
+
+function RankedPanel({ rank }: { rank?: RankedRecord }) {
+  return (
+    <section className="profile-panel profile-rank-panel">
+      <PanelHeading icon={<Shield size={16} />} title="Ranked Solo/Duo" />
+      <div className="profile-rank-read">
+        <img src={rankIconUrl(rank)} alt={rank ? rankLabel(rank) : 'Rank unavailable'} />
+        <div>
+          <strong>{rank ? rankLabel(rank) : 'Rank Unknown'}</strong>
+          <span>{rank ? `${rank.leaguePoints} LP · ${formatNumber(rank.totalGames)} ranked games` : 'No cached rank snapshot yet'}</span>
+        </div>
+      </div>
+      {rank ? (
+        <div className="profile-metric-row">
+          <ProfileMetric label="Winrate" value={`${rank.winRate.toFixed(1)}%`} />
+          <ProfileMetric label="Wins" value={formatNumber(rank.wins)} />
+          <ProfileMetric label="Losses" value={formatNumber(rank.losses)} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function FormPanel({ summary }: { summary: SummonerProfile['summary'] }) {
+  return (
+    <section className="profile-panel">
+      <PanelHeading icon={<Trophy size={16} />} title="Stored Match Form" />
+      <div className="profile-metric-row">
+        <ProfileMetric label="Games" value={formatNumber(summary.games)} />
+        <ProfileMetric label="Winrate" value={`${summary.winRate.toFixed(1)}%`} />
+        <ProfileMetric label="KDA" value={summary.kda ? summary.kda.toFixed(2) : '--'} />
+      </div>
+      <div className="profile-kda-line">
+        {summary.avgKills.toFixed(1)} / {summary.avgDeaths.toFixed(1)} / {summary.avgAssists.toFixed(1)} average across collected ranked games
+      </div>
+    </section>
+  );
+}
+
+function DataWindowPanel({ summary }: { summary: SummonerProfile['summary'] }) {
+  return (
+    <section className="profile-panel profile-window-panel">
+      <PanelHeading icon={<CalendarDays size={16} />} title="Stored Data Window" />
+      <div className="profile-metric-row">
+        <ProfileMetric label="First Seen" value={formatProfileDate(summary.firstSeen)} />
+        <ProfileMetric label="Last Seen" value={formatProfileDate(summary.lastSeen)} />
+        <ProfileMetric label="Sample" value={`${formatNumber(summary.games)} games`} />
+      </div>
+      <div className="profile-kda-line">
+        Profile summaries are compact read-model rows refreshed from retained ranked Solo/Duo matches.
+      </div>
+    </section>
+  );
+}
+
+function ChampionComfortPanel({ champions, records, title, wide = false }: { champions?: ChampionData; records: ChampionRecord[]; title: string; wide?: boolean }) {
+  return (
+    <section className={`profile-panel profile-wide-panel${wide ? ' profile-tab-panel' : ''}`}>
+      <PanelHeading icon={<Trophy size={16} />} title={title} />
+      {records.length ? (
+        <div className="profile-champion-list">
+          {records.map((record) => (
+            <ChampionComfortRow key={record.championId} record={record} champions={champions} />
+          ))}
+        </div>
+      ) : (
+        <p className="profile-empty-text">No stored champion games for this profile yet.</p>
+      )}
+    </section>
+  );
+}
+
+function RecentMatchesPanel({ champions, matches, title, wide = false }: { champions?: ChampionData; matches: SummonerRecentMatch[]; title: string; wide?: boolean }) {
+  return (
+    <section className={`profile-panel profile-wide-panel${wide ? ' profile-tab-panel' : ''}`}>
+      <PanelHeading icon={<History size={16} />} title={title} />
+      {matches.length ? (
+        <div className="profile-match-list">
+          {matches.map((match) => (
+            <RecentMatchRow key={`${match.matchId}:${match.championId}`} match={match} champions={champions} />
+          ))}
+        </div>
+      ) : (
+        <p className="profile-empty-text">Recent matches will appear once stored games are attached to this alias.</p>
+      )}
+    </section>
   );
 }
 
@@ -285,7 +361,12 @@ function ChampionComfortRow({ record, champions }: { record: ChampionRecord; cha
       <img src={championImageUrl(champions, record.championId)} alt={champion?.name ?? String(record.championId)} />
       <div>
         <strong>{champion?.name ?? `Champion ${record.championId}`}</strong>
-        <span>{formatNumber(record.games)} games · {record.winRate.toFixed(1)}% WR · {record.kda.toFixed(2)} KDA</span>
+        <span>{record.avgKills.toFixed(1)} / {record.avgDeaths.toFixed(1)} / {record.avgAssists.toFixed(1)} average</span>
+      </div>
+      <div className="profile-row-stats">
+        <ProfileMiniStat label="WR" value={`${record.winRate.toFixed(1)}%`} />
+        <ProfileMiniStat label="KDA" value={record.kda.toFixed(2)} />
+        <ProfileMiniStat label="Games" value={formatNumber(record.games)} />
       </div>
     </div>
   );
@@ -300,7 +381,21 @@ function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; cham
         <strong>{match.win ? 'Win' : 'Loss'} · {champion?.name ?? `Champion ${match.championId}`}</strong>
         <span><RoleIcon role={match.role} /> {roleLabel(match.role)} · {match.kills}/{match.deaths}/{match.assists} · Patch {match.patch} · {formatGameDate(match.gameStartTimestamp)} · {formatDuration(match.durationSeconds)}</span>
       </div>
+      <div className="profile-row-stats">
+        <ProfileMiniStat label="Result" value={match.win ? 'Win' : 'Loss'} tone={match.win ? 'win' : 'loss'} />
+        <ProfileMiniStat label="KDA" value={`${match.kills}/${match.deaths}/${match.assists}`} />
+        <ProfileMiniStat label="Role" value={roleLabel(match.role)} />
+      </div>
     </div>
+  );
+}
+
+function ProfileMiniStat({ label, tone, value }: { label: string; tone?: 'win' | 'loss'; value: string }) {
+  return (
+    <span className={`profile-mini-stat${tone ? ` ${tone}` : ''}`}>
+      <em>{label}</em>
+      <b>{value}</b>
+    </span>
   );
 }
 
@@ -326,6 +421,10 @@ function profileLiveError(riotId: string, message: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
+}
+
+function championName(champions: ChampionData | undefined, championId: number) {
+  return championByKey(champions, championId)?.name ?? `Champion ${championId}`;
 }
 
 function formatProfileDate(value?: string) {
