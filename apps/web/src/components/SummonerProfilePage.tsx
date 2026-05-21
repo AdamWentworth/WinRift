@@ -35,7 +35,7 @@ type MatchRoleFilter = 'ALL' | 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY
 const profileSections: { key: ProfileSection; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'champions', label: 'Champion Stats' },
-  { key: 'builds', label: 'Builds Used' },
+  { key: 'builds', label: 'Builds' },
   { key: 'matches', label: 'Match History' },
 ];
 
@@ -172,7 +172,7 @@ export function SummonerProfilePage({
               type="button"
             >
               <Package size={16} />
-              <span>Builds Used</span>
+              <span>Builds</span>
               <em>{profileQuery.data?.topBuilds?.length ? `${formatNumber(profileQuery.data.topBuilds.length)} stored paths` : 'Stored match paths'}</em>
             </button>
           </div>
@@ -456,7 +456,7 @@ function BuildsUsedTab({
   return (
     <section className="profile-panel profile-wide-panel profile-tab-panel profile-builds-tab">
       <div className="profile-tab-header">
-        <PanelHeading icon={<Package size={16} />} title="Builds Used" />
+        <PanelHeading icon={<Package size={16} />} title="Builds" />
         <div className="profile-tab-actions" aria-label="Summoner build sorting">
           <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
           <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />

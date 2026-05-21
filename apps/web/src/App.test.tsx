@@ -427,7 +427,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText('Profile Test#NA1')).toBeInTheDocument());
     await screen.findByText('Stored Form');
-    fireEvent.click(screen.getByRole('button', { name: /^Builds Used$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Builds$/i }));
     expect(await screen.findByText('This is usage history from stored ranked games for this summoner, not generalized build advice.')).toBeInTheDocument();
     expect(screen.getAllByText('Wukong').length).toBeGreaterThan(0);
     expect(screen.getAllByText('66.7%').length).toBeGreaterThan(0);
