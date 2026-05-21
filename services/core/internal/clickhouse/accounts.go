@@ -14,6 +14,17 @@ type AccountAlias struct {
 	LastSeen time.Time
 }
 
+type SummonerAccountSnapshot struct {
+	PUUID         string
+	Platform      string
+	SummonerID    string
+	AccountID     string
+	ProfileIconID uint32
+	SummonerLevel uint64
+	FetchedAt     time.Time
+	ExpiresAt     time.Time
+}
+
 func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 	statements := []string{`
 		CREATE TABLE IF NOT EXISTS riot_account_aliases
@@ -28,6 +39,21 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		)
 		ENGINE = ReplacingMergeTree(updated_at)
 		ORDER BY (platform, game_name_normalized, tag_line, puuid)
+	`, `
+		CREATE TABLE IF NOT EXISTS summoner_account_snapshots
+		(
+			puuid String,
+			platform LowCardinality(String),
+			summoner_id String,
+			account_id String,
+			profile_icon_id UInt32,
+			summoner_level UInt64,
+			fetched_at DateTime,
+			expires_at DateTime,
+			updated_at DateTime64(3) DEFAULT now64(3)
+		)
+		ENGINE = ReplacingMergeTree(updated_at)
+		ORDER BY (platform, puuid)
 	`, `
 		CREATE TABLE IF NOT EXISTS summoner_profile_summary
 		(
@@ -357,6 +383,65 @@ func (r *Repository) UpsertAccountAlias(ctx context.Context, alias AccountAlias)
 		alias.LastSeen,
 	)
 	return err
+}
+
+func (r *Repository) UpsertSummonerAccountSnapshot(ctx context.Context, snapshot SummonerAccountSnapshot) error {
+	if snapshot.PUUID == "" || snapshot.Platform == "" {
+		return nil
+	}
+	if snapshot.FetchedAt.IsZero() {
+		snapshot.FetchedAt = time.Now()
+	}
+	if snapshot.ExpiresAt.IsZero() {
+		snapshot.ExpiresAt = snapshot.FetchedAt.Add(7 * 24 * time.Hour)
+	}
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO summoner_account_snapshots
+			(puuid, platform, summoner_id, account_id, profile_icon_id, summoner_level, fetched_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		snapshot.PUUID,
+		snapshot.Platform,
+		snapshot.SummonerID,
+		snapshot.AccountID,
+		snapshot.ProfileIconID,
+		snapshot.SummonerLevel,
+		snapshot.FetchedAt,
+		snapshot.ExpiresAt,
+	)
+	return err
+}
+
+func (r *Repository) LatestSummonerAccountSnapshot(ctx context.Context, platform, puuid string) (SummonerAccountSnapshot, error) {
+	var snapshot SummonerAccountSnapshot
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT
+			puuid,
+			platform,
+			summoner_id,
+			account_id,
+			profile_icon_id,
+			summoner_level,
+			fetched_at,
+			expires_at
+		FROM summoner_account_snapshots FINAL
+		WHERE platform = ? AND puuid = ?
+		ORDER BY fetched_at DESC
+		LIMIT 1`,
+		platform,
+		puuid,
+	).Scan(
+		&snapshot.PUUID,
+		&snapshot.Platform,
+		&snapshot.SummonerID,
+		&snapshot.AccountID,
+		&snapshot.ProfileIconID,
+		&snapshot.SummonerLevel,
+		&snapshot.FetchedAt,
+		&snapshot.ExpiresAt,
+	)
+	return snapshot, err
 }
 
 func (r *Repository) ResolveAccountAliases(ctx context.Context, platform, gameName string, limit int) ([]AccountAlias, error) {

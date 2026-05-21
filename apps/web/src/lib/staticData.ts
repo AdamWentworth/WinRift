@@ -50,6 +50,11 @@ export function rankIconUrl(rank?: RankedRecord) {
   return `/images/ranked_icons/${tier}.png`;
 }
 
+export function profileIconUrl(version: string | undefined, profileIconId: number | undefined) {
+  if (!version || !profileIconId) return '';
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${profileIconId}.png`;
+}
+
 export function rankLabel(rank?: RankedRecord) {
   const tier = rank?.tier?.trim().toUpperCase();
   if (!tier || tier === 'UNRANKED') return 'UNRANKED';

@@ -5,7 +5,7 @@ import { CalendarDays, CircleAlert, History, LoaderCircle, RadioTower, Shield, T
 import { getLiveGame, getSummonerProfile, resolveAccountAlias } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
-import { championByKey, championImageUrl, rankIconUrl, rankLabel } from '../lib/staticData';
+import { championByKey, championImageUrl, profileIconUrl, rankIconUrl, rankLabel } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
 import { RoleIcon, roleLabel } from '../lib/roles';
 
@@ -99,17 +99,23 @@ export function SummonerProfilePage({
   const notInGame = Boolean(liveError);
   const showAliasLoading = aliasQuery.isLoading && Boolean(gameName && !tagLine);
   const showLiveLoading = liveQuery.isLoading && Boolean(resolvedGameName && resolvedTagLine);
+  const summonerIcon = profileIconUrl(champions?.version, profileQuery.data?.summoner?.profileIconId);
+  const summonerLevel = profileQuery.data?.summoner?.summonerLevel;
 
   return (
     <section className="profile-page">
       <div className="profile-card">
         <div className="profile-card-header">
-          <RadioTower size={24} />
+          {summonerIcon ? (
+            <img className="profile-card-icon" src={summonerIcon} alt={`${exactRiotId} profile icon`} />
+          ) : (
+            <RadioTower size={24} />
+          )}
           <div>
             <span>Summoner Profile</span>
             <strong>{exactRiotId || 'Search for a Riot ID'}</strong>
           </div>
-          <em>{platformLabel(resolvedPlatform)}</em>
+          <em>{platformLabel(resolvedPlatform)}{summonerLevel ? ` · Level ${formatNumber(summonerLevel)}` : ''}</em>
         </div>
 
         {!gameName ? (

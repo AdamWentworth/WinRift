@@ -20,6 +20,7 @@ import (
 )
 
 const defaultItemSlotMinGames = 5
+const summonerAccountSnapshotTTL = 7 * 24 * time.Hour
 
 type Server struct {
 	cfg       config.Config
@@ -98,6 +99,7 @@ func (s Server) resolveAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	response := map[string]any{"puuid": account.PUUID, "gameName": account.GameName, "tagLine": account.TagLine, "platform": platform}
 	if summoner != nil {
+		s.storeSummonerAccountSnapshot(r.Context(), summoner, platform)
 		response["summonerId"] = summoner.ID
 		response["accountId"] = summoner.AccountID
 		response["profileIconId"] = summoner.ProfileIconID
@@ -192,11 +194,15 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	summonerSnapshot := s.summonerAccountSnapshot(r.Context(), alias.Platform, alias.PUUID)
 	response := map[string]any{
 		"account":       accountAliasResponse(alias),
 		"summary":       summonerProfileStatsResponse(stats),
 		"topChampions":  championPerformanceRowsResponse(topChampions),
 		"recentMatches": summonerRecentMatchesResponse(recentMatches),
+	}
+	if summonerSnapshot != nil {
+		response["summoner"] = summonerAccountSnapshotResponse(*summonerSnapshot)
 	}
 	rank, err := s.repo.LatestRankSnapshot(r.Context(), alias.Platform, alias.PUUID, "RANKED_SOLO_5x5")
 	if err == nil {
@@ -1215,12 +1221,106 @@ func (s Server) storeAccountAlias(ctx context.Context, account *riot.Account, pl
 	}
 }
 
+func (s Server) storeSummonerAccountSnapshot(ctx context.Context, summoner *riot.Summoner, platform string) {
+	if summoner == nil {
+		return
+	}
+	now := time.Now()
+	if err := s.repo.UpsertSummonerAccountSnapshot(ctx, clickhouse.SummonerAccountSnapshot{
+		PUUID:         summoner.PUUID,
+		Platform:      platform,
+		SummonerID:    summoner.ID,
+		AccountID:     summoner.AccountID,
+		ProfileIconID: uint32(max(summoner.ProfileIconID, 0)),
+		SummonerLevel: uint64(max(summoner.SummonerLevel, 0)),
+		FetchedAt:     now,
+		ExpiresAt:     now.Add(summonerAccountSnapshotTTL),
+	}); err != nil {
+		log.Printf("summoner account snapshot store failed puuid=%s platform=%s err=%v", shortValue(summoner.PUUID), platform, err)
+	}
+}
+
+func (s Server) summonerAccountSnapshot(ctx context.Context, platform, puuid string) *clickhouse.SummonerAccountSnapshot {
+	now := time.Now()
+	var stale *clickhouse.SummonerAccountSnapshot
+	snapshot, err := s.repo.LatestSummonerAccountSnapshot(ctx, platform, puuid)
+	if err == nil {
+		if snapshot.ExpiresAt.IsZero() || snapshot.ExpiresAt.After(now) {
+			return &snapshot
+		}
+		stale = &snapshot
+	} else if !clickhouse.IsNoRows(err) {
+		log.Printf("summoner account snapshot lookup failed puuid=%s platform=%s err=%v", shortValue(puuid), platform, err)
+		return nil
+	}
+	if s.cfg.RiotAPIKey == "" || riot.AuthFailureMarkerExists(s.cfg) {
+		return stale
+	}
+	reservation, err := s.repo.ReserveRiotRequests(
+		ctx,
+		platform,
+		"api:summoner-profile-metadata",
+		1,
+		s.cfg.CollectorUsableRequestsPerRegion(),
+		s.cfg.CollectorRateLimitWindow,
+		now,
+	)
+	if err != nil {
+		log.Printf("summoner account snapshot budget check failed puuid=%s platform=%s err=%v", shortValue(puuid), platform, err)
+		return stale
+	}
+	if reservation.Granted < 1 {
+		log.Printf("summoner account snapshot refresh skipped puuid=%s platform=%s wait=%s used=%d limit=%d", shortValue(puuid), platform, reservation.Wait.Round(time.Second), reservation.Used, reservation.Limit)
+		return stale
+	}
+	summoner, err := s.riot.SummonerByPUUID(ctx, puuid, platform)
+	if err != nil {
+		log.Printf("summoner account snapshot refresh failed puuid=%s platform=%s err=%v", shortValue(puuid), platform, err)
+		return stale
+	}
+	if summoner == nil {
+		return stale
+	}
+	fresh := clickhouse.SummonerAccountSnapshot{
+		PUUID:         summoner.PUUID,
+		Platform:      platform,
+		SummonerID:    summoner.ID,
+		AccountID:     summoner.AccountID,
+		ProfileIconID: uint32(max(summoner.ProfileIconID, 0)),
+		SummonerLevel: uint64(max(summoner.SummonerLevel, 0)),
+		FetchedAt:     now,
+		ExpiresAt:     now.Add(summonerAccountSnapshotTTL),
+	}
+	if fresh.PUUID == "" {
+		fresh.PUUID = puuid
+	}
+	if err := s.repo.UpsertSummonerAccountSnapshot(ctx, fresh); err != nil {
+		log.Printf("summoner account snapshot store failed puuid=%s platform=%s err=%v", shortValue(puuid), platform, err)
+		return stale
+	}
+	return &fresh
+}
+
 func accountAliasResponse(alias clickhouse.AccountAlias) map[string]any {
 	return map[string]any{
 		"puuid":    alias.PUUID,
 		"platform": alias.Platform,
 		"gameName": alias.GameName,
 		"tagLine":  alias.TagLine,
+	}
+}
+
+func summonerAccountSnapshotResponse(snapshot clickhouse.SummonerAccountSnapshot) map[string]any {
+	return map[string]any{
+		"puuid":          snapshot.PUUID,
+		"platform":       snapshot.Platform,
+		"summonerId":     snapshot.SummonerID,
+		"accountId":      snapshot.AccountID,
+		"profileIconId":  snapshot.ProfileIconID,
+		"summonerLevel":  snapshot.SummonerLevel,
+		"fetchedAt":      snapshot.FetchedAt,
+		"expiresAt":      snapshot.ExpiresAt,
+		"cacheExpiresAt": snapshot.ExpiresAt,
 	}
 }
 

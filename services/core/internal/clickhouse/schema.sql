@@ -53,6 +53,21 @@ CREATE TABLE IF NOT EXISTS winrift.riot_account_aliases
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (platform, game_name_normalized, tag_line, puuid);
 
+CREATE TABLE IF NOT EXISTS winrift.summoner_account_snapshots
+(
+    puuid String,
+    platform LowCardinality(String),
+    summoner_id String,
+    account_id String,
+    profile_icon_id UInt32,
+    summoner_level UInt64,
+    fetched_at DateTime,
+    expires_at DateTime,
+    updated_at DateTime64(3) DEFAULT now64(3)
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (platform, puuid);
+
 CREATE TABLE IF NOT EXISTS winrift.summoner_profile_summary
 (
     platform LowCardinality(String),

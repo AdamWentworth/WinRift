@@ -307,6 +307,16 @@ button {
   color: #8cecff;
 }
 
+.profile-card-icon {
+  background: rgb(0 0 0 / 45%);
+  border: 1px solid rgb(140 236 255 / 42%);
+  box-shadow: 0 0 18px rgb(140 236 255 / 14%);
+  display: block;
+  height: 44px;
+  object-fit: cover;
+  width: 44px;
+}
+
 .profile-card-header span,
 .profile-next-panel span {
   color: #8fbfca;

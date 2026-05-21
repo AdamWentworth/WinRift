@@ -394,6 +394,18 @@ export type AccountAliasMatch = {
   tagLine: string;
 };
 
+export type SummonerAccountSnapshot = {
+  puuid: string;
+  platform: string;
+  summonerId?: string;
+  accountId?: string;
+  profileIconId?: number;
+  summonerLevel?: number;
+  fetchedAt?: string;
+  expiresAt?: string;
+  cacheExpiresAt?: string;
+};
+
 export type SummonerProfileSummary = {
   puuid: string;
   platform: string;
@@ -462,6 +474,7 @@ export type SummonerRecentMatch = {
 
 export type SummonerProfile = {
   account: AccountAliasMatch;
+  summoner?: SummonerAccountSnapshot;
   rank?: RankedRecord;
   summary: SummonerProfileSummary;
   topChampions: ChampionRecord[];
