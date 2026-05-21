@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, CircleAlert, History, LoaderCircle, RadioTower, Shield, Trophy } from 'lucide-react';
@@ -10,6 +10,9 @@ import { LiveMatchups } from './LiveMatchups';
 import { RoleIcon, roleLabel } from '../lib/roles';
 
 type ProfileSection = 'overview' | 'champions' | 'matches';
+type ChampionSort = 'games' | 'winrate' | 'kda';
+type MatchResultFilter = 'all' | 'wins' | 'losses';
+type MatchRoleFilter = 'ALL' | 'TOP' | 'JUNGLE' | 'MIDDLE' | 'BOTTOM' | 'UTILITY';
 
 const profileSections: { key: ProfileSection; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -221,23 +224,175 @@ function StoredProfile({ profile, champions }: { profile: SummonerProfile; champ
       </div>
 
       {section === 'overview' ? (
-        <div className="profile-data-grid">
-          <RankedPanel rank={rank} />
-          <FormPanel summary={summary} />
-          <DataWindowPanel summary={summary} />
-          <ChampionComfortPanel champions={champions} records={profile.topChampions.slice(0, 6)} title="Champion Comfort" />
-          <RecentMatchesPanel champions={champions} matches={profile.recentMatches.slice(0, 8)} title="Recent Stored Matches" />
-        </div>
+        <OverviewTab profile={profile} champions={champions} />
       ) : null}
 
       {section === 'champions' ? (
-        <ChampionComfortPanel champions={champions} records={profile.topChampions} title="Champion Stats" wide />
+        <ChampionPoolTab champions={champions} records={profile.topChampions} />
       ) : null}
 
       {section === 'matches' ? (
-        <RecentMatchesPanel champions={champions} matches={profile.recentMatches} title="Match History" wide />
+        <MatchHistoryTab champions={champions} matches={profile.recentMatches} />
       ) : null}
     </div>
+  );
+}
+
+function OverviewTab({ profile, champions }: { profile: SummonerProfile; champions?: ChampionData }) {
+  const rank = profile.rank;
+  const summary = profile.summary;
+  const bestChampion = profile.topChampions[0];
+  const recent = profile.recentMatches.slice(0, 10);
+  const recentWins = recent.filter((match) => match.win).length;
+  const recentWinRate = recent.length ? (recentWins / recent.length) * 100 : 0;
+  const recentChampion = recent[0] ? championName(champions, recent[0].championId) : 'No recent sample';
+  return (
+    <div className="profile-data-grid profile-overview-grid">
+      <RankedPanel rank={rank} />
+      <FormPanel summary={summary} />
+      <DataWindowPanel summary={summary} />
+
+      <section className="profile-panel profile-wide-panel profile-overview-read">
+        <PanelHeading icon={<Trophy size={16} />} title="Profile Read" />
+        <div className="profile-read-layout">
+          <div className="profile-read-main">
+            <span>Best Stored Champion</span>
+            <strong>{bestChampion ? championName(champions, bestChampion.championId) : 'No Champion Sample'}</strong>
+            <p>
+              {bestChampion
+                ? `${formatNumber(bestChampion.games)} games, ${bestChampion.winRate.toFixed(1)}% winrate, ${bestChampion.kda.toFixed(2)} KDA in WinRift's stored ranked data.`
+                : 'The collector has not attached enough ranked games to this profile yet.'}
+            </p>
+          </div>
+          <div className="profile-read-side">
+            <ProfileMetric label="Recent WR" value={recent.length ? `${recentWinRate.toFixed(1)}%` : '--'} />
+            <ProfileMetric label="Recent Games" value={formatNumber(recent.length)} />
+            <ProfileMetric label="Latest Champ" value={recentChampion} />
+          </div>
+        </div>
+        {recent.length ? (
+          <div className="profile-recent-pips" aria-label="Recent stored match results">
+            {recent.map((match) => (
+              <span key={`${match.matchId}:${match.championId}`} className={match.win ? 'win' : 'loss'} title={`${match.win ? 'Win' : 'Loss'} as ${championName(champions, match.championId)}`} />
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <ChampionHighlights champions={champions} records={profile.topChampions.slice(0, 4)} />
+    </div>
+  );
+}
+
+function ChampionHighlights({ champions, records }: { champions?: ChampionData; records: ChampionRecord[] }) {
+  return (
+    <section className="profile-panel profile-wide-panel">
+      <PanelHeading icon={<Trophy size={16} />} title="Champion Highlights" />
+      {records.length ? (
+        <div className="profile-highlight-grid">
+          {records.map((record) => {
+            const champion = championByKey(champions, record.championId);
+            return (
+              <div className="profile-highlight-card" key={record.championId}>
+                <img src={championImageUrl(champions, record.championId)} alt={champion?.name ?? String(record.championId)} />
+                <div>
+                  <strong>{champion?.name ?? `Champion ${record.championId}`}</strong>
+                  <span>{formatNumber(record.games)} games</span>
+                </div>
+                <b>{record.winRate.toFixed(1)}%</b>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="profile-empty-text">Champion highlights will appear once stored games are attached to this alias.</p>
+      )}
+    </section>
+  );
+}
+
+function ChampionPoolTab({ champions, records }: { champions?: ChampionData; records: ChampionRecord[] }) {
+  const [sort, setSort] = useState<ChampionSort>('games');
+  const sortedRecords = useMemo(() => sortChampionRecords(records, sort, champions), [champions, records, sort]);
+  const bestWinrate = sortedByWinRate(records)[0];
+  return (
+    <section className="profile-panel profile-wide-panel profile-tab-panel">
+      <div className="profile-tab-header">
+        <PanelHeading icon={<Trophy size={16} />} title="Champion Pool" />
+        <div className="profile-tab-actions" aria-label="Champion pool sorting">
+          <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
+          <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />
+          <ProfileToggle label="KDA" selected={sort === 'kda'} onClick={() => setSort('kda')} />
+        </div>
+      </div>
+      <div className="profile-tab-summary">
+        <ProfileMetric label="Champions" value={formatNumber(records.length)} />
+        <ProfileMetric label="Tracked Games" value={formatNumber(records.reduce((sum, record) => sum + record.games, 0))} />
+        <ProfileMetric label="Best WR" value={bestWinrate ? `${championName(champions, bestWinrate.championId)} ${bestWinrate.winRate.toFixed(1)}%` : '--'} />
+      </div>
+      {sortedRecords.length ? (
+        <div className="profile-champion-list">
+          {sortedRecords.map((record) => (
+            <ChampionComfortRow key={record.championId} record={record} champions={champions} />
+          ))}
+        </div>
+      ) : (
+        <p className="profile-empty-text">No stored champion games for this profile yet.</p>
+      )}
+    </section>
+  );
+}
+
+function MatchHistoryTab({ champions, matches }: { champions?: ChampionData; matches: SummonerRecentMatch[] }) {
+  const [resultFilter, setResultFilter] = useState<MatchResultFilter>('all');
+  const [roleFilter, setRoleFilter] = useState<MatchRoleFilter>('ALL');
+  const filteredMatches = useMemo(() => matches.filter((match) => {
+    const resultMatches = resultFilter === 'all' || (resultFilter === 'wins' ? match.win : !match.win);
+    const roleMatches = roleFilter === 'ALL' || match.role === roleFilter;
+    return resultMatches && roleMatches;
+  }), [matches, resultFilter, roleFilter]);
+  const wins = filteredMatches.filter((match) => match.win).length;
+  const winRate = filteredMatches.length ? (wins / filteredMatches.length) * 100 : 0;
+  return (
+    <section className="profile-panel profile-wide-panel profile-tab-panel">
+      <div className="profile-tab-header">
+        <PanelHeading icon={<History size={16} />} title="Match History" />
+        <div className="profile-tab-actions" aria-label="Match result filters">
+          <ProfileToggle label="All" selected={resultFilter === 'all'} onClick={() => setResultFilter('all')} />
+          <ProfileToggle label="Wins" selected={resultFilter === 'wins'} onClick={() => setResultFilter('wins')} />
+          <ProfileToggle label="Losses" selected={resultFilter === 'losses'} onClick={() => setResultFilter('losses')} />
+        </div>
+      </div>
+      <div className="profile-role-filter" aria-label="Match role filters">
+        {(['ALL', 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as MatchRoleFilter[]).map((role) => (
+          <button key={role} className={roleFilter === role ? 'selected' : ''} onClick={() => setRoleFilter(role)} type="button">
+            {role === 'ALL' ? 'All Roles' : <><RoleIcon role={role} /> {roleLabel(role)}</>}
+          </button>
+        ))}
+      </div>
+      <div className="profile-tab-summary">
+        <ProfileMetric label="Shown Games" value={formatNumber(filteredMatches.length)} />
+        <ProfileMetric label="Winrate" value={filteredMatches.length ? `${winRate.toFixed(1)}%` : '--'} />
+        <ProfileMetric label="Window" value={matches.length ? `${formatGameDate(matches[matches.length - 1].gameStartTimestamp)} to ${formatGameDate(matches[0].gameStartTimestamp)}` : '--'} />
+      </div>
+      {filteredMatches.length ? (
+        <div className="profile-match-list">
+          {filteredMatches.map((match) => (
+            <RecentMatchRow key={`${match.matchId}:${match.championId}`} match={match} champions={champions} />
+          ))}
+        </div>
+      ) : (
+        <p className="profile-empty-text">No stored matches match these filters yet.</p>
+      )}
+    </section>
+  );
+}
+
+function ProfileToggle({ label, onClick, selected }: { label: string; onClick: () => void; selected: boolean }) {
+  return (
+    <button className={selected ? 'selected' : ''} onClick={onClick} type="button">
+      {label}
+    </button>
   );
 }
 
@@ -304,40 +459,6 @@ function DataWindowPanel({ summary }: { summary: SummonerProfile['summary'] }) {
       <div className="profile-kda-line">
         Profile summaries are compact read-model rows refreshed from retained ranked Solo/Duo matches.
       </div>
-    </section>
-  );
-}
-
-function ChampionComfortPanel({ champions, records, title, wide = false }: { champions?: ChampionData; records: ChampionRecord[]; title: string; wide?: boolean }) {
-  return (
-    <section className={`profile-panel profile-wide-panel${wide ? ' profile-tab-panel' : ''}`}>
-      <PanelHeading icon={<Trophy size={16} />} title={title} />
-      {records.length ? (
-        <div className="profile-champion-list">
-          {records.map((record) => (
-            <ChampionComfortRow key={record.championId} record={record} champions={champions} />
-          ))}
-        </div>
-      ) : (
-        <p className="profile-empty-text">No stored champion games for this profile yet.</p>
-      )}
-    </section>
-  );
-}
-
-function RecentMatchesPanel({ champions, matches, title, wide = false }: { champions?: ChampionData; matches: SummonerRecentMatch[]; title: string; wide?: boolean }) {
-  return (
-    <section className={`profile-panel profile-wide-panel${wide ? ' profile-tab-panel' : ''}`}>
-      <PanelHeading icon={<History size={16} />} title={title} />
-      {matches.length ? (
-        <div className="profile-match-list">
-          {matches.map((match) => (
-            <RecentMatchRow key={`${match.matchId}:${match.championId}`} match={match} champions={champions} />
-          ))}
-        </div>
-      ) : (
-        <p className="profile-empty-text">Recent matches will appear once stored games are attached to this alias.</p>
-      )}
     </section>
   );
 }
@@ -431,6 +552,22 @@ function formatNumber(value: number) {
 
 function championName(champions: ChampionData | undefined, championId: number) {
   return championByKey(champions, championId)?.name ?? `Champion ${championId}`;
+}
+
+function sortChampionRecords(records: ChampionRecord[], sort: ChampionSort, champions: ChampionData | undefined) {
+  return [...records].sort((a, b) => {
+    if (sort === 'winrate') {
+      return b.winRate - a.winRate || b.games - a.games || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
+    }
+    if (sort === 'kda') {
+      return b.kda - a.kda || b.games - a.games || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
+    }
+    return b.games - a.games || b.winRate - a.winRate || championName(champions, a.championId).localeCompare(championName(champions, b.championId));
+  });
+}
+
+function sortedByWinRate(records: ChampionRecord[]) {
+  return [...records].sort((a, b) => b.winRate - a.winRate || b.games - a.games);
 }
 
 function formatProfileDate(value?: string) {
