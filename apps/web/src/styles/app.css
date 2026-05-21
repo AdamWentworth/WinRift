@@ -3146,6 +3146,56 @@ button {
   min-width: 0;
 }
 
+.build-setup-strip {
+  background: rgb(0 0 0 / 18%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  padding: 8px;
+}
+
+.build-setup-block {
+  align-items: center;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 8px;
+}
+
+.build-setup-block > span {
+  color: #9fb0b8;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.build-setup-block em {
+  color: #d8e3e6;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.build-setup-icons {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.build-setup-icons img {
+  border: 1px solid rgb(255 255 255 / 14%);
+  height: 26px;
+  object-fit: cover;
+  width: 26px;
+}
+
 .focused-build-picker {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 9%);
@@ -3295,6 +3345,21 @@ button {
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.build-advice-notes {
+  display: grid;
+  gap: 5px;
+}
+
+.build-advice-notes span {
+  background: rgb(130 215 255 / 7%);
+  border: 1px solid rgb(130 215 255 / 14%);
+  color: #c8d9df;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  padding: 6px 7px;
 }
 
 .build-delta {
@@ -4661,15 +4726,31 @@ button {
   padding: 8px;
 }
 
+.guide-build-advice-strip {
+  align-items: stretch;
+  background:
+    linear-gradient(90deg, rgb(130 215 255 / 9%), rgb(12 15 16 / 70%)),
+    rgb(12 15 16 / 72%);
+  border: 1px solid rgb(130 215 255 / 12%);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(170px, 0.85fr) repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+  padding: 8px;
+}
+
 .guide-coverage-title,
-.guide-coverage-stat {
+.guide-coverage-stat,
+.guide-build-advice-title,
+.guide-build-advice-stat {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 6%);
   min-width: 0;
   padding: 8px 10px;
 }
 
-.guide-coverage-title {
+.guide-coverage-title,
+.guide-build-advice-title {
   align-items: center;
   color: #93dceb;
   display: flex;
@@ -4680,7 +4761,9 @@ button {
 }
 
 .guide-coverage-stat span,
-.guide-coverage-stat strong {
+.guide-coverage-stat strong,
+.guide-build-advice-stat span,
+.guide-build-advice-stat strong {
   display: block;
   min-width: 0;
   overflow: hidden;
@@ -4688,14 +4771,16 @@ button {
   white-space: nowrap;
 }
 
-.guide-coverage-stat span {
+.guide-coverage-stat span,
+.guide-build-advice-stat span {
   color: #94acb3;
   font-size: 9px;
   font-weight: 1000;
   text-transform: uppercase;
 }
 
-.guide-coverage-stat strong {
+.guide-coverage-stat strong,
+.guide-build-advice-stat strong {
   color: #fff;
   font-size: 13px;
   font-weight: 1000;
@@ -5499,6 +5584,7 @@ button {
 
   .guide-stat-strip,
   .guide-coverage-strip,
+  .guide-build-advice-strip,
   .guide-filter-bar,
   .guide-rune-grid,
   .guide-item-grid {
@@ -5636,8 +5722,13 @@ button {
   }
 
   .focused-build-controls,
+  .build-setup-strip,
   .focused-build-results,
   .focused-build-result > header {
+    grid-template-columns: 1fr;
+  }
+
+  .build-setup-block {
     grid-template-columns: 1fr;
   }
 

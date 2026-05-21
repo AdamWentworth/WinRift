@@ -2,11 +2,51 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getItemSlotsBatch, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getBuildAdvice, getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
+
+const buildAdviceFixture = vi.hoisted(() => () => ({
+  filters: {
+    championId: 3,
+    role: 'MIDDLE',
+    opponentChampionId: 13,
+    patch: '16.10',
+    rankBucket: '',
+    itemContext: '',
+    minGames: 5,
+    championMinGames: 10,
+    limit: 12,
+  },
+  matchup: {
+    available: true,
+    itemSlots: [
+      { championId: 3, role: 'MIDDLE', opponentChampionId: 13, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 100, wins: 6, games: 10, winRate: 60, confidence: 45, sampleScopeLabel: 'Current patch exact matchup' },
+      { championId: 3, role: 'MIDDLE', opponentChampionId: 13, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 101, wins: 27, games: 50, winRate: 54, confidence: 48, sampleScopeLabel: 'Current patch exact matchup' },
+    ],
+    topBuilds: [],
+    sample: { maxGames: 50, optionCount: 2, fallbackUsed: false, scopeLabels: ['Current patch exact matchup'], sampleQuality: 'moderate', sampleQualityLabel: 'Moderate sample' },
+    sampleMode: 'champion_matchup',
+  },
+  champion: {
+    available: true,
+    itemSlots: [
+      { championId: 3, role: 'MIDDLE', opponentChampionId: 0, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 100, wins: 10, games: 20, winRate: 50, confidence: 40, sampleScopeLabel: 'Current patch champion overall' },
+    ],
+    topBuilds: [],
+    topRunes: [],
+    topSpells: [],
+    topItemPaths: [],
+    summary: { championId: 3, role: 'MIDDLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
+    sample: { maxGames: 20, optionCount: 1, fallbackUsed: false, scopeLabels: ['Current patch champion overall'], sampleQuality: 'early', sampleQualityLabel: 'Early sample' },
+    sampleMode: 'champion_overall',
+    strictRoleUsed: true,
+  },
+  notes: ['Build advice is compiled from stored ranked Solo/Duo games and refreshed summary tables.'],
+}));
 
 vi.mock('./api/client', () => ({
   getBuilds: vi.fn(async () => ({ results: [] })),
+  getBuildAdvice: vi.fn(async () => buildAdviceFixture()),
   getChampionGuide: vi.fn(async () => ({
     summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
     toughestMatchups: [],
@@ -22,7 +62,6 @@ vi.mock('./api/client', () => ({
     ],
   })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
-  getItemSlotsBatch: vi.fn(async () => ({ results: [] })),
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
   getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
   getChampions: vi.fn(async () => ({
@@ -70,7 +109,7 @@ describe('App', () => {
     vi.mocked(getChampionRoleRates).mockReset();
     vi.mocked(getChampionGuide).mockReset();
     vi.mocked(getChampionGuideIndex).mockReset();
-    vi.mocked(getItemSlotsBatch).mockReset();
+    vi.mocked(getBuildAdvice).mockReset();
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
@@ -89,7 +128,7 @@ describe('App', () => {
         { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
       ],
     });
-    vi.mocked(getItemSlotsBatch).mockResolvedValue({ results: [] });
+    vi.mocked(getBuildAdvice).mockResolvedValue(buildAdviceFixture());
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
     vi.mocked(getSummonerProfile).mockResolvedValue({
       account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Test Summoner', tagLine: 'NA1' },
@@ -500,19 +539,6 @@ describe('App', () => {
         { teamId: 200, championId: 12, spell1Id: 11, spell2Id: 4, puuid: 'red-jungle', summonerName: 'Red Jungle', perks: {}, bot: false },
       ],
     });
-    vi.mocked(getItemSlotsBatch).mockImplementation(async (requests) => ({
-      results: requests.map((request) => ({
-        key: request.key,
-        results: request.key === 'matchup'
-          ? [
-            { championId: 3, role: 'MIDDLE', opponentChampionId: 13, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 100, wins: 6, games: 10, winRate: 60, confidence: 45 },
-            { championId: 3, role: 'MIDDLE', opponentChampionId: 13, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 101, wins: 27, games: 50, winRate: 54, confidence: 48 },
-          ]
-          : [
-            { championId: 3, role: 'MIDDLE', opponentChampionId: 0, patchBucket: 'ALL', rankBucket: 'ALL', itemSlot: 1, itemId: 100, wins: 10, games: 20, winRate: 50, confidence: 40 },
-          ],
-      })),
-    }));
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -618,46 +644,28 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show Builds mode' }));
 
     await waitFor(() => {
-      const calls = vi.mocked(getItemSlotsBatch).mock.calls;
-      const requests = calls[calls.length - 1]?.[0] ?? [];
-      expect(requests).toEqual([
-        expect.objectContaining({
-          key: 'matchup',
-          championId: 3,
-          opponentChampionId: 13,
-          minGames: 5,
-          limit: 12,
-          patch: '16.10',
-          fallback: true,
-        }),
-        expect.objectContaining({
-          key: 'champion',
-          championId: 3,
-          minGames: 10,
-          limit: 12,
-          patch: '16.10',
-          fallback: true,
-        }),
-      ]);
-      expect(requests[1]).not.toHaveProperty('opponentChampionId');
+      expect(getBuildAdvice).toHaveBeenLastCalledWith(expect.objectContaining({
+        championId: 3,
+        role: 'MIDDLE',
+        opponentChampionId: 13,
+        minGames: 5,
+        championMinGames: 10,
+        limit: 12,
+        patch: '16.10',
+      }));
+      const calls = vi.mocked(getBuildAdvice).mock.calls;
+      expect(calls[calls.length - 1]?.[0]).not.toHaveProperty('fallback');
     });
     expect(screen.getAllByText('Blue Mid').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Red Mid').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByLabelText('Build For Red Jungle'));
     await waitFor(() => {
-      const calls = vi.mocked(getItemSlotsBatch).mock.calls;
-      const requests = calls[calls.length - 1]?.[0] ?? [];
-      expect(requests).toEqual([
-        expect.objectContaining({
-          key: 'matchup',
-          championId: 12,
-          opponentChampionId: 2,
-        }),
-        expect.objectContaining({
-          key: 'champion',
-          championId: 12,
-        }),
-      ]);
+      expect(getBuildAdvice).toHaveBeenLastCalledWith(expect.objectContaining({
+        championId: 12,
+        role: 'JUNGLE',
+        opponentChampionId: 2,
+        itemContext: 'JUNGLE',
+      }));
     });
     queryClient.clear();
   });

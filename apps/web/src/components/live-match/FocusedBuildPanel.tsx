@@ -1,10 +1,18 @@
-import type { AnalyticsItemSlot, BuildFilters, ChampionData, ItemData, LiveParticipant } from '../../api/types';
+import type { AnalyticsItemSlot, BuildAdviceResponse, BuildFilters, ChampionData, ItemData, LiveParticipant, RuneData, SummonerSpellData } from '../../api/types';
 import { RoleIcon, roleLabel } from '../../lib/roles';
 import {
   championByKey,
   championImageUrl,
   itemImageUrl,
   itemName,
+  parseRuneSignature,
+  runeImageUrl,
+  runeName,
+  runeStyleImageUrl,
+  runeStyleName,
+  signatureSpells,
+  summonerSpellImageUrl,
+  summonerSpellName,
 } from '../../lib/staticData';
 import {
   BUILD_BASELINE_MIN_GAMES,
@@ -23,8 +31,9 @@ export function FocusedBuildPanel({
   selection,
   champions,
   items,
-  matchupItemSlots,
-  championItemSlots,
+  spells,
+  runes,
+  buildAdvice,
   loading,
   selectedParticipantKey,
   onSelectParticipant,
@@ -34,8 +43,9 @@ export function FocusedBuildPanel({
   selection?: FocusedBuildSelection;
   champions?: ChampionData;
   items?: ItemData;
-  matchupItemSlots: AnalyticsItemSlot[];
-  championItemSlots: AnalyticsItemSlot[];
+  spells?: SummonerSpellData;
+  runes?: RuneData;
+  buildAdvice?: BuildAdviceResponse;
   loading: boolean;
   selectedParticipantKey: string;
   onSelectParticipant: (key: string) => void;
@@ -51,10 +61,12 @@ export function FocusedBuildPanel({
   const opponentUrl = championImageUrl(champions, selection.opponent.championId);
   const playerName = participantDisplayName(selection.participant);
   const opponentName = participantDisplayName(selection.opponent);
-  const matchupSample = buildSampleQuality(highestSlotSample(matchupItemSlots));
-  const championSample = buildSampleQuality(highestSlotSample(championItemSlots));
-  const matchupScopeLabel = buildScopeLabel(matchupItemSlots);
-  const championScopeLabel = buildScopeLabel(championItemSlots);
+  const matchupItemSlots = buildAdvice?.matchup.itemSlots ?? [];
+  const championItemSlots = buildAdvice?.champion.itemSlots ?? [];
+  const matchupSample = buildAdviceSample(buildAdvice?.matchup.sample, matchupItemSlots);
+  const championSample = buildAdviceSample(buildAdvice?.champion.sample, championItemSlots);
+  const matchupScopeLabel = buildScopeLabel(matchupItemSlots, buildAdvice?.matchup.sample.scopeLabels);
+  const championScopeLabel = buildScopeLabel(championItemSlots, buildAdvice?.champion.sample.scopeLabels);
   const matchupSummary = buildPathSummary(matchupItemSlots);
   const championSummary = buildPathSummary(championItemSlots);
   const matchupDelta = buildPathDelta(matchupSummary, championSummary);
@@ -100,6 +112,7 @@ export function FocusedBuildPanel({
           onSelect={onSelectOpponent}
         />
       </div>
+      <BuildAdviceSetupStrip buildAdvice={buildAdvice} spells={spells} runes={runes} loading={loading} />
       <div className="focused-build-results">
         <BuildResultCard
           title="Matchup Build"
@@ -108,6 +121,7 @@ export function FocusedBuildPanel({
           summary={matchupSummary}
           comparison={matchupDelta}
           scopeLabel={matchupScopeLabel}
+          notes={buildAdvice?.notes}
           side={selection.side}
           itemSlots={matchupItemSlots}
           loading={loading}
@@ -123,6 +137,7 @@ export function FocusedBuildPanel({
           summary={championSummary}
           comparison="Champion-wide reference"
           scopeLabel={championScopeLabel}
+          notes={undefined}
           side={selection.side}
           itemSlots={championItemSlots}
           loading={loading}
@@ -136,26 +151,16 @@ export function FocusedBuildPanel({
   );
 }
 
-export function buildFilters(participant: LiveParticipant, opponent: LiveParticipant, role: string, patch?: string): BuildFilters {
+export function buildAdviceFilters(participant: LiveParticipant, opponent: LiveParticipant, role: string, patch?: string): BuildFilters & { championMinGames: number } {
   return {
     championId: participant.championId,
+    role,
     opponentChampionId: opponent.championId,
     itemContext: itemContextForParticipant(participant, role),
     patch,
     minGames: BUILD_MATCHUP_MIN_GAMES,
+    championMinGames: BUILD_BASELINE_MIN_GAMES,
     limit: BUILD_SLOT_CANDIDATE_LIMIT,
-    fallback: Boolean(patch),
-  };
-}
-
-export function championBuildFiltersFor(participant: LiveParticipant, role: string, patch?: string): BuildFilters {
-  return {
-    championId: participant.championId,
-    itemContext: itemContextForParticipant(participant, role),
-    patch,
-    minGames: BUILD_BASELINE_MIN_GAMES,
-    limit: BUILD_SLOT_CANDIDATE_LIMIT,
-    fallback: Boolean(patch),
   };
 }
 
@@ -241,6 +246,7 @@ function BuildResultCard({
   summary,
   comparison,
   scopeLabel,
+  notes,
   side,
   itemSlots,
   loading,
@@ -255,6 +261,7 @@ function BuildResultCard({
   summary?: BuildPathSummary;
   comparison?: string;
   scopeLabel: string;
+  notes?: string[];
   side: TeamSide;
   itemSlots: AnalyticsItemSlot[];
   loading: boolean;
@@ -282,6 +289,11 @@ function BuildResultCard({
           {scopeLabel ? <StatusChip as="small" className="build-scope-label">{scopeLabel}</StatusChip> : null}
         </div>
       </header>
+      {notes?.length ? (
+        <div className="build-advice-notes">
+          {notes.slice(0, 2).map((note) => <span key={note}>{note}</span>)}
+        </div>
+      ) : null}
       <BuildSide
         side={side}
         itemSlots={itemSlots}
@@ -291,6 +303,54 @@ function BuildResultCard({
         emptySubtitle={emptySubtitle}
       />
     </article>
+  );
+}
+
+function BuildAdviceSetupStrip({
+  buildAdvice,
+  spells,
+  runes,
+  loading,
+}: {
+  buildAdvice?: BuildAdviceResponse;
+  spells?: SummonerSpellData;
+  runes?: RuneData;
+  loading: boolean;
+}) {
+  const runeRow = buildAdvice?.champion.topRunes[0];
+  const spellRow = buildAdvice?.champion.topSpells[0];
+  const parsedRunes = parseRuneSignature(runeRow?.runeSignature ?? '');
+  const spellIds = signatureSpells(spellRow?.spellSignature ?? '');
+  if (loading) {
+    return <div className="build-setup-strip muted">Loading runes and spells...</div>;
+  }
+  if (!runeRow && !spellRow) {
+    return null;
+  }
+  return (
+    <div className="build-setup-strip">
+      <div className="build-setup-block">
+        <span>Top Rune Setup</span>
+        <div className="build-setup-icons">
+          {parsedRunes.primaryStyleId ? (
+            <img src={runeStyleImageUrl(runes, parsedRunes.primaryStyleId)} alt={runeStyleName(runes, parsedRunes.primaryStyleId)} title={runeStyleName(runes, parsedRunes.primaryStyleId)} />
+          ) : null}
+          {parsedRunes.runeIds.slice(0, 4).map((runeId) => (
+            <img key={runeId} src={runeImageUrl(runes, runeId)} alt={runeName(runes, runeId)} title={runeName(runes, runeId)} />
+          ))}
+        </div>
+        {runeRow ? <em>{runeRow.winRate.toFixed(1)}% WR · {runeRow.games} games</em> : null}
+      </div>
+      <div className="build-setup-block">
+        <span>Top Spells</span>
+        <div className="build-setup-icons">
+          {spellIds.map((spellId) => (
+            <img key={spellId} src={summonerSpellImageUrl(spells, spellId)} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} />
+          ))}
+        </div>
+        {spellRow ? <em>{spellRow.winRate.toFixed(1)}% WR · {spellRow.games} games</em> : null}
+      </div>
+    </div>
   );
 }
 
@@ -443,6 +503,18 @@ function mostPlayedItemSlot(rows: AnalyticsItemSlot[]) {
   }, undefined);
 }
 
+function buildAdviceSample(sample: BuildAdviceResponse['matchup']['sample'] | undefined, itemSlots: AnalyticsItemSlot[]) {
+  if (sample) {
+    const samples = sample.maxGames;
+    const tone = sample.sampleQuality === 'strong' ? 'strong' : sample.sampleQuality === 'moderate' ? 'useful' : sample.sampleQuality === 'early' ? 'early' : sample.sampleQuality === 'tiny' ? 'thin' : 'none';
+    return {
+      label: samples > 0 ? `${samples} samples · ${sample.sampleQualityLabel.replace(/ sample$/i, '').toLowerCase()}` : sample.sampleQualityLabel,
+      tone,
+    };
+  }
+  return buildSampleQuality(highestSlotSample(itemSlots));
+}
+
 function buildSampleQuality(samples: number) {
   if (samples <= 0) return { label: 'No samples', tone: 'none' };
   if (samples < 5) return { label: `${samples} sample${samples === 1 ? '' : 's'} · thin`, tone: 'thin' };
@@ -451,8 +523,8 @@ function buildSampleQuality(samples: number) {
   return { label: `${samples} samples · strong`, tone: 'strong' };
 }
 
-function buildScopeLabel(itemSlots: AnalyticsItemSlot[]) {
-  const labels = [...new Set(itemSlots.map((row) => row.sampleScopeLabel).filter(Boolean))];
+function buildScopeLabel(itemSlots: AnalyticsItemSlot[], scopeLabels?: string[]) {
+  const labels = scopeLabels?.length ? scopeLabels : [...new Set(itemSlots.map((row) => row.sampleScopeLabel).filter(Boolean))];
   if (!labels.length) return '';
   if (labels.length === 1) return labels[0] ?? '';
   return 'Mixed fallback samples';

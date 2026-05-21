@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GripVertical } from 'lucide-react';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { ChampionData, ChampionRecord, ChampionRoleRate, ItemData, LiveGame, LiveParticipant, RankedRecord, RuneData, SummonerSpellData } from '../api/types';
-import { getChampionRoleRates, getItemSlotsBatch, getWinConditionAnalysis } from '../api/client';
+import { getBuildAdvice, getChampionRoleRates, getWinConditionAnalysis } from '../api/client';
 import {
   championByKey,
   championImageUrl,
@@ -16,7 +16,7 @@ import {
   summonerSpellName,
 } from '../lib/staticData';
 import { RoleIcon, roleLabel } from '../lib/roles';
-import { FocusedBuildPanel, buildFilters, championBuildFiltersFor, focusedBuildSelection } from './live-match/FocusedBuildPanel';
+import { FocusedBuildPanel, buildAdviceFilters, focusedBuildSelection } from './live-match/FocusedBuildPanel';
 import { LaneHeader, LaneTabs } from './live-match/LaneNavigation';
 import { LiveModeRail } from './live-match/LiveModeRail';
 import { MatchHeader } from './live-match/MatchHeader';
@@ -72,10 +72,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     return focusedBuildSelection(searchedParticipant, blueTeam, redTeam, selectedBuildParticipantKey, selectedBuildOpponentKey);
   }, [blueTeam, redTeam, searchedParticipant, selectedBuildOpponentKey, selectedBuildParticipantKey]);
   const focusedBuildFilters = useMemo(() => (
-    focusedBuild ? buildFilters(focusedBuild.participant, focusedBuild.opponent, focusedBuild.role, patchBucket) : undefined
-  ), [focusedBuild, patchBucket]);
-  const championBuildFilters = useMemo(() => (
-    focusedBuild ? championBuildFiltersFor(focusedBuild.participant, focusedBuild.role, patchBucket) : undefined
+    focusedBuild ? buildAdviceFilters(focusedBuild.participant, focusedBuild.opponent, focusedBuild.role, patchBucket) : undefined
   ), [focusedBuild, patchBucket]);
   const winConditionQuery = useQuery({
     queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, patchBucket, blueChampionIds, redChampionIds],
@@ -122,18 +119,12 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
     setRedTeam((team) => moveParticipantToIndex(team, fromIndex, toIndex));
   };
 
-  const focusedItemSlotQuery = useQuery({
-    queryKey: ['live-focused-item-slots', focusedBuildFilters, championBuildFilters],
-    queryFn: () => getItemSlotsBatch([
-      { key: 'matchup', ...focusedBuildFilters! },
-      { key: 'champion', ...championBuildFilters! },
-    ]),
-    enabled: showBuildMode && Boolean(focusedBuildFilters && championBuildFilters),
+  const focusedBuildAdviceQuery = useQuery({
+    queryKey: ['live-focused-build-advice', focusedBuildFilters],
+    queryFn: () => getBuildAdvice(focusedBuildFilters!),
+    enabled: showBuildMode && Boolean(focusedBuildFilters),
     staleTime: 30_000,
   });
-
-  const matchupItemSlots = focusedItemSlotQuery.data?.results.find((result) => result.key === 'matchup')?.results ?? [];
-  const championItemSlots = focusedItemSlotQuery.data?.results.find((result) => result.key === 'champion')?.results ?? [];
 
   return (
     <div className="game-board">
@@ -170,9 +161,10 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
               selection={focusedBuild}
               champions={champions}
               items={items}
-              matchupItemSlots={matchupItemSlots}
-              championItemSlots={championItemSlots}
-              loading={focusedItemSlotQuery.isLoading}
+              spells={spells}
+              runes={runes}
+              buildAdvice={focusedBuildAdviceQuery.data}
+              loading={focusedBuildAdviceQuery.isLoading}
               selectedParticipantKey={selectedBuildParticipantKey}
               onSelectParticipant={(key) => {
                 setSelectedBuildParticipantKey(key);

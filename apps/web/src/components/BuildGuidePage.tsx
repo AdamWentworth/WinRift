@@ -2,8 +2,8 @@ import { Database, Filter, Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getChampionGuide, getChampionGuideIndex, getItemSlots } from '../api/client';
-import type { AnalyticsItemSlot, Champion, ChampionData, ChampionGuideResponse, ChampionGuideSummary, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
+import { getBuildAdvice, getChampionGuide, getChampionGuideIndex } from '../api/client';
+import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideResponse, ChampionGuideSummary, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
   championByKey,
@@ -64,9 +64,9 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
     enabled: Boolean(championId && patch),
     staleTime: 5 * 60 * 1000,
   });
-  const itemSlotsQuery = useQuery({
-    queryKey: ['guide-item-slots', championId, role, patch, rankBucket, opponentChampionId],
-    queryFn: () => getItemSlots({
+  const buildAdviceQuery = useQuery({
+    queryKey: ['guide-build-advice', championId, role, patch, rankBucket, opponentChampionId],
+    queryFn: () => getBuildAdvice({
       championId,
       role,
       itemContext,
@@ -74,8 +74,8 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       patch,
       rankBucket,
       minGames: opponentChampionId ? 3 : 5,
+      championMinGames: 10,
       limit: 4,
-      fallback: true,
     }),
     enabled: Boolean(championId && patch),
     staleTime: 5 * 60 * 1000,
@@ -100,7 +100,11 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   };
 
   const guide = guideQuery.data;
-  const itemSlots = itemSlotsQuery.data?.results ?? [];
+  const buildAdvice = buildAdviceQuery.data;
+  const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
+  const itemSlots = buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
+    ? buildAdvice.matchup.itemSlots
+    : buildAdvice?.champion.itemSlots ?? [];
   const splash = championSplashUrl(champions, championId);
   const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
   const titleRole = roleLabel(role);
@@ -166,7 +170,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         onOpponentChange={setOpponentChampionId}
       />
 
-      <GuideStats guide={guide} loading={guideQuery.isLoading} />
+      <GuideStats guide={guideForBuilds} loading={guideQuery.isLoading && buildAdviceQuery.isLoading} />
       <GuideCoverage
         loading={guideIndexQuery.isLoading}
         championCount={guideIndex.length}
@@ -184,12 +188,12 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       </div>
 
       <div className="guide-primary-grid">
-        <RuneGuideCard guide={guide} runes={runes} loading={guideQuery.isLoading} />
+        <RuneGuideCard guide={guideForBuilds} runes={runes} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
         <div className="guide-side-stack">
-          <SpellGuideCard guide={guide} spells={spells} loading={guideQuery.isLoading} />
+          <SpellGuideCard guide={guideForBuilds} spells={spells} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
           <GuideMiniNote
             title="Matchup Lens"
-            body={opponent ? `Item panels are narrowed to ${opponent.name} when the sample exists, then fall back to broader ${champion?.name ?? 'champion'} data.` : 'Choose a matchup filter to compare item choices into a specific opponent.'}
+            body={buildAdvice?.notes[0] ?? (opponent ? `Item panels are narrowed to ${opponent.name} when the sample exists, then fall back to broader ${champion?.name ?? 'champion'} data.` : 'Choose a matchup filter to compare item choices into a specific opponent.')}
           />
         </div>
       </div>
@@ -201,14 +205,49 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
       </div>
 
-      <ItemPathSummaryCard guide={guide} items={items} loading={guideQuery.isLoading} />
+      <ItemPathSummaryCard guide={guideForBuilds} items={items} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
 
-      <ItemGuideGrid rows={itemSlots} items={items} loading={itemSlotsQuery.isLoading} context={opponent ? `Filtered into ${opponent.name}` : 'Champion-wide build path'} />
+      <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
+
+      <ItemGuideGrid rows={itemSlots} items={items} loading={buildAdviceQuery.isLoading} context={buildAdviceContext(buildAdvice, opponent?.name)} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
 
       <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={guideQuery.isLoading} />
     </section>
+  );
+}
+
+function BuildAdviceCoverage({ buildAdvice, loading }: { buildAdvice?: BuildAdviceResponse; loading: boolean }) {
+  const matchupSample = buildAdvice?.matchup.sample;
+  const championSample = buildAdvice?.champion.sample;
+  return (
+    <div className="guide-build-advice-strip">
+      <div className="guide-build-advice-title">
+        <Database size={15} />
+        <span>Build Advice Source</span>
+      </div>
+      <MetricTile
+        className="guide-build-advice-stat"
+        label="Matchup sample"
+        value={loading ? '...' : matchupSample?.sampleQualityLabel ?? 'No matchup'}
+      />
+      <MetricTile
+        className="guide-build-advice-stat"
+        label="Matchup max"
+        value={loading ? '...' : formatNumber(matchupSample?.maxGames ?? 0)}
+      />
+      <MetricTile
+        className="guide-build-advice-stat"
+        label="Champion sample"
+        value={loading ? '...' : championSample?.sampleQualityLabel ?? 'No sample'}
+      />
+      <MetricTile
+        className="guide-build-advice-stat"
+        label="Fallback"
+        value={loading ? '...' : buildAdvice ? (buildAdvice.matchup.sample.fallbackUsed ? 'Mixed' : 'Exact') : '--'}
+      />
+    </div>
   );
 }
 
@@ -265,6 +304,31 @@ function GuideFilters({
       </SelectControl>
     </div>
   );
+}
+
+function mergeGuideWithBuildAdvice(guide: ChampionGuideResponse | undefined, buildAdvice: BuildAdviceResponse): ChampionGuideResponse {
+  return {
+    summary: buildAdvice.champion.summary,
+    toughestMatchups: guide?.toughestMatchups ?? [],
+    bestMatchups: guide?.bestMatchups ?? [],
+    topRunes: buildAdvice.champion.topRunes,
+    topSpells: buildAdvice.champion.topSpells,
+    topSkillOrders: guide?.topSkillOrders ?? [],
+    topItemPaths: buildAdvice.champion.topItemPaths,
+  };
+}
+
+function buildAdviceContext(buildAdvice: BuildAdviceResponse | undefined, opponentName?: string) {
+  if (!buildAdvice) {
+    return opponentName ? `Filtered into ${opponentName}` : 'Champion-wide build path';
+  }
+  if (buildAdvice.matchup.available && buildAdvice.matchup.sample.fallbackUsed) {
+    return opponentName ? `Into ${opponentName}, widened where samples are thin` : 'Champion-wide build path';
+  }
+  if (buildAdvice.matchup.available) {
+    return opponentName ? `Filtered into ${opponentName}` : 'Champion-wide build path';
+  }
+  return 'Champion-wide build path';
 }
 
 function GuideCoverage({ loading, championCount, totalGames, selectedGames, role, rankLabel, patch }: { loading: boolean; championCount: number; totalGames: number; selectedGames: number; role: string; rankLabel: string; patch: string }) {
