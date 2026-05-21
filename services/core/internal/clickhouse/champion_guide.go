@@ -101,6 +101,12 @@ type ChampionGuideData struct {
 	TopItemPaths     []ChampionGuideItemPathRow
 }
 
+type ChampionGuideIndex struct {
+	Results            []ChampionGuideSummary
+	MatchCount         int
+	ParticipantSamples int
+}
+
 type championGuidePerformance struct {
 	Kills                      int
 	Deaths                     int
@@ -145,7 +151,7 @@ func (performance *championGuidePerformance) scanTargets() []any {
 	}
 }
 
-func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideSummary, error) {
+func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[string]string, minGames, limit int) (ChampionGuideIndex, error) {
 	if minGames <= 0 {
 		minGames = 1
 	}
@@ -154,9 +160,9 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	}
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, baseArgs := championGuideBaseSQL(filters, roleScope, false)
-	var totalRoleGames int
-	if err := r.db.QueryRowContext(ctx, "SELECT count() "+baseSQL, baseArgs...).Scan(&totalRoleGames); err != nil {
-		return nil, err
+	index := ChampionGuideIndex{}
+	if err := r.db.QueryRowContext(ctx, "SELECT count(), uniqExact(match_id) "+baseSQL, baseArgs...).Scan(&index.ParticipantSamples, &index.MatchCount); err != nil {
+		return ChampionGuideIndex{}, err
 	}
 	query := `
 		SELECT
@@ -189,7 +195,7 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	args := append(append([]any{}, baseArgs...), minGames)
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return ChampionGuideIndex{}, err
 	}
 	defer rows.Close()
 
@@ -199,7 +205,7 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 		var performance championGuidePerformance
 		scanTargets := append([]any{&row.ChampionID, &row.Wins, &row.Games, &row.WinRate}, performance.scanTargets()...)
 		if err := rows.Scan(scanTargets...); err != nil {
-			return nil, err
+			return ChampionGuideIndex{}, err
 		}
 		applyPerformanceAverages(&row, performance)
 		row.Role = roleLabel(filters["role"])
@@ -208,22 +214,23 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 		if row.Games > 0 {
 			row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
 		}
-		if totalRoleGames > 0 {
-			row.PickRate = float64(row.Games) / float64(totalRoleGames)
+		if index.ParticipantSamples > 0 {
+			row.PickRate = float64(row.Games) / float64(index.ParticipantSamples)
 		}
 		out = append(out, row)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return ChampionGuideIndex{}, err
 	}
 	out, err = r.rankChampionGuideSummaries(ctx, filters, out)
 	if err != nil {
-		return nil, err
+		return ChampionGuideIndex{}, err
 	}
 	if len(out) > limit {
 		out = out[:limit]
 	}
-	return out, nil
+	index.Results = out
+	return index, nil
 }
 
 func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]string, minGames, limit int) (ChampionGuideData, error) {
@@ -886,6 +893,7 @@ func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScop
 		FROM
 		(
 			SELECT
+				pm.match_id AS match_id,
 				pm.champion_id AS champion_id,
 				pm.role AS role,
 				pm.opponent_champion_id AS opponent_champion_id,

@@ -288,12 +288,16 @@ func (s Server) analyticsChampionGuideIndex(w http.ResponseWriter, r *http.Reque
 	}
 	minGames := queryInt(query.Get("minGames"), 1)
 	limit := queryInt(query.Get("limit"), 250)
-	rows, err := s.repo.QueryChampionGuideIndex(r.Context(), filters, minGames, limit)
+	index, err := s.repo.QueryChampionGuideIndex(r.Context(), filters, minGames, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": championGuideSummariesResponse(rows)})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"results":            championGuideSummariesResponse(index.Results),
+		"matchCount":         index.MatchCount,
+		"participantSamples": index.ParticipantSamples,
+	})
 }
 
 func (s Server) analyticsChampionGuide(w http.ResponseWriter, r *http.Request) {

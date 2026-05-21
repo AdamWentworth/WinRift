@@ -246,6 +246,8 @@ export type ChampionGuideResponse = {
 
 export type ChampionGuideIndexResponse = {
   results: ChampionGuideSummary[];
+  matchCount?: number;
+  participantSamples?: number;
 };
 
 export type ChampionRoleRate = {

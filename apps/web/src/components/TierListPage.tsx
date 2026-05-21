@@ -88,7 +88,9 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
       .sort((a, b) => sortRows(a, b, sortMode));
   }, [champions, normalizedSearch, sortMode, tierQuery.data?.results]);
   const featured = rows.slice(0, 3);
-  const totalGames = (tierQuery.data?.results ?? []).reduce((sum, row) => sum + row.games, 0);
+  const summedChampionGames = (tierQuery.data?.results ?? []).reduce((sum, row) => sum + row.games, 0);
+  const participantSamples = tierQuery.data?.participantSamples ?? summedChampionGames;
+  const matchCount = tierQuery.data?.matchCount ?? estimatedMatchCount(participantSamples, role);
 
   return (
     <section className="tier-list-page">
@@ -103,7 +105,8 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
         <div className="tier-list-hero-stats">
           <TierHeroStat label="Patch" value={patch || champions?.version || 'Current'} />
           <TierHeroStat label="Rank" value={selectedRank} />
-          <TierHeroStat label="Matches Indexed" value={formatNumber(totalGames)} />
+          <TierHeroStat label="Matches Indexed" value={formatNumber(matchCount)} />
+          <TierHeroStat label="Champion Games" value={formatNumber(participantSamples)} />
         </div>
       </div>
 
@@ -285,4 +288,9 @@ function sortRows(a: TierRow, b: TierRow, sortMode: SortMode) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
+}
+
+function estimatedMatchCount(participantSamples: number, role: string) {
+  if (participantSamples <= 0) return 0;
+  return Math.round(participantSamples / (role ? 2 : 10));
 }
