@@ -4,7 +4,7 @@ This is the next-session list from the live app rebuild work. The project is mov
 
 ## Frontend Structure
 
-Status: items 1-8 have been addressed in the current cleanup pass. The next product pass is live-mode refinement and validation, not basic page scaffolding.
+Status: items 1-9 have been addressed in the current cleanup pass. The next product pass should be deeper live-page modularization or the next backend read model, not basic page scaffolding.
 
 1. Split `LiveMatchups.tsx` into smaller live-match modules. It currently owns the page shell, mode rail, champion cards, build view, win-condition view, charting, and matchup helpers.
 2. Extract shared UI pieces for stat tiles, sample chips, champion rows, role selectors, and card shells so the live page, champion guide, and tier list feel consistently built instead of copied forward.
@@ -17,7 +17,7 @@ Status: items 1-8 have been addressed in the current cleanup pass. The next prod
 6. Expand champion guide backend data for skill order, matchup counters, rune paths, summoner spell pairs, and item-path summaries. First pass complete: skill orders, matchups, rune/spell signatures, ban rates, item slots, and full item-path summaries are now available.
 7. Build the first summoner profile page. Current pass complete: Riot ID searches resolve saved aliases, live players jump into the match room, and non-live profiles show cached rank, stored match form, champion comfort, summoner-owned builds, and recent stored matches.
 8. Refine the summoner profile page now that the base surface exists. Current pass complete: stable tab width, clearer stored-data freshness, champion-name filtering, cleaner empty states, improved recent-match rows, and profile-specific background art based on recently played champions. Still open: role-aware champion comfort once the backend stores champion summaries by role.
-9. Refine live-match modes so Match, Builds, and Win Conditions each have a clear job and do not silently load hidden heavy analytics.
+9. Refine live-match modes so Match, Builds, and Win Conditions each have a clear job and do not silently load hidden heavy analytics. Current pass complete: the mode rail has explicit context copy, Builds and Win Conditions keep their heavy queries gated to their active modes, and image fallbacks no longer emit empty `src` warnings in the guide/build surfaces.
 
 ## Analytics
 

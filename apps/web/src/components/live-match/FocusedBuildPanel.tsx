@@ -321,6 +321,7 @@ function BuildAdviceSetupStrip({
   const spellRow = buildAdvice?.champion.topSpells[0];
   const parsedRunes = parseRuneSignature(runeRow?.runeSignature ?? '');
   const spellIds = signatureSpells(spellRow?.spellSignature ?? '');
+  const primaryRuneStyleSrc = runeStyleImageUrl(runes, parsedRunes.primaryStyleId);
   if (loading) {
     return <div className="build-setup-strip muted">Loading runes and spells...</div>;
   }
@@ -332,21 +333,23 @@ function BuildAdviceSetupStrip({
       <div className="build-setup-block">
         <span>Top Rune Setup</span>
         <div className="build-setup-icons">
-          {parsedRunes.primaryStyleId ? (
-            <img src={runeStyleImageUrl(runes, parsedRunes.primaryStyleId)} alt={runeStyleName(runes, parsedRunes.primaryStyleId)} title={runeStyleName(runes, parsedRunes.primaryStyleId)} />
+          {primaryRuneStyleSrc ? (
+            <img src={primaryRuneStyleSrc} alt={runeStyleName(runes, parsedRunes.primaryStyleId)} title={runeStyleName(runes, parsedRunes.primaryStyleId)} />
           ) : null}
-          {parsedRunes.runeIds.slice(0, 4).map((runeId) => (
-            <img key={runeId} src={runeImageUrl(runes, runeId)} alt={runeName(runes, runeId)} title={runeName(runes, runeId)} />
-          ))}
+          {parsedRunes.runeIds.slice(0, 4).map((runeId) => {
+            const src = runeImageUrl(runes, runeId);
+            return src ? <img key={runeId} src={src} alt={runeName(runes, runeId)} title={runeName(runes, runeId)} /> : null;
+          })}
         </div>
         {runeRow ? <em>{runeRow.winRate.toFixed(1)}% WR · {runeRow.games} games</em> : null}
       </div>
       <div className="build-setup-block">
         <span>Top Spells</span>
         <div className="build-setup-icons">
-          {spellIds.map((spellId) => (
-            <img key={spellId} src={summonerSpellImageUrl(spells, spellId)} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} />
-          ))}
+          {spellIds.map((spellId) => {
+            const src = summonerSpellImageUrl(spells, spellId);
+            return src ? <img key={spellId} src={src} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} /> : null;
+          })}
         </div>
         {spellRow ? <em>{spellRow.winRate.toFixed(1)}% WR · {spellRow.games} games</em> : null}
       </div>

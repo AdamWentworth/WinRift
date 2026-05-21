@@ -1856,6 +1856,87 @@ button {
   min-width: 0;
 }
 
+.live-mode-context {
+  align-items: center;
+  background:
+    radial-gradient(ellipse at 0 0, rgb(100 239 232 / 10%), transparent 56%),
+    linear-gradient(90deg, rgb(0 0 0 / 34%), rgb(0 0 0 / 18%));
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #dce5ea;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0 auto 10px;
+  max-width: 1500px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.live-mode-context.builds {
+  border-color: rgb(135 206 235 / 24%);
+}
+
+.live-mode-context.win-conditions {
+  border-color: rgb(222 190 118 / 24%);
+}
+
+.live-mode-context span {
+  color: #91a5ad;
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.live-mode-context strong {
+  color: #fff;
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-mode-context p {
+  color: #b8cbd1;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 4px 0 0;
+}
+
+.live-mode-status {
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  color: #dce5ea;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.live-mode-status.good,
+.live-mode-status.useful {
+  border-color: rgb(100 239 232 / 34%);
+  color: #cffffb;
+}
+
+.live-mode-status.early {
+  border-color: rgb(222 190 118 / 34%);
+  color: #ffe8a8;
+}
+
+.live-mode-status.thin {
+  border-color: rgb(255 255 255 / 10%);
+  color: #aeb8bf;
+}
+
 .live-mode-rail {
   background:
     linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
@@ -5746,6 +5827,14 @@ button {
     min-height: 54px;
     padding: 8px 10px;
     text-align: left;
+  }
+
+  .live-mode-context {
+    grid-template-columns: 1fr;
+  }
+
+  .live-mode-status {
+    justify-self: start;
   }
 
   .champion-row,

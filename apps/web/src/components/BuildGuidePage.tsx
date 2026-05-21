@@ -387,10 +387,11 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
 
 function RuneTreePanel({ style, selectedRuneIds, runes }: { style?: RuneStyle; selectedRuneIds: number[]; runes?: RuneData }) {
   const selected = new Set(selectedRuneIds);
+  const styleImage = style ? runeStyleImageUrl(runes, style.id) : '';
   return (
     <div className="guide-rune-tree">
       <div className="guide-rune-tree-title">
-        {style ? <img src={runeStyleImageUrl(runes, style.id)} alt="" /> : null}
+        {styleImage ? <img src={styleImage} alt="" /> : null}
         <strong>{style?.name ?? 'Rune Tree'}</strong>
       </div>
       <div className="guide-rune-slots">
@@ -398,15 +399,16 @@ function RuneTreePanel({ style, selectedRuneIds, runes }: { style?: RuneStyle; s
           <div key={`${style?.id}-${index}`} className="guide-rune-slot">
             {slot.runes.map((rune) => {
               const active = selected.has(rune.id);
-              return (
+              const src = runeImageUrl(runes, rune.id);
+              return src ? (
                 <img
                   key={rune.id}
                   className={active ? 'selected' : ''}
-                  src={runeImageUrl(runes, rune.id)}
+                  src={src}
                   alt={rune.name}
                   title={active ? `${rune.name} selected` : rune.name}
                 />
-              );
+              ) : null;
             })}
           </div>
         ))}
@@ -423,9 +425,10 @@ function SpellGuideCard({ guide, spells, loading }: { guide?: ChampionGuideRespo
       <PanelTitle title="Summoner Spells" detail={spellRow ? `${spellRow.winRate.toFixed(2)}% WR (${formatNumber(spellRow.games)} matches)` : loading ? 'Loading...' : 'No spell sample yet'} />
       {spellIds.length ? (
         <div className="guide-spell-pair">
-          {spellIds.map((spellId) => (
-            <img key={spellId} src={summonerSpellImageUrl(spells, spellId)} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} />
-          ))}
+          {spellIds.map((spellId) => {
+            const src = summonerSpellImageUrl(spells, spellId);
+            return src ? <img key={spellId} src={src} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} /> : null;
+          })}
         </div>
       ) : <EmptyState message="Summoner spell samples will appear after collection." />}
     </PanelCard>
@@ -561,9 +564,14 @@ function ItemSignatureImages({ signature, items, limit }: { signature: string; i
   const itemIds = signatureItems(signature).slice(0, limit ?? 99);
   return (
     <div className="guide-build-path-icons">
-      {itemIds.length ? itemIds.map((itemId) => (
-        <img key={`${signature}-${itemId}`} src={itemImageUrl(items, String(itemId))} alt={itemName(items, String(itemId))} title={itemName(items, String(itemId))} />
-      )) : <em>No items</em>}
+      {itemIds.length ? itemIds.map((itemId) => {
+        const src = itemImageUrl(items, String(itemId));
+        return src ? (
+          <img key={`${signature}-${itemId}`} src={src} alt={itemName(items, String(itemId))} title={itemName(items, String(itemId))} />
+        ) : (
+          <span key={`${signature}-${itemId}`} className="item-pill">{itemId}</span>
+        );
+      }) : <em>No items</em>}
     </div>
   );
 }
@@ -577,7 +585,11 @@ function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { tit
           {rows.map((row, index) => (
             <div key={`${title}-${row.itemSlot}-${row.itemId}`} className="guide-item-option">
               {index > 0 && linked ? <span className="guide-item-arrow">-&gt;</span> : null}
-              <img src={itemImageUrl(items, String(row.itemId))} alt={itemName(items, String(row.itemId))} title={itemName(items, String(row.itemId))} />
+              {itemImageUrl(items, String(row.itemId)) ? (
+                <img src={itemImageUrl(items, String(row.itemId))} alt={itemName(items, String(row.itemId))} title={itemName(items, String(row.itemId))} />
+              ) : (
+                <span className="item-pill">{row.itemId}</span>
+              )}
               <div>
                 <strong>{row.winRate.toFixed(2)}% WR</strong>
                 <span>{formatNumber(row.games)} matches</span>

@@ -221,6 +221,7 @@ Why this is good:
 Implementation notes:
 
 - `liveMode` state in `LiveMatchups` is `'match' | 'builds' | 'winConditions'`.
+- A small mode context banner now sits below the match header. It names the current lens, makes the lazy-loading behavior explicit, and gives users a short reminder of what that mode is for.
 - Gate the focused item-slot batch query so it only runs in Builds mode. The current batch asks for two rows of advice: exact matchup and champion baseline. This avoids frontend and API work for hidden build panels.
 - Build rows use minimum sample thresholds before an item can appear: 5+ games for exact matchup slots and 10+ games for champion baseline slots. Results are still sorted by Wilson lower-bound confidence after the threshold, so a 1-game 100% item does not outrank a more established pattern.
 - Build cards should show context, not just winrate: weighted shown-item winrate, shown sample volume, matchup delta against the champion baseline, and a "common" hint when the most played candidate differs from the confidence-ranked item.
@@ -232,5 +233,5 @@ Implementation notes:
 Open UX questions:
 
 - Whether the rail belongs on the left or right. Left is discoverable; right may stay out of the way of the WinRift logo/search header.
-- Whether to show a small mode description under the match header. Useful early, but maybe unnecessary once the UI is obvious.
+- Whether the mode context banner remains permanently or eventually collapses once the UI is obvious.
 - Whether Win Conditions should become the default when build sample sizes are very thin. Probably not yet; better to keep defaults predictable.
