@@ -270,10 +270,10 @@ button {
   border: 1px solid rgb(130 215 255 / 28%);
   box-shadow: 0 24px 90px rgb(0 0 0 / 54%), inset 0 1px 0 rgb(255 255 255 / 8%);
   color: #f5fbff;
-  max-width: 610px;
+  max-width: 920px;
   padding: 18px;
   position: relative;
-  width: min(610px, calc(100vw - 36px));
+  width: min(920px, calc(100vw - 36px));
   z-index: 3;
 }
 
@@ -419,7 +419,7 @@ button {
 .profile-data-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 14px;
 }
 
@@ -5061,6 +5061,19 @@ button {
 
   .tier-list-hero-copy h2 {
     font-size: 28px;
+  }
+
+  .profile-page {
+    align-items: stretch;
+    padding: 10px 8px 28px;
+  }
+
+  .profile-card {
+    width: 100%;
+  }
+
+  .profile-data-grid {
+    grid-template-columns: 1fr;
   }
 
   .champion-directory-page {

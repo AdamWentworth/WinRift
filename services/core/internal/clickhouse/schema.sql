@@ -53,6 +53,41 @@ CREATE TABLE IF NOT EXISTS winrift.riot_account_aliases
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (platform, game_name_normalized, tag_line, puuid);
 
+CREATE TABLE IF NOT EXISTS winrift.summoner_profile_summary
+(
+    platform LowCardinality(String),
+    queue_id UInt16,
+    puuid String,
+    games UInt64,
+    wins UInt64,
+    kills UInt64,
+    deaths UInt64,
+    assists UInt64,
+    first_seen_at DateTime,
+    last_seen_at DateTime,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY (platform, queue_id, puuid);
+
+CREATE TABLE IF NOT EXISTS winrift.summoner_champion_summary
+(
+    platform LowCardinality(String),
+    queue_id UInt16,
+    puuid String,
+    champion_id UInt16,
+    games UInt64,
+    wins UInt64,
+    kills UInt64,
+    deaths UInt64,
+    assists UInt64,
+    first_seen_at DateTime,
+    last_seen_at DateTime,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY (platform, queue_id, puuid, champion_id);
+
 CREATE TABLE IF NOT EXISTS winrift.riot_request_events
 (
     route LowCardinality(String),

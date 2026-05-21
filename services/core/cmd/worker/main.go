@@ -45,7 +45,7 @@ func main() {
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s win_condition_refresh_enabled=%t win_condition_refresh_interval=%s",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s win_condition_refresh_enabled=%t win_condition_refresh_interval=%s summoner_profile_refresh_enabled=%t summoner_profile_refresh_interval=%s",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -64,6 +64,8 @@ func main() {
 		cfg.ChampionGuideRefreshInterval,
 		cfg.WinConditionRefreshEnabled,
 		cfg.WinConditionRefreshInterval,
+		cfg.SummonerProfileRefreshEnabled,
+		cfg.SummonerProfileRefreshInterval,
 	)
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {
@@ -78,9 +80,11 @@ func main() {
 	var lastItemSlotRefresh time.Time
 	var lastChampionGuideRefresh time.Time
 	var lastWinConditionRefresh time.Time
+	var lastSummonerProfileRefresh time.Time
 	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, &lastItemSlotRefresh)
 	maybeRefreshChampionGuideAnalytics(context.Background(), cfg, repo, &lastChampionGuideRefresh)
 	maybeRefreshWinConditionAnalytics(context.Background(), cfg, repo, platforms, &lastWinConditionRefresh)
+	maybeRefreshSummonerProfileAnalytics(context.Background(), cfg, repo, &lastSummonerProfileRefresh)
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
@@ -179,6 +183,7 @@ func main() {
 		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, &lastItemSlotRefresh)
 		maybeRefreshChampionGuideAnalytics(ctx, cfg, repo, &lastChampionGuideRefresh)
 		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, platforms, &lastWinConditionRefresh)
+		maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, &lastSummonerProfileRefresh)
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
 		log.Printf(
 			"collector sweep complete platforms=%d active_platforms=%d requests=%d sleep=%s",
@@ -400,6 +405,30 @@ func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, r
 		return
 	}
 	log.Printf("win condition analytics scheduled refresh complete patch=%s queue=%d platforms=%d duration=%s", patch, analytics.RankedSoloQueueID, len(platforms), time.Since(startedAt).Round(time.Millisecond))
+}
+
+func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, lastRefresh *time.Time) {
+	if !cfg.SummonerProfileRefreshEnabled {
+		return
+	}
+	interval := cfg.SummonerProfileRefreshInterval
+	if interval <= 0 {
+		interval = 10 * time.Minute
+	}
+	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
+		return
+	}
+	startedAt := time.Now()
+	log.Printf("summoner profile analytics scheduled refresh start queue=%d interval=%s", analytics.RankedSoloQueueID, interval)
+	defer func() {
+		*lastRefresh = time.Now()
+	}()
+	result, err := repo.RefreshSummonerProfileAnalytics(ctx, analytics.RankedSoloQueueID)
+	if err != nil {
+		log.Printf("summoner profile analytics scheduled refresh failed queue=%d duration=%s err=%v", analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), err)
+		return
+	}
+	log.Printf("summoner profile analytics scheduled refresh complete queue=%d profile_rows=%d champion_rows=%d duration=%s", analytics.RankedSoloQueueID, result.ProfileRows, result.ChampionRows, time.Since(startedAt).Round(time.Millisecond))
 }
 
 func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, rankRequests int) collector.Result {

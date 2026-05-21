@@ -86,6 +86,8 @@ cd apps/web && npm test && npm run build
 - [Live Match Experience Roadmap](docs/live-match-experience-roadmap.md)
 - [Legacy Win Condition Audit](docs/legacy-win-condition-audit.md)
 - [Analytics Philosophy](docs/product/analytics-philosophy.md)
+- [Summoner Profiles](docs/product/summoner-profiles.md)
+- [Remaining Work](docs/product/remaining-work.md)
 - Discussions:
   - [Match Collection](docs/discussions/match-collection.md)
   - [Build Matchup Analytics](docs/discussions/build-matchup-analytics.md)

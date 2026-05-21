@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CircleAlert, History, LoaderCircle, RadioTower, Shield, Trophy } from 'lucide-react';
+import { CalendarDays, CircleAlert, History, LoaderCircle, RadioTower, Shield, Trophy } from 'lucide-react';
 import { getLiveGame, getSummonerProfile, resolveAccountAlias } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
@@ -219,6 +219,18 @@ function StoredProfile({ profile, champions }: { profile: SummonerProfile; champ
         </div>
       </section>
 
+      <section className="profile-panel profile-window-panel">
+        <PanelHeading icon={<CalendarDays size={16} />} title="Stored Data Window" />
+        <div className="profile-metric-row">
+          <ProfileMetric label="First Seen" value={formatProfileDate(summary.firstSeen)} />
+          <ProfileMetric label="Last Seen" value={formatProfileDate(summary.lastSeen)} />
+          <ProfileMetric label="Sample" value={`${formatNumber(summary.games)} games`} />
+        </div>
+        <div className="profile-kda-line">
+          Profile summaries are compact read-model rows refreshed from retained ranked Solo/Duo matches.
+        </div>
+      </section>
+
       <section className="profile-panel profile-wide-panel">
         <PanelHeading icon={<Trophy size={16} />} title="Champion Comfort" />
         {profile.topChampions.length ? (
@@ -286,7 +298,7 @@ function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; cham
       <img src={championImageUrl(champions, match.championId)} alt={champion?.name ?? String(match.championId)} />
       <div>
         <strong>{match.win ? 'Win' : 'Loss'} · {champion?.name ?? `Champion ${match.championId}`}</strong>
-        <span><RoleIcon role={match.role} /> {roleLabel(match.role)} · {match.kills}/{match.deaths}/{match.assists} · Patch {match.patch}</span>
+        <span><RoleIcon role={match.role} /> {roleLabel(match.role)} · {match.kills}/{match.deaths}/{match.assists} · Patch {match.patch} · {formatGameDate(match.gameStartTimestamp)} · {formatDuration(match.durationSeconds)}</span>
       </div>
     </div>
   );
@@ -314,4 +326,25 @@ function profileLiveError(riotId: string, message: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
+}
+
+function formatProfileDate(value?: string) {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date.getFullYear() <= 1970) return '--';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
+function formatGameDate(timestamp: number) {
+  if (!timestamp) return 'unknown date';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'unknown date';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
+function formatDuration(seconds: number) {
+  if (!seconds) return '--';
+  const minutes = Math.floor(seconds / 60);
+  const remaining = seconds % 60;
+  return `${minutes}:${String(remaining).padStart(2, '0')}`;
 }

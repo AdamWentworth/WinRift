@@ -58,6 +58,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/dev/collector/seed", s.seedCollector)
 	mux.HandleFunc("POST /api/dev/analytics/item-slots/refresh", s.refreshItemSlotAnalytics)
 	mux.HandleFunc("POST /api/dev/analytics/champion-guides/refresh", s.refreshChampionGuideAnalytics)
+	mux.HandleFunc("POST /api/dev/analytics/summoner-profiles/refresh", s.refreshSummonerProfileAnalytics)
 	return s.cors(mux)
 }
 
@@ -1081,6 +1082,38 @@ func (s Server) refreshChampionGuideAnalytics(w http.ResponseWriter, r *http.Req
 	})
 }
 
+func (s Server) refreshSummonerProfileAnalytics(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.IsDevelopment() {
+		writeError(w, http.StatusNotFound, "not available")
+		return
+	}
+	var body struct {
+		QueueID int `json:"queueId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	queueID := uint16(body.QueueID)
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	startedAt := time.Now()
+	log.Printf("summoner profile analytics refresh start queue=%d", queueID)
+	result, err := s.repo.RefreshSummonerProfileAnalytics(r.Context(), queueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	log.Printf("summoner profile analytics refresh complete queue=%d profile_rows=%d champion_rows=%d duration=%s", queueID, result.ProfileRows, result.ChampionRows, time.Since(startedAt).Round(time.Millisecond))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"queueId":      queueID,
+		"profileRows":  result.ProfileRows,
+		"championRows": result.ChampionRows,
+		"durationMs":   time.Since(startedAt).Milliseconds(),
+	})
+}
+
 func (s Server) itemSlotRefreshContexts(ctx context.Context) ([]clickhouse.ItemSlotAnalyticsContext, error) {
 	defaultItems, err := s.static.BuildItemIDs(ctx, "", false, false)
 	if err != nil {
@@ -1492,7 +1525,7 @@ func championPerformanceRowsResponse(rows []clickhouse.ChampionPerformance) []ma
 }
 
 func summonerProfileStatsResponse(stats clickhouse.SummonerProfileStats) map[string]any {
-	return map[string]any{
+	response := map[string]any{
 		"puuid":      stats.PUUID,
 		"platform":   stats.Platform,
 		"queueId":    stats.QueueID,
@@ -1507,8 +1540,14 @@ func summonerProfileStatsResponse(stats clickhouse.SummonerProfileStats) map[str
 		"avgAssists": round(stats.AvgAssists),
 		"kda":        round(stats.KDA),
 		"winRate":    round(stats.WinRate * 100),
-		"lastSeen":   stats.LastSeen,
 	}
+	if !stats.FirstSeen.IsZero() {
+		response["firstSeen"] = stats.FirstSeen
+	}
+	if !stats.LastSeen.IsZero() {
+		response["lastSeen"] = stats.LastSeen
+	}
+	return response
 }
 
 func summonerRecentMatchesResponse(rows []clickhouse.SummonerRecentMatch) []map[string]any {

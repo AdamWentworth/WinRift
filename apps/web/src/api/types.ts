@@ -409,6 +409,7 @@ export type SummonerProfileSummary = {
   avgAssists: number;
   kda: number;
   winRate: number;
+  firstSeen?: string;
   lastSeen?: string;
 };
 

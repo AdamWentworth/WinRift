@@ -29,6 +29,18 @@ Cached ranked metadata keyed by `platform`, `puuid`, and `queue_type`.
 
 Important columns: tier, division, league points, wins, losses, rank bucket, fetched time, and expiry time. Current ingestion uses `RANKED_SOLO_5x5` snapshots for participant `rank_bucket` when rank enrichment is enabled. Unranked players are cached as `UNRANKED` so they are not repeatedly queried.
 
+## `summoner_profile_summary`
+
+Read model for summoner profile pages.
+
+One row per platform, queue, and PUUID. It stores total stored games, wins, kills, deaths, assists, first stored game time, last stored game time, and compile time. The worker refreshes it from retained `participants` plus `raw_matches`, so profile pages do not need to aggregate all participant rows on every request.
+
+## `summoner_champion_summary`
+
+Read model for summoner champion comfort.
+
+One row per platform, queue, PUUID, and champion. It stores games, wins, kills, deaths, assists, first stored game time, last stored game time, and compile time. The summoner profile endpoint uses this for top champion rows and falls back to direct participant aggregation only when the read model has not been populated yet.
+
 ## `patch_snapshots`
 
 One row per patch/platform/queue lifecycle state. Tracks whether a patch is collecting, compiling, or closed, plus match counts, participant counts, compile timestamp, and raw retention date.
