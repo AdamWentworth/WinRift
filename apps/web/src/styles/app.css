@@ -4,6 +4,7 @@
   background: #111;
   color: #f4f6f8;
   letter-spacing: 0;
+  scrollbar-gutter: stable;
 }
 
 * {
@@ -14,6 +15,7 @@ body {
   margin: 0;
   min-width: 320px;
   background: #111;
+  overflow-y: scroll;
 }
 
 button,
@@ -260,6 +262,7 @@ button {
   overflow: visible;
   padding: 28px;
   position: relative;
+  width: 100%;
   z-index: 2;
 }
 
@@ -273,7 +276,7 @@ button {
   max-width: 1120px;
   padding: 18px;
   position: relative;
-  width: min(1120px, calc(100vw - 36px));
+  width: 100%;
   z-index: 3;
 }
 
@@ -502,6 +505,8 @@ button {
   display: grid;
   gap: 12px;
   margin-top: 14px;
+  min-width: 0;
+  width: 100%;
 }
 
 .profile-snapshot-strip {
@@ -568,7 +573,9 @@ button {
   display: grid;
   gap: 6px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
   padding: 6px;
+  width: 100%;
 }
 
 .profile-section-tabs button {
@@ -608,6 +615,7 @@ button {
   display: grid;
   gap: 10px;
   min-height: 420px;
+  width: 100%;
 }
 
 .profile-panel-heading {
