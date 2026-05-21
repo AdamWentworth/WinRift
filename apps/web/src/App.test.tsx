@@ -179,6 +179,10 @@ describe('App', () => {
     await waitFor(() => expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: '', patch: '16.10', minGames: 50 })));
     expect((await screen.findAllByText('Wukong')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('60.00%').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Games, not sorted' }));
+    expect(screen.getByText(/Games descending/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Games, descending' }));
+    expect(screen.getByText(/Games ascending/)).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('button', { name: /Wukong/i })[0]);
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());

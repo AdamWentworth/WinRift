@@ -1,4 +1,4 @@
-import { Database, Filter, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronsUpDown, Database, Filter, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -30,6 +30,7 @@ const minimumSamples = [
 ];
 
 const sortModes = [
+  { value: 'tier', label: 'Tier' },
   { value: 'rank', label: 'WinRift Rank' },
   { value: 'confidence', label: 'WinRift Score' },
   { value: 'win-rate', label: 'Win Rate' },
@@ -41,6 +42,18 @@ const sortModes = [
 ];
 
 type SortMode = typeof sortModes[number]['value'];
+type SortDirection = 'asc' | 'desc';
+
+const tierTableColumns: { mode: SortMode; label: string }[] = [
+  { mode: 'tier', label: 'Tier' },
+  { mode: 'name', label: 'Champion' },
+  { mode: 'win-rate', label: 'Win Rate' },
+  { mode: 'impact', label: 'Impact' },
+  { mode: 'pick-rate', label: 'Pick' },
+  { mode: 'ban-rate', label: 'Ban' },
+  { mode: 'confidence', label: 'Score' },
+  { mode: 'games', label: 'Games' },
+];
 
 type Props = {
   champions?: ChampionData;
@@ -58,7 +71,8 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
   const [role, setRole] = useState('');
   const [rankBucket, setRankBucket] = useState('');
   const [minGames, setMinGames] = useState(50);
-  const [sortMode, setSortMode] = useState<SortMode>('rank');
+  const [sortMode, setSortMode] = useState<SortMode>('confidence');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchText, setSearchText] = useState('');
   const patch = patchBucket(champions?.version);
   const tierQuery = useQuery({
@@ -85,12 +99,27 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
         if (!normalizedSearch) return true;
         return normalizeLookup(row.champion?.name ?? String(row.summary.championId)).includes(normalizedSearch);
       })
-      .sort((a, b) => sortRows(a, b, sortMode));
-  }, [champions, normalizedSearch, sortMode, tierQuery.data?.results]);
+      .sort((a, b) => sortRows(a, b, sortMode, sortDirection));
+  }, [champions, normalizedSearch, sortDirection, sortMode, tierQuery.data?.results]);
   const featured = rows.slice(0, 3);
   const summedChampionGames = (tierQuery.data?.results ?? []).reduce((sum, row) => sum + row.games, 0);
   const participantSamples = tierQuery.data?.participantSamples ?? summedChampionGames;
   const matchCount = tierQuery.data?.matchCount ?? estimatedMatchCount(participantSamples, role);
+  const sortDescription = `${sortModes.find((mode) => mode.value === sortMode)?.label ?? 'WinRift Rank'} ${sortDirection === 'asc' ? 'ascending' : 'descending'}`;
+
+  function applySort(nextMode: SortMode) {
+    if (nextMode === sortMode) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortMode(nextMode);
+    setSortDirection(defaultSortDirection(nextMode));
+  }
+
+  function selectSort(nextMode: SortMode) {
+    setSortMode(nextMode);
+    setSortDirection(defaultSortDirection(nextMode));
+  }
 
   return (
     <section className="tier-list-page">
@@ -132,7 +161,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
             <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
           ))}
         </SelectControl>
-        <SelectControl className="guide-select-control compact" label="Sort" value={sortMode} onChange={(value) => setSortMode(value as SortMode)}>
+        <SelectControl className="guide-select-control compact" label="Sort" value={sortMode} onChange={(value) => selectSort(value as SortMode)}>
           {sortModes.map((candidate) => (
             <option key={candidate.value} value={candidate.value}>{candidate.label}</option>
           ))}
@@ -147,7 +176,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
         <div className="tier-list-scope">
           <Database size={15} />
           <span>{tierQuery.isLoading ? 'Loading rankings...' : `${formatNumber(rows.length)} champions shown`}</span>
-          <b>{selectedRole} / {selectedRank} / {minimumSamples.find((sample) => sample.value === minGames)?.label}</b>
+          <b>{selectedRole} / {selectedRank} / {minimumSamples.find((sample) => sample.value === minGames)?.label} / {sortDescription}</b>
         </div>
       </div>
 
@@ -163,14 +192,15 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
 
       <div className="tier-table-card">
         <div className="tier-table-header">
-          <span>Tier</span>
-          <span>Champion</span>
-          <span>Win Rate</span>
-          <span>Impact</span>
-          <span>Pick</span>
-          <span>Ban</span>
-          <span>Score</span>
-          <span>Games</span>
+          {tierTableColumns.map((column) => (
+            <TierSortHeader
+              key={column.mode}
+              active={sortMode === column.mode}
+              direction={sortDirection}
+              label={column.label}
+              onClick={() => applySort(column.mode)}
+            />
+          ))}
         </div>
         <div className="tier-table-body">
           {rows.length ? rows.map((row) => (
@@ -186,6 +216,23 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
 
 function TierHeroStat({ label, value }: { label: string; value: string }) {
   return <MetricTile label={label} value={value} />;
+}
+
+function TierSortHeader({ active, direction, label, onClick }: { active: boolean; direction: SortDirection; label: string; onClick: () => void }) {
+  const Icon = active ? (direction === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown;
+  const directionLabel = active ? (direction === 'asc' ? 'ascending' : 'descending') : 'not sorted';
+  return (
+    <button
+      aria-label={`Sort by ${label}, ${directionLabel}`}
+      aria-pressed={active}
+      className={`tier-sort-header${active ? ' active' : ''}`}
+      onClick={onClick}
+      type="button"
+    >
+      <span>{label}</span>
+      <Icon aria-hidden="true" size={13} strokeWidth={2.5} />
+    </button>
+  );
 }
 
 function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
@@ -261,27 +308,36 @@ function impactLabel(summary: ChampionGuideSummary) {
   return '--';
 }
 
-function sortRows(a: TierRow, b: TierRow, sortMode: SortMode) {
+function sortRows(a: TierRow, b: TierRow, sortMode: SortMode, sortDirection: SortDirection) {
+  const primary = compareRows(a, b, sortMode);
+  const ordered = sortDirection === 'asc' ? primary : -primary;
+  return ordered || compareRows(a, b, 'rank') || compareRows(a, b, 'name');
+}
+
+function compareRows(a: TierRow, b: TierRow, sortMode: SortMode) {
+  if (sortMode === 'tier') {
+    return tierValue(a.tier) - tierValue(b.tier) || a.score - b.score;
+  }
   if (sortMode === 'name') {
     return (a.champion?.name ?? '').localeCompare(b.champion?.name ?? '');
   }
   if (sortMode === 'confidence') {
-    return b.score - a.score || a.summary.roleRank - b.summary.roleRank;
+    return a.score - b.score;
   }
   if (sortMode === 'win-rate') {
-    return b.summary.winRate - a.summary.winRate || b.summary.games - a.summary.games;
+    return a.summary.winRate - b.summary.winRate;
   }
   if (sortMode === 'impact') {
-    return (b.summary.impactScore ?? 0) - (a.summary.impactScore ?? 0) || b.score - a.score;
+    return (a.summary.impactScore ?? 0) - (b.summary.impactScore ?? 0);
   }
   if (sortMode === 'pick-rate') {
-    return b.summary.pickRate - a.summary.pickRate || b.summary.games - a.summary.games;
+    return a.summary.pickRate - b.summary.pickRate;
   }
   if (sortMode === 'ban-rate') {
-    return b.summary.banRate - a.summary.banRate || b.summary.games - a.summary.games;
+    return a.summary.banRate - b.summary.banRate;
   }
   if (sortMode === 'games') {
-    return b.summary.games - a.summary.games || b.score - a.score;
+    return a.summary.games - b.summary.games;
   }
   return a.summary.roleRank - b.summary.roleRank;
 }
@@ -293,4 +349,27 @@ function formatNumber(value: number) {
 function estimatedMatchCount(participantSamples: number, role: string) {
   if (participantSamples <= 0) return 0;
   return Math.round(participantSamples / (role ? 2 : 10));
+}
+
+function defaultSortDirection(sortMode: SortMode): SortDirection {
+  return sortMode === 'rank' || sortMode === 'name' ? 'asc' : 'desc';
+}
+
+function tierValue(tier: string) {
+  switch (tier) {
+    case 'S+':
+      return 6;
+    case 'S':
+      return 5;
+    case 'A':
+      return 4;
+    case 'B':
+      return 3;
+    case 'C':
+      return 2;
+    case 'D':
+      return 1;
+    default:
+      return 0;
+  }
 }

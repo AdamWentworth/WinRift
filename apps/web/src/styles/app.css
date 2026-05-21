@@ -3825,10 +3825,51 @@ button {
   background: linear-gradient(180deg, rgb(34 39 42 / 96%), rgb(18 21 23 / 96%));
   border-bottom: 1px solid rgb(255 255 255 / 9%);
   color: #9fb6bd;
+  padding: 10px 14px;
+}
+
+.tier-sort-header {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: #9fb6bd;
+  cursor: pointer;
+  display: inline-flex;
   font-size: 10px;
   font-weight: 1000;
-  padding: 10px 14px;
+  gap: 5px;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
   text-transform: uppercase;
+}
+
+.tier-sort-header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tier-sort-header svg {
+  color: rgb(147 220 235 / 54%);
+  flex: 0 0 auto;
+}
+
+.tier-sort-header:hover,
+.tier-sort-header:focus-visible {
+  color: #fff;
+  outline: none;
+}
+
+.tier-sort-header:hover svg,
+.tier-sort-header:focus-visible svg,
+.tier-sort-header.active svg {
+  color: #f0d583;
+}
+
+.tier-sort-header.active {
+  color: #fff;
 }
 
 .tier-table-body {
