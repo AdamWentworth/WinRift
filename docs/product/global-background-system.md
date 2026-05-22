@@ -41,14 +41,25 @@ Broad pages use the full art pool:
 - Home
 - Champions index
 - Tier list
+- Broad build/stat pages that are not about one specific champion or summoner
 
 Specific champion guide pages pass `championScopeId`. When that prop is set, the background pool is filtered to that champion's base splash and skins. If the skin manifest is unavailable, the component falls back to that champion's base splash.
 
 Summoner profile pages pass `championScopeIds` after the stored profile loads. That pool is built from recent stored matches first, then top champion comfort rows. The result is still atmospheric and dimmed, but it feels tied to the summoner rather than random global art.
 
-Live match pages currently keep the dense generic profile unless we later choose to scope them to live participants.
+Live match pages use the global art system too, but keep the dense contrast profile because the card grid and middle analytics row are high-information surfaces. If we later scope them, the most natural pool is the ten live participants plus any focused player/opponent pair in Builds mode.
 
 This gives champion pages a stronger identity without needing separate page-specific background systems.
+
+## User-Facing Rules
+
+The background is allowed to create product mood, but it should never compete with the search console, live-game cards, or analytics tables.
+
+- Search controls, buttons, inputs, and card content must render above the dimming layers, not inherit the decorative opacity.
+- Dense pages should prefer `background-dense` or `background-data`.
+- Champion pages can be more characterful because their data is scoped to one champion.
+- Profile pages should use the player's recently played champions when available, then fall back to global art.
+- The topbar should stay visually attached to the app shell; avoid extra full-width bars that break the background composition.
 
 ## Contrast Profiles
 
@@ -83,6 +94,9 @@ The backdrop should feel atmospheric, not busy.
 - Each slide gets a deterministic pan direction from a small set of CSS pan classes.
 - The current slide fades out while the next slide fades in.
 - Movement is intentionally slow and subtle to avoid fighting dense UI panels.
+- The end of a slide should not snap before the fade. If it starts to feel jerky, tune the keyframes or duration in CSS before adding more React state.
+
+The component renders only the active and previous slides during a transition. That keeps DOM size small even when the splash manifest contains every champion skin.
 
 ## Deployment Policy
 
@@ -96,6 +110,14 @@ If CDN latency or availability becomes a real issue later, add an optional exter
 
 Do not commit Riot splash art into the repository.
 
+For a home-server deployment, the best future cache shape is a mounted directory or NAS-backed read-through cache. The app should still treat cached art as disposable generated/runtime data, not source code.
+
 ## Future Tuning
 
 If a page feels too loud or too muddy, adjust its `.background-*` variables before touching the slideshow logic. The animation, shuffle deck, and champion scoping should remain shared.
+
+Open tuning items:
+
+- Recheck contrast on the live page after the mode system settles.
+- Add reduced-motion handling if the background bothers users who prefer less animation.
+- Consider preloading the next slide once the app has been idle long enough to avoid stealing bandwidth from API requests.

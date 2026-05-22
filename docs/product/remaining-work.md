@@ -4,11 +4,11 @@ This is the next-session list from the live app rebuild work. The project is mov
 
 ## Frontend Structure
 
-Status: items 1-10 have been addressed in the current cleanup pass. The next product pass should be shared UI extraction, production ops docs, or the next backend read model, not basic page scaffolding.
+Status: items 1-10 and the first ops/documentation pass have been addressed. The next product pass should be validation, performance polish, or the next backend read model, not basic page scaffolding.
 
 1. Split `LiveMatchups.tsx` into smaller live-match modules. Current pass complete: `LiveMatchups.tsx` now stays focused on live-state orchestration, with player cards, mode context copy, card-grid rendering, and lane-order helpers moved into `components/live-match/`.
 2. Extract shared UI pieces for stat tiles, sample chips, champion rows, role selectors, and card shells so the live page, champion guide, and tier list feel consistently built instead of copied forward. Current pass complete: profile tabs/sort buttons now use a shared segmented control, profile role filters use shared role tabs, profile metrics use the shared metric tile/mini-stat primitives, and profile/guide empty states share one component shape.
-3. Document `GlobalBackgroundStage` as the global background system, including the champion-filtered mode for champion pages.
+3. Document `GlobalBackgroundStage` as the global background system, including the champion-filtered mode for champion pages. Current pass complete: `docs/product/global-background-system.md` now covers image sources, page scoping, contrast profiles, motion rules, CDN/deployment policy, and future tuning.
 4. Tune the global background contrast by page type so the art is atmospheric without making dense data screens harder to read.
 
 ## Product Surfaces
@@ -27,6 +27,6 @@ Status: items 1-10 have been addressed in the current cleanup pass. The next pro
 
 ## Ops
 
-13. Document production deployment flow for the home server: code deploys from dev to prod, but match collection should run on prod only once stable.
-14. Add clearer worker lifecycle commands or docs so `down`, worker stop, key expiry handling, and restart behavior are obvious.
-15. Add storage policy docs for ClickHouse raw retention, summary-table retention, backups, and NAS/off-box archive options.
+13. Document production deployment flow for the home server: code deploys from dev to prod, but match collection should run on prod only once stable. Current pass complete: see `docs/ops-deployment.md`.
+14. Add clearer worker lifecycle commands or docs so `down`, worker stop, key expiry handling, and restart behavior are obvious. Current pass complete: see `docs/ops-deployment.md` and `docs/collector-runbook.md`.
+15. Add storage policy docs for ClickHouse raw retention, summary-table retention, backups, and NAS/off-box archive options. Current pass complete: see `docs/storage-policy.md`.

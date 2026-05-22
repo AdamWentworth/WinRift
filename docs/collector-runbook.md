@@ -1,5 +1,7 @@
 # Collector Runbook
 
+For server deployment, storage, backups, and production lifecycle notes, also see [Deployment And Operations](ops-deployment.md) and [Storage Policy](storage-policy.md).
+
 ## Start Infrastructure
 
 ```bash
