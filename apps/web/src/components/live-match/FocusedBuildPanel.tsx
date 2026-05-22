@@ -132,8 +132,8 @@ export function FocusedBuildPanel({
       <BuildAdviceSetupStrip buildAdvice={buildAdvice} spells={spells} runes={runes} loading={loading} />
       <div className="focused-build-results">
         <BuildResultCard
-          title="Matchup Items"
-          description={`For ${championName} against ${opponentChampionName}`}
+          title={`Best ${championName} build vs ${opponentChampionName}`}
+          description={`Matchup-specific items for ${championName} into ${opponentChampionName}`}
           sample={matchupSample}
           summary={matchupSummary}
           comparison={matchupDelta}
@@ -151,8 +151,8 @@ export function FocusedBuildPanel({
           emptySubtitle={`Needs ${BUILD_MATCHUP_MIN_GAMES}+ stored games for this exact pairing`}
         />
         <BuildResultCard
-          title="Champion Baseline"
-          description={`For ${championName} across all stored matchups`}
+          title={`Best overall ${championName} build`}
+          description={`Champion-wide baseline across all stored ${championName} matchups`}
           sample={championSample}
           summary={championSummary}
           comparison="Champion-wide reference"
