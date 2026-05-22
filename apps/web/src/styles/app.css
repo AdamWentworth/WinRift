@@ -4026,9 +4026,9 @@ button {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 9%);
   display: grid;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
-  padding: 8px;
+  padding: 7px;
 }
 
 .focused-build-picker > span {
@@ -4043,7 +4043,7 @@ button {
 
 .focused-build-picker > div {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
@@ -4054,10 +4054,13 @@ button {
   color: #dce5ea;
   display: grid;
   gap: 4px;
-  grid-template-rows: 28px auto auto auto;
-  justify-items: center;
+  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  justify-items: start;
   min-width: 0;
-  padding: 6px 4px;
+  min-height: 54px;
+  padding: 5px;
+  text-align: left;
 }
 
 .focused-build-picker button.blue {
@@ -4079,6 +4082,7 @@ button {
 
 .focused-build-picker img {
   height: 28px;
+  grid-row: 1 / 4;
   object-fit: cover;
   width: 28px;
 }
@@ -4111,7 +4115,7 @@ button {
   align-items: center;
   display: inline-flex;
   gap: 3px;
-  justify-content: center;
+  justify-content: start;
 }
 
 .focused-build-result {
@@ -4120,7 +4124,7 @@ button {
     rgb(0 0 0 / 20%);
   border: 1px solid rgb(255 255 255 / 10%);
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   padding: 8px;
 }
@@ -4129,7 +4133,7 @@ button {
   align-items: start;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .focused-build-result > header span,
@@ -4139,60 +4143,12 @@ button {
   min-width: 0;
 }
 
-.focused-build-result > header div {
-  justify-items: end;
-}
-
 .focused-build-result > header strong {
   color: #fff;
   font-size: 13px;
   font-weight: 900;
   line-height: 1;
   text-transform: uppercase;
-}
-
-.build-result-owner {
-  align-items: center;
-  background: rgb(100 239 232 / 8%);
-  border: 1px solid rgb(100 239 232 / 16%);
-  display: inline-grid;
-  gap: 7px;
-  grid-template-columns: 28px minmax(0, auto);
-  justify-self: start;
-  max-width: 100%;
-  min-width: 0;
-  padding: 4px 7px 4px 4px;
-}
-
-.build-result-owner img {
-  border: 1px solid rgb(255 255 255 / 14%);
-  height: 28px;
-  object-fit: cover;
-  width: 28px;
-}
-
-.build-result-owner span {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.build-result-owner small {
-  color: #9fb0b8;
-  font-size: 8px;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.build-result-owner b {
-  color: #fff;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .focused-build-result > header em {
@@ -4206,6 +4162,14 @@ button {
   white-space: nowrap;
 }
 
+.build-result-meta {
+  align-items: center;
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 5px !important;
+  justify-content: flex-start;
+}
+
 .focused-build-result-body {
   align-items: stretch;
   display: grid;
@@ -4214,9 +4178,13 @@ button {
   min-width: 0;
 }
 
+.focused-build-result-body.slots-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .build-slot-signals {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -4275,6 +4243,16 @@ button {
   color: #aeb8bf;
   font-size: 10px;
   font-weight: 800;
+}
+
+.build-path-inline-note {
+  background: rgb(130 215 255 / 7%);
+  border: 1px solid rgb(130 215 255 / 14%);
+  color: #b7c4cb;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  padding: 5px 7px;
 }
 
 .build-path-signals-title,

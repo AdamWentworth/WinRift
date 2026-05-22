@@ -140,8 +140,6 @@ export function FocusedBuildPanel({
           scopeLabel={matchupScopeLabel}
           notes={buildAdvice?.notes}
           side={selection.side}
-          ownerName={championName}
-          ownerImageUrl={championUrl}
           itemSlots={matchupItemSlots}
           buildPaths={buildPathDisplays(buildAdvice?.matchup.topBuilds)}
           loading={loading}
@@ -159,8 +157,6 @@ export function FocusedBuildPanel({
           scopeLabel={championScopeLabel}
           notes={undefined}
           side={selection.side}
-          ownerName={championName}
-          ownerImageUrl={championUrl}
           itemSlots={championItemSlots}
           buildPaths={buildPathDisplays(buildAdvice?.champion.topBuilds, buildAdvice?.champion.topItemPaths)}
           loading={loading}
@@ -271,8 +267,6 @@ function BuildResultCard({
   scopeLabel,
   notes,
   side,
-  ownerName,
-  ownerImageUrl,
   itemSlots,
   buildPaths,
   loading,
@@ -289,8 +283,6 @@ function BuildResultCard({
   scopeLabel: string;
   notes?: string[];
   side: TeamSide;
-  ownerName: string;
-  ownerImageUrl: string;
   itemSlots: AnalyticsItemSlot[];
   buildPaths: BuildPathDisplay[];
   loading: boolean;
@@ -299,17 +291,11 @@ function BuildResultCard({
   emptyTitle: string;
   emptySubtitle: string;
 }) {
+  const showPathRows = loading || buildPaths.length > 0;
   return (
     <article className="focused-build-result">
       <header>
         <span>
-          <span className="build-result-owner">
-            {ownerImageUrl ? <img src={ownerImageUrl} alt="" /> : null}
-            <span>
-              <small>Builds for</small>
-              <b>{ownerName}</b>
-            </span>
-          </span>
           <strong>{title}</strong>
           <em>{description}</em>
           {summary ? (
@@ -318,7 +304,7 @@ function BuildResultCard({
             </small>
           ) : null}
         </span>
-        <div>
+        <div className="build-result-meta">
           {comparison ? <StatusChip as="b" className="build-delta" tone={comparison.includes('+') ? 'good' : comparison.includes('-') ? 'warn' : undefined}>{comparison}</StatusChip> : null}
           <StatusChip as="b" className="build-sample-chip" tone={sample.tone}>{sample.label}</StatusChip>
           <StatusChip as="small" className="build-min-sample">{minGames}+ games/item</StatusChip>
@@ -330,9 +316,10 @@ function BuildResultCard({
           {notes.slice(0, 2).map((note) => <span key={note}>{note}</span>)}
         </div>
       ) : null}
-      <div className="focused-build-result-body">
-        <BuildPathRows paths={buildPaths} items={items} loading={loading} />
+      <div className={`focused-build-result-body${showPathRows ? '' : ' slots-only'}`}>
+        {showPathRows ? <BuildPathRows paths={buildPaths} items={items} loading={loading} /> : null}
         <div className="build-slot-signals">
+          {!showPathRows ? <span className="build-path-inline-note">No stable full item path yet. Slot signals are the best available read for this sample.</span> : null}
           <div className="build-slot-heading">
             <span>Best item by completion slot</span>
             <em>Independent slot signals, not a locked six-item script.</em>
