@@ -33,6 +33,8 @@ Known gaps:
 - Tier-list impact is still a correlation-heavy score. It now uses final participant performance fields, but those signals should be validated as the corpus grows. See `docs/product/tier-list-ranking.md`.
 - Item paths use timeline-derived first-three completed item signatures where available, then final inventory signatures for the completed build. Final inventory order is still Riot inventory order, not guaranteed purchase order.
 - Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin.
+- Live matchup slot panels should not mix champion-wide fallback rows into the matchup card. Exact-matchup scope can widen across stored patches, while champion-wide baseline stays in the separate overall card.
+- Displayed slot rows apply a small sanity pass for player readability, including suppressing duplicate boots. The underlying API still returns the candidate rows; the UI chooses a plausible one-boot display.
 - The build-advice endpoint is the preferred contract for future profile/live/champion build UI work. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.
 - Skill paths are real timeline-derived paths, but they are still aggregated by champion/role/rank/patch rather than matchup-specific skill paths.
 

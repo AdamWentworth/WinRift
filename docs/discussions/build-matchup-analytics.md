@@ -16,14 +16,20 @@ Live item advice currently filters by:
 
 - champion id,
 - opponent champion id,
-- optional item context.
+- role scope,
+- optional item context,
+- patch when the live match knows the current patch.
 
 It does not default-filter by:
 
-- patch,
 - region/platform,
-- rank bucket,
-- exact role.
+- rank bucket.
+
+Role is intentionally nuanced:
+
+- Jungle, bot, and support stay role-specific because their item economies and map duties are materially different.
+- Top and mid are merged for build advice because many matchup-specific item responses transfer between solo lanes.
+- Champion guide and tier-list ranking stay strict by role. That prevents mid-lane games from leaking into top-lane strength rankings.
 
 Item context is used for item pool eligibility:
 
@@ -106,14 +112,29 @@ This is deliberately simple and player-facing. The deeper Wilson-style confidenc
 
 ### Live Fallback Ladder
 
-For live matchup cards, the item-slot endpoint now fills missing slots through a labeled fallback ladder:
+For live matchup cards, the item-slot endpoint now fills missing slots only through exact matchup scopes:
 
 1. Current patch exact champion matchup.
 2. Exact champion matchup across all stored patches.
-3. Current patch champion-wide item slot.
-4. Champion-wide item slot across all stored patches.
 
-The fallback is slot-by-slot. If slot one has exact matchup data but slot five does not, slot one stays exact while slot five can fall back. The UI labels mixed fallback samples instead of pretending the whole row came from one exact matchup.
+The champion-wide fallback is deliberately not mixed into the matchup card anymore. It lives in a separate "Best overall champion build" card. This avoids a misleading overlap where the matchup card silently fills missing late slots with the same rows shown in the baseline card.
+
+The fallback is slot-by-slot. If slot one has current-patch exact matchup data but slot four only has all-patch exact matchup data, slot one stays current-patch exact while slot four can use the broader exact-matchup scope. If slot five has no exact matchup row above threshold, it stays empty rather than borrowing champion-wide data.
+
+The live UI now keeps fallback language short. It shows one caveat at most, such as "Some slots use exact-matchup data from older stored patches." More detailed scope diagnostics belong in developer/debug tooling, not in the normal match read.
+
+### Slot Reads And Build Sanity
+
+Slot reads are independent signals, not a guaranteed six-item script. They are still useful because they answer "what item has performed best when completed in this slot?"
+
+The UI now applies a basic sanity pass before rendering:
+
+- only one boots item can appear in the displayed slot row,
+- if two boot candidates rank highly in different slots, the stronger boot row wins and the other boot slot looks for the next non-boot candidate,
+- jungle/support item eligibility is still controlled by item context,
+- empty slots remain empty when exact matchup data is not available.
+
+This keeps the read honest without pretending we have a complete path when the sample only supports slot-level signals.
 
 ### Read Model And Batch Loading
 

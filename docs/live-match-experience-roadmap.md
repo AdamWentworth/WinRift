@@ -161,8 +161,8 @@ Recent refinements:
 - Champion cards use splash art backdrops, with champion stats paired against ranked record in separate columns.
 - Ranked tier icon lives above the ranked record area so it mirrors the champion portrait/champion-stats relationship.
 - Role confidence is used behind the scenes for ordering but is hidden from the default card UI.
-- Build cards now show six item slots, clear sample-size language, and a better no-data state.
-- Build cards use a labeled fallback ladder so sparse exact matchups can still show champion-wide context without hiding the source.
+- Build cards now show prioritized item-slot reads, clear sample-size language, quieter no-data states, and less tiny explanatory text.
+- Build cards keep exact matchup rows and champion-wide baseline rows separate. Sparse exact matchups can widen to all stored patches, but they do not silently borrow champion-wide slots.
 - Live lookup loading and miss states are presented as status plates instead of loose text.
 - Win-condition match reads surface the selected `Your condition vs Enemy condition` pairing, evidence strength, game count, and likely winrate range near the headline.
 
@@ -207,7 +207,7 @@ Recommended model:
 Current modes:
 
 - Match: default scout view with lane labels and the two teams' champion cards. No heavier analytics are loaded.
-- Builds: focused item-path view. It defaults to the searched player and lane opponent, but both the build target and opponent can be changed from the live match. It shows both the exact matchup item path and the champion-wide baseline, so a player can compare "what works into this enemy" against "what generally works on this champion."
+- Builds: focused item-path view. It defaults to the searched player and lane opponent, but both the build target and opponent can be changed from the live match. It shows exact matchup slot reads beside a separate champion-wide baseline, so a player can compare "what works into this enemy" against "what generally works on this champion" without mixing those scopes into one card.
 - Win Conditions: show champion rows with the win-condition analysis band between teams.
 - Player Form later: deeper recent games, off-role/specialist flags, and live backfill status if the card stats need more context.
 
@@ -222,9 +222,11 @@ Implementation notes:
 
 - `liveMode` state in `LiveMatchups` is `'match' | 'builds' | 'winConditions'`.
 - A small mode context banner now sits below the match header. It names the current lens, makes the lazy-loading behavior explicit, and gives users a short reminder of what that mode is for.
-- Gate the focused item-slot batch query so it only runs in Builds mode. The current batch asks for two rows of advice: exact matchup and champion baseline. This avoids frontend and API work for hidden build panels.
+- Gate the build-advice query so it only runs in Builds mode. The unified `GET /api/analytics/build-advice` response returns matchup slots, champion baseline slots, runes, spells, paths, sample quality, and fallback notes in one payload.
 - Build rows use minimum sample thresholds before an item can appear: 5+ games for exact matchup slots and 10+ games for champion baseline slots. Results are still sorted by Wilson lower-bound confidence after the threshold, so a 1-game 100% item does not outrank a more established pattern.
-- Build cards should show context, not just winrate: weighted shown-item winrate, shown sample volume, matchup delta against the champion baseline, and a "common" hint when the most played candidate differs from the confidence-ranked item.
+- Matchup cards can fall back from current-patch exact matchup to all-patch exact matchup, but they do not borrow champion-wide rows. The champion-wide baseline is shown separately.
+- Build cards should prioritize context without tiny-text overload: weighted shown-item winrate, shown sample volume, matchup delta/reference chip, one sample-strength chip, one caveat max, and the item slot row.
+- Displayed slot rows should avoid impossible reads such as two boots in one build. If duplicate boots would appear, keep the stronger boot row and look for the next non-boot candidate in the other slot.
 - Gate win-condition query so it only runs in Win Conditions mode, unless we later want to prefetch after idle.
 - Keep the current champion card drag/drop shared across all modes because role correction affects every mode.
 - Use icons plus short labels in the rail. Good icon choices from lucide: sword/build, network/strategy, user/player form.
