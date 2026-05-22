@@ -73,29 +73,45 @@ export function FocusedBuildPanel({
   const matchupDelta = buildPathDelta(matchupSummary, championSummary);
   const activeParticipantKey = selectedParticipantKey || selection.participantKey;
   const activeOpponentKey = selectedOpponentKey || selection.opponentKey;
+  const championName = champion?.name ?? String(selection.participant.championId);
+  const opponentChampionName = opponentChampion?.name ?? String(selection.opponent.championId);
 
   return (
     <section className={`focused-build-panel ${selection.side}`} aria-label="Focused build matchup">
       <div className="focused-build-header">
-        <div className="focused-build-player">
-          {championUrl ? <img src={championUrl} alt={champion?.name ?? 'Champion'} /> : null}
+        <div className="focused-build-owner-card">
+          {championUrl ? <img src={championUrl} alt={championName} /> : null}
           <span>
-            <small><RoleIcon role={selection.role} /> {roleLabel(selection.role)}</small>
-            <strong>{champion?.name ?? selection.participant.championId}</strong>
+            <small>Builds For</small>
+            <strong>{championName}</strong>
             <em>{playerName}</em>
+            <b><RoleIcon role={selection.role} /> {roleLabel(selection.role)}</b>
           </span>
         </div>
-        <div className="focused-build-versus">
+        <div className="focused-build-context-card">
+          <span className="focused-build-context-label">Matchup Context</span>
+          <div>
+            {opponentUrl ? <img src={opponentUrl} alt={opponentChampionName} /> : null}
+            <span>
+              <small>Against</small>
+              <strong>{opponentChampionName}</strong>
+              <em>{opponentName}</em>
+            </span>
+          </div>
+          <p>Both build panels below are for {championName}. The opponent only narrows the matchup sample.</p>
+        </div>
+      </div>
+      <div className="focused-build-intent">
+        <span>
+          <strong>{championName} item reads</strong>
+          <em>Left is matchup-specific when enough games exist. Right is the broader champion baseline for comparison.</em>
+        </span>
+        <span className="focused-build-intent-vs">
+          {championUrl ? <img src={championUrl} alt="" /> : null}
           <b>vs</b>
-        </div>
-        <div className="focused-build-player enemy">
-          {opponentUrl ? <img src={opponentUrl} alt={opponentChampion?.name ?? 'Opponent'} /> : null}
-          <span>
-            <small>Opponent</small>
-            <strong>{opponentChampion?.name ?? selection.opponent.championId}</strong>
-            <em>{opponentName}</em>
-          </span>
-        </div>
+          {opponentUrl ? <img src={opponentUrl} alt="" /> : null}
+          <small>{opponentChampionName}</small>
+        </span>
       </div>
       <div className="focused-build-controls">
         <BuildParticipantPicker
@@ -116,14 +132,16 @@ export function FocusedBuildPanel({
       <BuildAdviceSetupStrip buildAdvice={buildAdvice} spells={spells} runes={runes} loading={loading} />
       <div className="focused-build-results">
         <BuildResultCard
-          title="Matchup Build"
-          description={`${champion?.name ?? selection.participant.championId} vs ${opponentChampion?.name ?? selection.opponent.championId}`}
+          title="Matchup Items"
+          description={`For ${championName} against ${opponentChampionName}`}
           sample={matchupSample}
           summary={matchupSummary}
           comparison={matchupDelta}
           scopeLabel={matchupScopeLabel}
           notes={buildAdvice?.notes}
           side={selection.side}
+          ownerName={championName}
+          ownerImageUrl={championUrl}
           itemSlots={matchupItemSlots}
           buildPaths={buildPathDisplays(buildAdvice?.matchup.topBuilds)}
           loading={loading}
@@ -134,13 +152,15 @@ export function FocusedBuildPanel({
         />
         <BuildResultCard
           title="Champion Baseline"
-          description={`Highest winrate ${champion?.name ?? selection.participant.championId} items overall`}
+          description={`For ${championName} across all stored matchups`}
           sample={championSample}
           summary={championSummary}
           comparison="Champion-wide reference"
           scopeLabel={championScopeLabel}
           notes={undefined}
           side={selection.side}
+          ownerName={championName}
+          ownerImageUrl={championUrl}
           itemSlots={championItemSlots}
           buildPaths={buildPathDisplays(buildAdvice?.champion.topBuilds, buildAdvice?.champion.topItemPaths)}
           loading={loading}
@@ -251,6 +271,8 @@ function BuildResultCard({
   scopeLabel,
   notes,
   side,
+  ownerName,
+  ownerImageUrl,
   itemSlots,
   buildPaths,
   loading,
@@ -267,6 +289,8 @@ function BuildResultCard({
   scopeLabel: string;
   notes?: string[];
   side: TeamSide;
+  ownerName: string;
+  ownerImageUrl: string;
   itemSlots: AnalyticsItemSlot[];
   buildPaths: BuildPathDisplay[];
   loading: boolean;
@@ -279,6 +303,13 @@ function BuildResultCard({
     <article className="focused-build-result">
       <header>
         <span>
+          <span className="build-result-owner">
+            {ownerImageUrl ? <img src={ownerImageUrl} alt="" /> : null}
+            <span>
+              <small>Builds for</small>
+              <b>{ownerName}</b>
+            </span>
+          </span>
           <strong>{title}</strong>
           <em>{description}</em>
           {summary ? (
