@@ -970,19 +970,24 @@ func championGuideBuildVariantRowsResponse(rows []clickhouse.ChampionGuideBuildV
 	results := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		results = append(results, map[string]any{
-			"variantKey":          row.VariantKey,
-			"variantLabel":        row.VariantLabel,
-			"variantTags":         row.VariantTags,
-			"core2Signature":      row.Core2Signature,
-			"core3Signature":      row.Core3Signature,
-			"finalItemsSignature": row.FinalItemsSignature,
-			"runeSignature":       row.RuneSignature,
-			"spellSignature":      row.SpellSignature,
-			"wins":                row.Wins,
-			"games":               row.Games,
-			"winRate":             round(row.WinRate * 100),
-			"confidence":          round(row.Confidence * 100),
-			"buildCount":          row.BuildCount,
+			"variantKey":           row.VariantKey,
+			"variantLabel":         row.VariantLabel,
+			"variantTags":          row.VariantTags,
+			"core2Signature":       row.Core2Signature,
+			"core3Signature":       row.Core3Signature,
+			"finalItemsSignature":  row.FinalItemsSignature,
+			"runeSignature":        row.RuneSignature,
+			"spellSignature":       row.SpellSignature,
+			"skillOrderSignature":  row.SkillOrderSignature,
+			"skillOrderWins":       row.SkillOrderWins,
+			"skillOrderGames":      row.SkillOrderGames,
+			"skillOrderWinRate":    round(row.SkillOrderWinRate * 100),
+			"skillOrderConfidence": round(row.SkillOrderConfidence * 100),
+			"wins":                 row.Wins,
+			"games":                row.Games,
+			"winRate":              round(row.WinRate * 100),
+			"confidence":           round(row.Confidence * 100),
+			"buildCount":           row.BuildCount,
 		})
 	}
 	return results

@@ -321,6 +321,11 @@ export type ChampionGuideBuildVariant = {
   finalItemsSignature: string;
   runeSignature: string;
   spellSignature: string;
+  skillOrderSignature?: string;
+  skillOrderWins?: number;
+  skillOrderGames?: number;
+  skillOrderWinRate?: number;
+  skillOrderConfidence?: number;
   wins: number;
   games: number;
   winRate: number;

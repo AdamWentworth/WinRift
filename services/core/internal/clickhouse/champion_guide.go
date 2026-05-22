@@ -92,19 +92,24 @@ type ChampionGuideItemPathRow struct {
 }
 
 type ChampionGuideBuildVariantRow struct {
-	VariantKey          string
-	VariantLabel        string
-	VariantTags         []string
-	Core2Signature      string
-	Core3Signature      string
-	FinalItemsSignature string
-	RuneSignature       string
-	SpellSignature      string
-	Wins                int
-	Games               int
-	WinRate             float64
-	Confidence          float64
-	BuildCount          int
+	VariantKey           string
+	VariantLabel         string
+	VariantTags          []string
+	Core2Signature       string
+	Core3Signature       string
+	FinalItemsSignature  string
+	RuneSignature        string
+	SpellSignature       string
+	SkillOrderSignature  string
+	SkillOrderWins       int
+	SkillOrderGames      int
+	SkillOrderWinRate    float64
+	SkillOrderConfidence float64
+	Wins                 int
+	Games                int
+	WinRate              float64
+	Confidence           float64
+	BuildCount           int
 }
 
 type ChampionGuideData struct {
@@ -1004,7 +1009,160 @@ func (r *Repository) queryChampionGuideBuildVariants(ctx context.Context, filter
 	if len(out) > limit {
 		out = out[:limit]
 	}
+	if err := r.attachBuildVariantSkillOrders(ctx, filters, out, minGames); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+type buildVariantSkillAggregate struct {
+	Wins  int
+	Games int
+}
+
+func (r *Repository) attachBuildVariantSkillOrders(ctx context.Context, filters map[string]string, variants []ChampionGuideBuildVariantRow, minGames int) error {
+	if len(variants) == 0 {
+		return nil
+	}
+	skillMinGames := minGames
+	if skillMinGames > 2 {
+		skillMinGames = 2
+	}
+	wanted := map[string]int{}
+	for index, variant := range variants {
+		wanted[variant.VariantKey] = index
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	query := `
+		WITH skill_paths AS
+		(
+			SELECT
+				match_id,
+				participant_id,
+				arrayStringConcat(
+					arrayMap(x -> toString(tupleElement(x, 2)),
+						arraySort(x -> tupleElement(x, 1), groupArray((skill_order, skill_slot)))
+					),
+					'-'
+				) AS skill_order_signature
+			FROM timeline_skill_events FINAL
+			WHERE skill_slot BETWEEN 1 AND 4
+			GROUP BY match_id, participant_id
+			HAVING skill_order_signature != ''
+		)
+		SELECT
+			pm.core2_signature,
+			pm.core3_signature,
+			pm.final_items_signature,
+			sp.skill_order_signature,
+			toUInt64(sum(pm.win)) AS wins,
+			toUInt64(count()) AS games
+		FROM participant_matchups AS pm FINAL
+		INNER JOIN skill_paths AS sp
+			ON pm.match_id = sp.match_id
+			AND pm.participant_id = sp.participant_id
+		LEFT JOIN
+		(
+			SELECT
+				platform,
+				puuid,
+				argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+			FROM summoner_rank_snapshots FINAL
+			WHERE queue_type = 'RANKED_SOLO_5x5'
+			GROUP BY platform, puuid
+		) AS s
+			ON s.platform = pm.platform AND s.puuid = pm.puuid
+		WHERE pm.champion_id = ?
+			AND pm.core2_signature != ''
+			AND pm.final_items_signature != ''`
+	args := []any{filterValue(filters["champion_id"])}
+	if roleScope.whereSQL != "" {
+		query += " AND " + qualifyRoleWhereSQL(roleScope.whereSQL, "pm.role")
+		args = append(args, roleScope.args...)
+	}
+	if filterValue(filters["patch"]) != "" {
+		query += " AND pm.patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND multiIf(s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket, pm.rank_bucket) = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	query += `
+		GROUP BY
+			pm.core2_signature,
+			pm.core3_signature,
+			pm.final_items_signature,
+			sp.skill_order_signature
+		HAVING games >= ?
+		ORDER BY games DESC`
+	args = append(args, skillMinGames)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type skillRow struct {
+		core2, core3, final, signature string
+		wins, games                    int
+	}
+	byVariant := map[string]map[string]buildVariantSkillAggregate{}
+	for rows.Next() {
+		var row skillRow
+		if err := rows.Scan(&row.core2, &row.core3, &row.final, &row.signature, &row.wins, &row.games); err != nil {
+			return err
+		}
+		key := buildVariantCoreKey(row.core3, row.final, row.core2)
+		if key == "" {
+			continue
+		}
+		label, tags := buildVariantLabelAndTags(row.core2 + "-" + row.core3 + "-" + row.final)
+		groupKey := buildVariantGroupKey(ChampionGuideBuildVariantRow{
+			VariantKey:   key,
+			VariantLabel: label,
+			VariantTags:  tags,
+		})
+		if _, ok := wanted[groupKey]; !ok {
+			continue
+		}
+		if byVariant[groupKey] == nil {
+			byVariant[groupKey] = map[string]buildVariantSkillAggregate{}
+		}
+		current := byVariant[groupKey][row.signature]
+		current.Wins += row.wins
+		current.Games += row.games
+		byVariant[groupKey][row.signature] = current
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for variantKey, skills := range byVariant {
+		index, ok := wanted[variantKey]
+		if !ok {
+			continue
+		}
+		bestSignature := ""
+		best := buildVariantSkillAggregate{}
+		for signature, aggregate := range skills {
+			if aggregate.Games < skillMinGames {
+				continue
+			}
+			if bestSignature == "" || aggregate.Games > best.Games || (aggregate.Games == best.Games && aggregate.Wins > best.Wins) {
+				bestSignature = signature
+				best = aggregate
+			}
+		}
+		if bestSignature == "" || best.Games <= 0 {
+			continue
+		}
+		variants[index].SkillOrderSignature = bestSignature
+		variants[index].SkillOrderWins = best.Wins
+		variants[index].SkillOrderGames = best.Games
+		variants[index].SkillOrderWinRate = float64(best.Wins) / float64(best.Games)
+		variants[index].SkillOrderConfidence = analytics.WilsonLowerBound(best.Wins, best.Games, 1.96)
+	}
+	return nil
 }
 
 func buildVariantCoreKey(signatures ...string) string {

@@ -261,22 +261,16 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         </div>
       </div>
 
+      <div className="guide-skill-items-row build-linked">
+        <SkillGuideCard guide={guide} variant={selectedBuildVariant} champion={champion} champions={champions} loading={guideQuery.isLoading} />
+        <SkillPathCard guide={guide} variant={selectedBuildVariant} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
+      </div>
+
       <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
 
       <ItemGuideGrid rows={itemSlots} items={items} loading={buildAdviceQuery.isLoading} context={itemSlotContext} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
-
-      <section className="guide-ability-section" aria-label={`${champion?.name ?? 'Champion'} ability order`}>
-        <div className="guide-section-title">
-          <span>Ability Order</span>
-          <em>Champion-level skill priority from stored timeline level-ups.</em>
-        </div>
-        <div className="guide-skill-items-row">
-          <SkillGuideCard guide={guide} champion={champion} champions={champions} loading={guideQuery.isLoading} />
-          <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
-        </div>
-      </section>
 
       <section className="guide-matchups-section" aria-label={`${champion?.name ?? 'Champion'} matchups`}>
         <div className="guide-section-title">
@@ -584,13 +578,16 @@ function MatchupStrip({ title, subtitle, rows, champions, tone, loading }: { tit
   );
 }
 
-function SkillGuideCard({ guide, champion, champions, loading }: { guide?: ChampionGuideResponse; champion?: Champion; champions?: ChampionData; loading: boolean }) {
+function SkillGuideCard({ guide, variant, champion, champions, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; champion?: Champion; champions?: ChampionData; loading: boolean }) {
   const spells = champion?.spells ?? [];
-  const skillOrder = guide?.topSkillOrders?.[0];
+  const skillOrder = variant?.skillOrderSignature ? variantSkillOrderRow(variant) : guide?.topSkillOrders?.[0];
   const priority = skillPriority(skillOrder?.skillOrderSignature ?? '');
+  const detail = skillOrder
+    ? `${skillOrder.winRate.toFixed(2)}% WR (${formatNumber(skillOrder.games)} matches)${variant?.skillOrderSignature ? ' for this build' : ''}`
+    : loading ? 'Loading...' : 'No skill sample yet';
   return (
     <PanelCard className="guide-card skill-priority-card">
-      <PanelTitle title="Skill Priority" detail={skillOrder ? `${skillOrder.winRate.toFixed(2)}% WR (${formatNumber(skillOrder.games)} matches)` : loading ? 'Loading...' : 'No skill sample yet'} />
+      <PanelTitle title="Skill Priority" detail={detail} />
       <div className="skill-priority-icons">
         {(priority.length ? priority : [1, 2, 3]).map((slot) => {
           const ability = spells[slot - 1];
@@ -603,7 +600,7 @@ function SkillGuideCard({ guide, champion, champions, loading }: { guide?: Champ
         })}
       </div>
       {skillOrder ? (
-        <p>Derived from Match-V5 timeline skill-level events in collected ranked games.</p>
+        <p>{variant?.skillOrderSignature ? 'This priority is filtered to the selected build family.' : 'Derived from Match-V5 timeline skill-level events in collected ranked games.'}</p>
       ) : (
         <p>{loading ? 'Checking collected timelines.' : 'Skill order will appear after guide analytics refreshes for this champion.'}</p>
       )}
@@ -611,12 +608,12 @@ function SkillGuideCard({ guide, champion, champions, loading }: { guide?: Champ
   );
 }
 
-function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuideResponse; championName: string; loading: boolean }) {
-  const skillOrder = guide?.topSkillOrders?.[0];
+function SkillPathCard({ guide, variant, championName, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; championName: string; loading: boolean }) {
+  const skillOrder = variant?.skillOrderSignature ? variantSkillOrderRow(variant) : guide?.topSkillOrders?.[0];
   const slots = skillSlots(skillOrder?.skillOrderSignature ?? '');
   return (
     <PanelCard className="guide-card skill-path-card">
-      <PanelTitle title="Skill Path" detail={skillOrder ? `${formatNumber(skillOrder.games)} matching paths` : loading ? 'Loading...' : 'No path sample yet'} />
+      <PanelTitle title="Skill Path" detail={skillOrder ? `${formatNumber(skillOrder.games)} matching paths${variant?.skillOrderSignature ? ' for this build' : ''}` : loading ? 'Loading...' : 'No path sample yet'} />
       {slots.length ? (
         <div className="skill-path-placeholder-grid">
           {[1, 2, 3, 4].map((slot) => (
@@ -631,7 +628,7 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
           ))}
         </div>
       ) : <EmptyState message={loading ? 'Loading skill path...' : `No skill path sample yet for ${championName}.`} />}
-      <p>{slots.length ? `${championName} skill order is shown from the most common collected path.` : 'This panel stays empty until real timeline data exists.'}</p>
+      <p>{slots.length ? `${championName} skill order is shown from the most common collected path${variant?.skillOrderSignature ? ' for this build family' : ''}.` : 'This panel stays empty until real timeline data exists.'}</p>
     </PanelCard>
   );
 }
@@ -789,7 +786,18 @@ function groupBuildVariantsForDisplay(variants: ChampionGuideBuildVariant[], ite
       next.finalItemsSignature = variant.finalItemsSignature;
       next.runeSignature = variant.runeSignature;
       next.spellSignature = variant.spellSignature;
+      next.skillOrderSignature = variant.skillOrderSignature;
+      next.skillOrderWins = variant.skillOrderWins;
+      next.skillOrderGames = variant.skillOrderGames;
+      next.skillOrderWinRate = variant.skillOrderWinRate;
+      next.skillOrderConfidence = variant.skillOrderConfidence;
       representativeGames.set(key, variant.games);
+    } else if (!next.skillOrderSignature && variant.skillOrderSignature) {
+      next.skillOrderSignature = variant.skillOrderSignature;
+      next.skillOrderWins = variant.skillOrderWins;
+      next.skillOrderGames = variant.skillOrderGames;
+      next.skillOrderWinRate = variant.skillOrderWinRate;
+      next.skillOrderConfidence = variant.skillOrderConfidence;
     }
     groups.set(key, next);
   }
@@ -816,6 +824,16 @@ function variantSpellRow(variant: ChampionGuideBuildVariant) {
     games: variant.games,
     winRate: variant.winRate,
     confidence: variant.confidence,
+  };
+}
+
+function variantSkillOrderRow(variant: ChampionGuideBuildVariant) {
+  return {
+    skillOrderSignature: variant.skillOrderSignature ?? '',
+    wins: variant.skillOrderWins ?? 0,
+    games: variant.skillOrderGames ?? 0,
+    winRate: variant.skillOrderWinRate ?? 0,
+    confidence: variant.skillOrderConfidence ?? 0,
   };
 }
 
