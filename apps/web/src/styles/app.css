@@ -3677,7 +3677,7 @@ button {
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 0.95fr);
   min-width: 0;
 }
 
@@ -3694,10 +3694,12 @@ button {
 
 .focused-build-command-group.build-target {
   border-color: rgb(135 206 235 / 22%);
+  grid-template-columns: minmax(180px, 0.28fr) minmax(0, 1fr);
 }
 
 .focused-build-command-group.opponent-target {
   border-color: rgb(240 128 128 / 22%);
+  grid-template-columns: minmax(188px, 0.48fr) minmax(0, 1fr);
 }
 
 .focused-build-owner-card,
@@ -3999,10 +4001,14 @@ button {
 
 .focused-build-picker > div {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
   overflow-x: auto;
   padding-bottom: 1px;
+}
+
+.focused-build-command-group.opponent-target .focused-build-picker > div {
+  justify-content: space-between;
 }
 
 .focused-build-picker button {
@@ -4014,7 +4020,7 @@ button {
   gap: 3px;
   grid-template-columns: 1fr;
   grid-template-rows: 34px auto;
-  flex: 0 0 54px;
+  flex: 0 0 48px;
   justify-items: center;
   min-width: 0;
   min-height: 54px;
@@ -4042,9 +4048,9 @@ button {
 .focused-build-picker img {
   border: 1px solid rgb(255 255 255 / 14%);
   box-shadow: 0 2px 5px rgb(0 0 0 / 38%);
-  height: 34px;
+  height: 32px;
   object-fit: cover;
-  width: 34px;
+  width: 32px;
 }
 
 .focused-build-picker strong,
@@ -6417,6 +6423,10 @@ button {
     max-width: 1500px;
   }
 
+  .focused-build-command-row {
+    grid-template-columns: 1fr;
+  }
+
   .win-condition-panel {
     grid-template-columns: 1fr;
   }
@@ -6752,6 +6762,12 @@ button {
   }
 
   .focused-build-command-row {
+    grid-template-columns: 1fr;
+  }
+
+  .focused-build-command-group,
+  .focused-build-command-group.build-target,
+  .focused-build-command-group.opponent-target {
     grid-template-columns: 1fr;
   }
 
