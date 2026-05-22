@@ -36,6 +36,19 @@ export function App() {
   const items = useQuery({ queryKey: ['items'], queryFn: getItems, staleTime: STATIC_STALE_TIME });
   const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells, staleTime: STATIC_STALE_TIME });
   const runes = useQuery({ queryKey: ['runes'], queryFn: getRunes, staleTime: STATIC_STALE_TIME });
+  const championIds = useMemo(() => {
+    if (!champions.data) return [];
+    return Object.values(champions.data.data.data)
+      .map((champion) => Number(champion.key))
+      .filter((championId) => Number.isFinite(championId) && championId > 0);
+  }, [champions.data]);
+  const allChampionRoleRates = useQuery({
+    queryKey: ['champion-main-roles', DEFAULT_QUEUE_ID, championIds.join(',')],
+    queryFn: () => getChampionRoleRates(championIds, DEFAULT_QUEUE_ID),
+    enabled: championIds.length > 0,
+    staleTime: ROLE_STALE_TIME,
+  });
+  const allChampionRoleRateRows = useMemo(() => allChampionRoleRates.data?.results ?? [], [allChampionRoleRates.data?.results]);
 
   useEffect(() => {
     const onPopState = () => setRoute(readRoute());
@@ -94,9 +107,14 @@ export function App() {
     };
 
     const normalizedPreferredRole = normalizeRole(preferredRole ?? '');
+    const cachedDetectedRole = mainChampionRole(allChampionRoleRateRows, championId);
     if (normalizedPreferredRole) {
       prefetchForRole(normalizedPreferredRole);
+    } else if (cachedDetectedRole) {
+      prefetchForRole(cachedDetectedRole);
     }
+
+    if (cachedDetectedRole) return;
 
     void queryClient.ensureQueryData({
       queryKey: ['champion-main-role', championId],
@@ -112,7 +130,7 @@ export function App() {
         prefetchForRole('MIDDLE');
       }
     });
-  }, [champions.data, queryClient]);
+  }, [allChampionRoleRateRows, champions.data, queryClient]);
   const openChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
     prefetchChampionGuide(champion, preferredRole);
     navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
@@ -192,6 +210,7 @@ export function App() {
           spells={spells.data}
           runes={runes.data}
           initialChampionId={initialChampionId}
+          roleRates={allChampionRoleRateRows}
           onChampionChange={openChampionGuide}
         />
       ) : route.kind === 'summoner' ? (

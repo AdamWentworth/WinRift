@@ -45,12 +45,13 @@ type Props = {
   spells?: SummonerSpellData;
   runes?: RuneData;
   initialChampionId?: number;
+  roleRates?: ChampionRoleRate[];
   onChampionChange?: (champion: Champion) => void;
 };
 
-type GuideItemSlot = Pick<AnalyticsItemSlot, 'itemSlot' | 'itemId' | 'wins' | 'games' | 'winRate' | 'confidence'>;
+export type GuideItemSlot = Pick<AnalyticsItemSlot, 'itemSlot' | 'itemId' | 'wins' | 'games' | 'winRate' | 'confidence'>;
 
-export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, onChampionChange }: Props) {
+export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, roleRates, onChampionChange }: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
   const defaultChampionId = useMemo(() => {
     const wukong = championsByName.find((champion) => champion.id === 'MonkeyKing');
@@ -65,14 +66,19 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const patch = patchBucket(champions?.version);
   const champion = championByKey(champions, championId);
   const opponent = opponentChampionId ? championByKey(champions, opponentChampionId) : undefined;
+  const seededRoleRates = useMemo(() => (
+    roleRates?.filter((row) => row.championId === championId) ?? []
+  ), [championId, roleRates]);
   const roleRatesQuery = useQuery({
     queryKey: ['champion-main-role', championId],
     queryFn: () => getChampionRoleRates([championId], DEFAULT_QUEUE_ID),
-    enabled: Boolean(championId),
+    enabled: Boolean(championId && !seededRoleRates.length),
     staleTime: 30 * 60 * 1000,
   });
-  const mainRole = useMemo(() => mainChampionRole(roleRatesQuery.data?.results ?? [], championId), [roleRatesQuery.data?.results, championId]);
-  const defaultRole = mainRole || (roleRatesQuery.isSuccess || roleRatesQuery.isError ? 'MIDDLE' : '');
+  const activeRoleRates = seededRoleRates.length ? seededRoleRates : roleRatesQuery.data?.results ?? [];
+  const mainRole = useMemo(() => mainChampionRole(activeRoleRates, championId), [activeRoleRates, championId]);
+  const roleRatesSettled = seededRoleRates.length > 0 || roleRatesQuery.isSuccess || roleRatesQuery.isError;
+  const defaultRole = mainRole || (roleRatesSettled ? 'MIDDLE' : '');
   const itemContext = itemContextForRole(role);
   const guideQuery = useQuery({
     queryKey: ['champion-guide', championId, role, patch, rankBucket],
@@ -634,19 +640,29 @@ function SkillPathCard({ guide, variant, championName, loading }: { guide?: Cham
 }
 
 function ItemGuideGrid({ rows, items, loading, context }: { rows: GuideItemSlot[]; items?: ItemData; loading: boolean; context: string }) {
-  const startingRows = sortedSlotCandidates(rows, 0);
-  const completedSlotRows = [1, 2, 3, 4, 5, 6].map((slot) => sortedSlotCandidates(rows, slot));
-  const coreRows = pickUniqueCoreRows(completedSlotRows.slice(0, 3));
-  const coreItemIds = new Set(coreRows.map((row) => row.itemId));
+  const { startingRows, coreRows, fourthRows, fifthRows, sixthRows } = selectGuideItemPanelRows(rows);
   return (
     <section className="guide-item-grid">
       <GuideItemPanel title="Starting Items" subtitle={context} rows={startingRows.slice(0, 3)} items={items} loading={loading} />
       <GuideItemPanel title="Core Items" subtitle="Highest-confidence path" rows={coreRows} items={items} loading={loading} linked />
-      <GuideItemPanel title="Fourth Item Options" subtitle="Options after core" rows={optionRows(completedSlotRows[3] ?? [], coreItemIds)} items={items} loading={loading} />
-      <GuideItemPanel title="Fifth Item Options" subtitle="Late build pivots" rows={optionRows(completedSlotRows[4] ?? [], coreItemIds)} items={items} loading={loading} />
-      <GuideItemPanel title="Sixth Item Options" subtitle="Full-build finishers" rows={optionRows(completedSlotRows[5] ?? [], coreItemIds)} items={items} loading={loading} />
+      <GuideItemPanel title="Fourth Item Options" subtitle="Options after core" rows={fourthRows} items={items} loading={loading} />
+      <GuideItemPanel title="Fifth Item Options" subtitle="Late build pivots" rows={fifthRows} items={items} loading={loading} />
+      <GuideItemPanel title="Sixth Item Options" subtitle="Full-build finishers" rows={sixthRows} items={items} loading={loading} />
     </section>
   );
+}
+
+export function selectGuideItemPanelRows(rows: GuideItemSlot[]) {
+  const startingRows = uniqueItemRows(sortedSlotCandidates(rows, 0)).slice(0, 3);
+  const completedSlotRows = [1, 2, 3, 4, 5, 6].map((slot) => sortedSlotCandidates(rows, slot));
+  const coreRows = pickUniqueCoreRows(completedSlotRows.slice(0, 3));
+  const displayedLateItems = new Set(coreRows.map((row) => row.itemId));
+  const fourthRows = optionRows(completedSlotRows[3] ?? [], displayedLateItems);
+  addDisplayedItems(displayedLateItems, fourthRows);
+  const fifthRows = optionRows(completedSlotRows[4] ?? [], displayedLateItems);
+  addDisplayedItems(displayedLateItems, fifthRows);
+  const sixthRows = optionRows(completedSlotRows[5] ?? [], displayedLateItems);
+  return { startingRows, coreRows, fourthRows, fifthRows, sixthRows };
 }
 
 function ItemSignatureImages({ signature, items, limit }: { signature: string; items?: ItemData; limit?: number }) {
@@ -672,7 +688,7 @@ function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { tit
       {rows.length ? (
         <div className={linked ? 'guide-item-list linked' : 'guide-item-list'}>
           {rows.map((row, index) => (
-            <div key={`${title}-${row.itemSlot}-${row.itemId}`} className="guide-item-option">
+            <div key={`${title}-${row.itemSlot}-${row.itemId}-${index}`} className="guide-item-option">
               {index > 0 && linked ? <span className="guide-item-arrow">-&gt;</span> : null}
               {itemImageUrl(items, String(row.itemId)) ? (
                 <img src={itemImageUrl(items, String(row.itemId))} alt={itemName(items, String(row.itemId))} title={itemName(items, String(row.itemId))} />
@@ -882,6 +898,17 @@ function sortedSlotCandidates(rows: GuideItemSlot[], slot: number) {
     });
 }
 
+function uniqueItemRows(rows: GuideItemSlot[]) {
+  const out: GuideItemSlot[] = [];
+  const used = new Set<number>();
+  for (const row of rows) {
+    if (used.has(row.itemId)) continue;
+    used.add(row.itemId);
+    out.push(row);
+  }
+  return out;
+}
+
 function pickUniqueCoreRows(slotRows: GuideItemSlot[][]) {
   const used = new Set<number>();
   const out: GuideItemSlot[] = [];
@@ -895,8 +922,15 @@ function pickUniqueCoreRows(slotRows: GuideItemSlot[][]) {
 }
 
 function optionRows(rows: GuideItemSlot[], usedCoreItemIds: Set<number>) {
-  const filtered = rows.filter((row) => !usedCoreItemIds.has(row.itemId));
-  return (filtered.length ? filtered : rows).slice(0, 3);
+  const uniqueRows = uniqueItemRows(rows);
+  const filtered = uniqueRows.filter((row) => !usedCoreItemIds.has(row.itemId));
+  return (filtered.length ? filtered : uniqueRows).slice(0, 3);
+}
+
+function addDisplayedItems(used: Set<number>, rows: GuideItemSlot[]) {
+  for (const row of rows) {
+    used.add(row.itemId);
+  }
 }
 
 function guideItemSlotScore(row: GuideItemSlot) {
