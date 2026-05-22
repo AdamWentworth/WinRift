@@ -17,3 +17,7 @@ export function sameParticipantIdentity(participant: LiveParticipant, target: Li
 export function participantKey(participant: LiveParticipant, index: number) {
   return `${participant.teamId}-${participant.summonerId ?? participant.riotId ?? participant.championId}-${index}`;
 }
+
+export function liveParticipantName(participant?: LiveParticipant) {
+  return participant?.riotId || participant?.summonerName || 'Unknown player';
+}

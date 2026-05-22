@@ -1,7 +1,6 @@
-import type { ChampionData, LiveParticipant, RuneData, SummonerSpellData, WinConditionAnalysisResponse } from '../../api/types';
+import type { ChampionData, LiveParticipant, RuneData, SummonerSpellData } from '../../api/types';
 import { LaneHeader, LaneTabs } from './LaneNavigation';
 import { LiveChampionCard } from './LiveChampionCard';
-import { WinConditionPanel } from './WinConditionPanel';
 import { roles, type DraggedCard, type TeamSide } from './types';
 import { participantKey } from './utils';
 
@@ -16,11 +15,6 @@ export function LiveMatchCardGrid({
   onDragTarget,
   onMoveCard,
   onClearDrag,
-  showWinConditions,
-  winConditionAnalysis,
-  winConditionLoading,
-  winConditionError,
-  yourSide,
   champions,
   spells,
   runes,
@@ -35,11 +29,6 @@ export function LiveMatchCardGrid({
   onDragTarget: (card: DraggedCard) => void;
   onMoveCard: (side: TeamSide, fromIndex: number, toIndex: number) => void;
   onClearDrag: () => void;
-  showWinConditions: boolean;
-  winConditionAnalysis?: WinConditionAnalysisResponse;
-  winConditionLoading: boolean;
-  winConditionError?: string;
-  yourSide: TeamSide;
   champions?: ChampionData;
   spells?: SummonerSpellData;
   runes?: RuneData;
@@ -62,14 +51,6 @@ export function LiveMatchCardGrid({
         spells={spells}
         runes={runes}
       />
-      {showWinConditions ? (
-        <WinConditionPanel
-          analysis={winConditionAnalysis}
-          yourSide={yourSide}
-          loading={winConditionLoading}
-          error={winConditionError}
-        />
-      ) : null}
       <TeamRow
         side="red"
         team={redTeam}

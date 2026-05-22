@@ -1,6 +1,7 @@
 import type { LiveParticipant } from '../../api/types';
 import { StatusChip } from '../ui/StatusChip';
 import type { FocusedBuildSelection, LiveMode } from './types';
+import { liveParticipantName } from './utils';
 
 export function LiveModeContext({
   mode,
@@ -37,7 +38,7 @@ export function LiveModeContext({
         <div>
           <span>Win Conditions Mode</span>
           <strong>Team strategy read</strong>
-          <p>Composition metrics load only here. Reorder cards first if Riot's live lane order looks wrong, then read the primary strategy and timing windows.</p>
+          <p>Composition metrics load only here. Use Match mode to correct lane order, then read the focused strategy, timing, and counter-plan dashboard.</p>
         </div>
         <StatusChip className="live-mode-status" tone={!winReady ? 'thin' : winLoading ? 'early' : 'useful'}>{!winReady ? 'Needs 5v5 order' : winLoading ? 'Loading strategy stats' : 'Strategy query active'}</StatusChip>
       </section>
@@ -53,8 +54,4 @@ export function LiveModeContext({
       <StatusChip className="live-mode-status" tone={searchedParticipant ? 'good' : 'thin'}>{searchedParticipant ? `Focused on ${liveParticipantName(searchedParticipant)}` : 'No searched player marker'}</StatusChip>
     </section>
   );
-}
-
-function liveParticipantName(participant?: LiveParticipant) {
-  return participant?.riotId || participant?.summonerName || 'Unknown player';
 }

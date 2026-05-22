@@ -7,6 +7,7 @@ import { LiveMatchCardGrid } from './live-match/LiveMatchCardGrid';
 import { LiveModeContext } from './live-match/LiveModeContext';
 import { LiveModeRail } from './live-match/LiveModeRail';
 import { MatchHeader } from './live-match/MatchHeader';
+import { WinConditionFocusedView } from './live-match/WinConditionFocusedView';
 import {
   buildRoleRateMap,
   livePlayerSide,
@@ -177,6 +178,17 @@ export function LiveMatchups({ liveGame, champions, items, profileAction, spells
               selectedOpponentKey={selectedBuildOpponentKey}
               onSelectOpponent={setSelectedBuildOpponentKey}
             />
+          ) : showWinConditionMode ? (
+            <WinConditionFocusedView
+              blueTeam={blueTeam}
+              redTeam={redTeam}
+              yourSide={yourSide}
+              champions={champions}
+              analysis={winConditionQuery.data}
+              loading={winConditionQuery.isLoading}
+              error={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
+              ready={blueChampionIds.length === 5 && redChampionIds.length === 5}
+            />
           ) : (
             <LiveMatchCardGrid
               blueTeam={blueTeam}
@@ -192,11 +204,6 @@ export function LiveMatchups({ liveGame, champions, items, profileAction, spells
                 setDraggedCard(null);
                 setDragTarget(null);
               }}
-              showWinConditions={showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5}
-              winConditionAnalysis={winConditionQuery.data}
-              winConditionLoading={winConditionQuery.isLoading}
-              winConditionError={winConditionQuery.error instanceof Error ? winConditionQuery.error.message : undefined}
-              yourSide={yourSide}
               champions={champions}
               spells={spells}
               runes={runes}
