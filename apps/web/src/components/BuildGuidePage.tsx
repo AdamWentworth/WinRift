@@ -45,6 +45,8 @@ type Props = {
   onChampionChange?: (champion: Champion) => void;
 };
 
+type GuideItemSlot = Pick<AnalyticsItemSlot, 'itemSlot' | 'itemId' | 'wins' | 'games' | 'winRate' | 'confidence'>;
+
 export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, onChampionChange }: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
   const defaultChampionId = useMemo(() => {
@@ -110,9 +112,17 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
   const buildVariants = useMemo(() => groupBuildVariantsForDisplay(guideForBuilds?.buildVariants ?? [], items), [guideForBuilds?.buildVariants, items]);
   const selectedBuildVariant = buildVariants.find((variant) => variant.variantKey === selectedBuildVariantKey) ?? buildVariants[0];
-  const itemSlots = buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
-    ? buildAdvice.matchup.itemSlots
-    : buildAdvice?.champion.itemSlots ?? [];
+  const selectedBuildVariantIndex = selectedBuildVariant ? buildVariants.indexOf(selectedBuildVariant) : -1;
+  const selectedBuildVariantLabel = selectedBuildVariant ? buildVariantLabel(selectedBuildVariant, selectedBuildVariantIndex, items) : '';
+  const selectedVariantItemSlots = selectedBuildVariant ? variantItemSlots(selectedBuildVariant) : [];
+  const itemSlots: GuideItemSlot[] = selectedVariantItemSlots.length
+    ? selectedVariantItemSlots
+    : buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
+      ? buildAdvice.matchup.itemSlots
+      : buildAdvice?.champion.itemSlots ?? [];
+  const itemSlotContext = selectedVariantItemSlots.length
+    ? `${selectedBuildVariantLabel} selected build family`
+    : buildAdviceContext(buildAdvice, opponent?.name);
   const splash = championSplashUrl(champions, championId);
   const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
   const titleRole = roleLabel(role);
@@ -224,7 +234,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
 
       <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
 
-      <ItemGuideGrid rows={itemSlots} items={items} loading={buildAdviceQuery.isLoading} context={buildAdviceContext(buildAdvice, opponent?.name)} />
+      <ItemGuideGrid rows={itemSlots} items={items} loading={buildAdviceQuery.isLoading} context={itemSlotContext} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
 
@@ -557,9 +567,9 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
   );
 }
 
-function ItemGuideGrid({ rows, items, loading, context }: { rows: AnalyticsItemSlot[]; items?: ItemData; loading: boolean; context: string }) {
+function ItemGuideGrid({ rows, items, loading, context }: { rows: GuideItemSlot[]; items?: ItemData; loading: boolean; context: string }) {
   const slotRows = [1, 2, 3, 4, 5, 6].map((slot) => rows.filter((row) => row.itemSlot === slot));
-  const coreRows = slotRows.slice(0, 3).map((candidates) => candidates[0]).filter(Boolean) as AnalyticsItemSlot[];
+  const coreRows = slotRows.slice(0, 3).map((candidates) => candidates[0]).filter(Boolean) as GuideItemSlot[];
   return (
     <section className="guide-item-grid">
       <GuideItemPanel title="First Slot" subtitle={context} rows={slotRows[0]?.slice(0, 1) ?? []} items={items} loading={loading} />
@@ -626,7 +636,7 @@ function ItemSignatureImages({ signature, items, limit }: { signature: string; i
   );
 }
 
-function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { title: string; subtitle: string; rows: AnalyticsItemSlot[]; items?: ItemData; loading: boolean; linked?: boolean }) {
+function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { title: string; subtitle: string; rows: GuideItemSlot[]; items?: ItemData; loading: boolean; linked?: boolean }) {
   return (
     <PanelCard className="guide-card guide-item-panel">
       <PanelTitle title={title} />
@@ -776,6 +786,23 @@ function variantItemPathRow(variant: ChampionGuideBuildVariant) {
     winRate: variant.winRate,
     confidence: variant.confidence,
   };
+}
+
+function variantItemSlots(variant: ChampionGuideBuildVariant): GuideItemSlot[] {
+  const path = signatureItems(variant.core3Signature);
+  for (const itemId of signatureItems(variant.finalItemsSignature)) {
+    if (!path.includes(itemId)) {
+      path.push(itemId);
+    }
+  }
+  return path.slice(0, 6).map((itemId, index) => ({
+    itemSlot: index + 1,
+    itemId,
+    wins: variant.wins,
+    games: variant.games,
+    winRate: variant.winRate,
+    confidence: variant.confidence,
+  }));
 }
 
 function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, items?: ItemData) {
