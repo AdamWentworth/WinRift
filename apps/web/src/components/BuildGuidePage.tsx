@@ -373,10 +373,8 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
       {runeRow ? (
         <div className="guide-rune-grid">
           <RuneTreePanel style={primary} selectedRuneIds={parsed.runeIds} runes={runes} />
-          <div className="guide-rune-side">
-            <RuneTreePanel style={secondary} selectedRuneIds={parsed.runeIds} runes={runes} />
-            <StatShardGrid selectedIds={parsed.statPerks} className="guide-stat-shards" />
-          </div>
+          <RuneTreePanel style={secondary} selectedRuneIds={parsed.runeIds} runes={runes} />
+          <StatShardGrid selectedIds={parsed.statPerks} className="guide-stat-shards" />
         </div>
       ) : <EmptyState message="Rune pages will appear once this champion has enough collected games." />}
     </PanelCard>
