@@ -330,19 +330,23 @@ function BuildResultCard({
           {notes.slice(0, 2).map((note) => <span key={note}>{note}</span>)}
         </div>
       ) : null}
-      <BuildPathRows paths={buildPaths} items={items} loading={loading} />
-      <div className="build-slot-heading">
-        <span>Best item by completion slot</span>
-        <em>Each slot is evaluated independently, so treat this as item pressure, not a locked six-item script.</em>
+      <div className="focused-build-result-body">
+        <BuildPathRows paths={buildPaths} items={items} loading={loading} />
+        <div className="build-slot-signals">
+          <div className="build-slot-heading">
+            <span>Best item by completion slot</span>
+            <em>Independent slot signals, not a locked six-item script.</em>
+          </div>
+          <BuildSide
+            side={side}
+            itemSlots={itemSlots}
+            loading={loading}
+            items={items}
+            emptyTitle={emptyTitle}
+            emptySubtitle={emptySubtitle}
+          />
+        </div>
       </div>
-      <BuildSide
-        side={side}
-        itemSlots={itemSlots}
-        loading={loading}
-        items={items}
-        emptyTitle={emptyTitle}
-        emptySubtitle={emptySubtitle}
-      />
     </article>
   );
 }

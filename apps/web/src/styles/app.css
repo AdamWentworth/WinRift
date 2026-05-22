@@ -4206,6 +4206,20 @@ button {
   white-space: nowrap;
 }
 
+.focused-build-result-body {
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(420px, 1.18fr);
+  min-width: 0;
+}
+
+.build-slot-signals {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
 .build-result-summary {
   color: #d8e3e6;
   font-size: 9px;
@@ -4238,9 +4252,9 @@ button {
     rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 9%);
   display: grid;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
-  padding: 8px;
+  padding: 7px;
 }
 
 .build-path-signals.muted {
@@ -4277,10 +4291,10 @@ button {
   background: rgb(255 255 255 / 4%);
   border: 1px solid rgb(255 255 255 / 8%);
   display: grid;
-  gap: 8px;
+  gap: 7px;
   grid-template-columns: 24px minmax(0, 1fr) minmax(72px, auto);
   min-width: 0;
-  padding: 6px;
+  padding: 5px;
 }
 
 .build-path-signal-row > b {
@@ -4309,8 +4323,8 @@ button {
 .build-path-items em {
   border: 1px solid rgb(255 255 255 / 14%);
   flex: 0 0 auto;
-  height: 28px;
-  width: 28px;
+  height: 26px;
+  width: 26px;
 }
 
 .build-path-items img {
@@ -4359,7 +4373,7 @@ button {
 }
 
 .build-slot-heading {
-  align-items: end;
+  align-items: center;
   display: grid;
   gap: 4px;
   grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr);
@@ -4400,21 +4414,21 @@ button {
 }
 
 .focused-build-panel .build-side {
-  min-height: 126px;
-  padding: 8px;
+  min-height: 108px;
+  padding: 7px;
 }
 
 .focused-build-panel .item-slot-column {
-  gap: 5px;
-  grid-template-rows: 16px 38px auto;
-  padding: 7px 4px;
+  gap: 4px;
+  grid-template-rows: 15px 34px auto;
+  padding: 6px 3px;
 }
 
 .focused-build-panel .item-slot-column img,
 .focused-build-panel .item-slot-column .item-pill,
 .focused-build-panel .item-slot-empty {
-  height: 38px;
-  width: 38px;
+  height: 34px;
+  width: 34px;
 }
 
 .focused-opponent-picker {
@@ -6812,6 +6826,7 @@ button {
   .build-setup-strip,
   .focused-build-intent,
   .focused-build-results,
+  .focused-build-result-body,
   .focused-build-result > header {
     grid-template-columns: 1fr;
   }
