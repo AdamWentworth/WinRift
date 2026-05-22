@@ -172,6 +172,36 @@ export type BuildAdviceChampionSection = BuildAdviceSection & {
   strictRoleUsed: boolean;
 };
 
+export type BuildAdviceSlotDiagnostic = {
+  slot: number;
+  missing: boolean;
+  candidateCount: number;
+  itemId?: number;
+  games?: number;
+  winRate?: number;
+  sampleScope?: string;
+  sampleScopeLabel?: string;
+  fallback: boolean;
+  opponentChampionId?: number;
+};
+
+export type BuildAdviceScopeDiagnostic = {
+  scope: string;
+  label: string;
+  fallback: boolean;
+  rows: number;
+};
+
+export type BuildAdviceDiagnosticsSection = {
+  selectedSlots: BuildAdviceSlotDiagnostic[];
+  missingSlots: number[];
+  fallbackSlots: number[];
+  currentPatchExactSlots: number[];
+  allPatchExactSlots: number[];
+  championWideSlots: number[];
+  scopeCounts: BuildAdviceScopeDiagnostic[];
+};
+
 export type BuildAdviceResponse = {
   filters: {
     championId: number;
@@ -186,6 +216,10 @@ export type BuildAdviceResponse = {
   };
   matchup: BuildAdviceSection;
   champion: BuildAdviceChampionSection;
+  diagnostics?: {
+    matchup: BuildAdviceDiagnosticsSection;
+    champion: BuildAdviceDiagnosticsSection;
+  };
   notes: string[];
 };
 

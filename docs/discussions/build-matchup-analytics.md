@@ -123,6 +123,18 @@ The fallback is slot-by-slot. If slot one has current-patch exact matchup data b
 
 The live UI now keeps fallback language short. It shows one caveat at most, such as "Some slots use exact-matchup data from older stored patches." More detailed scope diagnostics belong in developer/debug tooling, not in the normal match read.
 
+The build-advice API now includes a diagnostics block for that developer/debug view. It reports:
+
+- which slot row was selected for each of the six item slots,
+- which slots are missing,
+- which slots are fallback rows,
+- which slots came from current-patch exact matchup data,
+- which slots came from all-patch exact matchup data,
+- whether any champion-wide rows slipped into a scope,
+- row counts by sample scope.
+
+The normal player UI should keep ignoring this block. It exists so we can spot-check examples like "Rek'Sai vs Naafiri" and immediately see whether a suspicious row came from exact matchup data, older exact matchup data, or a broader baseline.
+
 ### Slot Reads And Build Sanity
 
 Slot reads are independent signals, not a guaranteed six-item script. They are still useful because they answer "what item has performed best when completed in this slot?"
@@ -135,6 +147,8 @@ The UI now applies a basic sanity pass before rendering:
 - empty slots remain empty when exact matchup data is not available.
 
 This keeps the read honest without pretending we have a complete path when the sample only supports slot-level signals.
+
+There is now a focused frontend regression test for this behavior so the build card cannot quietly regress back into showing two pairs of boots.
 
 ### Read Model And Batch Loading
 

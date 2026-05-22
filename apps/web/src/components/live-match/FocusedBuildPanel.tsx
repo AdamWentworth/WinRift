@@ -580,7 +580,7 @@ function topItemSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
     .filter((row): row is AnalyticsItemSlot => Boolean(row));
 }
 
-function selectBuildSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
+export function selectBuildSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
   const slotRows = [1, 2, 3, 4, 5, 6].map((slot) => itemSlots.filter((candidate) => candidate.itemSlot === slot));
   const initialRows = slotRows.map((rows) => rows[0]).filter((row): row is AnalyticsItemSlot => Boolean(row));
   const selectedBoot = selectSingleBootRow(initialRows, items);

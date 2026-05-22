@@ -205,3 +205,75 @@ func TestBuildAdviceNotesSummarizeMixedAllPatchFallback(t *testing.T) {
 		t.Fatalf("notes = %+v; wanted all-patch fallback note", notes)
 	}
 }
+
+func TestBuildAdviceItemSlotDiagnosticsSummarizeScopes(t *testing.T) {
+	rows := []scopedItemSlotRow{
+		{
+			Row: clickhouse.ItemSlotRow{ItemSlot: 1, ItemID: 3053, OpponentChampionID: 950, Games: 15, WinRate: 0.6},
+			Scope: itemSlotScope{
+				Key:      "exact_patch_matchup",
+				Label:    "Current patch exact matchup",
+				Fallback: false,
+			},
+		},
+		{
+			Row: clickhouse.ItemSlotRow{ItemSlot: 1, ItemID: 3071, OpponentChampionID: 950, Games: 12, WinRate: 0.55},
+			Scope: itemSlotScope{
+				Key:      "exact_patch_matchup",
+				Label:    "Current patch exact matchup",
+				Fallback: false,
+			},
+		},
+		{
+			Row: clickhouse.ItemSlotRow{ItemSlot: 2, ItemID: 3006, OpponentChampionID: 950, Games: 20, WinRate: 0.5},
+			Scope: itemSlotScope{
+				Key:      "all_patch_matchup",
+				Label:    "Exact matchup, all stored patches",
+				Fallback: true,
+			},
+		},
+		{
+			Row: clickhouse.ItemSlotRow{ItemSlot: 3, ItemID: 3026, OpponentChampionID: 0, Games: 40, WinRate: 0.525},
+			Scope: itemSlotScope{
+				Key:      "patch_champion",
+				Label:    "Current patch champion overall",
+				Fallback: true,
+			},
+		},
+	}
+
+	got := buildAdviceItemSlotDiagnostics(rows)
+	if got.SelectedSlots[0].ItemID != 3053 || got.SelectedSlots[0].CandidateCount != 2 || got.SelectedSlots[0].WinRate != 60 {
+		t.Fatalf("slot 1 diagnostic = %+v; wanted first exact row with two candidates", got.SelectedSlots[0])
+	}
+	if !intSlicesEqual(got.MissingSlots, []int{4, 5, 6}) {
+		t.Fatalf("missing slots = %+v; want [4 5 6]", got.MissingSlots)
+	}
+	if !intSlicesEqual(got.FallbackSlots, []int{2, 3}) {
+		t.Fatalf("fallback slots = %+v; want [2 3]", got.FallbackSlots)
+	}
+	if !intSlicesEqual(got.CurrentPatchExactSlots, []int{1}) {
+		t.Fatalf("current exact slots = %+v; want [1]", got.CurrentPatchExactSlots)
+	}
+	if !intSlicesEqual(got.AllPatchExactSlots, []int{2}) {
+		t.Fatalf("all-patch exact slots = %+v; want [2]", got.AllPatchExactSlots)
+	}
+	if !intSlicesEqual(got.ChampionWideSlots, []int{3}) {
+		t.Fatalf("champion-wide slots = %+v; want [3]", got.ChampionWideSlots)
+	}
+	if len(got.ScopeCounts) != 3 || got.ScopeCounts[0].Rows != 2 || got.ScopeCounts[1].Rows != 1 || got.ScopeCounts[2].Rows != 1 {
+		t.Fatalf("scope counts = %+v; wanted 2/1/1 rows by scope", got.ScopeCounts)
+	}
+}
+
+func intSlicesEqual(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for index := range a {
+		if a[index] != b[index] {
+			return false
+		}
+	}
+	return true
+}

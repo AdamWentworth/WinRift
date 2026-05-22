@@ -404,6 +404,10 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 			"sampleMode":     "champion_overall",
 			"strictRoleUsed": role != "",
 		},
+		"diagnostics": map[string]any{
+			"matchup":  buildAdviceItemSlotDiagnostics(matchupSlots),
+			"champion": buildAdviceItemSlotDiagnostics(championSlots),
+		},
 		"notes": notes,
 	})
 }
@@ -622,6 +626,141 @@ func buildAdviceSampleResponse(rows []scopedItemSlotRow) map[string]any {
 		"sampleQuality":      buildAdviceSampleQuality(maxGames),
 		"sampleQualityLabel": buildAdviceSampleQualityLabel(maxGames),
 	}
+}
+
+type buildAdviceDiagnostics struct {
+	SelectedSlots          []buildAdviceSlotDiagnostic  `json:"selectedSlots"`
+	MissingSlots           []int                        `json:"missingSlots"`
+	FallbackSlots          []int                        `json:"fallbackSlots"`
+	CurrentPatchExactSlots []int                        `json:"currentPatchExactSlots"`
+	AllPatchExactSlots     []int                        `json:"allPatchExactSlots"`
+	ChampionWideSlots      []int                        `json:"championWideSlots"`
+	ScopeCounts            []buildAdviceScopeDiagnostic `json:"scopeCounts"`
+}
+
+type buildAdviceSlotDiagnostic struct {
+	Slot               int     `json:"slot"`
+	Missing            bool    `json:"missing"`
+	CandidateCount     int     `json:"candidateCount"`
+	ItemID             uint32  `json:"itemId,omitempty"`
+	Games              int     `json:"games,omitempty"`
+	WinRate            float64 `json:"winRate,omitempty"`
+	SampleScope        string  `json:"sampleScope,omitempty"`
+	SampleScopeLabel   string  `json:"sampleScopeLabel,omitempty"`
+	Fallback           bool    `json:"fallback"`
+	OpponentChampionID uint16  `json:"opponentChampionId,omitempty"`
+}
+
+type buildAdviceScopeDiagnostic struct {
+	Scope    string `json:"scope"`
+	Label    string `json:"label"`
+	Fallback bool   `json:"fallback"`
+	Rows     int    `json:"rows"`
+}
+
+func buildAdviceItemSlotDiagnostics(rows []scopedItemSlotRow) buildAdviceDiagnostics {
+	firstBySlot := map[uint8]scopedItemSlotRow{}
+	countBySlot := map[uint8]int{}
+	scopeCounts := []buildAdviceScopeDiagnostic{}
+	scopeIndexes := map[string]int{}
+	slotSets := struct {
+		missing           map[int]bool
+		fallback          map[int]bool
+		currentPatchExact map[int]bool
+		allPatchExact     map[int]bool
+		championWide      map[int]bool
+	}{
+		missing:           map[int]bool{},
+		fallback:          map[int]bool{},
+		currentPatchExact: map[int]bool{},
+		allPatchExact:     map[int]bool{},
+		championWide:      map[int]bool{},
+	}
+
+	for _, scoped := range rows {
+		countBySlot[scoped.Row.ItemSlot]++
+		if _, ok := firstBySlot[scoped.Row.ItemSlot]; !ok {
+			firstBySlot[scoped.Row.ItemSlot] = scoped
+		}
+		scopeKey := scoped.Scope.Key
+		if scopeKey == "" {
+			scopeKey = "unknown"
+		}
+		if index, ok := scopeIndexes[scopeKey]; ok {
+			scopeCounts[index].Rows++
+		} else {
+			scopeIndexes[scopeKey] = len(scopeCounts)
+			scopeCounts = append(scopeCounts, buildAdviceScopeDiagnostic{
+				Scope:    scopeKey,
+				Label:    scoped.Scope.Label,
+				Fallback: scoped.Scope.Fallback,
+				Rows:     1,
+			})
+		}
+	}
+
+	selected := make([]buildAdviceSlotDiagnostic, 0, 6)
+	for slot := uint8(1); slot <= 6; slot++ {
+		scoped, ok := firstBySlot[slot]
+		if !ok {
+			slotSets.missing[int(slot)] = true
+			selected = append(selected, buildAdviceSlotDiagnostic{
+				Slot:           int(slot),
+				Missing:        true,
+				CandidateCount: 0,
+				Fallback:       false,
+			})
+			continue
+		}
+		if scoped.Scope.Fallback {
+			slotSets.fallback[int(slot)] = true
+		}
+		switch scoped.Scope.Key {
+		case "exact_patch_matchup", "requested":
+			if !scoped.Scope.Fallback {
+				slotSets.currentPatchExact[int(slot)] = true
+			}
+		case "all_patch_matchup":
+			slotSets.allPatchExact[int(slot)] = true
+		case "patch_champion", "all_champion":
+			slotSets.championWide[int(slot)] = true
+		}
+		if scoped.Row.OpponentChampionID == 0 {
+			slotSets.championWide[int(slot)] = true
+		}
+		selected = append(selected, buildAdviceSlotDiagnostic{
+			Slot:               int(slot),
+			Missing:            false,
+			CandidateCount:     countBySlot[slot],
+			ItemID:             scoped.Row.ItemID,
+			Games:              scoped.Row.Games,
+			WinRate:            round(scoped.Row.WinRate * 100),
+			SampleScope:        scoped.Scope.Key,
+			SampleScopeLabel:   scoped.Scope.Label,
+			Fallback:           scoped.Scope.Fallback,
+			OpponentChampionID: scoped.Row.OpponentChampionID,
+		})
+	}
+
+	return buildAdviceDiagnostics{
+		SelectedSlots:          selected,
+		MissingSlots:           sortedSlotSet(slotSets.missing),
+		FallbackSlots:          sortedSlotSet(slotSets.fallback),
+		CurrentPatchExactSlots: sortedSlotSet(slotSets.currentPatchExact),
+		AllPatchExactSlots:     sortedSlotSet(slotSets.allPatchExact),
+		ChampionWideSlots:      sortedSlotSet(slotSets.championWide),
+		ScopeCounts:            scopeCounts,
+	}
+}
+
+func sortedSlotSet(slots map[int]bool) []int {
+	out := make([]int, 0, len(slots))
+	for slot := 1; slot <= 6; slot++ {
+		if slots[slot] {
+			out = append(out, slot)
+		}
+	}
+	return out
 }
 
 func buildAdviceSampleQuality(games int) string {

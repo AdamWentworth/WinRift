@@ -29,9 +29,9 @@ Status: items 1-10 and the first ops/documentation pass have been addressed. The
 
 13. Validate build-card ranking against a larger set of champion/opponent examples. We fixed one integrity class, but still need spot checks for jungle starters, support items, transformed/Ornn-style item IDs, item reworks, and unusual inventory events.
 14. Decide how to present missing exact-matchup slots. Current behavior leaves slots blank once exact matchup data runs out. That is honest, but the UI may eventually need a softer "baseline available below" treatment.
-15. Add diagnostics for build-advice scope composition. A debug-only panel or endpoint should show how many displayed slots came from current-patch exact matchup versus all-patch exact matchup, without cluttering the player-facing card.
+15. Add diagnostics for build-advice scope composition. Current pass complete: the build-advice API now returns a non-UI diagnostics block with selected rows, missing slots, fallback slots, exact/current/all-patch slot buckets, champion-wide slot flags, and scope row counts.
 16. Revisit actual full build paths once samples are denser. Slot reads are useful, but a completed path is easier for players to digest when the sample is strong enough.
-17. Add a small frontend regression test for duplicate boots in displayed build slots.
+17. Add a small frontend regression test for duplicate boots in displayed build slots. Current pass complete: `selectBuildSlotRows` is covered with a focused test that verifies only one boots item can survive the displayed slot read.
 
 ## Ops
 
