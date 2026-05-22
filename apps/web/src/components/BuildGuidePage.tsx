@@ -36,6 +36,8 @@ const ranks = [
   { value: 'GOLD', label: 'Gold' },
 ];
 
+const RECOMMENDED_BUILD_KEY = 'recommended';
+
 type Props = {
   champions?: ChampionData;
   items?: ItemData;
@@ -111,7 +113,9 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const buildAdvice = buildAdviceQuery.data;
   const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
   const buildVariants = useMemo(() => groupBuildVariantsForDisplay(guideForBuilds?.buildVariants ?? [], items), [guideForBuilds?.buildVariants, items]);
-  const selectedBuildVariant = buildVariants.find((variant) => variant.variantKey === selectedBuildVariantKey) ?? buildVariants[0];
+  const selectedBuildVariant = selectedBuildVariantKey && selectedBuildVariantKey !== RECOMMENDED_BUILD_KEY
+    ? buildVariants.find((variant) => variant.variantKey === selectedBuildVariantKey)
+    : undefined;
   const selectedBuildVariantIndex = selectedBuildVariant ? buildVariants.indexOf(selectedBuildVariant) : -1;
   const selectedBuildVariantLabel = selectedBuildVariant ? buildVariantLabel(selectedBuildVariant, selectedBuildVariantIndex, items) : '';
   const selectedVariantItemSlots = selectedBuildVariant ? variantItemSlots(selectedBuildVariant) : [];
@@ -207,7 +211,8 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
 
       <BuildVariantTabs
         variants={buildVariants}
-        selectedKey={selectedBuildVariant?.variantKey ?? ''}
+        recommendedGuide={guideForBuilds}
+        selectedKey={selectedBuildVariant?.variantKey ?? RECOMMENDED_BUILD_KEY}
         items={items}
         onSelect={setSelectedBuildVariantKey}
       />
@@ -333,19 +338,35 @@ function GuideFilters({
 
 function BuildVariantTabs({
   variants,
+  recommendedGuide,
   selectedKey,
   items,
   onSelect,
 }: {
   variants: ChampionGuideBuildVariant[];
+  recommendedGuide?: ChampionGuideResponse;
   selectedKey: string;
   items?: ItemData;
   onSelect: (key: string) => void;
 }) {
-  if (!variants.length) return null;
+  if (!variants.length && !recommendedGuide) return null;
+  const recommendedPath = recommendedGuide?.topItemPaths[0];
+  const recommendedSummary = recommendedGuide?.summary;
   return (
     <div className="guide-build-variant-tabs" role="tablist" aria-label="Build variants">
-      {variants.slice(0, 6).map((variant, index) => (
+      <button
+        key={RECOMMENDED_BUILD_KEY}
+        className={selectedKey === RECOMMENDED_BUILD_KEY ? 'active' : ''}
+        type="button"
+        role="tab"
+        aria-selected={selectedKey === RECOMMENDED_BUILD_KEY}
+        onClick={() => onSelect('')}
+      >
+        <span>Recommended</span>
+        <ItemSignatureImages signature={recommendedPath?.core3Signature ?? recommendedPath?.finalItemsSignature ?? ''} items={items} limit={2} />
+        <em>{recommendedSummary?.games ? `${recommendedSummary.winRate.toFixed(1)}% · ${formatNumber(recommendedSummary.games)}` : 'All collected data'}</em>
+      </button>
+      {variants.slice(0, 5).map((variant, index) => (
         <button
           key={variant.variantKey}
           className={variant.variantKey === selectedKey ? 'active' : ''}
@@ -806,7 +827,6 @@ function variantItemSlots(variant: ChampionGuideBuildVariant): GuideItemSlot[] {
 }
 
 function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, items?: ItemData) {
-  if (index === 0) return 'Recommended';
   const familyLabel = buildVariantFamilyLabel(variant, items);
   if (familyLabel) return familyLabel;
   return `Variant ${index + 1}`;
