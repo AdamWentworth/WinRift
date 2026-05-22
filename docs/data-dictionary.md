@@ -41,6 +41,12 @@ Read model for summoner champion comfort.
 
 One row per platform, queue, PUUID, and champion. It stores games, wins, kills, deaths, assists, first stored game time, last stored game time, and compile time. The summoner profile endpoint uses this for top champion rows and falls back to direct participant aggregation only when the read model has not been populated yet.
 
+## `summoner_champion_role_summary`
+
+Role-aware read model for summoner champion comfort.
+
+One row per platform, queue, PUUID, champion, and role. It stores the same counters as `summoner_champion_summary`, but keeps top, jungle, mid, bot, and support samples separate. The profile Champion Stats tab uses this when a role filter is selected, so a player's Wukong jungle games do not get blended into Wukong top or mid.
+
 ## `patch_snapshots`
 
 One row per patch/platform/queue lifecycle state. Tracks whether a patch is collecting, compiling, or closed, plus match counts, participant counts, compile timestamp, and raw retention date.

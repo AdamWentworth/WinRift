@@ -486,6 +486,7 @@ export type RankedRecord = {
 export type ChampionRecord = {
   queueId: number;
   championId: number;
+  role?: string;
   games: number;
   wins: number;
   losses: number;
@@ -543,6 +544,7 @@ export type SummonerProfile = {
   rank?: RankedRecord;
   summary: SummonerProfileSummary;
   topChampions: ChampionRecord[];
+  topChampionRoles?: ChampionRecord[];
   recentMatches: SummonerRecentMatch[];
   topBuilds?: SummonerBuildRecord[];
 };

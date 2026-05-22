@@ -17,6 +17,7 @@ type ChampionPerformance struct {
 	Platform   string
 	ChampionID uint16
 	QueueID    uint16
+	Role       string
 	Games      int
 	Wins       int
 	Losses     int

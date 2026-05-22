@@ -190,6 +190,11 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	topChampionRoles, err := s.repo.SummonerTopChampionRoles(r.Context(), alias.Platform, alias.PUUID, queueID, 60)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	recentMatches, err := s.repo.SummonerRecentMatches(r.Context(), alias.Platform, alias.PUUID, queueID, 20)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -202,11 +207,12 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	summonerSnapshot := s.summonerAccountSnapshot(r.Context(), alias.Platform, alias.PUUID)
 	response := map[string]any{
-		"account":       accountAliasResponse(alias),
-		"summary":       summonerProfileStatsResponse(stats),
-		"topChampions":  championPerformanceRowsResponse(topChampions),
-		"recentMatches": summonerRecentMatchesResponse(recentMatches),
-		"topBuilds":     summonerBuildRowsResponse(topBuilds),
+		"account":          accountAliasResponse(alias),
+		"summary":          summonerProfileStatsResponse(stats),
+		"topChampions":     championPerformanceRowsResponse(topChampions),
+		"topChampionRoles": championPerformanceRowsResponse(topChampionRoles),
+		"recentMatches":    summonerRecentMatchesResponse(recentMatches),
+		"topBuilds":        summonerBuildRowsResponse(topBuilds),
 	}
 	if summonerSnapshot != nil {
 		response["summoner"] = summonerAccountSnapshotResponse(*summonerSnapshot)
@@ -1339,12 +1345,13 @@ func (s Server) refreshSummonerProfileAnalytics(w http.ResponseWriter, r *http.R
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	log.Printf("summoner profile analytics refresh complete queue=%d profile_rows=%d champion_rows=%d duration=%s", queueID, result.ProfileRows, result.ChampionRows, time.Since(startedAt).Round(time.Millisecond))
+	log.Printf("summoner profile analytics refresh complete queue=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", queueID, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
 	writeJSON(w, http.StatusOK, map[string]any{
-		"queueId":      queueID,
-		"profileRows":  result.ProfileRows,
-		"championRows": result.ChampionRows,
-		"durationMs":   time.Since(startedAt).Milliseconds(),
+		"queueId":          queueID,
+		"profileRows":      result.ProfileRows,
+		"championRows":     result.ChampionRows,
+		"championRoleRows": result.ChampionRoleRows,
+		"durationMs":       time.Since(startedAt).Milliseconds(),
 	})
 }
 
@@ -1827,7 +1834,7 @@ func championStatsGames(value any) int {
 }
 
 func championPerformanceResponse(performance clickhouse.ChampionPerformance) map[string]any {
-	return map[string]any{
+	response := map[string]any{
 		"queueId":    performance.QueueID,
 		"championId": performance.ChampionID,
 		"games":      performance.Games,
@@ -1842,6 +1849,10 @@ func championPerformanceResponse(performance clickhouse.ChampionPerformance) map
 		"kda":        round(performance.KDA),
 		"winRate":    round(performance.WinRate * 100),
 	}
+	if performance.Role != "" {
+		response["role"] = performance.Role
+	}
+	return response
 }
 
 func championPerformanceRowsResponse(rows []clickhouse.ChampionPerformance) []map[string]any {

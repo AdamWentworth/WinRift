@@ -90,6 +90,25 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ENGINE = ReplacingMergeTree(compiled_at)
 		ORDER BY (platform, queue_id, puuid, champion_id)
 	`, `
+		CREATE TABLE IF NOT EXISTS summoner_champion_role_summary
+		(
+			platform LowCardinality(String),
+			queue_id UInt16,
+			puuid String,
+			champion_id UInt16,
+			role LowCardinality(String),
+			games UInt64,
+			wins UInt64,
+			kills UInt64,
+			deaths UInt64,
+			assists UInt64,
+			first_seen_at DateTime,
+			last_seen_at DateTime,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY (platform, queue_id, puuid, champion_id, role)
+	`, `
 		CREATE TABLE IF NOT EXISTS riot_request_events
 		(
 			route LowCardinality(String),

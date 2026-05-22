@@ -12,7 +12,7 @@ The profile page currently shows:
 - stored ranked Solo/Duo form from collected matches
 - stored data window showing first and last retained game in the profile sample
 - explicit freshness read so old stored samples are not mistaken for live form
-- champion comfort rows with client-side champion-name filtering
+- champion comfort rows with client-side champion-name filtering and role filters
 - summoner-owned build paths from stored games
 - recent stored matches with result, role, patch, KDA, and duration
 - profile-specific background art using splash art for recently played champions
@@ -25,6 +25,7 @@ The frontend should not aggregate a summoner's whole stored history on every req
 
 - `summoner_profile_summary`: one row per platform, queue, and PUUID
 - `summoner_champion_summary`: one row per platform, queue, PUUID, and champion
+- `summoner_champion_role_summary`: one row per platform, queue, PUUID, champion, and role
 
 The profile endpoint also returns `topBuilds`, grouped directly from stored participant rows by champion, role, item signatures, rune signature, and spell signature. This is usage history for that summoner, not generalized build advice. It belongs on profile pages as "what this player tends to use"; matchup advice stays in live match and champion-guide surfaces.
 
@@ -32,7 +33,6 @@ The worker refreshes these summaries on a schedule. The API falls back to direct
 
 ## Follow-Ups
 
-- Add role filters to champion comfort after introducing a role-aware `summoner_champion_role_summary` read model.
 - Add patch filters once the profile page needs historical comparison.
 - Consider a small "collector queued" state when a live lookup nudges a player into the frontier.
 - Add profile-level trends over time once we keep enough retained history.

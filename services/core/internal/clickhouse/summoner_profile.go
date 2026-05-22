@@ -68,8 +68,9 @@ type SummonerBuildRecord struct {
 }
 
 type SummonerProfileRefreshResult struct {
-	ProfileRows  int
-	ChampionRows int
+	ProfileRows      int
+	ChampionRows     int
+	ChampionRoleRows int
 }
 
 func (r *Repository) FindAccountAlias(ctx context.Context, platform, gameName, tagLine string) (AccountAlias, error) {
@@ -237,6 +238,9 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_champion_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_champion_role_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
 	if _, err := r.db.ExecContext(ctx, `
 		INSERT INTO summoner_profile_summary
 			(platform, queue_id, puuid, games, wins, kills, deaths, assists, first_seen_at, last_seen_at, compiled_at)
@@ -284,7 +288,35 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
 			AND p.champion_id > 0
-		GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id`, queueID); err != nil {
+	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if _, err := r.db.ExecContext(ctx, `
+		INSERT INTO summoner_champion_role_summary
+			(platform, queue_id, puuid, champion_id, role, games, wins, kills, deaths, assists, first_seen_at, last_seen_at, compiled_at)
+		SELECT
+			p.platform,
+			p.queue_id,
+			p.puuid,
+			p.champion_id,
+			p.role,
+			toUInt64(count()) AS games,
+			toUInt64(sum(p.win)) AS wins,
+			toUInt64(sum(p.kills)) AS kills,
+			toUInt64(sum(p.deaths)) AS deaths,
+			toUInt64(sum(p.assists)) AS assists,
+			min(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS first_seen_at,
+			max(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS last_seen_at,
+			now() AS compiled_at
+		FROM participants AS p FINAL
+		LEFT JOIN raw_matches AS rm FINAL
+			ON rm.match_id = p.match_id
+			AND rm.platform = p.platform
+		WHERE p.queue_id = ?
+			AND p.puuid != ''
+			AND p.champion_id > 0
+			AND p.role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
+		GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role`, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	result := SummonerProfileRefreshResult{}
@@ -292,6 +324,9 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_champion_summary FINAL WHERE queue_id = ?`, queueID).Scan(&result.ChampionRows); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_champion_role_summary FINAL WHERE queue_id = ?`, queueID).Scan(&result.ChampionRoleRows); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	return result, nil
@@ -385,6 +420,115 @@ func (r *Repository) summonerTopChampionsFromParticipants(ctx context.Context, p
 		var row ChampionPerformance
 		var games, wins, kills, deaths, assists uint64
 		if err := rows.Scan(&row.ChampionID, &games, &wins, &kills, &deaths, &assists); err != nil {
+			return nil, err
+		}
+		row.PUUID = puuid
+		row.Platform = platform
+		row.QueueID = queueID
+		row.Games = int(games)
+		row.Wins = int(wins)
+		row.Losses = int(games - wins)
+		row.Kills = int(kills)
+		row.Deaths = int(deaths)
+		row.Assists = int(assists)
+		applyChampionPerformanceAverages(&row)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) SummonerTopChampionRoles(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]ChampionPerformance, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	rows, err := r.summonerTopChampionRolesFromSummary(ctx, platform, puuid, queueID, limit)
+	if err == nil && len(rows) > 0 {
+		return rows, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.summonerTopChampionRolesFromParticipants(ctx, platform, puuid, queueID, limit)
+}
+
+func (r *Repository) summonerTopChampionRolesFromSummary(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]ChampionPerformance, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			champion_id,
+			role,
+			games,
+			wins,
+			kills,
+			deaths,
+			assists
+		FROM summoner_champion_role_summary FINAL
+		WHERE platform = ? AND puuid = ? AND queue_id = ?
+		ORDER BY games DESC, wins / games DESC, champion_id ASC, role ASC
+		LIMIT ?`,
+		platform,
+		puuid,
+		queueID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ChampionPerformance{}
+	for rows.Next() {
+		var row ChampionPerformance
+		var games, wins, kills, deaths, assists uint64
+		if err := rows.Scan(&row.ChampionID, &row.Role, &games, &wins, &kills, &deaths, &assists); err != nil {
+			return nil, err
+		}
+		row.PUUID = puuid
+		row.Platform = platform
+		row.QueueID = queueID
+		row.Games = int(games)
+		row.Wins = int(wins)
+		row.Losses = int(games - wins)
+		row.Kills = int(kills)
+		row.Deaths = int(deaths)
+		row.Assists = int(assists)
+		applyChampionPerformanceAverages(&row)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) summonerTopChampionRolesFromParticipants(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]ChampionPerformance, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			champion_id,
+			role,
+			count() AS games,
+			sum(win) AS wins,
+			sum(kills) AS kills,
+			sum(deaths) AS deaths,
+			sum(assists) AS assists
+		FROM participants FINAL
+		WHERE platform = ? AND puuid = ? AND queue_id = ?
+			AND champion_id > 0
+			AND role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
+		GROUP BY champion_id, role
+		ORDER BY games DESC, wins / games DESC, champion_id ASC, role ASC
+		LIMIT ?`,
+		platform,
+		puuid,
+		queueID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ChampionPerformance{}
+	for rows.Next() {
+		var row ChampionPerformance
+		var games, wins, kills, deaths, assists uint64
+		if err := rows.Scan(&row.ChampionID, &row.Role, &games, &wins, &kills, &deaths, &assists); err != nil {
 			return nil, err
 		}
 		row.PUUID = puuid

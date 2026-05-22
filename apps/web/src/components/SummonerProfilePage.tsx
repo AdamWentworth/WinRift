@@ -39,6 +39,8 @@ const profileSections: { key: ProfileSection; label: string }[] = [
   { key: 'matches', label: 'Match History' },
 ];
 
+const profileRoleFilters: MatchRoleFilter[] = ['ALL', 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
+
 type Props = {
   platform?: string;
   gameName?: string;
@@ -327,7 +329,7 @@ function StoredProfile({
       ) : null}
 
       {section === 'champions' ? (
-        <ChampionPoolTab champions={champions} records={profile.topChampions} />
+        <ChampionPoolTab champions={champions} records={profile.topChampions} roleRecords={profile.topChampionRoles ?? []} />
       ) : null}
 
       {section === 'builds' ? (
@@ -420,10 +422,14 @@ function ChampionHighlights({ champions, records }: { champions?: ChampionData; 
   );
 }
 
-function ChampionPoolTab({ champions, records }: { champions?: ChampionData; records: ChampionRecord[] }) {
+function ChampionPoolTab({ champions, records, roleRecords }: { champions?: ChampionData; records: ChampionRecord[]; roleRecords: ChampionRecord[] }) {
   const [sort, setSort] = useState<ChampionSort>('games');
+  const [roleFilter, setRoleFilter] = useState<MatchRoleFilter>('ALL');
   const [query, setQuery] = useState('');
-  const filteredRecords = useMemo(() => filterChampionRecords(records, query, champions), [champions, query, records]);
+  const activeRecords = useMemo(() => (
+    roleFilter === 'ALL' ? records : roleRecords.filter((record) => record.role === roleFilter)
+  ), [records, roleFilter, roleRecords]);
+  const filteredRecords = useMemo(() => filterChampionRecords(activeRecords, query, champions), [activeRecords, champions, query]);
   const sortedRecords = useMemo(() => sortChampionRecords(filteredRecords, sort, champions), [champions, filteredRecords, sort]);
   const bestWinrate = sortedByWinRate(filteredRecords)[0];
   return (
@@ -442,19 +448,26 @@ function ChampionPoolTab({ champions, records }: { champions?: ChampionData; rec
           </div>
         </div>
       </div>
+      <div className="profile-role-filter" aria-label="Champion comfort role filters">
+        {profileRoleFilters.map((role) => (
+          <button key={role} className={roleFilter === role ? 'selected' : ''} onClick={() => setRoleFilter(role)} type="button">
+            {role === 'ALL' ? 'All Roles' : <><RoleIcon role={role} /> {roleLabel(role)}</>}
+          </button>
+        ))}
+      </div>
       <div className="profile-tab-summary">
-        <ProfileMetric label="Shown Champions" value={`${formatNumber(filteredRecords.length)} / ${formatNumber(records.length)}`} />
+        <ProfileMetric label="Shown Champions" value={`${formatNumber(filteredRecords.length)} / ${formatNumber(activeRecords.length)}`} />
         <ProfileMetric label="Tracked Games" value={formatNumber(filteredRecords.reduce((sum, record) => sum + record.games, 0))} />
         <ProfileMetric label="Best WR" value={bestWinrate ? `${championName(champions, bestWinrate.championId)} ${bestWinrate.winRate.toFixed(1)}%` : '--'} />
       </div>
       {sortedRecords.length ? (
         <div className="profile-champion-list">
           {sortedRecords.map((record) => (
-            <ChampionComfortRow key={record.championId} record={record} champions={champions} />
+            <ChampionComfortRow key={`${record.championId}:${record.role ?? 'ALL'}`} record={record} champions={champions} />
           ))}
         </div>
       ) : (
-        <ProfileEmptyState title={records.length ? 'No champions match that filter' : 'No champion sample yet'} body={records.length ? 'Clear the filter or try another champion name.' : 'The collector has not attached stored ranked champion games to this alias yet.'} />
+        <ProfileEmptyState title={championPoolEmptyTitle(records, activeRecords, roleFilter)} body={championPoolEmptyBody(records, activeRecords, roleFilter)} />
       )}
     </section>
   );
@@ -702,7 +715,7 @@ function ChampionComfortRow({ record, champions }: { record: ChampionRecord; cha
       <img src={championImageUrl(champions, record.championId)} alt={champion?.name ?? String(record.championId)} />
       <div>
         <strong>{champion?.name ?? `Champion ${record.championId}`}</strong>
-        <span>{record.avgKills.toFixed(1)} / {record.avgDeaths.toFixed(1)} / {record.avgAssists.toFixed(1)} average</span>
+        <span>{record.role ? <><RoleIcon role={record.role} /> {roleLabel(record.role)} · </> : null}{record.avgKills.toFixed(1)} / {record.avgDeaths.toFixed(1)} / {record.avgAssists.toFixed(1)} average</span>
       </div>
       <div className="profile-row-stats">
         <ProfileMiniStat label="WR" value={`${record.winRate.toFixed(1)}%`} />
@@ -869,6 +882,26 @@ function filterChampionRecords(records: ChampionRecord[], query: string, champio
     const name = championName(champions, record.championId).toLowerCase();
     return name.includes(normalizedQuery) || String(record.championId).includes(normalizedQuery);
   });
+}
+
+function championPoolEmptyTitle(overallRecords: ChampionRecord[], activeRecords: ChampionRecord[], roleFilter: MatchRoleFilter) {
+  if (!overallRecords.length) {
+    return 'No champion sample yet';
+  }
+  if (roleFilter !== 'ALL' && !activeRecords.length) {
+    return `No ${roleLabel(roleFilter).toLowerCase()} champion sample yet`;
+  }
+  return 'No champions match that filter';
+}
+
+function championPoolEmptyBody(overallRecords: ChampionRecord[], activeRecords: ChampionRecord[], roleFilter: MatchRoleFilter) {
+  if (!overallRecords.length) {
+    return 'The collector has not attached stored ranked champion games to this alias yet.';
+  }
+  if (roleFilter !== 'ALL' && !activeRecords.length) {
+    return 'Role-specific rows appear after the summoner champion role summary refreshes or the collector finds games in this role.';
+  }
+  return 'Clear the filter or try another champion name.';
 }
 
 function sortChampionRecords(records: ChampionRecord[], sort: ChampionSort, champions: ChampionData | undefined) {

@@ -435,6 +435,48 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it('filters summoner champion comfort by role', async () => {
+    vi.mocked(getSummonerProfile).mockResolvedValueOnce({
+      account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Role Test', tagLine: 'NA1' },
+      summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 10, wins: 6, losses: 4, kills: 60, deaths: 30, assists: 70, avgKills: 6, avgDeaths: 3, avgAssists: 7, kda: 4.33, winRate: 60 },
+      topChampions: [
+        { queueId: 420, championId: 62, games: 10, wins: 6, losses: 4, kills: 60, deaths: 30, assists: 70, avgKills: 6, avgDeaths: 3, avgAssists: 7, kda: 4.33, winRate: 60 },
+      ],
+      topChampionRoles: [
+        { queueId: 420, championId: 62, role: 'JUNGLE', games: 7, wins: 5, losses: 2, kills: 45, deaths: 20, assists: 50, avgKills: 6.4, avgDeaths: 2.9, avgAssists: 7.1, kda: 4.75, winRate: 71.43 },
+      ],
+      recentMatches: [],
+      topBuilds: [],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
+      target: { value: 'Role Test#NA1' },
+    });
+    fireEvent.click(screen.getByLabelText('Search WinRift'));
+
+    await waitFor(() => expect(screen.getByText('Role Test#NA1')).toBeInTheDocument());
+    await screen.findByText('Stored Form');
+    fireEvent.click(screen.getByRole('button', { name: 'Champion Stats' }));
+    fireEvent.click(screen.getByRole('button', { name: /Jungle/i }));
+
+    expect(await screen.findByText('71.4%')).toBeInTheDocument();
+    expect(screen.getAllByText('7').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Jungle · 6\.4 \/ 2\.9 \/ 7\.1 average/)).toBeInTheDocument();
+    queryClient.clear();
+  });
+
   it('shows ranked record stats on live player cards', async () => {
     const liveGame: LiveGame = {
       platform: 'NA1',
