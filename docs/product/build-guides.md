@@ -16,6 +16,7 @@ The current version can show:
 - ban-rate estimates derived from champion bans in stored Match-V5 payloads
 - toughest and favorable opponent matchups from stored participant matchup rows
 - complete item-path summaries from `core3_signature` and `final_items_signature`
+- alternative build variants grouped by meaningful early core items, with player-facing labels such as AP, On Hit, Tank, Crit, Lethality, AD Bruiser, Enchanter, and Support Tank
 - item slot panels from the precomputed `item_slot_analytics` read model
 
 Backend contracts:
@@ -25,6 +26,14 @@ Backend contracts:
 - `GET /api/analytics/champion-guide`: focused champion guide payload for one champion and role.
 - `GET /api/analytics/item-slots`: slot-level item read model with matchup-aware fallback.
 - `POST /api/dev/analytics/champion-guides/refresh`: local/dev refresh endpoint. With `backfill: true`, it derives participant performance, skill events, and champion bans from retained raw payloads before rebuilding guide read models.
+
+Build variant labeling:
+
+- Variants should come from WinRift's own match corpus, not from a runtime scrape of another stats site.
+- External guide pages can be used as research inspiration for common player language, but the production path should remain our own classifier plus curated overrides where the data needs champion-specific wording.
+- The first pass ignores boots, starter items, jungle pets, support quest items, consumables, and common components when deciding the variant identity.
+- Variant labels are intentionally broad. For example, two Katarina AP paths can both be AP, while the UI can add the anchor item name to make the tabs readable.
+- Future refinement: add a small curated champion override map for cases where community jargon is specific and stable, such as Katarina AD/On Hit/Tank or Shyvana AP/Tank.
 
 Known gaps:
 

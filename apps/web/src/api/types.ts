@@ -314,6 +314,8 @@ export type ChampionGuideItemPath = {
 
 export type ChampionGuideBuildVariant = {
   variantKey: string;
+  variantLabel?: string;
+  variantTags?: string[];
   core2Signature: string;
   core3Signature: string;
   finalItemsSignature: string;

@@ -93,6 +93,8 @@ type ChampionGuideItemPathRow struct {
 
 type ChampionGuideBuildVariantRow struct {
 	VariantKey          string
+	VariantLabel        string
+	VariantTags         []string
 	Core2Signature      string
 	Core3Signature      string
 	FinalItemsSignature string
@@ -892,25 +894,66 @@ func (r *Repository) queryChampionGuideBuildVariants(ctx context.Context, filter
 		LIMIT ?`
 	args := append([]any{}, rawArgs...)
 	args = append(args, compiledArgs...)
-	args = append(args, minGames, limit*4)
+	args = append(args, minGames, limit*12)
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	out := []ChampionGuideBuildVariantRow{}
+	type variantAggregate struct {
+		row                 ChampionGuideBuildVariantRow
+		representativeGames int
+	}
+	variants := map[string]*variantAggregate{}
 	for rows.Next() {
 		var row ChampionGuideBuildVariantRow
 		if err := rows.Scan(&row.Core2Signature, &row.Core3Signature, &row.FinalItemsSignature, &row.RuneSignature, &row.SpellSignature, &row.Wins, &row.Games, &row.WinRate, &row.BuildCount); err != nil {
 			return nil, err
 		}
-		row.VariantKey = row.Core2Signature
-		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
-		out = append(out, row)
+		key := buildVariantCoreKey(row.Core3Signature, row.FinalItemsSignature, row.Core2Signature)
+		if key == "" {
+			continue
+		}
+		aggregate := variants[key]
+		if aggregate == nil {
+			aggregate = &variantAggregate{
+				row: ChampionGuideBuildVariantRow{
+					VariantKey:          key,
+					Core2Signature:      key,
+					Core3Signature:      row.Core3Signature,
+					FinalItemsSignature: row.FinalItemsSignature,
+					RuneSignature:       row.RuneSignature,
+					SpellSignature:      row.SpellSignature,
+				},
+				representativeGames: row.Games,
+			}
+			variants[key] = aggregate
+		}
+		aggregate.row.Wins += row.Wins
+		aggregate.row.Games += row.Games
+		aggregate.row.BuildCount += row.BuildCount
+		if row.Games > aggregate.representativeGames {
+			aggregate.row.Core3Signature = row.Core3Signature
+			aggregate.row.FinalItemsSignature = row.FinalItemsSignature
+			aggregate.row.RuneSignature = row.RuneSignature
+			aggregate.row.SpellSignature = row.SpellSignature
+			aggregate.representativeGames = row.Games
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	out := []ChampionGuideBuildVariantRow{}
+	for _, aggregate := range variants {
+		row := aggregate.row
+		if row.Games < minGames {
+			continue
+		}
+		row.WinRate = float64(row.Wins) / float64(row.Games)
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		row.VariantLabel, row.VariantTags = buildVariantLabelAndTags(row.Core2Signature + "-" + row.Core3Signature + "-" + row.FinalItemsSignature)
+		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Games != out[j].Games {
@@ -928,6 +971,167 @@ func (r *Repository) queryChampionGuideBuildVariants(ctx context.Context, filter
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+func buildVariantCoreKey(signatures ...string) string {
+	items := []int{}
+	seen := map[int]bool{}
+	for _, signature := range signatures {
+		for _, itemID := range parseItemSignature(signature) {
+			if seen[itemID] || buildVariantIgnoredItemID(itemID) {
+				continue
+			}
+			seen[itemID] = true
+			items = append(items, itemID)
+			if len(items) == 2 {
+				return joinItemSignature(items)
+			}
+		}
+	}
+	if len(items) < 2 {
+		return ""
+	}
+	return joinItemSignature(items)
+}
+
+func parseItemSignature(signature string) []int {
+	if signature == "" {
+		return nil
+	}
+	parts := strings.Split(signature, "-")
+	items := make([]int, 0, len(parts))
+	for _, part := range parts {
+		itemID, err := strconv.Atoi(strings.TrimSpace(part))
+		if err == nil && itemID > 0 {
+			items = append(items, itemID)
+		}
+	}
+	return items
+}
+
+func joinItemSignature(items []int) string {
+	if len(items) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(items))
+	for _, itemID := range items {
+		parts = append(parts, strconv.Itoa(itemID))
+	}
+	return strings.Join(parts, "-")
+}
+
+func buildVariantIgnoredItemID(itemID int) bool {
+	if itemID >= 1101 && itemID <= 1103 {
+		return true
+	}
+	if itemID >= 3865 && itemID <= 3877 {
+		return true
+	}
+	switch itemID {
+	case 1001, 2422, 3006, 3009, 3020, 3047, 3111, 3117, 3158, 3173,
+		1004, 1006, 1011, 1026, 1027, 1028, 1029, 1031, 1033, 1035, 1036, 1037, 1038,
+		1042, 1043, 1052, 1053, 1054, 1055, 1056, 1057, 1058, 1082, 1083,
+		2003, 2010, 2015, 2021, 2022, 2031, 2033, 2055, 2420, 2421, 2423,
+		3010, 3024, 3044, 3051, 3066, 3067, 3070, 3076, 3082, 3086, 3105, 3108,
+		3113, 3114, 3123, 3133, 3134, 3140, 3145, 3155, 3211, 3801, 3802, 3916,
+		4630, 4632, 4642, 6029, 6660, 6670, 6677, 6690:
+		return true
+	default:
+		return false
+	}
+}
+
+func buildVariantLabelAndTags(signature string) (string, []string) {
+	scores := map[string]int{}
+	for _, itemID := range parseItemSignature(signature) {
+		if buildVariantIgnoredItemID(itemID) {
+			continue
+		}
+		for _, tag := range buildVariantItemTags(itemID) {
+			scores[tag]++
+		}
+	}
+	tags := buildVariantSortedTags(scores)
+	if scores["enchanter"] >= 2 {
+		return "Enchanter", tags
+	}
+	if scores["support-tank"] >= 2 || (scores["support-tank"] >= 1 && scores["tank"] >= 1) {
+		return "Support Tank", tags
+	}
+	if scores["tank"] >= 2 || (scores["tank"] >= 1 && scores["health"] >= 2 && scores["damage"] == 0) {
+		return "Tank", tags
+	}
+	if scores["on-hit"] >= 2 || (scores["on-hit"] >= 1 && scores["attack-speed"] >= 2) {
+		return "On Hit", tags
+	}
+	if scores["crit"] >= 2 {
+		return "Crit", tags
+	}
+	if scores["lethality"] >= 2 || (scores["lethality"] >= 1 && scores["ad"] >= 2) {
+		return "Lethality", tags
+	}
+	if scores["ad-bruiser"] >= 2 || (scores["ad-bruiser"] >= 1 && scores["health"] >= 1) {
+		return "AD Bruiser", tags
+	}
+	if scores["ap-bruiser"] >= 1 && (scores["health"] >= 1 || scores["tank"] >= 1) {
+		return "AP Bruiser", tags
+	}
+	if scores["ap"] >= 2 || scores["burst-ap"] >= 1 {
+		return "AP Burst", tags
+	}
+	if scores["ad"] >= 2 {
+		return "AD", tags
+	}
+	if scores["ap"] >= 1 && scores["ad"] >= 1 {
+		return "Hybrid", tags
+	}
+	return "", tags
+}
+
+func buildVariantItemTags(itemID int) []string {
+	switch itemID {
+	case 3100, 3115, 3146, 4645, 3089, 3157, 3135, 6655, 6653, 2503, 4628:
+		return []string{"ap", "burst-ap", "damage"}
+	case 4633, 6665, 6657, 3152:
+		return []string{"ap", "ap-bruiser", "health", "damage"}
+	case 3124, 3153, 3091, 3302, 6672:
+		return []string{"ad", "on-hit", "attack-speed", "damage"}
+	case 6675, 3085:
+		return []string{"crit", "on-hit", "attack-speed", "damage"}
+	case 3031, 3033, 3036, 3094, 3508, 6676, 3032:
+		return []string{"ad", "crit", "damage"}
+	case 3142, 3814, 6694, 6696, 6701, 6692:
+		return []string{"ad", "lethality", "damage"}
+	case 3078, 3071, 3074, 3748, 3053, 3161, 6631, 6610, 3181, 6333:
+		return []string{"ad", "ad-bruiser", "health", "damage"}
+	case 3084, 3068, 6662, 3143, 3065, 3075, 4401, 8020, 2502, 2504, 6664, 3001, 2501:
+		return []string{"tank", "health"}
+	case 3190, 3002:
+		return []string{"support-tank", "tank", "health"}
+	case 6617, 3504, 6616, 6620, 3222, 2065, 3011, 4643:
+		return []string{"enchanter", "utility"}
+	default:
+		return nil
+	}
+}
+
+func buildVariantSortedTags(scores map[string]int) []string {
+	tags := make([]string, 0, len(scores))
+	for tag, score := range scores {
+		if score > 0 {
+			tags = append(tags, tag)
+		}
+	}
+	sort.Slice(tags, func(i, j int) bool {
+		if scores[tags[i]] != scores[tags[j]] {
+			return scores[tags[i]] > scores[tags[j]]
+		}
+		return tags[i] < tags[j]
+	})
+	if len(tags) > 6 {
+		return tags[:6]
+	}
+	return tags
 }
 
 func (r *Repository) queryChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {

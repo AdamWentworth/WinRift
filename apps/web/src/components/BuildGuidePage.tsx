@@ -741,6 +741,15 @@ function variantItemPathRow(variant: ChampionGuideBuildVariant) {
 
 function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, items?: ItemData) {
   if (index === 0) return 'Recommended';
+  if (variant.variantLabel) {
+    const anchorItem = signatureItems(variant.core2Signature)
+      .map((itemId) => itemName(items, String(itemId)))
+      .find((name) => !/^\d+$/.test(name));
+    if (anchorItem && ['AP Burst', 'AD Bruiser', 'AD', 'Crit', 'Lethality'].includes(variant.variantLabel)) {
+      return `${shortItemName(anchorItem)} ${variant.variantLabel.replace(' Burst', '')}`;
+    }
+    return variant.variantLabel;
+  }
   const names = signatureItems(`${variant.core2Signature}-${variant.core3Signature}-${variant.finalItemsSignature}`)
     .map((itemId) => itemName(items, String(itemId)).toLowerCase());
   const has = (...needles: string[]) => names.some((name) => needles.some((needle) => name.includes(needle)));
@@ -760,6 +769,13 @@ function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, it
     .map((itemId) => itemName(items, String(itemId)))
     .filter((name) => !/^\d+$/.test(name));
   return coreNames[0] ? coreNames[0].replace(/'s\b.*$/, '') : `Variant ${index + 1}`;
+}
+
+function shortItemName(name: string) {
+  return name
+    .replace(/'s\b.*$/, '')
+    .replace(/\bThe\b\s+/i, '')
+    .trim();
 }
 
 function skillSlots(signature: string) {

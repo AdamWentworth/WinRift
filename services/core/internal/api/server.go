@@ -967,6 +967,8 @@ func championGuideBuildVariantRowsResponse(rows []clickhouse.ChampionGuideBuildV
 	for _, row := range rows {
 		results = append(results, map[string]any{
 			"variantKey":          row.VariantKey,
+			"variantLabel":        row.VariantLabel,
+			"variantTags":         row.VariantTags,
 			"core2Signature":      row.Core2Signature,
 			"core3Signature":      row.Core3Signature,
 			"finalItemsSignature": row.FinalItemsSignature,
