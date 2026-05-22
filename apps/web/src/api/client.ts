@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildAdviceResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerProfile, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildAdviceResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionPageBundleResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerProfile, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -79,6 +79,25 @@ export function getChampionGuide(filters: BuildFilters) {
   params.set('minGames', String(filters.minGames));
   if (filters.limit) params.set('limit', String(filters.limit));
   return request<ChampionGuideResponse>(`/api/analytics/champion-guide?${params.toString()}`);
+}
+
+export function getChampionPageBundle(filters: BuildFilters & { championMinGames?: number; guideMinGames?: number; guideLimit?: number; indexMinGames?: number; indexLimit?: number; queueId?: number }) {
+  const params = new URLSearchParams();
+  if (filters.championId) params.set('championId', String(filters.championId));
+  if (filters.role) params.set('role', filters.role);
+  if (filters.itemContext) params.set('itemContext', filters.itemContext);
+  if (filters.opponentChampionId) params.set('opponentChampionId', String(filters.opponentChampionId));
+  if (filters.patch) params.set('patch', filters.patch);
+  if (filters.rankBucket) params.set('rankBucket', filters.rankBucket);
+  params.set('minGames', String(filters.minGames));
+  if (filters.championMinGames) params.set('championMinGames', String(filters.championMinGames));
+  if (filters.limit) params.set('limit', String(filters.limit));
+  if (filters.guideMinGames) params.set('guideMinGames', String(filters.guideMinGames));
+  if (filters.guideLimit) params.set('guideLimit', String(filters.guideLimit));
+  if (filters.indexMinGames) params.set('indexMinGames', String(filters.indexMinGames));
+  if (filters.indexLimit) params.set('indexLimit', String(filters.indexLimit));
+  if (filters.queueId) params.set('queueId', String(filters.queueId));
+  return request<ChampionPageBundleResponse>(`/api/analytics/champion-page?${params.toString()}`);
 }
 
 export function getChampionGuideIndex(filters: BuildFilters) {

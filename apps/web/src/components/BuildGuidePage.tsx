@@ -2,7 +2,7 @@ import { Database, Filter, Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getBuildAdvice, getChampionGuide, getChampionGuideIndex, getChampionRoleRates } from '../api/client';
+import { getChampionPageBundle, getChampionRoleRates } from '../api/client';
 import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
@@ -80,15 +80,9 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const roleRatesSettled = seededRoleRates.length > 0 || roleRatesQuery.isSuccess || roleRatesQuery.isError;
   const defaultRole = mainRole || (roleRatesSettled ? 'MIDDLE' : '');
   const itemContext = itemContextForRole(role);
-  const guideQuery = useQuery({
-    queryKey: ['champion-guide', championId, role, patch, rankBucket],
-    queryFn: () => getChampionGuide({ championId, role, patch, rankBucket, minGames: 5, limit: 12 }),
-    enabled: Boolean(championId && patch && role),
-    staleTime: 5 * 60 * 1000,
-  });
-  const buildAdviceQuery = useQuery({
-    queryKey: ['guide-build-advice', championId, role, patch, rankBucket, opponentChampionId],
-    queryFn: () => getBuildAdvice({
+  const championPageQuery = useQuery({
+    queryKey: ['champion-page', championId, role, patch, rankBucket, opponentChampionId],
+    queryFn: () => getChampionPageBundle({
       championId,
       role,
       itemContext,
@@ -97,6 +91,11 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       rankBucket,
       minGames: opponentChampionId ? 3 : 5,
       championMinGames: 10,
+      guideMinGames: 5,
+      guideLimit: 12,
+      indexMinGames: 1,
+      indexLimit: 250,
+      queueId: DEFAULT_QUEUE_ID,
       limit: 4,
     }),
     enabled: Boolean(championId && patch && role),
@@ -146,8 +145,8 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
     setRole(value);
   };
 
-  const guide = guideQuery.data;
-  const buildAdvice = buildAdviceQuery.data;
+  const guide = championPageQuery.data?.guide;
+  const buildAdvice = championPageQuery.data?.buildAdvice;
   const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
   const buildVariants = useMemo(() => groupBuildVariantsForDisplay(guideForBuilds?.buildVariants ?? [], items), [guideForBuilds?.buildVariants, items]);
   const selectedBuildVariant = selectedBuildVariantKey && selectedBuildVariantKey !== RECOMMENDED_BUILD_KEY
@@ -169,13 +168,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
   const titleRole = roleLabel(role);
   const sampleContext = opponent ? `${champion?.name ?? championId} vs ${opponent.name}` : `${champion?.name ?? championId} overall`;
-  const guideIndexQuery = useQuery({
-    queryKey: ['champion-guide-index', role, patch, rankBucket],
-    queryFn: () => getChampionGuideIndex({ role, patch, rankBucket, minGames: 1, limit: 250 }),
-    enabled: Boolean(patch && role),
-    staleTime: 5 * 60 * 1000,
-  });
-  const guideIndex = guideIndexQuery.data?.results ?? [];
+  const guideIndex = championPageQuery.data?.guideIndex.results ?? [];
   const coverageByChampionId = useMemo(() => {
     const map = new Map<number, ChampionGuideSummary>();
     for (const summary of guideIndex) {
@@ -230,9 +223,9 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         onOpponentChange={setOpponentChampionId}
       />
 
-      <GuideStats guide={guideForBuilds} loading={guideQuery.isLoading && buildAdviceQuery.isLoading} />
+      <GuideStats guide={guideForBuilds} loading={championPageQuery.isLoading} />
       <GuideCoverage
-        loading={guideIndexQuery.isLoading}
+        loading={championPageQuery.isLoading}
         championCount={guideIndex.length}
         totalGames={coveredGames}
         selectedGames={currentCoverage?.games ?? 0}
@@ -257,9 +250,9 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       />
 
       <div className="guide-primary-grid">
-        <RuneGuideCard guide={guideForBuilds} variant={selectedBuildVariant} runes={runes} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
+        <RuneGuideCard guide={guideForBuilds} variant={selectedBuildVariant} runes={runes} loading={championPageQuery.isLoading} />
         <div className="guide-side-stack">
-          <SpellGuideCard guide={guideForBuilds} variant={selectedBuildVariant} spells={spells} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
+          <SpellGuideCard guide={guideForBuilds} variant={selectedBuildVariant} spells={spells} loading={championPageQuery.isLoading} />
           <GuideMiniNote
             title="Matchup Lens"
             body={buildAdvice?.notes[0] ?? (opponent ? `Item panels are narrowed to ${opponent.name} when the sample exists, then fall back to broader ${champion?.name ?? 'champion'} data.` : 'Choose a matchup filter to compare item choices into a specific opponent.')}
@@ -268,13 +261,13 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       </div>
 
       <div className="guide-skill-items-row build-linked">
-        <SkillGuideCard guide={guide} variant={selectedBuildVariant} champion={champion} champions={champions} loading={guideQuery.isLoading} />
-        <SkillPathCard guide={guide} variant={selectedBuildVariant} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
+        <SkillGuideCard guide={guide} variant={selectedBuildVariant} champion={champion} champions={champions} loading={championPageQuery.isLoading} />
+        <SkillPathCard guide={guide} variant={selectedBuildVariant} championName={champion?.name ?? 'this champion'} loading={championPageQuery.isLoading} />
       </div>
 
-      <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
+      <BuildAdviceCoverage buildAdvice={buildAdvice} loading={championPageQuery.isLoading} />
 
-      <ItemGuideGrid rows={itemSlots} items={items} loading={buildAdviceQuery.isLoading} context={itemSlotContext} />
+      <ItemGuideGrid rows={itemSlots} items={items} loading={championPageQuery.isLoading} context={itemSlotContext} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
 
@@ -284,8 +277,8 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
           <em>Counter picks and favorable opponents from stored ranked games.</em>
         </div>
         <div className="guide-matchups-grid">
-          <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={guideQuery.isLoading} />
-          <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={guideQuery.isLoading} />
+          <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={championPageQuery.isLoading} />
+          <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={championPageQuery.isLoading} />
         </div>
       </section>
     </section>

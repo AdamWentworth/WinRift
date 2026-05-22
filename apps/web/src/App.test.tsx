@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getBuildAdvice, getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getBuildAdvice, getChampionGuideIndex, getChampionPageBundle, getChampionRoleRates, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 const buildAdviceFixture = vi.hoisted(() => () => ({
@@ -45,24 +45,37 @@ const buildAdviceFixture = vi.hoisted(() => () => ({
   notes: ['Build advice is compiled from stored ranked Solo/Duo games and refreshed summary tables.'],
 }));
 
+const championGuideFixture = vi.hoisted(() => () => ({
+  summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
+  toughestMatchups: [],
+  bestMatchups: [],
+  topRunes: [],
+  topSpells: [],
+  topSkillOrders: [],
+  topItemPaths: [],
+  buildVariants: [],
+}));
+
+const championGuideIndexFixture = vi.hoisted(() => () => ({
+  results: [
+    { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
+  ],
+}));
+
+const championPageBundleFixture = vi.hoisted(() => () => ({
+  filters: { championId: 62, role: 'JUNGLE', opponentChampionId: 0, patch: '16.10', rankBucket: '', queueId: 420 },
+  guide: championGuideFixture(),
+  buildAdvice: buildAdviceFixture(),
+  guideIndex: championGuideIndexFixture(),
+  roleRates: { results: [] },
+}));
+
 vi.mock('./api/client', () => ({
   getBuilds: vi.fn(async () => ({ results: [] })),
   getBuildAdvice: vi.fn(async () => buildAdviceFixture()),
-  getChampionGuide: vi.fn(async () => ({
-    summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
-    toughestMatchups: [],
-    bestMatchups: [],
-    topRunes: [],
-    topSpells: [],
-    topSkillOrders: [],
-    topItemPaths: [],
-    buildVariants: [],
-  })),
-  getChampionGuideIndex: vi.fn(async () => ({
-    results: [
-      { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
-    ],
-  })),
+  getChampionGuide: vi.fn(async () => championGuideFixture()),
+  getChampionGuideIndex: vi.fn(async () => championGuideIndexFixture()),
+  getChampionPageBundle: vi.fn(async () => championPageBundleFixture()),
   getItemSlots: vi.fn(async () => ({ results: [] })),
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
   getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
@@ -110,29 +123,16 @@ describe('App', () => {
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getSummonerProfile).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
-    vi.mocked(getChampionGuide).mockReset();
     vi.mocked(getChampionGuideIndex).mockReset();
+    vi.mocked(getChampionPageBundle).mockReset();
     vi.mocked(getBuildAdvice).mockReset();
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
     vi.mocked(getLiveGame).mockRejectedValue(new Error('Player is not currently in a live game'));
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
-    vi.mocked(getChampionGuide).mockResolvedValue({
-      summary: { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
-      toughestMatchups: [],
-      bestMatchups: [],
-      topRunes: [],
-      topSpells: [],
-      topSkillOrders: [],
-      topItemPaths: [],
-      buildVariants: [],
-    });
-    vi.mocked(getChampionGuideIndex).mockResolvedValue({
-      results: [
-        { championId: 62, role: 'JUNGLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
-      ],
-    });
+    vi.mocked(getChampionGuideIndex).mockResolvedValue(championGuideIndexFixture());
+    vi.mocked(getChampionPageBundle).mockResolvedValue(championPageBundleFixture());
     vi.mocked(getBuildAdvice).mockResolvedValue(buildAdviceFixture());
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
     vi.mocked(getSummonerProfile).mockResolvedValue({
@@ -203,8 +203,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /Wukong/i }));
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
-    await waitFor(() => expect(getChampionGuide).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
-    expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: 'JUNGLE', patch: '16.10' }));
+    await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
     queryClient.clear();
   });
 

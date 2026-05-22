@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getBuildAdvice, getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import { getChampionPageBundle, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
 import type { Champion, ChampionRoleRate } from './api/types';
 import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
 import { BuildGuidePage } from './components/BuildGuidePage';
@@ -81,13 +81,8 @@ export function App() {
       const role = normalizeRole(roleValue ?? '') || 'MIDDLE';
       const itemContext = itemContextForRole(role);
       void queryClient.prefetchQuery({
-        queryKey: ['champion-guide', championId, role, patch, ''],
-        queryFn: () => getChampionGuide({ championId, role, patch, rankBucket: '', minGames: 5, limit: 12 }),
-        staleTime: GUIDE_STALE_TIME,
-      });
-      void queryClient.prefetchQuery({
-        queryKey: ['guide-build-advice', championId, role, patch, '', 0],
-        queryFn: () => getBuildAdvice({
+        queryKey: ['champion-page', championId, role, patch, '', 0],
+        queryFn: () => getChampionPageBundle({
           championId,
           role,
           itemContext,
@@ -95,13 +90,13 @@ export function App() {
           rankBucket: '',
           minGames: 5,
           championMinGames: 10,
+          guideMinGames: 5,
+          guideLimit: 12,
+          indexMinGames: 1,
+          indexLimit: 250,
+          queueId: DEFAULT_QUEUE_ID,
           limit: 4,
         }),
-        staleTime: GUIDE_STALE_TIME,
-      });
-      void queryClient.prefetchQuery({
-        queryKey: ['champion-guide-index', role, patch, ''],
-        queryFn: () => getChampionGuideIndex({ role, patch, rankBucket: '', minGames: 1, limit: 250 }),
         staleTime: GUIDE_STALE_TIME,
       });
     };

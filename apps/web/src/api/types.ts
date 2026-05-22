@@ -362,6 +362,21 @@ export type ChampionRoleRatesResponse = {
   results: ChampionRoleRate[];
 };
 
+export type ChampionPageBundleResponse = {
+  filters: {
+    championId: number;
+    role: string;
+    opponentChampionId: number;
+    patch: string;
+    rankBucket: string;
+    queueId: number;
+  };
+  guide: ChampionGuideResponse;
+  buildAdvice: BuildAdviceResponse;
+  guideIndex: ChampionGuideIndexResponse;
+  roleRates: ChampionRoleRatesResponse;
+};
+
 export type WinConditionAnalysisRequest = {
   blueChampionIds: number[];
   redChampionIds: number[];

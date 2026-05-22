@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,6 +53,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
 	mux.HandleFunc("GET /api/analytics/build-advice", s.analyticsBuildAdvice)
+	mux.HandleFunc("GET /api/analytics/champion-page", s.analyticsChampionPage)
 	mux.HandleFunc("GET /api/analytics/champion-guides", s.analyticsChampionGuideIndex)
 	mux.HandleFunc("GET /api/analytics/champion-guide", s.analyticsChampionGuide)
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
@@ -293,16 +295,111 @@ func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	championID := uint16(queryInt(query.Get("championId"), 0))
-	if championID == 0 {
-		writeError(w, http.StatusBadRequest, "championId is required")
+	request, badRequest := parseBuildAdviceRequest(r.URL.Query())
+	if badRequest != "" {
+		writeError(w, http.StatusBadRequest, badRequest)
 		return
 	}
+	cacheKey := "build-advice:" + r.URL.RequestURI()
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
+	response, err := s.buildAdviceResponse(r.Context(), request)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writeCachedJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+}
+
+func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
+	buildRequest, badRequest := parseBuildAdviceRequest(r.URL.Query())
+	if badRequest != "" {
+		writeError(w, http.StatusBadRequest, badRequest)
+		return
+	}
+	query := r.URL.Query()
+	guideMinGames := queryInt(query.Get("guideMinGames"), 5)
+	guideLimit := queryInt(query.Get("guideLimit"), 12)
+	indexMinGames := queryInt(query.Get("indexMinGames"), 1)
+	indexLimit := queryInt(query.Get("indexLimit"), 250)
+	queueID := uint16(queryInt(query.Get("queueId"), analytics.RankedSoloQueueID))
+	cacheKey := "champion-page:" + r.URL.RequestURI()
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
+	guideFilters := map[string]string{
+		"champion_id": strconv.Itoa(int(buildRequest.ChampionID)),
+		"role":        buildRequest.Role,
+		"patch":       buildRequest.Patch,
+		"rank_bucket": buildRequest.RankBucket,
+	}
+	indexFilters := map[string]string{
+		"role":        buildRequest.Role,
+		"patch":       buildRequest.Patch,
+		"rank_bucket": buildRequest.RankBucket,
+	}
+	guide, err := s.repo.QueryChampionGuide(r.Context(), guideFilters, guideMinGames, guideLimit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	buildAdvice, err := s.buildAdviceResponse(r.Context(), buildRequest)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	index, err := s.repo.QueryChampionGuideIndex(r.Context(), indexFilters, indexMinGames, indexLimit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	roleRates, err := s.repo.ChampionRoleRates(r.Context(), []uint16{buildRequest.ChampionID}, queueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response := map[string]any{
+		"filters": map[string]any{
+			"championId":         buildRequest.ChampionID,
+			"role":               buildRequest.Role,
+			"opponentChampionId": buildRequest.OpponentChampionID,
+			"patch":              buildRequest.Patch,
+			"rankBucket":         buildRequest.RankBucket,
+			"queueId":            queueID,
+		},
+		"guide":       championGuideResponse(guide),
+		"buildAdvice": buildAdvice,
+		"guideIndex": map[string]any{
+			"results":            championGuideSummariesResponse(index.Results),
+			"matchCount":         index.MatchCount,
+			"participantSamples": index.ParticipantSamples,
+		},
+		"roleRates": championRoleRatesResponse(roleRates),
+	}
+	s.writeCachedJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+}
+
+type buildAdviceRequest struct {
+	ChampionID         uint16
+	Role               string
+	OpponentChampionID uint16
+	Patch              string
+	RankBucket         string
+	MinGames           int
+	ChampionMinGames   int
+	OptionLimit        int
+	ItemContext        string
+}
+
+func parseBuildAdviceRequest(query url.Values) (buildAdviceRequest, string) {
+	championID := uint16(queryInt(query.Get("championId"), 0))
+	if championID == 0 {
+		return buildAdviceRequest{}, "championId is required"
+	}
 	role := strings.ToUpper(query.Get("role"))
-	opponentChampionID := uint16(queryInt(query.Get("opponentChampionId"), 0))
-	patch := strings.TrimSpace(query.Get("patch"))
-	rankBucket := strings.ToUpper(query.Get("rankBucket"))
 	minGames := queryInt(query.Get("minGames"), defaultItemSlotMinGames)
 	if minGames <= 0 {
 		minGames = defaultItemSlotMinGames
@@ -315,87 +412,90 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 	if optionLimit > 12 {
 		optionLimit = 12
 	}
-	itemContext := normalizedItemContext(strings.ToUpper(query.Get("itemContext")), role)
-	cacheKey := "build-advice:" + r.URL.RequestURI()
-	if body, ok := s.responseCache.get(cacheKey); ok {
-		writeJSONBytes(w, http.StatusOK, body, true)
-		return
-	}
+	return buildAdviceRequest{
+		ChampionID:         championID,
+		Role:               role,
+		OpponentChampionID: uint16(queryInt(query.Get("opponentChampionId"), 0)),
+		Patch:              strings.TrimSpace(query.Get("patch")),
+		RankBucket:         strings.ToUpper(query.Get("rankBucket")),
+		MinGames:           minGames,
+		ChampionMinGames:   championMinGames,
+		OptionLimit:        optionLimit,
+		ItemContext:        normalizedItemContext(strings.ToUpper(query.Get("itemContext")), role),
+	}, ""
+}
+
+func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequest) (map[string]any, error) {
 	matchupRequest := itemSlotAnalyticsRequest{
 		Key:                      "matchup",
-		ChampionID:               championID,
-		Role:                     role,
-		ItemContext:              itemContext,
-		OpponentChampionID:       opponentChampionID,
-		Patch:                    patch,
-		RankBucket:               rankBucket,
-		MinGames:                 minGames,
-		Limit:                    optionLimit,
+		ChampionID:               request.ChampionID,
+		Role:                     request.Role,
+		ItemContext:              request.ItemContext,
+		OpponentChampionID:       request.OpponentChampionID,
+		Patch:                    request.Patch,
+		RankBucket:               request.RankBucket,
+		MinGames:                 request.MinGames,
+		Limit:                    request.OptionLimit,
 		Fallback:                 true,
 		SuppressChampionFallback: true,
 	}
 	championRequest := matchupRequest
 	championRequest.Key = "champion"
 	championRequest.OpponentChampionID = 0
-	championRequest.MinGames = championMinGames
+	championRequest.MinGames = request.ChampionMinGames
 
 	matchupSlots := []scopedItemSlotRow{}
 	var err error
-	if opponentChampionID > 0 {
-		matchupSlots, err = s.queryScopedItemSlots(r.Context(), matchupRequest)
+	if request.OpponentChampionID > 0 {
+		matchupSlots, err = s.queryScopedItemSlots(ctx, matchupRequest)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
+			return nil, err
 		}
 	}
-	championSlots, err := s.queryScopedItemSlots(r.Context(), championRequest)
+	championSlots, err := s.queryScopedItemSlots(ctx, championRequest)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
 	buildFilters := map[string]string{
-		"champion_id":          strconv.Itoa(int(championID)),
-		"role":                 role,
+		"champion_id":          strconv.Itoa(int(request.ChampionID)),
+		"role":                 request.Role,
 		"opponent_champion_id": "",
-		"patch":                patch,
-		"rank_bucket":          rankBucket,
+		"patch":                request.Patch,
+		"rank_bucket":          request.RankBucket,
 	}
 	matchupBuilds := []clickhouse.BuildRow{}
-	if opponentChampionID > 0 {
-		buildFilters["opponent_champion_id"] = strconv.Itoa(int(opponentChampionID))
-		matchupBuilds, err = s.repo.QueryBuilds(r.Context(), buildFilters, minGames, 8)
+	if request.OpponentChampionID > 0 {
+		buildFilters["opponent_champion_id"] = strconv.Itoa(int(request.OpponentChampionID))
+		matchupBuilds, err = s.repo.QueryBuilds(ctx, buildFilters, request.MinGames, 8)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
+			return nil, err
 		}
 	}
 	championFilters := cloneStringMap(buildFilters)
 	championFilters["opponent_champion_id"] = ""
-	championBuilds, err := s.repo.QueryBuilds(r.Context(), championFilters, championMinGames, 8)
+	championBuilds, err := s.repo.QueryBuilds(ctx, championFilters, request.ChampionMinGames, 8)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
-	guide, err := s.repo.QueryChampionGuide(r.Context(), championFilters, championMinGames, 8)
+	guide, err := s.repo.QueryChampionGuide(ctx, championFilters, request.ChampionMinGames, 8)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
-	notes := buildAdviceNotes(opponentChampionID > 0, matchupSlots, championSlots)
-	response := map[string]any{
+	notes := buildAdviceNotes(request.OpponentChampionID > 0, matchupSlots, championSlots)
+	return map[string]any{
 		"filters": map[string]any{
-			"championId":         championID,
-			"role":               role,
-			"opponentChampionId": opponentChampionID,
-			"patch":              patch,
-			"rankBucket":         rankBucket,
-			"itemContext":        itemContext,
-			"minGames":           minGames,
-			"championMinGames":   championMinGames,
-			"limit":              optionLimit,
+			"championId":         request.ChampionID,
+			"role":               request.Role,
+			"opponentChampionId": request.OpponentChampionID,
+			"patch":              request.Patch,
+			"rankBucket":         request.RankBucket,
+			"itemContext":        request.ItemContext,
+			"minGames":           request.MinGames,
+			"championMinGames":   request.ChampionMinGames,
+			"limit":              request.OptionLimit,
 		},
 		"matchup": map[string]any{
-			"available":  opponentChampionID > 0,
+			"available":  request.OpponentChampionID > 0,
 			"itemSlots":  itemSlotRowsResponse(matchupSlots),
 			"topBuilds":  buildRowsResponse(matchupBuilds),
 			"sample":     buildAdviceSampleResponse(matchupSlots),
@@ -411,15 +511,14 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 			"summary":        championGuideSummaryResponse(guide.Summary),
 			"sample":         buildAdviceSampleResponse(championSlots),
 			"sampleMode":     "champion_overall",
-			"strictRoleUsed": role != "",
+			"strictRoleUsed": request.Role != "",
 		},
 		"diagnostics": map[string]any{
 			"matchup":  buildAdviceItemSlotDiagnostics(matchupSlots),
 			"champion": buildAdviceItemSlotDiagnostics(championSlots),
 		},
 		"notes": notes,
-	}
-	s.writeCachedJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+	}, nil
 }
 
 func (s Server) analyticsChampionGuideIndex(w http.ResponseWriter, r *http.Request) {
@@ -1164,6 +1263,10 @@ func (s Server) analyticsChampionRoles(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	writeJSON(w, http.StatusOK, championRoleRatesResponse(rows))
+}
+
+func championRoleRatesResponse(rows []clickhouse.ChampionRoleRate) map[string]any {
 	results := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		results = append(results, map[string]any{
@@ -1174,7 +1277,7 @@ func (s Server) analyticsChampionRoles(w http.ResponseWriter, r *http.Request) {
 			"pickRate":   round(row.PickRate * 100),
 		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+	return map[string]any{"results": results}
 }
 
 func (s Server) staticData(w http.ResponseWriter, r *http.Request) {
