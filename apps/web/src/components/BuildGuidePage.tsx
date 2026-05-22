@@ -372,9 +372,9 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
       <PanelTitle title="Runes" detail={runeRow ? `${runeRow.winRate.toFixed(2)}% WR (${formatNumber(runeRow.games)} matches)` : loading ? 'Loading...' : 'No rune sample yet'} />
       {runeRow ? (
         <div className="guide-rune-grid">
-          <RuneTreePanel style={primary} selectedRuneIds={parsed.runeIds} runes={runes} />
+          <RuneTreePanel style={primary} selectedRuneIds={parsed.runeIds} runes={runes} treeRole="primary" />
           <div className="guide-rune-side">
-            <RuneTreePanel style={secondary} selectedRuneIds={parsed.runeIds} runes={runes} />
+            <RuneTreePanel style={secondary} selectedRuneIds={parsed.runeIds} runes={runes} treeRole="secondary" />
             <StatShardGrid selectedIds={parsed.statPerks} className="guide-stat-shards" />
           </div>
         </div>
@@ -383,33 +383,37 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
   );
 }
 
-function RuneTreePanel({ style, selectedRuneIds, runes }: { style?: RuneStyle; selectedRuneIds: number[]; runes?: RuneData }) {
+function RuneTreePanel({ style, selectedRuneIds, runes, treeRole }: { style?: RuneStyle; selectedRuneIds: number[]; runes?: RuneData; treeRole: 'primary' | 'secondary' }) {
   const selected = new Set(selectedRuneIds);
   const styleImage = style ? runeStyleImageUrl(runes, style.id) : '';
+  const slots = treeRole === 'secondary' ? (style?.slots ?? []).slice(1) : (style?.slots ?? []);
   return (
-    <div className="guide-rune-tree">
+    <div className={treeRole === 'secondary' ? 'guide-rune-tree secondary' : 'guide-rune-tree primary'}>
       <div className="guide-rune-tree-title">
         {styleImage ? <img src={styleImage} alt="" /> : null}
         <strong>{style?.name ?? 'Rune Tree'}</strong>
       </div>
       <div className="guide-rune-slots">
-        {(style?.slots ?? []).map((slot, index) => (
-          <div key={`${style?.id}-${index}`} className={index === 0 ? 'guide-rune-slot keystone' : 'guide-rune-slot'}>
-            {slot.runes.map((rune) => {
-              const active = selected.has(rune.id);
-              const src = runeImageUrl(runes, rune.id);
-              return src ? (
-                <img
-                  key={rune.id}
-                  className={active ? 'selected' : ''}
-                  src={src}
-                  alt={rune.name}
-                  title={active ? `${rune.name} selected` : rune.name}
-                />
-              ) : null;
-            })}
-          </div>
-        ))}
+        {slots.map((slot, index) => {
+          const originalIndex = treeRole === 'secondary' ? index + 1 : index;
+          return (
+            <div key={`${style?.id}-${originalIndex}`} className={originalIndex === 0 ? 'guide-rune-slot keystone' : 'guide-rune-slot'}>
+              {slot.runes.map((rune) => {
+                const active = selected.has(rune.id);
+                const src = runeImageUrl(runes, rune.id);
+                return src ? (
+                  <img
+                    key={rune.id}
+                    className={active ? 'selected' : ''}
+                    src={src}
+                    alt={rune.name}
+                    title={active ? `${rune.name} selected` : rune.name}
+                  />
+                ) : null;
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
