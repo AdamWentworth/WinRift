@@ -201,16 +201,6 @@ export function SummonerProfilePage({
               <span>Live Match</span>
               <em>{liveQuery.data ? 'Live now' : liveQuery.isLoading ? 'Checking...' : 'Not live'}</em>
             </button>
-            <button
-              className={`profile-action-button ${section === 'builds' ? 'selected' : ''}`}
-              disabled={!profileQuery.data}
-              onClick={() => setSection('builds')}
-              type="button"
-            >
-              <Package size={16} />
-              <span>Builds</span>
-              <em>{profileQuery.data?.topBuilds?.length ? `${formatNumber(profileQuery.data.topBuilds.length)} stored paths` : 'Stored match paths'}</em>
-            </button>
           </div>
         ) : null}
 
