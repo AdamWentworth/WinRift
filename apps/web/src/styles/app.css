@@ -1240,23 +1240,36 @@ button {
 .profile-live-shell {
   min-height: calc(100vh - 77px);
   overflow: hidden;
+  padding: 10px 12px 24px;
   position: relative;
   z-index: 2;
 }
 
 .profile-live-toolbar {
   align-items: center;
-  background: linear-gradient(90deg, rgb(10 14 16 / 92%), rgb(16 24 27 / 86%));
+  background:
+    radial-gradient(ellipse at 0 0, rgb(130 215 255 / 16%), transparent 48%),
+    linear-gradient(90deg, rgb(10 14 16 / 94%), rgb(16 24 27 / 88%));
   border: 1px solid rgb(130 215 255 / 24%);
   box-shadow: 0 12px 38px rgb(0 0 0 / 34%);
   color: #d7edf2;
-  display: flex;
+  display: grid;
   gap: 12px;
-  left: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0 auto 8px;
+  max-width: 1500px;
+  min-width: 0;
   padding: 8px 10px;
-  position: absolute;
-  top: 10px;
+  position: relative;
   z-index: 20;
+}
+
+.profile-live-status {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
 }
 
 .profile-live-toolbar button {
@@ -1270,12 +1283,36 @@ button {
   min-height: 28px;
   padding: 5px 9px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.profile-live-toolbar span {
+.profile-live-toolbar span,
+.profile-live-toolbar em {
   color: #b9d4da;
-  font-size: 11px;
+  font-size: 10px;
+  font-style: normal;
   font-weight: 900;
+  text-transform: uppercase;
+}
+
+.profile-live-toolbar strong {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 1000;
+  line-height: 1.05;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-live-toolbar em {
+  color: #8cecff;
+}
+
+.profile-live-shell .game-board {
+  min-height: calc(100vh - 153px);
+  padding-top: 0;
 }
 
 .global-art-stage {
