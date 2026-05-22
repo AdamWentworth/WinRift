@@ -79,41 +79,45 @@ export function FocusedBuildPanel({
   return (
     <section className={`focused-build-panel ${selection.side}`} aria-label="Focused build matchup">
       <div className="focused-build-command-row">
-        <div className="focused-build-owner-card">
-          {championUrl ? <img src={championUrl} alt={championName} /> : null}
-          <span>
-            <small>Builds For</small>
-            <strong>{championName}</strong>
-            <em>{playerName}</em>
-            <b><RoleIcon role={selection.role} /> {roleLabel(selection.role)}</b>
-          </span>
-        </div>
-        <div className="focused-build-context-card">
-          <span className="focused-build-context-label">Matchup Context</span>
-          <div>
-            {opponentUrl ? <img src={opponentUrl} alt={opponentChampionName} /> : null}
+        <div className="focused-build-command-group build-target">
+          <div className="focused-build-owner-card">
+            {championUrl ? <img src={championUrl} alt={championName} /> : null}
             <span>
-              <small>Against</small>
-              <strong>{opponentChampionName}</strong>
-              <em>{opponentName}</em>
+              <small>Builds For</small>
+              <strong>{championName}</strong>
+              <em>{playerName}</em>
+              <b><RoleIcon role={selection.role} /> {roleLabel(selection.role)}</b>
             </span>
           </div>
-          <p>Opponent filters the matchup sample. Build cards below remain for {championName}.</p>
+          <BuildParticipantPicker
+            title="Build Target"
+            options={selection.participantOptions}
+            selectedKey={activeParticipantKey}
+            champions={champions}
+            onSelect={onSelectParticipant}
+          />
         </div>
-        <BuildParticipantPicker
-          title="Build For"
-          options={selection.participantOptions}
-          selectedKey={activeParticipantKey}
-          champions={champions}
-          onSelect={onSelectParticipant}
-        />
-        <BuildParticipantPicker
-          title="Against"
-          options={selection.opponentOptions}
-          selectedKey={activeOpponentKey}
-          champions={champions}
-          onSelect={onSelectOpponent}
-        />
+        <div className="focused-build-command-group opponent-target">
+          <div className="focused-build-context-card">
+            <span className="focused-build-context-label">Matchup Context</span>
+            <div>
+              {opponentUrl ? <img src={opponentUrl} alt={opponentChampionName} /> : null}
+              <span>
+                <small>Against</small>
+                <strong>{opponentChampionName}</strong>
+                <em>{opponentName}</em>
+              </span>
+            </div>
+            <p>Opponent filters the matchup sample. Build cards below remain for {championName}.</p>
+          </div>
+          <BuildParticipantPicker
+            title="Opponent"
+            options={selection.opponentOptions}
+            selectedKey={activeOpponentKey}
+            champions={champions}
+            onSelect={onSelectOpponent}
+          />
+        </div>
       </div>
       <BuildAdviceSetupStrip buildAdvice={buildAdvice} spells={spells} runes={runes} loading={loading} />
       <div className="focused-build-results">
@@ -216,6 +220,7 @@ function BuildParticipantPicker({
   champions?: ChampionData;
   onSelect: (key: string) => void;
 }) {
+  const actionLabel = title === 'Build Target' ? 'Build For' : title === 'Opponent' ? 'Against' : title;
   return (
     <div className="focused-build-picker">
       <span>{title}</span>
@@ -224,17 +229,17 @@ function BuildParticipantPicker({
           const optionChampion = championByKey(champions, option.participant.championId);
           const optionUrl = championImageUrl(champions, option.participant.championId);
           const labelName = participantDisplayName(option.participant);
+          const championName = optionChampion?.name ?? String(option.participant.championId);
           return (
             <button
               className={`${option.side}${option.key === selectedKey ? ' selected' : ''}`}
               key={option.key}
               onClick={() => onSelect(option.key)}
               type="button"
-              aria-label={`${title} ${labelName}`}
+              aria-label={`${actionLabel} ${labelName}`}
+              title={`${championName} - ${roleLabel(option.role)} - ${labelName}`}
             >
               {optionUrl ? <img src={optionUrl} alt="" /> : null}
-              <strong>{optionChampion?.name ?? option.participant.championId}</strong>
-              <em>{labelName}</em>
               <small><RoleIcon role={option.role} /> {roleLabel(option.role)}</small>
             </button>
           );
