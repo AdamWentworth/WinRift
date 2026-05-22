@@ -36,6 +36,7 @@ const buildAdviceFixture = vi.hoisted(() => () => ({
     topRunes: [],
     topSpells: [],
     topItemPaths: [],
+    buildVariants: [],
     summary: { championId: 3, role: 'MIDDLE', patchBucket: '16.10', rankBucket: 'ALL', wins: 12, games: 20, bans: 3, winRate: 60, confidence: 40, pickRate: 2.2, banRate: 1.1, roleRank: 1, roleRankTotal: 12 },
     sample: { maxGames: 20, optionCount: 1, fallbackUsed: false, scopeLabels: ['Current patch champion overall'], sampleQuality: 'early', sampleQualityLabel: 'Early sample' },
     sampleMode: 'champion_overall',
@@ -55,6 +56,7 @@ vi.mock('./api/client', () => ({
     topSpells: [],
     topSkillOrders: [],
     topItemPaths: [],
+    buildVariants: [],
   })),
   getChampionGuideIndex: vi.fn(async () => ({
     results: [
@@ -124,6 +126,7 @@ describe('App', () => {
       topSpells: [],
       topSkillOrders: [],
       topItemPaths: [],
+      buildVariants: [],
     });
     vi.mocked(getChampionGuideIndex).mockResolvedValue({
       results: [

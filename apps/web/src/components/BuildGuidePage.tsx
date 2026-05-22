@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getBuildAdvice, getChampionGuide, getChampionGuideIndex } from '../api/client';
-import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideResponse, ChampionGuideSummary, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
+import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
   championByKey,
@@ -55,6 +55,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const [role, setRole] = useState('JUNGLE');
   const [rankBucket, setRankBucket] = useState('');
   const [opponentChampionId, setOpponentChampionId] = useState(0);
+  const [selectedBuildVariantKey, setSelectedBuildVariantKey] = useState('');
   const patch = patchBucket(champions?.version);
   const champion = championByKey(champions, championId);
   const opponent = opponentChampionId ? championByKey(champions, opponentChampionId) : undefined;
@@ -92,6 +93,10 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
     }
   }, [champions, championId, defaultChampionId, initialChampionId]);
 
+  useEffect(() => {
+    setSelectedBuildVariantKey('');
+  }, [championId, role, rankBucket]);
+
   const updateChampion = (value: number) => {
     setChampionId(value);
     const nextChampion = championByKey(champions, value);
@@ -103,6 +108,8 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const guide = guideQuery.data;
   const buildAdvice = buildAdviceQuery.data;
   const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
+  const buildVariants = guideForBuilds?.buildVariants ?? [];
+  const selectedBuildVariant = buildVariants.find((variant) => variant.variantKey === selectedBuildVariantKey) ?? buildVariants[0];
   const itemSlots = buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
     ? buildAdvice.matchup.itemSlots
     : buildAdvice?.champion.itemSlots ?? [];
@@ -188,10 +195,17 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         <em>{opponent ? 'matchup-filtered where possible, then widened carefully' : 'champion-wide until a matchup is selected'}</em>
       </div>
 
+      <BuildVariantTabs
+        variants={buildVariants}
+        selectedKey={selectedBuildVariant?.variantKey ?? ''}
+        items={items}
+        onSelect={setSelectedBuildVariantKey}
+      />
+
       <div className="guide-primary-grid">
-        <RuneGuideCard guide={guideForBuilds} runes={runes} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
+        <RuneGuideCard guide={guideForBuilds} variant={selectedBuildVariant} runes={runes} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
         <div className="guide-side-stack">
-          <SpellGuideCard guide={guideForBuilds} spells={spells} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
+          <SpellGuideCard guide={guideForBuilds} variant={selectedBuildVariant} spells={spells} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
           <GuideMiniNote
             title="Matchup Lens"
             body={buildAdvice?.notes[0] ?? (opponent ? `Item panels are narrowed to ${opponent.name} when the sample exists, then fall back to broader ${champion?.name ?? 'champion'} data.` : 'Choose a matchup filter to compare item choices into a specific opponent.')}
@@ -206,7 +220,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
       </div>
 
-      <ItemPathSummaryCard guide={guideForBuilds} items={items} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
+      <ItemPathSummaryCard guide={guideForBuilds} variant={selectedBuildVariant} items={items} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
 
       <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
 
@@ -307,6 +321,38 @@ function GuideFilters({
   );
 }
 
+function BuildVariantTabs({
+  variants,
+  selectedKey,
+  items,
+  onSelect,
+}: {
+  variants: ChampionGuideBuildVariant[];
+  selectedKey: string;
+  items?: ItemData;
+  onSelect: (key: string) => void;
+}) {
+  if (!variants.length) return null;
+  return (
+    <div className="guide-build-variant-tabs" role="tablist" aria-label="Build variants">
+      {variants.slice(0, 6).map((variant, index) => (
+        <button
+          key={variant.variantKey}
+          className={variant.variantKey === selectedKey ? 'active' : ''}
+          type="button"
+          role="tab"
+          aria-selected={variant.variantKey === selectedKey}
+          onClick={() => onSelect(variant.variantKey)}
+        >
+          <span>{buildVariantLabel(variant, index, items)}</span>
+          <ItemSignatureImages signature={variant.core2Signature || variant.core3Signature} items={items} limit={2} />
+          <em>{variant.winRate.toFixed(1)}% · {formatNumber(variant.games)}</em>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function mergeGuideWithBuildAdvice(guide: ChampionGuideResponse | undefined, buildAdvice: BuildAdviceResponse): ChampionGuideResponse {
   return {
     summary: buildAdvice.champion.summary,
@@ -316,6 +362,7 @@ function mergeGuideWithBuildAdvice(guide: ChampionGuideResponse | undefined, bui
     topSpells: buildAdvice.champion.topSpells,
     topSkillOrders: guide?.topSkillOrders ?? [],
     topItemPaths: buildAdvice.champion.topItemPaths,
+    buildVariants: buildAdvice.champion.buildVariants ?? guide?.buildVariants ?? [],
   };
 }
 
@@ -362,8 +409,8 @@ function GuideStats({ guide, loading }: { guide?: ChampionGuideResponse; loading
   );
 }
 
-function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideResponse; runes?: RuneData; loading: boolean }) {
-  const runeRow = guide?.topRunes[0];
+function RuneGuideCard({ guide, variant, runes, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; runes?: RuneData; loading: boolean }) {
+  const runeRow = variant?.runeSignature ? variantRuneRow(variant) : guide?.topRunes[0];
   const parsed = parseRuneSignature(runeRow?.runeSignature ?? '');
   const primary = runes?.data.find((style) => style.id === parsed.primaryStyleId);
   const secondary = runes?.data.find((style) => style.id === parsed.secondaryStyleId);
@@ -419,8 +466,8 @@ function RuneTreePanel({ style, selectedRuneIds, runes, treeRole }: { style?: Ru
   );
 }
 
-function SpellGuideCard({ guide, spells, loading }: { guide?: ChampionGuideResponse; spells?: SummonerSpellData; loading: boolean }) {
-  const spellRow = guide?.topSpells[0];
+function SpellGuideCard({ guide, variant, spells, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; spells?: SummonerSpellData; loading: boolean }) {
+  const spellRow = variant?.spellSignature ? variantSpellRow(variant) : guide?.topSpells[0];
   const spellIds = signatureSpells(spellRow?.spellSignature ?? '');
   return (
     <PanelCard className="guide-card spell-guide-card">
@@ -524,13 +571,14 @@ function ItemGuideGrid({ rows, items, loading, context }: { rows: AnalyticsItemS
   );
 }
 
-function ItemPathSummaryCard({ guide, items, loading }: { guide?: ChampionGuideResponse; items?: ItemData; loading: boolean }) {
-  const rows = guide?.topItemPaths ?? [];
+function ItemPathSummaryCard({ guide, variant, items, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; items?: ItemData; loading: boolean }) {
+  const selectedPath = variant ? variantItemPathRow(variant) : undefined;
+  const rows = selectedPath ? [selectedPath, ...(guide?.topItemPaths ?? []).filter((row) => row.core3Signature !== selectedPath.core3Signature).slice(0, 2)] : guide?.topItemPaths ?? [];
   return (
     <PanelCard className="guide-card item-path-summary-card">
       <PanelTitle
         title="Item Paths"
-        detail={rows[0] ? `${rows[0].winRate.toFixed(2)}% WR (${formatNumber(rows[0].games)} matches) for the strongest complete path` : loading ? 'Loading...' : 'No complete path sample yet'}
+        detail={rows[0] ? `${rows[0].winRate.toFixed(2)}% WR (${formatNumber(rows[0].games)} matches)${variant ? ' for selected build family' : ' for the strongest complete path'}` : loading ? 'Loading...' : 'No complete path sample yet'}
       />
       {rows.length ? (
         <div className="guide-build-path-list">
@@ -658,6 +706,60 @@ function guideTierClassName(tier: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
+}
+
+function variantRuneRow(variant: ChampionGuideBuildVariant) {
+  return {
+    runeSignature: variant.runeSignature,
+    wins: variant.wins,
+    games: variant.games,
+    winRate: variant.winRate,
+    confidence: variant.confidence,
+  };
+}
+
+function variantSpellRow(variant: ChampionGuideBuildVariant) {
+  return {
+    spellSignature: variant.spellSignature,
+    wins: variant.wins,
+    games: variant.games,
+    winRate: variant.winRate,
+    confidence: variant.confidence,
+  };
+}
+
+function variantItemPathRow(variant: ChampionGuideBuildVariant) {
+  return {
+    core3Signature: variant.core3Signature,
+    finalItemsSignature: variant.finalItemsSignature,
+    wins: variant.wins,
+    games: variant.games,
+    winRate: variant.winRate,
+    confidence: variant.confidence,
+  };
+}
+
+function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, items?: ItemData) {
+  if (index === 0) return 'Recommended';
+  const names = signatureItems(`${variant.core2Signature}-${variant.core3Signature}-${variant.finalItemsSignature}`)
+    .map((itemId) => itemName(items, String(itemId)).toLowerCase());
+  const has = (...needles: string[]) => names.some((name) => needles.some((needle) => name.includes(needle)));
+  if (has('heartsteel', "jak'sho", 'randuin', 'spirit visage', 'thornmail', 'sunfire', 'unending', 'dead man', 'kaenic', 'rookern')) {
+    return 'Tank';
+  }
+  if (has("guinsoo", "nashor", 'ruined king', "wit'", 'terminus')) {
+    return 'On Hit';
+  }
+  if (has('kraken', 'collector', 'infinity edge', 'serylda', "youmuu", 'eclipse', 'opportunity', 'axiom', 'edge of night', 'lord dominik')) {
+    return 'AD';
+  }
+  if (has('rabadon', 'shadowflame', 'stormsurge', 'lich bane', 'void staff', 'zhonya', 'liandry', 'luden', 'malignance')) {
+    return 'AP';
+  }
+  const coreNames = signatureItems(variant.core2Signature)
+    .map((itemId) => itemName(items, String(itemId)))
+    .filter((name) => !/^\d+$/.test(name));
+  return coreNames[0] ? coreNames[0].replace(/'s\b.*$/, '') : `Variant ${index + 1}`;
 }
 
 function skillSlots(signature: string) {

@@ -168,6 +168,7 @@ export type BuildAdviceChampionSection = BuildAdviceSection & {
   topRunes: ChampionGuideRune[];
   topSpells: ChampionGuideSpells[];
   topItemPaths: ChampionGuideItemPath[];
+  buildVariants: ChampionGuideBuildVariant[];
   summary: ChampionGuideSummary;
   strictRoleUsed: boolean;
 };
@@ -311,6 +312,20 @@ export type ChampionGuideItemPath = {
   confidence: number;
 };
 
+export type ChampionGuideBuildVariant = {
+  variantKey: string;
+  core2Signature: string;
+  core3Signature: string;
+  finalItemsSignature: string;
+  runeSignature: string;
+  spellSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+  buildCount: number;
+};
+
 export type ChampionGuideResponse = {
   summary: ChampionGuideSummary;
   toughestMatchups: ChampionGuideMatchup[];
@@ -319,6 +334,7 @@ export type ChampionGuideResponse = {
   topSpells: ChampionGuideSpells[];
   topSkillOrders: ChampionGuideSkillOrder[];
   topItemPaths: ChampionGuideItemPath[];
+  buildVariants: ChampionGuideBuildVariant[];
 };
 
 export type ChampionGuideIndexResponse = {

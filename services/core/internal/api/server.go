@@ -399,6 +399,7 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 			"topRunes":       championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
 			"topSpells":      championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
 			"topItemPaths":   championGuideItemPathRowsResponse(guide.TopItemPaths),
+			"buildVariants":  championGuideBuildVariantRowsResponse(guide.BuildVariants),
 			"summary":        championGuideSummaryResponse(guide.Summary),
 			"sample":         buildAdviceSampleResponse(championSlots),
 			"sampleMode":     "champion_overall",
@@ -843,6 +844,7 @@ func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
 		"topSpells":        championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
 		"topSkillOrders":   championGuideSkillOrderRowsResponse(guide.TopSkillOrders),
 		"topItemPaths":     championGuideItemPathRowsResponse(guide.TopItemPaths),
+		"buildVariants":    championGuideBuildVariantRowsResponse(guide.BuildVariants),
 	}
 }
 
@@ -955,6 +957,26 @@ func championGuideItemPathRowsResponse(rows []clickhouse.ChampionGuideItemPathRo
 			"games":               row.Games,
 			"winRate":             round(row.WinRate * 100),
 			"confidence":          round(row.Confidence * 100),
+		})
+	}
+	return results
+}
+
+func championGuideBuildVariantRowsResponse(rows []clickhouse.ChampionGuideBuildVariantRow) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"variantKey":          row.VariantKey,
+			"core2Signature":      row.Core2Signature,
+			"core3Signature":      row.Core3Signature,
+			"finalItemsSignature": row.FinalItemsSignature,
+			"runeSignature":       row.RuneSignature,
+			"spellSignature":      row.SpellSignature,
+			"wins":                row.Wins,
+			"games":               row.Games,
+			"winRate":             round(row.WinRate * 100),
+			"confidence":          round(row.Confidence * 100),
+			"buildCount":          row.BuildCount,
 		})
 	}
 	return results

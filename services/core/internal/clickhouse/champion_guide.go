@@ -91,6 +91,20 @@ type ChampionGuideItemPathRow struct {
 	Confidence          float64
 }
 
+type ChampionGuideBuildVariantRow struct {
+	VariantKey          string
+	Core2Signature      string
+	Core3Signature      string
+	FinalItemsSignature string
+	RuneSignature       string
+	SpellSignature      string
+	Wins                int
+	Games               int
+	WinRate             float64
+	Confidence          float64
+	BuildCount          int
+}
+
 type ChampionGuideData struct {
 	Summary          ChampionGuideSummary
 	ToughestMatchups []ChampionGuideMatchupRow
@@ -99,6 +113,7 @@ type ChampionGuideData struct {
 	TopSpells        []ChampionGuideSignatureRow
 	TopSkillOrders   []ChampionGuideSkillOrderRow
 	TopItemPaths     []ChampionGuideItemPathRow
+	BuildVariants    []ChampionGuideBuildVariantRow
 }
 
 type ChampionGuideIndex struct {
@@ -268,6 +283,10 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 	if err != nil {
 		return ChampionGuideData{}, err
 	}
+	buildVariants, err := r.queryChampionGuideBuildVariants(ctx, filters, minGames, limit)
+	if err != nil {
+		return ChampionGuideData{}, err
+	}
 	banRates, err := r.queryChampionBanRates(ctx, filters)
 	if err != nil {
 		return ChampionGuideData{}, err
@@ -284,6 +303,7 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 		TopSpells:        spells,
 		TopSkillOrders:   skills,
 		TopItemPaths:     itemPaths,
+		BuildVariants:    buildVariants,
 	}, nil
 }
 
@@ -790,6 +810,119 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 			return out[i].Core3Signature < out[j].Core3Signature
 		}
 		return out[i].FinalItemsSignature < out[j].FinalItemsSignature
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
+func (r *Repository) queryChampionGuideBuildVariants(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideBuildVariantRow, error) {
+	if minGames <= 0 {
+		minGames = 5
+	}
+	if limit <= 0 {
+		limit = 12
+	}
+	championID := filterValue(filters["champion_id"])
+	if championID == "" {
+		return nil, nil
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	rawSQL, rawArgs := championGuideBaseSQL(filters, roleScope, true)
+	compiledWhere := `
+		FROM patch_build_metrics FINAL
+		WHERE champion_id = ?
+			AND core2_signature != ''
+			AND final_items_signature != ''`
+	compiledArgs := []any{championID}
+	if roleScope.whereSQL != "" {
+		compiledWhere += " AND " + roleScope.whereSQL
+		compiledArgs = append(compiledArgs, roleScope.args...)
+	}
+	if filterValue(filters["patch"]) != "" {
+		compiledWhere += " AND patch = ?"
+		compiledArgs = append(compiledArgs, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		compiledWhere += " AND rank_bucket = ?"
+		compiledArgs = append(compiledArgs, filterValue(filters["rank_bucket"]))
+	}
+
+	query := `
+		SELECT
+			core2_signature,
+			argMax(core3_signature, row_games) AS core3_signature,
+			argMax(final_items_signature, row_games) AS final_items_signature,
+			argMax(rune_signature, row_games) AS rune_signature,
+			argMax(spell_signature, row_games) AS spell_signature,
+			toUInt64(sum(row_wins)) AS wins,
+			toUInt64(sum(row_games)) AS games,
+			wins / games AS win_rate,
+			count() AS build_count
+		FROM
+		(
+			SELECT
+				core2_signature,
+				core3_signature,
+				final_items_signature,
+				rune_signature,
+				spell_signature,
+				toUInt64(sum(win)) AS row_wins,
+				toUInt64(count()) AS row_games
+			` + rawSQL + `
+				AND core2_signature != ''
+				AND final_items_signature != ''
+			GROUP BY core2_signature, core3_signature, final_items_signature, rune_signature, spell_signature
+			UNION ALL
+			SELECT
+				core2_signature,
+				core3_signature,
+				final_items_signature,
+				rune_signature,
+				spell_signature,
+				toUInt64(sum(wins)) AS row_wins,
+				toUInt64(sum(games)) AS row_games
+			` + compiledWhere + `
+			GROUP BY core2_signature, core3_signature, final_items_signature, rune_signature, spell_signature
+		)
+		GROUP BY core2_signature
+		HAVING games >= ?
+		ORDER BY games DESC, win_rate DESC
+		LIMIT ?`
+	args := append([]any{}, rawArgs...)
+	args = append(args, compiledArgs...)
+	args = append(args, minGames, limit*4)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ChampionGuideBuildVariantRow{}
+	for rows.Next() {
+		var row ChampionGuideBuildVariantRow
+		if err := rows.Scan(&row.Core2Signature, &row.Core3Signature, &row.FinalItemsSignature, &row.RuneSignature, &row.SpellSignature, &row.Wins, &row.Games, &row.WinRate, &row.BuildCount); err != nil {
+			return nil, err
+		}
+		row.VariantKey = row.Core2Signature
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		if out[i].Confidence != out[j].Confidence {
+			return out[i].Confidence > out[j].Confidence
+		}
+		if out[i].WinRate != out[j].WinRate {
+			return out[i].WinRate > out[j].WinRate
+		}
+		return out[i].VariantKey < out[j].VariantKey
 	})
 	if len(out) > limit {
 		out = out[:limit]
