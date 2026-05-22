@@ -25,6 +25,7 @@ import { MetricTile } from './ui/MetricTile';
 import { EmptyState, PanelCard, PanelTitle } from './ui/Panel';
 import { RoleTabs } from './ui/RoleTabs';
 import { SelectControl } from './ui/SelectControl';
+import { StatShardGrid } from './ui/StatShardDisplay';
 
 const ranks = [
   { value: '', label: 'All Ranks' },
@@ -372,12 +373,9 @@ function RuneGuideCard({ guide, runes, loading }: { guide?: ChampionGuideRespons
       {runeRow ? (
         <div className="guide-rune-grid">
           <RuneTreePanel style={primary} selectedRuneIds={parsed.runeIds} runes={runes} />
-          <RuneTreePanel style={secondary} selectedRuneIds={parsed.runeIds} runes={runes} />
-          <div className="guide-stat-shards">
-            <span>Stat Shards</span>
-            <div>
-              {parsed.statPerks.length ? parsed.statPerks.map((perk) => <b key={perk}>{statPerkLabel(perk)}</b>) : <b>Not available</b>}
-            </div>
+          <div className="guide-rune-side">
+            <RuneTreePanel style={secondary} selectedRuneIds={parsed.runeIds} runes={runes} />
+            <StatShardGrid selectedIds={parsed.statPerks} className="guide-stat-shards" />
           </div>
         </div>
       ) : <EmptyState message="Rune pages will appear once this champion has enough collected games." />}
@@ -656,19 +654,6 @@ function guideTierClassName(tier: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
-}
-
-function statPerkLabel(id: number) {
-  const labels: Record<number, string> = {
-    5001: 'Health',
-    5005: 'Attack Speed',
-    5007: 'Ability Haste',
-    5008: 'Adaptive',
-    5010: 'Move Speed',
-    5011: 'Health',
-    5013: 'Tenacity',
-  };
-  return labels[id] ?? String(id);
 }
 
 function skillSlots(signature: string) {

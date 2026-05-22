@@ -15,6 +15,7 @@ import {
   summonerSpellImageUrl,
   summonerSpellName,
 } from '../../lib/staticData';
+import { StatShardIconStrip } from '../ui/StatShardDisplay';
 import {
   BUILD_BASELINE_MIN_GAMES,
   BUILD_MATCHUP_MIN_GAMES,
@@ -407,6 +408,7 @@ function BuildAdviceSetupStrip({
             const src = runeImageUrl(runes, runeId);
             return src ? <img key={runeId} src={src} alt={runeName(runes, runeId)} title={runeName(runes, runeId)} /> : null;
           })}
+          <StatShardIconStrip selectedIds={parsedRunes.statPerks} />
         </div>
         {runeRow ? <em>{runeRow.winRate.toFixed(1)}% WR · {runeRow.games} games</em> : null}
       </div>

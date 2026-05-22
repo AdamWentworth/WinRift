@@ -129,6 +129,41 @@ export function runeStyleName(runes: RuneData | undefined, styleId: number | und
   return runeStyleById(runes, styleId)?.name ?? (styleId ? String(styleId) : 'Unknown');
 }
 
+export const STAT_PERK_ROWS = [
+  { key: 'offense', label: 'Offense', options: [5005, 5008, 5007] },
+  { key: 'flex', label: 'Flex', options: [5008, 5010, 5001] },
+  { key: 'defense', label: 'Defense', options: [5011, 5013, 5001] },
+] as const;
+
+export function statPerkLabel(id: number | undefined) {
+  if (!id) return 'Unknown';
+  const labels: Record<number, string> = {
+    5001: 'Scaling Health',
+    5005: 'Attack Speed',
+    5007: 'Ability Haste',
+    5008: 'Adaptive Force',
+    5010: 'Move Speed',
+    5011: 'Health',
+    5013: 'Tenacity',
+  };
+  return labels[id] ?? String(id);
+}
+
+export function statPerkImageUrl(id: number | undefined) {
+  if (!id) return '';
+  const files: Record<number, string> = {
+    5001: 'StatModsHealthScalingIcon.png',
+    5005: 'StatModsAttackSpeedIcon.png',
+    5007: 'StatModsCDRScalingIcon.png',
+    5008: 'StatModsAdaptiveForceIcon.png',
+    5010: 'StatModsMovementSpeedIcon.png',
+    5011: 'StatModsHealthPlusIcon.png',
+    5013: 'StatModsTenacityIcon.png',
+  };
+  const file = files[id];
+  return file ? `https://ddragon.leagueoflegends.com/cdn/img/perk-images/StatMods/${file}` : '';
+}
+
 function splitNumbers(value?: string) {
   if (!value) return [];
   return value
