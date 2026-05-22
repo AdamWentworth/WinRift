@@ -150,20 +150,14 @@ export function SummonerProfilePage({
   if (liveQuery.data && !liveViewDismissed) {
     return (
       <section className="profile-live-shell live-panel has-game">
-        <div className="profile-live-toolbar" aria-label="Live profile context">
-          <div className="profile-live-status">
-            <span>Live Match</span>
-            <strong>{exactRiotId}</strong>
-            <em>Currently in game</em>
-          </div>
-          <button type="button" onClick={() => setLiveViewDismissed(true)}>
-            View Profile
-          </button>
-        </div>
         <LiveMatchups
           liveGame={liveQuery.data}
           champions={champions}
           items={items}
+          profileAction={{
+            label: 'View Profile',
+            onClick: () => setLiveViewDismissed(true),
+          }}
           spells={spells}
           runes={runes}
         />

@@ -5,6 +5,7 @@ export function MatchHeader({
   liveGame,
   now,
   patch,
+  profileAction,
   searchedParticipant,
   yourSide,
   blueTeam,
@@ -13,6 +14,10 @@ export function MatchHeader({
   liveGame: LiveGame;
   now: number;
   patch?: string;
+  profileAction?: {
+    label: string;
+    onClick: () => void;
+  };
   searchedParticipant?: LiveParticipant;
   yourSide: TeamSide;
   blueTeam: LiveParticipant[];
@@ -26,6 +31,11 @@ export function MatchHeader({
       <div className="match-header-main">
         <div className="match-kicker">{queueLabel(liveGame.gameQueueConfigId)} · {liveGame.platform}</div>
         <h2>{searchedName}</h2>
+        {profileAction ? (
+          <button className="match-header-action" onClick={profileAction.onClick} type="button">
+            {profileAction.label}
+          </button>
+        ) : null}
         <div className="match-subline">
           <span>{liveGame.gameMode}</span>
           <span>{yourSide === 'blue' ? 'Blue side' : 'Red side'}</span>

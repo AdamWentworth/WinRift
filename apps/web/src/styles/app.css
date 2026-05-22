@@ -1240,79 +1240,8 @@ button {
 .profile-live-shell {
   min-height: calc(100vh - 77px);
   overflow: hidden;
-  padding: 10px 12px 24px;
   position: relative;
   z-index: 2;
-}
-
-.profile-live-toolbar {
-  align-items: center;
-  background:
-    radial-gradient(ellipse at 0 0, rgb(130 215 255 / 16%), transparent 48%),
-    linear-gradient(90deg, rgb(10 14 16 / 94%), rgb(16 24 27 / 88%));
-  border: 1px solid rgb(130 215 255 / 24%);
-  box-shadow: 0 12px 38px rgb(0 0 0 / 34%);
-  color: #d7edf2;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  margin: 0 auto 8px;
-  max-width: 1500px;
-  min-width: 0;
-  padding: 8px 10px;
-  position: relative;
-  z-index: 20;
-}
-
-.profile-live-status {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  min-width: 0;
-}
-
-.profile-live-toolbar button {
-  background:
-    linear-gradient(180deg, rgb(140 236 255 / 18%), rgb(140 236 255 / 7%)),
-    rgb(0 0 0 / 34%);
-  border: 1px solid rgb(140 236 255 / 38%);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 1000;
-  min-height: 28px;
-  padding: 5px 9px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.profile-live-toolbar span,
-.profile-live-toolbar em {
-  color: #b9d4da;
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.profile-live-toolbar strong {
-  color: #fff;
-  font-size: 15px;
-  font-weight: 1000;
-  line-height: 1.05;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-live-toolbar em {
-  color: #8cecff;
-}
-
-.profile-live-shell .game-board {
-  min-height: calc(100vh - 153px);
-  padding-top: 0;
 }
 
 .global-art-stage {
@@ -2128,6 +2057,31 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.match-header-action {
+  background:
+    linear-gradient(180deg, rgb(var(--match-header-accent-rgb) / 17%), rgb(var(--match-header-accent-rgb) / 7%)),
+    rgb(0 0 0 / 28%);
+  border: 1px solid rgb(var(--match-header-accent-rgb) / 34%);
+  color: #fff;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 1000;
+  line-height: 1;
+  min-height: 26px;
+  padding: 6px 9px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.match-header-action:hover,
+.match-header-action:focus-visible {
+  background:
+    linear-gradient(180deg, rgb(var(--match-header-accent-rgb) / 26%), rgb(var(--match-header-accent-rgb) / 10%)),
+    rgb(0 0 0 / 35%);
+  border-color: rgb(var(--match-header-accent-rgb) / 54%);
+  outline: none;
 }
 
 .match-header.red-side h2 {

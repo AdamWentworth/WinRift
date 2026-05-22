@@ -27,11 +27,15 @@ type Props = {
   liveGame: LiveGame;
   champions?: ChampionData;
   items?: ItemData;
+  profileAction?: {
+    label: string;
+    onClick: () => void;
+  };
   spells?: SummonerSpellData;
   runes?: RuneData;
 };
 
-export function LiveMatchups({ liveGame, champions, items, spells, runes }: Props) {
+export function LiveMatchups({ liveGame, champions, items, profileAction, spells, runes }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [liveMode, setLiveMode] = useState<LiveMode>('match');
   const liveChampionIds = useMemo(() => uniqueChampionIds(liveGame.participants), [liveGame.participants]);
@@ -124,6 +128,7 @@ export function LiveMatchups({ liveGame, champions, items, spells, runes }: Prop
         now={now}
         patch={patchBucket}
         searchedParticipant={searchedParticipant}
+        profileAction={profileAction}
         yourSide={yourSide}
         blueTeam={blueTeam}
         redTeam={redTeam}
