@@ -330,7 +330,16 @@ func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, stati
 		log.Printf("item slot analytics scheduled refresh failed patch=%s queue=%d contexts=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(contexts), time.Since(startedAt).Round(time.Millisecond), err)
 		return
 	}
-	log.Printf("item slot analytics scheduled refresh complete patch=%s queue=%d contexts=%d duration=%s", patch, analytics.RankedSoloQueueID, len(contexts), time.Since(startedAt).Round(time.Millisecond))
+	loadoutContexts, err := startingLoadoutRefreshContexts(ctx, staticService)
+	if err != nil {
+		log.Printf("starting loadout analytics scheduled refresh skipped patch=%s err=%v", patch, err)
+		return
+	}
+	if err := repo.RefreshStartingLoadoutAnalytics(ctx, patch, analytics.RankedSoloQueueID, loadoutContexts); err != nil {
+		log.Printf("starting loadout analytics scheduled refresh failed patch=%s queue=%d contexts=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(loadoutContexts), time.Since(startedAt).Round(time.Millisecond), err)
+		return
+	}
+	log.Printf("item slot analytics scheduled refresh complete patch=%s queue=%d item_contexts=%d loadout_contexts=%d duration=%s", patch, analytics.RankedSoloQueueID, len(contexts), len(loadoutContexts), time.Since(startedAt).Round(time.Millisecond))
 }
 
 func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Service) ([]clickhouse.ItemSlotAnalyticsContext, error) {
@@ -362,6 +371,26 @@ func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Serv
 		{Key: "DEFAULT", ItemIDs: defaultItems, StartingItemIDs: defaultStartingItems},
 		{Key: "JUNGLE", ItemIDs: jungleItems, StartingItemIDs: jungleStartingItems},
 		{Key: "SUPPORT", ItemIDs: supportItems, StartingItemIDs: supportStartingItems},
+	}, nil
+}
+
+func startingLoadoutRefreshContexts(ctx context.Context, staticService *staticdata.Service) ([]clickhouse.StartingLoadoutAnalyticsContext, error) {
+	defaultCosts, err := staticService.OpeningItemCosts(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleCosts, err := staticService.OpeningItemCosts(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	supportCosts, err := staticService.OpeningItemCosts(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
+	return []clickhouse.StartingLoadoutAnalyticsContext{
+		{Key: "DEFAULT", OpeningItemCosts: defaultCosts},
+		{Key: "JUNGLE", OpeningItemCosts: jungleCosts},
+		{Key: "SUPPORT", OpeningItemCosts: supportCosts},
 	}, nil
 }
 

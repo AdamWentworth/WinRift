@@ -52,7 +52,15 @@ func main() {
 			err = contextErr
 			break
 		}
-		err = repo.RefreshItemSlotAnalytics(ctx, *patch, uint16(*queueID), contexts)
+		if err = repo.RefreshItemSlotAnalytics(ctx, *patch, uint16(*queueID), contexts); err != nil {
+			break
+		}
+		loadoutContexts, contextErr := startingLoadoutRefreshContexts(ctx, staticService)
+		if contextErr != nil {
+			err = contextErr
+			break
+		}
+		err = repo.RefreshStartingLoadoutAnalytics(ctx, *patch, uint16(*queueID), loadoutContexts)
 	case "champion-guides":
 		if *backfill {
 			if _, err = repo.BackfillParticipantPerformance(ctx, *patch, uint16(*queueID)); err != nil {
@@ -103,5 +111,25 @@ func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Serv
 		{Key: "DEFAULT", ItemIDs: defaultItems, StartingItemIDs: defaultStartingItems},
 		{Key: "JUNGLE", ItemIDs: jungleItems, StartingItemIDs: jungleStartingItems},
 		{Key: "SUPPORT", ItemIDs: supportItems, StartingItemIDs: supportStartingItems},
+	}, nil
+}
+
+func startingLoadoutRefreshContexts(ctx context.Context, staticService *staticdata.Service) ([]clickhouse.StartingLoadoutAnalyticsContext, error) {
+	defaultCosts, err := staticService.OpeningItemCosts(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleCosts, err := staticService.OpeningItemCosts(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	supportCosts, err := staticService.OpeningItemCosts(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
+	return []clickhouse.StartingLoadoutAnalyticsContext{
+		{Key: "DEFAULT", OpeningItemCosts: defaultCosts},
+		{Key: "JUNGLE", OpeningItemCosts: jungleCosts},
+		{Key: "SUPPORT", OpeningItemCosts: supportCosts},
 	}, nil
 }

@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"time"
 )
@@ -23,6 +24,45 @@ type SummonerAccountSnapshot struct {
 	SummonerLevel uint64
 	FetchedAt     time.Time
 	ExpiresAt     time.Time
+}
+
+func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey string) ([]byte, bool, error) {
+	cacheKey = strings.TrimSpace(cacheKey)
+	if cacheKey == "" {
+		return nil, false, nil
+	}
+	var payload string
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT payload_json
+		FROM champion_page_bundle_cache FINAL
+		WHERE cache_key = ? AND expires_at > now()
+		ORDER BY compiled_at DESC
+		LIMIT 1`,
+		cacheKey,
+	).Scan(&payload)
+	if err == sql.ErrNoRows {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return []byte(payload), true, nil
+}
+
+func (r *Repository) StoreChampionPageBundle(ctx context.Context, cacheKey string, body []byte, ttl time.Duration) error {
+	cacheKey = strings.TrimSpace(cacheKey)
+	if cacheKey == "" || len(body) == 0 || ttl <= 0 {
+		return nil
+	}
+	_, err := r.db.ExecContext(
+		ctx,
+		`INSERT INTO champion_page_bundle_cache (cache_key, payload_json, expires_at, compiled_at) VALUES (?, ?, ?, now())`,
+		cacheKey,
+		string(body),
+		time.Now().Add(ttl),
+	)
+	return err
 }
 
 func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
@@ -108,6 +148,17 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		)
 		ENGINE = ReplacingMergeTree(compiled_at)
 		ORDER BY (platform, queue_id, puuid, champion_id, role)
+	`, `
+		CREATE TABLE IF NOT EXISTS champion_page_bundle_cache
+		(
+			cache_key String,
+			payload_json String,
+			expires_at DateTime,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY cache_key
+		TTL expires_at DELETE
 	`, `
 		CREATE TABLE IF NOT EXISTS riot_request_events
 		(
@@ -362,6 +413,35 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 			rank_bucket,
 			item_slot,
 			item_id
+		)
+	`, `
+		CREATE TABLE IF NOT EXISTS starting_loadout_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			item_context LowCardinality(String),
+			champion_id UInt16,
+			role LowCardinality(String),
+			opponent_champion_id UInt16,
+			rank_bucket LowCardinality(String),
+			item_signature String,
+			wins UInt64,
+			games UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_signature
 		)
 	`}
 	for _, statement := range statements {

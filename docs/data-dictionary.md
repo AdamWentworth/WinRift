@@ -47,6 +47,10 @@ Role-aware read model for summoner champion comfort.
 
 One row per platform, queue, PUUID, champion, and role. It stores the same counters as `summoner_champion_summary`, but keeps top, jungle, mid, bot, and support samples separate. The profile Champion Stats tab uses this when a role filter is selected, so a player's Wukong jungle games do not get blended into Wukong top or mid.
 
+## `champion_page_bundle_cache`
+
+Short-lived persisted JSON cache for exact champion-page API requests. The API also keeps these payloads in memory, but this table lets warmed pages remain fast across API restarts until the cache expiry.
+
 ## `patch_snapshots`
 
 One row per patch/platform/queue lifecycle state. Tracks whether a patch is collecting, compiling, or closed, plus match counts, participant counts, compile timestamp, and raw retention date.
@@ -63,7 +67,7 @@ Compact closed-patch item timing metrics for first, second, and third non-trinke
 
 Current read model for live build matchup cards. One row per patch, item context, champion, role, opponent champion, rank bucket, item slot, and item id.
 
-`item_slot = 0` is reserved for starting items bought in the opening two minutes. Slots `1-6` are completed build items in timeline purchase order.
+`item_slot = 0` is the older single-item starting fallback. Slots `1-6` are completed build items in timeline purchase order.
 
 `item_context` is one of:
 
@@ -71,11 +75,17 @@ Current read model for live build matchup cards. One row per patch, item context
 - `JUNGLE`: lane build items plus jungle items.
 - `SUPPORT`: lane build items plus support items.
 
-The live API reads this table first. If it is empty, the API can fall back to the older timeline scan, but normal operation should refresh this table and serve item cards from compact aggregate rows.
+The live API reads this table first for completed-item panels. If it is empty, the API can fall back to the older timeline scan, but normal operation should refresh this table and serve item cards from compact aggregate rows.
+
+## `starting_loadout_analytics`
+
+Current read model for legal fountain-opener bundles. One row per patch, item context, champion, role, opponent champion, rank bucket, and sorted item signature.
+
+This table uses the first opening shop burst plus a starting-gold cap, so it can preserve legal potion/control-ward bundles while filtering out early recall purchases such as Doran plus Long Sword. Champion guide and live build panels read this table before falling back to a retained timeline scan.
 
 Refresh options:
 
-- Worker: `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true` with `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10` refreshes the current patch automatically.
+- Worker: `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true` with `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10` refreshes the current patch item-slot and starting-loadout read models automatically.
 - Local/dev API: `POST /api/dev/analytics/item-slots/refresh`
 - CLI: `patchctl -action item-slots -patch 16.10 -queue 420`
 

@@ -122,6 +122,17 @@ CREATE TABLE IF NOT EXISTS winrift.summoner_champion_role_summary
 ENGINE = ReplacingMergeTree(compiled_at)
 ORDER BY (platform, queue_id, puuid, champion_id, role);
 
+CREATE TABLE IF NOT EXISTS winrift.champion_page_bundle_cache
+(
+    cache_key String,
+    payload_json String,
+    expires_at DateTime,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY cache_key
+TTL expires_at DELETE;
+
 CREATE TABLE IF NOT EXISTS winrift.riot_request_events
 (
     route LowCardinality(String),
@@ -312,6 +323,35 @@ ORDER BY
     rank_bucket,
     item_slot,
     item_id
+);
+
+CREATE TABLE IF NOT EXISTS winrift.starting_loadout_analytics
+(
+    patch LowCardinality(String),
+    platform LowCardinality(String),
+    queue_id UInt16,
+    item_context LowCardinality(String),
+    champion_id UInt16,
+    role LowCardinality(String),
+    opponent_champion_id UInt16,
+    rank_bucket LowCardinality(String),
+    item_signature String,
+    wins UInt64,
+    games UInt64,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY
+(
+    patch,
+    platform,
+    queue_id,
+    item_context,
+    champion_id,
+    role,
+    opponent_champion_id,
+    rank_bucket,
+    item_signature
 );
 
 CREATE TABLE IF NOT EXISTS winrift.patch_power_curve_metrics

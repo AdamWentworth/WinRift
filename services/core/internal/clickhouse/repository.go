@@ -70,6 +70,11 @@ type ItemSlotAnalyticsContext struct {
 	StartingItemIDs []uint32
 }
 
+type StartingLoadoutAnalyticsContext struct {
+	Key              string
+	OpeningItemCosts map[uint32]uint32
+}
+
 const startingItemWindowMS uint32 = 120000
 const openingPurchaseFirstWindowMS uint32 = 45000
 const openingPurchaseBurstWindowMS uint32 = 20000
@@ -142,8 +147,8 @@ func NewRepository(cfg config.Config) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(5)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(time.Hour)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -393,7 +398,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 	return r.queryItemSlotsLiveScan(ctx, filters, completionItemIDs, startingItemIDs, minGames, limit)
 }
 
-func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[string]string, openingItemCosts map[uint32]uint32, minGames, limit int) ([]StartingItemLoadoutRow, error) {
+func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[string]string, itemContext string, openingItemCosts map[uint32]uint32, minGames, limit int) ([]StartingItemLoadoutRow, error) {
 	if len(openingItemCosts) == 0 {
 		return nil, nil
 	}
@@ -403,6 +408,25 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 	if limit <= 0 {
 		limit = 6
 	}
+	itemContext = normalizedItemContext(itemContext)
+	rows, err := r.queryStartingItemLoadoutsSummary(ctx, filters, itemContext, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) > 0 {
+		return rows, nil
+	}
+	hasSummary, err := r.StartingLoadoutAnalyticsHasData(ctx, itemContext, filters["patch"])
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryStartingItemLoadoutsLiveScan(ctx, filters, openingItemCosts, minGames, limit)
+}
+
+func (r *Repository) queryStartingItemLoadoutsLiveScan(ctx context.Context, filters map[string]string, openingItemCosts map[uint32]uint32, minGames, limit int) ([]StartingItemLoadoutRow, error) {
 	openingItemIDs := uint32MapKeysSorted(openingItemCosts)
 	itemList := uint32ListSQL(openingItemIDs)
 	itemCostExpr := itemCostExpressionSQL("tie.item_id", openingItemCosts)
@@ -536,6 +560,73 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 		ORDER BY win_rate DESC, games DESC`
 	queryArgs = append(queryArgs, minGames)
 	return r.scanStartingItemLoadoutRows(ctx, query, queryArgs, limit)
+}
+
+func (r *Repository) queryStartingItemLoadoutsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]StartingItemLoadoutRow, error) {
+	patchBucketExpr := "'ALL'"
+	rankBucketExpr := "'ALL'"
+	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
+	if filters["patch"] != "" {
+		patchBucketExpr = "patch"
+	}
+	if filters["rank_bucket"] != "" {
+		rankBucketExpr = "rank_bucket"
+	}
+	roleScope := analyticsRoleScope(filters["role"])
+	query := fmt.Sprintf(`
+		SELECT
+			champion_id,
+			%s AS role_bucket,
+			%s AS opponent_champion_id,
+			%s AS patch_bucket,
+			%s AS rank_bucket,
+			item_signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM starting_loadout_analytics FINAL
+		WHERE item_context = ?
+			AND item_signature != ''`, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+	args := []any{itemContext}
+	if filters["champion_id"] != "" {
+		query += " AND champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filters["opponent_champion_id"] != "" {
+		query += " AND opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		query += " AND patch = ?"
+		args = append(args, filters["patch"])
+	}
+	if filters["rank_bucket"] != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filters["rank_bucket"])
+	}
+	query += `
+		GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, item_signature
+		HAVING games >= ?
+		ORDER BY win_rate DESC, games DESC`
+	args = append(args, minGames)
+	return r.scanStartingItemLoadoutRows(ctx, query, args, limit)
+}
+
+func (r *Repository) StartingLoadoutAnalyticsHasData(ctx context.Context, itemContext, patch string) (bool, error) {
+	query := "SELECT count() FROM starting_loadout_analytics WHERE item_context = ?"
+	args := []any{normalizedItemContext(itemContext)}
+	if strings.TrimSpace(patch) != "" {
+		query += " AND patch = ?"
+		args = append(args, patch)
+	}
+	query += " LIMIT 1"
+	var count uint64
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count > 0, err
 }
 
 func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]ItemSlotRow, error) {
@@ -1070,6 +1161,150 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 	return nil
 }
 
+func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch string, queueID uint16, contexts []StartingLoadoutAnalyticsContext) error {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		return fmt.Errorf("patch is required")
+	}
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	for _, context := range contexts {
+		key := normalizedItemContext(context.Key)
+		if len(context.OpeningItemCosts) == 0 {
+			continue
+		}
+		if _, err := r.db.ExecContext(
+			ctx,
+			`ALTER TABLE starting_loadout_analytics DELETE WHERE patch = ? AND queue_id = ? AND item_context = ? SETTINGS mutations_sync = 2`,
+			patch,
+			queueID,
+			key,
+		); err != nil {
+			return err
+		}
+		openingItemIDs := uint32MapKeysSorted(context.OpeningItemCosts)
+		itemList := uint32ListSQL(openingItemIDs)
+		itemCostExpr := itemCostExpressionSQL("tie.item_id", context.OpeningItemCosts)
+		_, err := r.db.ExecContext(
+			ctx,
+			fmt.Sprintf(`
+				INSERT INTO starting_loadout_analytics
+				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games)
+				WITH raw_opening_item_events AS
+				(
+					SELECT
+						pm.match_id AS match_id,
+						pm.participant_id AS participant_id,
+						pm.patch AS patch,
+						pm.queue_id AS queue_id,
+						pm.champion_id AS champion_id,
+						pm.role AS role,
+						pm.opponent_champion_id AS opponent_champion_id,
+						multiIf(
+							s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+							pm.rank_bucket
+						) AS rank_bucket,
+						pm.win AS win,
+						tie.timestamp_ms AS timestamp_ms,
+						tie.item_id AS item_id,
+						%s AS item_cost
+					FROM participant_matchups AS pm FINAL
+					INNER JOIN timeline_item_events AS tie FINAL
+						ON pm.match_id = tie.match_id
+						AND pm.participant_id = tie.participant_id
+					LEFT JOIN
+					(
+						SELECT
+							platform,
+							puuid,
+							argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+						FROM summoner_rank_snapshots FINAL
+						WHERE queue_type = 'RANKED_SOLO_5x5'
+						GROUP BY platform, puuid
+					) AS s
+						ON s.platform = pm.platform AND s.puuid = pm.puuid
+					WHERE pm.patch = ?
+						AND pm.queue_id = ?
+						AND tie.event_type = 'ITEM_PURCHASED'
+						AND tie.timestamp_ms <= ?
+						AND tie.item_id IN (%s)
+				),
+				first_opening_purchases AS
+				(
+					SELECT
+						match_id,
+						participant_id,
+						min(timestamp_ms) AS first_purchase_ms
+					FROM raw_opening_item_events
+					GROUP BY match_id, participant_id
+				),
+				opening_purchases AS
+				(
+					SELECT
+						e.match_id AS match_id,
+						e.participant_id AS participant_id,
+						e.patch AS patch,
+						e.queue_id AS queue_id,
+						e.champion_id AS champion_id,
+						e.role AS role,
+						e.opponent_champion_id AS opponent_champion_id,
+						e.rank_bucket AS rank_bucket,
+						e.win AS win,
+						arraySort(groupArray(toUInt32(e.item_id))) AS item_ids,
+						sum(toUInt32(e.item_cost)) AS item_gold
+					FROM raw_opening_item_events AS e
+					INNER JOIN first_opening_purchases AS f
+						ON e.match_id = f.match_id
+						AND e.participant_id = f.participant_id
+					WHERE e.timestamp_ms <= f.first_purchase_ms + ?
+					GROUP BY
+						e.match_id,
+						e.participant_id,
+						e.patch,
+						e.queue_id,
+						e.champion_id,
+						e.role,
+						e.opponent_champion_id,
+						e.rank_bucket,
+						e.win
+					HAVING length(item_ids) > 0 AND item_gold <= ?
+				)
+				SELECT
+					patch,
+					'ALL' AS platform,
+					queue_id,
+					? AS item_context,
+					champion_id,
+					role,
+					opponent_champion_id,
+					rank_bucket,
+					arrayStringConcat(arrayMap(item -> toString(item), item_ids), '-') AS item_signature,
+					toUInt64(sum(win)) AS wins,
+					toUInt64(count()) AS games
+				FROM opening_purchases
+				GROUP BY
+					patch,
+					queue_id,
+					champion_id,
+					role,
+					opponent_champion_id,
+					rank_bucket,
+					item_signature`, itemCostExpr, itemList),
+			patch,
+			queueID,
+			openingPurchaseFirstWindowMS,
+			openingPurchaseBurstWindowMS,
+			openingPurchaseGoldCap,
+			key,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *Repository) MarkPatchCollecting(ctx context.Context, patch, platform string, queueID uint16) error {
 	_, err := r.db.ExecContext(
 		ctx,
@@ -1118,6 +1353,7 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 		`ALTER TABLE timeline_combat_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE starting_loadout_analytics DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 	}
 	for _, statement := range statements {
 		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
@@ -1170,6 +1406,7 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch FROM patch_build_metrics
 			UNION ALL SELECT patch FROM patch_item_timing_metrics
 			UNION ALL SELECT patch FROM item_slot_analytics
+			UNION ALL SELECT patch FROM starting_loadout_analytics
 			UNION ALL SELECT patch FROM champion_skill_analytics
 			UNION ALL SELECT patch FROM champion_ban_analytics
 			UNION ALL SELECT patch FROM champion_build_variant_analytics
@@ -1218,6 +1455,7 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "patch_build_metrics", column: "patch"},
 		{table: "patch_item_timing_metrics", column: "patch"},
 		{table: "item_slot_analytics", column: "patch"},
+		{table: "starting_loadout_analytics", column: "patch"},
 		{table: "champion_skill_analytics", column: "patch"},
 		{table: "champion_ban_analytics", column: "patch"},
 		{table: "champion_build_variant_analytics", column: "patch"},

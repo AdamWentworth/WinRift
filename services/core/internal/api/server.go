@@ -330,35 +330,61 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		writeJSONBytes(w, http.StatusOK, body, true)
 		return
 	}
-	guideFilters := map[string]string{
-		"champion_id": strconv.Itoa(int(buildRequest.ChampionID)),
-		"role":        buildRequest.Role,
-		"patch":       buildRequest.Patch,
-		"rank_bucket": buildRequest.RankBucket,
+	if body, ok, err := s.repo.CachedChampionPageBundle(r.Context(), cacheKey); err != nil {
+		log.Printf("champion page persistent cache lookup failed key=%s err=%v", cacheKey, err)
+	} else if ok {
+		s.responseCache.set(cacheKey, body, analyticsResponseCacheTTL)
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
 	}
 	indexFilters := map[string]string{
 		"role":        buildRequest.Role,
 		"patch":       buildRequest.Patch,
 		"rank_bucket": buildRequest.RankBucket,
 	}
-	guide, err := s.repo.QueryChampionGuide(r.Context(), guideFilters, guideMinGames, guideLimit)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+	queryCtx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	var (
+		buildAdvice map[string]any
+		guide       clickhouse.ChampionGuideData
+		index       clickhouse.ChampionGuideIndex
+		roleRates   []clickhouse.ChampionRoleRate
+		wg          sync.WaitGroup
+		mu          sync.Mutex
+		firstErr    error
+	)
+	run := func(fn func(context.Context) error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(queryCtx); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+					cancel()
+				}
+				mu.Unlock()
+			}
+		}()
 	}
-	buildAdvice, err := s.buildAdviceResponse(r.Context(), buildRequest)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	index, err := s.repo.QueryChampionGuideIndex(r.Context(), indexFilters, indexMinGames, indexLimit)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	roleRates, err := s.repo.ChampionRoleRates(r.Context(), []uint16{buildRequest.ChampionID}, queueID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+	run(func(ctx context.Context) error {
+		var err error
+		buildAdvice, guide, err = s.buildAdviceResponseWithGuide(ctx, buildRequest, guideMinGames, guideLimit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		index, err = s.repo.QueryChampionGuideIndex(ctx, indexFilters, indexMinGames, indexLimit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		roleRates, err = s.repo.ChampionRoleRates(ctx, []uint16{buildRequest.ChampionID}, queueID)
+		return err
+	})
+	wg.Wait()
+	if firstErr != nil {
+		writeError(w, http.StatusInternalServerError, firstErr.Error())
 		return
 	}
 	response := map[string]any{
@@ -379,7 +405,7 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		},
 		"roleRates": championRoleRatesResponse(roleRates),
 	}
-	s.writeCachedJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+	s.writeCachedChampionPageJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
 }
 
 type buildAdviceRequest struct {
@@ -426,6 +452,11 @@ func parseBuildAdviceRequest(query url.Values) (buildAdviceRequest, string) {
 }
 
 func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequest) (map[string]any, error) {
+	response, _, err := s.buildAdviceResponseWithGuide(ctx, request, request.ChampionMinGames, 8)
+	return response, err
+}
+
+func (s Server) buildAdviceResponseWithGuide(ctx context.Context, request buildAdviceRequest, guideMinGames, guideLimit int) (map[string]any, clickhouse.ChampionGuideData, error) {
 	matchupRequest := itemSlotAnalyticsRequest{
 		Key:                      "matchup",
 		ChampionID:               request.ChampionID,
@@ -439,6 +470,12 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 		Fallback:                 true,
 		SuppressChampionFallback: true,
 	}
+	if guideMinGames <= 0 {
+		guideMinGames = request.ChampionMinGames
+	}
+	if guideLimit <= 0 {
+		guideLimit = 8
+	}
 	championRequest := matchupRequest
 	championRequest.Key = "champion"
 	championRequest.OpponentChampionID = 0
@@ -449,16 +486,16 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 	if request.OpponentChampionID > 0 {
 		matchupSlots, err = s.queryScopedItemSlots(ctx, matchupRequest)
 		if err != nil {
-			return nil, err
+			return nil, clickhouse.ChampionGuideData{}, err
 		}
 	}
 	championSlots, err := s.queryScopedItemSlots(ctx, championRequest)
 	if err != nil {
-		return nil, err
+		return nil, clickhouse.ChampionGuideData{}, err
 	}
 	openingItemCosts, err := s.openingItemCosts(ctx, request.ItemContext)
 	if err != nil {
-		return nil, err
+		return nil, clickhouse.ChampionGuideData{}, err
 	}
 	buildFilters := map[string]string{
 		"champion_id":          strconv.Itoa(int(request.ChampionID)),
@@ -473,26 +510,26 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 		buildFilters["opponent_champion_id"] = strconv.Itoa(int(request.OpponentChampionID))
 		matchupBuilds, err = s.repo.QueryBuilds(ctx, buildFilters, request.MinGames, 8)
 		if err != nil {
-			return nil, err
+			return nil, clickhouse.ChampionGuideData{}, err
 		}
-		matchupStartingLoadouts, err = s.repo.QueryStartingItemLoadouts(ctx, buildFilters, openingItemCosts, request.MinGames, request.OptionLimit)
+		matchupStartingLoadouts, err = s.repo.QueryStartingItemLoadouts(ctx, buildFilters, request.ItemContext, openingItemCosts, request.MinGames, request.OptionLimit)
 		if err != nil {
-			return nil, err
+			return nil, clickhouse.ChampionGuideData{}, err
 		}
 	}
 	championFilters := cloneStringMap(buildFilters)
 	championFilters["opponent_champion_id"] = ""
-	championStartingLoadouts, err := s.repo.QueryStartingItemLoadouts(ctx, championFilters, openingItemCosts, request.ChampionMinGames, request.OptionLimit)
+	championStartingLoadouts, err := s.repo.QueryStartingItemLoadouts(ctx, championFilters, request.ItemContext, openingItemCosts, request.ChampionMinGames, request.OptionLimit)
 	if err != nil {
-		return nil, err
+		return nil, clickhouse.ChampionGuideData{}, err
 	}
 	championBuilds, err := s.repo.QueryBuilds(ctx, championFilters, request.ChampionMinGames, 8)
 	if err != nil {
-		return nil, err
+		return nil, clickhouse.ChampionGuideData{}, err
 	}
-	guide, err := s.repo.QueryChampionGuide(ctx, championFilters, request.ChampionMinGames, 8)
+	guide, err := s.repo.QueryChampionGuide(ctx, championFilters, guideMinGames, guideLimit)
 	if err != nil {
-		return nil, err
+		return nil, clickhouse.ChampionGuideData{}, err
 	}
 	notes := buildAdviceNotes(request.OpponentChampionID > 0, matchupSlots, championSlots)
 	return map[string]any{
@@ -533,7 +570,7 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 			"champion": buildAdviceItemSlotDiagnostics(championSlots),
 		},
 		"notes": notes,
-	}, nil
+	}, guide, nil
 }
 
 func (s Server) analyticsChampionGuideIndex(w http.ResponseWriter, r *http.Request) {
@@ -1589,6 +1626,11 @@ func (s Server) refreshItemSlotAnalytics(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	loadoutContexts, err := s.startingLoadoutRefreshContexts(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	refreshed := []string{}
 	for _, patch := range patches {
 		patch = strings.TrimSpace(patch)
@@ -1600,13 +1642,19 @@ func (s Server) refreshItemSlotAnalytics(w http.ResponseWriter, r *http.Request)
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		log.Printf("starting loadout analytics refresh start patch=%s queue=%d contexts=%d", patch, queueID, len(loadoutContexts))
+		if err := s.repo.RefreshStartingLoadoutAnalytics(r.Context(), patch, queueID, loadoutContexts); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 		refreshed = append(refreshed, patch)
-		log.Printf("item slot analytics refresh complete patch=%s queue=%d contexts=%d", patch, queueID, len(contexts))
+		log.Printf("item slot analytics refresh complete patch=%s queue=%d item_contexts=%d loadout_contexts=%d", patch, queueID, len(contexts), len(loadoutContexts))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"patches":  refreshed,
-		"queueId":  queueID,
-		"contexts": itemSlotRefreshContextKeys(contexts),
+		"patches":         refreshed,
+		"queueId":         queueID,
+		"contexts":        itemSlotRefreshContextKeys(contexts),
+		"loadoutContexts": startingLoadoutRefreshContextKeys(loadoutContexts),
 	})
 }
 
@@ -1749,7 +1797,35 @@ func (s Server) itemSlotRefreshContexts(ctx context.Context) ([]clickhouse.ItemS
 	}, nil
 }
 
+func (s Server) startingLoadoutRefreshContexts(ctx context.Context) ([]clickhouse.StartingLoadoutAnalyticsContext, error) {
+	defaultCosts, err := s.static.OpeningItemCosts(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleCosts, err := s.static.OpeningItemCosts(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	supportCosts, err := s.static.OpeningItemCosts(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
+	return []clickhouse.StartingLoadoutAnalyticsContext{
+		{Key: "DEFAULT", OpeningItemCosts: defaultCosts},
+		{Key: "JUNGLE", OpeningItemCosts: jungleCosts},
+		{Key: "SUPPORT", OpeningItemCosts: supportCosts},
+	}, nil
+}
+
 func itemSlotRefreshContextKeys(contexts []clickhouse.ItemSlotAnalyticsContext) []string {
+	keys := make([]string, 0, len(contexts))
+	for _, context := range contexts {
+		keys = append(keys, context.Key)
+	}
+	return keys
+}
+
+func startingLoadoutRefreshContextKeys(contexts []clickhouse.StartingLoadoutAnalyticsContext) []string {
 	keys := make([]string, 0, len(contexts))
 	for _, context := range contexts {
 		keys = append(keys, context.Key)
@@ -2445,6 +2521,21 @@ func (s Server) writeCachedJSON(w http.ResponseWriter, status int, cacheKey stri
 	}
 	if status >= 200 && status < 300 {
 		s.responseCache.set(cacheKey, body, ttl)
+	}
+	writeJSONBytes(w, status, body, false)
+}
+
+func (s Server) writeCachedChampionPageJSON(w http.ResponseWriter, status int, cacheKey string, ttl time.Duration, value any) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "encode response")
+		return
+	}
+	if status >= 200 && status < 300 {
+		s.responseCache.set(cacheKey, body, ttl)
+		if err := s.repo.StoreChampionPageBundle(context.Background(), cacheKey, body, ttl); err != nil {
+			log.Printf("champion page persistent cache store failed key=%s err=%v", cacheKey, err)
+		}
 	}
 	writeJSONBytes(w, status, body, false)
 }

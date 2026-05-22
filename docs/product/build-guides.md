@@ -17,8 +17,8 @@ The current version can show:
 - toughest and favorable opponent matchups from stored participant matchup rows
 - complete item-path summaries from `core3_signature` and `final_items_signature` as backend/debug data, not as a separate primary champion-page panel
 - precomputed alternative build variants grouped by meaningful early core items, with player-facing labels such as AP, On Hit, Tank, Crit, Lethality, AD Bruiser, Enchanter, and Support Tank
-- starting-item and completed-item slot panels from the precomputed `item_slot_analytics` read model
-- opening purchase bundles from retained timeline events, so the starting-items panel can show combinations like Doran's Ring plus two potions instead of only the main starter item
+- completed-item slot panels from the precomputed `item_slot_analytics` read model
+- opening purchase bundles from the precomputed `starting_loadout_analytics` read model, so the starting-items panel can show legal combinations like Doran's Ring plus two potions instead of only the main starter item
 
 Backend contracts:
 
@@ -34,7 +34,9 @@ Read models:
 - `champion_build_variant_analytics`: precomputed champion-guide alternative build tabs, representative runes/spells/items, and build-specific skill orders where the sample floor is met.
 - `champion_skill_analytics`: champion/role skill order rows.
 - `champion_ban_analytics`: sample-relative ban-rate rows.
-- `item_slot_analytics`: starting-item and completed-item slot rows used by guide and live build panels.
+- `item_slot_analytics`: completed-item slot rows plus a single-starting-item fallback used by guide and live build panels.
+- `starting_loadout_analytics`: legal fountain-opener bundles used by the starting-items panel before falling back to retained timeline scans.
+- `champion_page_bundle_cache`: short-lived persisted JSON bundles for exact champion-page requests. The API still keeps an in-memory cache, but this table lets warmed pages survive API restarts and keeps repeated page loads close to instant.
 
 Build variant labeling:
 
