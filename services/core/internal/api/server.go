@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"winrift/services/core/internal/analytics"
@@ -21,14 +22,16 @@ import (
 
 const defaultItemSlotMinGames = 5
 const summonerAccountSnapshotTTL = 7 * 24 * time.Hour
+const analyticsResponseCacheTTL = 10 * time.Minute
 
 type Server struct {
-	cfg       config.Config
-	riot      *riot.Client
-	repo      *clickhouse.Repository
-	static    *staticdata.Service
-	collector collector.Collector
-	winConds  winconditions.Analyzer
+	cfg           config.Config
+	riot          *riot.Client
+	repo          *clickhouse.Repository
+	static        *staticdata.Service
+	collector     collector.Collector
+	winConds      winconditions.Analyzer
+	responseCache *responseCache
 }
 
 func NewServer(cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, staticService *staticdata.Service) Server {
@@ -36,7 +39,7 @@ func NewServer(cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repo
 	if err != nil {
 		log.Printf("win condition catalog load failed err=%v", err)
 	}
-	return Server{cfg: cfg, riot: riotClient, repo: repo, static: staticService, collector: collector.New(riotClient, repo), winConds: winconditions.NewAnalyzer(catalog)}
+	return Server{cfg: cfg, riot: riotClient, repo: repo, static: staticService, collector: collector.New(riotClient, repo), winConds: winconditions.NewAnalyzer(catalog), responseCache: newResponseCache()}
 }
 
 func (s Server) Routes() http.Handler {
@@ -313,6 +316,11 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 		optionLimit = 12
 	}
 	itemContext := normalizedItemContext(strings.ToUpper(query.Get("itemContext")), role)
+	cacheKey := "build-advice:" + r.URL.RequestURI()
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
 	matchupRequest := itemSlotAnalyticsRequest{
 		Key:                      "matchup",
 		ChampionID:               championID,
@@ -374,7 +382,7 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	notes := buildAdviceNotes(opponentChampionID > 0, matchupSlots, championSlots)
-	writeJSON(w, http.StatusOK, map[string]any{
+	response := map[string]any{
 		"filters": map[string]any{
 			"championId":         championID,
 			"role":               role,
@@ -410,7 +418,8 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 			"champion": buildAdviceItemSlotDiagnostics(championSlots),
 		},
 		"notes": notes,
-	})
+	}
+	s.writeCachedJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
 }
 
 func (s Server) analyticsChampionGuideIndex(w http.ResponseWriter, r *http.Request) {
@@ -448,12 +457,17 @@ func (s Server) analyticsChampionGuide(w http.ResponseWriter, r *http.Request) {
 	}
 	minGames := queryInt(query.Get("minGames"), 5)
 	limit := queryInt(query.Get("limit"), 12)
+	cacheKey := "champion-guide:" + r.URL.RequestURI()
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
 	guide, err := s.repo.QueryChampionGuide(r.Context(), filters, minGames, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, championGuideResponse(guide))
+	s.writeCachedJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, championGuideResponse(guide))
 }
 
 func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
@@ -2231,6 +2245,73 @@ func liveRankSnapshotFromEntries(puuid, platform string, entries []riot.LeagueEn
 
 func writeError(w http.ResponseWriter, status int, detail string) {
 	writeJSON(w, status, map[string]string{"detail": detail})
+}
+
+type cachedAPIResponse struct {
+	body      []byte
+	expiresAt time.Time
+}
+
+type responseCache struct {
+	mu      sync.Mutex
+	entries map[string]cachedAPIResponse
+}
+
+func newResponseCache() *responseCache {
+	return &responseCache{entries: map[string]cachedAPIResponse{}}
+}
+
+func (c *responseCache) get(key string) ([]byte, bool) {
+	if c == nil || key == "" {
+		return nil, false
+	}
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.entries[key]
+	if !ok {
+		return nil, false
+	}
+	if now.After(entry.expiresAt) {
+		delete(c.entries, key)
+		return nil, false
+	}
+	return append([]byte(nil), entry.body...), true
+}
+
+func (c *responseCache) set(key string, body []byte, ttl time.Duration) {
+	if c == nil || key == "" || len(body) == 0 || ttl <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = cachedAPIResponse{
+		body:      append([]byte(nil), body...),
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
+func (s Server) writeCachedJSON(w http.ResponseWriter, status int, cacheKey string, ttl time.Duration, value any) {
+	body, err := json.Marshal(value)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "encode response")
+		return
+	}
+	if status >= 200 && status < 300 {
+		s.responseCache.set(cacheKey, body, ttl)
+	}
+	writeJSONBytes(w, status, body, false)
+}
+
+func writeJSONBytes(w http.ResponseWriter, status int, body []byte, cacheHit bool) {
+	w.Header().Set("Content-Type", "application/json")
+	if cacheHit {
+		w.Header().Set("X-WinRift-Cache", "hit")
+	} else {
+		w.Header().Set("X-WinRift-Cache", "miss")
+	}
+	w.WriteHeader(status)
+	_, _ = w.Write(append(body, '\n'))
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
