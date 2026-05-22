@@ -21,6 +21,7 @@ The current version can show:
 
 Backend contracts:
 
+- `GET /api/analytics/champion-page`: bundled champion guide payload for the frontend champion page. It combines the focused guide, build-advice data, role-rate hints, and guide index in one cached response so champion pages avoid a browser-side request waterfall.
 - `GET /api/analytics/build-advice`: unified build payload for one champion, optional opponent, role, patch, and rank scope. It returns matchup item slots, champion-wide baseline item slots, top build signatures, runes, spells, item paths for diagnostics, sample quality, and fallback notes in one response.
 - `GET /api/analytics/champion-guides`: index of champion summaries for the current role/patch/rank scope. This powers champion coverage and lets the UI expose every champion we have stored data for.
 - `GET /api/analytics/champion-guide`: focused champion guide payload for one champion and role.
@@ -54,7 +55,7 @@ Known gaps:
 - Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin. Slot `0` is reserved for starting items; slots `1-6` remain completed-item purchase order.
 - Live matchup slot panels should not mix champion-wide fallback rows into the matchup card. Exact-matchup scope can widen across stored patches, while champion-wide baseline stays in the separate overall card.
 - Displayed slot rows apply a small sanity pass for player readability, including suppressing duplicate boots. The underlying API still returns the candidate rows; the UI chooses a plausible one-boot display.
-- The build-advice endpoint is the preferred contract for future profile/live/champion build UI work. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.
+- The champion-page bundle is the preferred contract for the champion guide screen. The build-advice endpoint remains the focused contract for live matchup panels and specialty build surfaces. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.
 - Skill paths are real timeline-derived paths. Recommended builds use champion/role/rank/patch skill order, while alternative build tabs can show a build-family-specific skill order when retained timeline data exists. A build family currently needs at least 10 retained skill-path matches, or the higher requested guide `minGames` value, before its own skill order is shown. Below that floor, the UI falls back to the champion-level skill order.
 
 The build guide page should remain a reference surface. Live match mode can point users toward contextual matchup stats, while guide mode lets users explore champion-wide and matchup-specific patterns calmly before queueing.
