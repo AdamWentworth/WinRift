@@ -66,8 +66,6 @@ export function FocusedBuildPanel({
   const championItemSlots = buildAdvice?.champion.itemSlots ?? [];
   const matchupSample = buildAdviceSample(buildAdvice?.matchup.sample, matchupItemSlots);
   const championSample = buildAdviceSample(buildAdvice?.champion.sample, championItemSlots);
-  const matchupScopeLabel = buildScopeLabel(matchupItemSlots, buildAdvice?.matchup.sample.scopeLabels);
-  const championScopeLabel = buildScopeLabel(championItemSlots, buildAdvice?.champion.sample.scopeLabels);
   const matchupSummary = buildPathSummary(matchupItemSlots, items);
   const championSummary = buildPathSummary(championItemSlots, items);
   const matchupDelta = buildPathDelta(matchupSummary, championSummary);
@@ -124,37 +122,29 @@ export function FocusedBuildPanel({
       <div className="focused-build-results">
         <BuildResultCard
           title={matchupHasExactSlots ? `Best ${championName} build vs ${opponentChampionName}` : `${championName} baseline vs ${opponentChampionName}`}
-          description={matchupHasExactSlots
-            ? `Matchup-specific items for ${championName} into ${opponentChampionName}`
-            : `Exact ${opponentChampionName} samples are thin; showing ${championName}'s strongest baseline slot reads`}
           sample={matchupSample}
           summary={matchupSummary}
           comparison={matchupHasExactSlots ? matchupDelta : 'Baseline fallback'}
-          scopeLabel={matchupScopeLabel}
           notes={buildAdvice?.notes}
           side={selection.side}
           itemSlots={matchupItemSlots}
           buildPaths={buildPathDisplays(buildAdvice?.matchup.topBuilds)}
           loading={loading}
           items={items}
-          minGames={BUILD_MATCHUP_MIN_GAMES}
           emptyTitle="No matchup build yet"
           emptySubtitle={`Needs ${BUILD_MATCHUP_MIN_GAMES}+ stored games for this exact pairing`}
         />
         <BuildResultCard
           title={`Best overall ${championName} build`}
-          description={`Champion-wide baseline across all stored ${championName} matchups`}
           sample={championSample}
           summary={championSummary}
           comparison="Champion-wide reference"
-          scopeLabel={championScopeLabel}
           notes={undefined}
           side={selection.side}
           itemSlots={championItemSlots}
           buildPaths={buildPathDisplays(buildAdvice?.champion.topBuilds, buildAdvice?.champion.topItemPaths)}
           loading={loading}
           items={items}
-          minGames={BUILD_BASELINE_MIN_GAMES}
           emptyTitle="No champion build yet"
           emptySubtitle={`Needs ${BUILD_BASELINE_MIN_GAMES}+ stored games for this champion`}
         />
@@ -254,34 +244,28 @@ function BuildParticipantPicker({
 
 function BuildResultCard({
   title,
-  description,
   sample,
   summary,
   comparison,
-  scopeLabel,
   notes,
   side,
   itemSlots,
   buildPaths,
   loading,
   items,
-  minGames,
   emptyTitle,
   emptySubtitle,
 }: {
   title: string;
-  description: string;
   sample: { label: string; tone: string };
   summary?: BuildPathSummary;
   comparison?: string;
-  scopeLabel: string;
   notes?: string[];
   side: TeamSide;
   itemSlots: AnalyticsItemSlot[];
   buildPaths: BuildPathDisplay[];
   loading: boolean;
   items?: ItemData;
-  minGames: number;
   emptyTitle: string;
   emptySubtitle: string;
 }) {
@@ -291,32 +275,27 @@ function BuildResultCard({
       <header>
         <span>
           <strong>{title}</strong>
-          <em>{description}</em>
           {summary ? (
             <small className="build-result-summary">
-              {summary.weightedWinRate.toFixed(1)}% shown-item WR · {summary.totalGames} shown samples
+              {summary.weightedWinRate.toFixed(1)}% WR · {summary.totalGames} item samples
             </small>
           ) : null}
         </span>
         <div className="build-result-meta">
           {comparison ? <StatusChip as="b" className="build-delta" tone={comparison.includes('+') ? 'good' : comparison.includes('-') ? 'warn' : undefined}>{comparison}</StatusChip> : null}
           <StatusChip as="b" className="build-sample-chip" tone={sample.tone}>{sample.label}</StatusChip>
-          <StatusChip as="small" className="build-min-sample">{minGames}+ games/item</StatusChip>
-          {scopeLabel ? <StatusChip as="small" className="build-scope-label">{scopeLabel}</StatusChip> : null}
         </div>
       </header>
       {notes?.length ? (
         <div className="build-advice-notes">
-          {notes.slice(0, 2).map((note) => <span key={note}>{note}</span>)}
+          {notes.slice(0, 1).map((note) => <span key={note}>{compactBuildNote(note)}</span>)}
         </div>
       ) : null}
       <div className={`focused-build-result-body${showPathRows ? '' : ' slots-only'}`}>
         {showPathRows ? <BuildPathRows paths={buildPaths} items={items} loading={loading} /> : null}
         <div className="build-slot-signals">
-          {!showPathRows ? <span className="build-path-inline-note">No stable full item path yet. Slot signals are the best available read for this sample.</span> : null}
           <div className="build-slot-heading">
-            <span>Best item by completion slot</span>
-            <em>Independent slot signals, not a locked six-item script.</em>
+            <span>Item slot reads</span>
           </div>
           <BuildSide
             side={side}
@@ -330,6 +309,14 @@ function BuildResultCard({
       </div>
     </article>
   );
+}
+
+function compactBuildNote(note: string) {
+  if (note.includes('other stored patches')) return 'Some slots use exact-matchup data from older stored patches.';
+  if (note.includes('No current-patch matchup')) return 'No current-patch slot sample yet; using exact matchup history.';
+  if (note.includes('No exact matchup item slots')) return 'Exact matchup sample is too thin; baseline shown instead.';
+  if (note.includes('champion-wide fallback')) return 'Some slots fall back to champion-wide data.';
+  return note;
 }
 
 type BuildPathDisplay = {
@@ -496,7 +483,7 @@ function ItemSlotLine({ row, commonRow, items }: { row: AnalyticsItemSlot; commo
         <strong>{row.winRate.toFixed(1)}%</strong>
         <span>{row.games}g{row.games < 5 ? ' · thin' : ''}</span>
       </div>
-      {commonRow ? <small className="item-common-note">Most common: {commonRow.games}g</small> : null}
+      {commonRow ? <small className="item-common-note">Common {commonRow.games}g</small> : null}
     </div>
   );
 }
@@ -508,7 +495,6 @@ function MissingItemSlotLine({ slot }: { slot: number }) {
       <span className="item-slot-empty">--</span>
       <div className="item-slot-stats">
         <strong>--</strong>
-        <span>No sample</span>
       </div>
     </div>
   );
@@ -679,13 +665,6 @@ function buildSampleQuality(samples: number) {
   if (samples < 15) return { label: `${samples} samples · early`, tone: 'early' };
   if (samples < 50) return { label: `${samples} samples · useful`, tone: 'useful' };
   return { label: `${samples} samples · strong`, tone: 'strong' };
-}
-
-function buildScopeLabel(itemSlots: AnalyticsItemSlot[], scopeLabels?: string[]) {
-  const labels = scopeLabels?.length ? scopeLabels : [...new Set(itemSlots.map((row) => row.sampleScopeLabel).filter(Boolean))];
-  if (!labels.length) return '';
-  if (labels.length === 1) return labels[0] ?? '';
-  return 'Mixed fallback samples';
 }
 
 function ordinal(value: number) {

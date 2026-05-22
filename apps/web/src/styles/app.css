@@ -4122,17 +4122,6 @@ button {
   text-transform: uppercase;
 }
 
-.focused-build-result > header em {
-  color: #adbac1;
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 800;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .build-result-meta {
   align-items: center;
   display: flex !important;
@@ -4214,16 +4203,6 @@ button {
   color: #aeb8bf;
   font-size: 10px;
   font-weight: 800;
-}
-
-.build-path-inline-note {
-  background: rgb(130 215 255 / 7%);
-  border: 1px solid rgb(130 215 255 / 14%);
-  color: #b7c4cb;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
-  padding: 5px 7px;
 }
 
 .build-path-signals-title,
@@ -4323,19 +4302,8 @@ button {
 
 .build-slot-heading {
   align-items: center;
-  display: grid;
-  gap: 4px;
-  grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr);
+  display: flex;
   min-width: 0;
-}
-
-.build-slot-heading em {
-  color: #aeb8bf;
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 800;
-  line-height: 1.25;
-  text-align: right;
 }
 
 .build-delta {
@@ -4470,28 +4438,6 @@ button {
   font-size: 10px;
   font-style: normal;
   font-weight: 800;
-}
-
-.build-scope-label {
-  color: #9faeb5;
-  font-size: 9px;
-  font-weight: 900;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.build-min-sample {
-  color: #d1bb7a;
-  font-size: 8px;
-  font-weight: 900;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .build-sample-chip {

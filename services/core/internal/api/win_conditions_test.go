@@ -193,3 +193,15 @@ func TestBuildAdviceNotesCallOutAllPatchMatchupFallback(t *testing.T) {
 		t.Fatalf("notes = %+v; wanted exact-matchup broader-patch warning", notes)
 	}
 }
+
+func TestBuildAdviceNotesSummarizeMixedAllPatchFallback(t *testing.T) {
+	matchupSlots := []scopedItemSlotRow{
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 1, OpponentChampionID: 950, Games: 12}, Scope: itemSlotScope{Key: "exact_patch_matchup", Fallback: false}},
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 2, OpponentChampionID: 950, Games: 12}, Scope: itemSlotScope{Key: "all_patch_matchup", Fallback: true}},
+	}
+
+	notes := buildAdviceNotes(true, matchupSlots, []scopedItemSlotRow{{Row: clickhouse.ItemSlotRow{ItemSlot: 1, Games: 50}}})
+	if len(notes) == 0 || notes[0] != "Some slots use exact-matchup data from other stored patches." {
+		t.Fatalf("notes = %+v; wanted all-patch fallback note", notes)
+	}
+}

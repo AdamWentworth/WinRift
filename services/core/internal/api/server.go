@@ -663,8 +663,10 @@ func buildAdviceNotes(hasOpponent bool, matchupSlots, championSlots []scopedItem
 		notes = append(notes, "No exact matchup item slots met the threshold yet; showing champion-wide slot signals as a baseline.")
 	} else if hasOpponent && allItemSlotRowsAreFallback(matchupSlots) {
 		notes = append(notes, "No current-patch matchup item slots met the threshold yet; showing exact-matchup rows from broader patch scope.")
+	} else if hasOpponent && buildAdviceSampleResponse(matchupSlots)["fallbackUsed"] == true && hasChampionWideItemSlotFallback(matchupSlots) {
+		notes = append(notes, "Some matchup slots use champion-wide fallback data where exact samples are thin.")
 	} else if hasOpponent && buildAdviceSampleResponse(matchupSlots)["fallbackUsed"] == true {
-		notes = append(notes, "Some matchup slots use broader fallback data where exact samples are thin.")
+		notes = append(notes, "Some slots use exact-matchup data from other stored patches.")
 	}
 	if len(championSlots) == 0 {
 		notes = append(notes, "No champion-wide build sample met the requested threshold yet.")
