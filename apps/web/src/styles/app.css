@@ -5875,6 +5875,22 @@ button {
   min-width: 0;
 }
 
+.guide-rune-grid > .guide-rune-tree {
+  min-height: 100%;
+}
+
+.guide-rune-side {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  grid-template-rows: auto auto;
+  min-width: 0;
+}
+
+.guide-rune-side .guide-rune-tree {
+  min-height: 0;
+}
+
 .guide-rune-tree-title {
   align-items: center;
   background: rgb(0 0 0 / 30%);
@@ -5896,6 +5912,8 @@ button {
 }
 
 .guide-rune-slots {
+  display: grid;
+  grid-auto-rows: minmax(54px, 1fr);
   padding-top: 12px;
 }
 
@@ -5920,6 +5938,18 @@ button {
   transform: scale(1.08);
 }
 
+.guide-rune-side .guide-rune-tree-title {
+  min-height: 44px;
+}
+
+.guide-rune-side .guide-rune-slots {
+  grid-auto-rows: minmax(48px, auto);
+}
+
+.guide-rune-side .guide-rune-slot {
+  min-height: 48px;
+}
+
 .stat-shard-grid {
   background:
     radial-gradient(circle at 75% 20%, rgb(79 245 234 / 9%), transparent 42%),
@@ -5932,10 +5962,8 @@ button {
 }
 
 .guide-stat-shards {
-  grid-column: 1 / -1;
   grid-template-columns: 1fr;
-  justify-self: end;
-  width: calc((100% - 20px) / 2);
+  width: 100%;
 }
 
 .stat-shard-grid-title {
