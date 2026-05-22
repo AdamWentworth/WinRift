@@ -17,10 +17,11 @@ type SortMode = typeof sortModes[number]['value'];
 
 type Props = {
   champions?: ChampionData;
+  onChampionIntent?: (champion: Champion) => void;
   onSelectChampion: (champion: Champion) => void;
 };
 
-export function ChampionDirectoryPage({ champions, onSelectChampion }: Props) {
+export function ChampionDirectoryPage({ champions, onChampionIntent, onSelectChampion }: Props) {
   const [searchText, setSearchText] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const championsByName = useMemo(() => championList(champions), [champions]);
@@ -76,6 +77,7 @@ export function ChampionDirectoryPage({ champions, onSelectChampion }: Props) {
             key={champion.key}
             champion={champion}
             champions={champions}
+            onIntent={() => onChampionIntent?.(champion)}
             onSelect={() => onSelectChampion(champion)}
           />
         ))}
@@ -84,11 +86,14 @@ export function ChampionDirectoryPage({ champions, onSelectChampion }: Props) {
   );
 }
 
-function ChampionDirectoryCard({ champion, champions, onSelect }: { champion: Champion; champions?: ChampionData; onSelect: () => void }) {
+function ChampionDirectoryCard({ champion, champions, onIntent, onSelect }: { champion: Champion; champions?: ChampionData; onIntent?: () => void; onSelect: () => void }) {
   return (
     <button
       className="champion-directory-card neutral"
       onClick={onSelect}
+      onFocus={onIntent}
+      onMouseEnter={onIntent}
+      onTouchStart={onIntent}
       style={{ '--champion-splash': `url(${championSplashUrl(champions, Number(champion.key))})` } as CSSProperties}
       type="button"
     >

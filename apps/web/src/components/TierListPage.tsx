@@ -57,7 +57,8 @@ const tierTableColumns: { mode: SortMode; label: string }[] = [
 
 type Props = {
   champions?: ChampionData;
-  onSelectChampion: (champion: Champion) => void;
+  onChampionIntent?: (champion: Champion, preferredRole?: string) => void;
+  onSelectChampion: (champion: Champion, preferredRole?: string) => void;
 };
 
 type TierRow = {
@@ -67,7 +68,7 @@ type TierRow = {
   tier: string;
 };
 
-export function TierListPage({ champions, onSelectChampion }: Props) {
+export function TierListPage({ champions, onChampionIntent, onSelectChampion }: Props) {
   const [role, setRole] = useState('');
   const [rankBucket, setRankBucket] = useState('');
   const [minGames, setMinGames] = useState(50);
@@ -182,7 +183,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
 
       <div className="tier-feature-grid">
         {featured.length ? featured.map((row) => (
-          <TierFeatureCard key={row.summary.championId} row={row} champions={champions} onSelectChampion={onSelectChampion} />
+          <TierFeatureCard key={row.summary.championId} row={row} champions={champions} onChampionIntent={onChampionIntent} onSelectChampion={onSelectChampion} />
         )) : (
           <div className="tier-empty-state">
             {tierQuery.isLoading ? 'Loading top champions...' : 'No champions meet this sample yet.'}
@@ -204,7 +205,7 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
         </div>
         <div className="tier-table-body">
           {rows.length ? rows.map((row) => (
-            <TierTableRow key={`${row.summary.championId}-${row.summary.role}`} row={row} champions={champions} onSelectChampion={onSelectChampion} />
+            <TierTableRow key={`${row.summary.championId}-${row.summary.role}`} row={row} champions={champions} onChampionIntent={onChampionIntent} onSelectChampion={onSelectChampion} />
           )) : (
             <div className="tier-empty-row">{tierQuery.isLoading ? 'Loading champion rows...' : 'No tier-list rows for this filter yet.'}</div>
           )}
@@ -231,13 +232,17 @@ function TierSortHeader({ active, direction, label, onClick }: { active: boolean
   );
 }
 
-function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
+function TierFeatureCard({ row, champions, onChampionIntent, onSelectChampion }: { row: TierRow; champions?: ChampionData; onChampionIntent?: (champion: Champion, preferredRole?: string) => void; onSelectChampion: (champion: Champion, preferredRole?: string) => void }) {
   const champion = row.champion;
+  const prefetch = () => champion && onChampionIntent?.(champion, row.summary.role);
   return (
     <button
       className={`tier-feature-card ${tierClassName(row.tier)}`}
       disabled={!champion}
-      onClick={() => champion && onSelectChampion(champion)}
+      onClick={() => champion && onSelectChampion(champion, row.summary.role)}
+      onFocus={prefetch}
+      onMouseEnter={prefetch}
+      onTouchStart={prefetch}
       style={{ '--tier-splash': `url(${championSplashUrl(champions, row.summary.championId)})` } as CSSProperties}
       type="button"
     >
@@ -255,10 +260,19 @@ function TierFeatureCard({ row, champions, onSelectChampion }: { row: TierRow; c
   );
 }
 
-function TierTableRow({ row, champions, onSelectChampion }: { row: TierRow; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
+function TierTableRow({ row, champions, onChampionIntent, onSelectChampion }: { row: TierRow; champions?: ChampionData; onChampionIntent?: (champion: Champion, preferredRole?: string) => void; onSelectChampion: (champion: Champion, preferredRole?: string) => void }) {
   const champion = row.champion;
+  const prefetch = () => champion && onChampionIntent?.(champion, row.summary.role);
   return (
-    <button className="tier-table-row" disabled={!champion} onClick={() => champion && onSelectChampion(champion)} type="button">
+    <button
+      className="tier-table-row"
+      disabled={!champion}
+      onClick={() => champion && onSelectChampion(champion, row.summary.role)}
+      onFocus={prefetch}
+      onMouseEnter={prefetch}
+      onTouchStart={prefetch}
+      type="button"
+    >
       <span><b className={`tier-badge ${tierClassName(row.tier)}`}>{row.tier}</b></span>
       <ChampionIdentity
         champion={champion}

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getBuildAdvice, getChampionGuide, getChampionGuideIndex, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import type { Champion, ChampionRoleRate } from './api/types';
 import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
 import { BuildGuidePage } from './components/BuildGuidePage';
 import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
@@ -12,6 +13,13 @@ import {
   championRouteSlug,
   summonerPath,
 } from './lib/lookup';
+import { normalizeRole } from './lib/roles';
+import { championImageUrl, championSplashUrl } from './lib/staticData';
+
+const DEFAULT_QUEUE_ID = 420;
+const STATIC_STALE_TIME = Infinity;
+const GUIDE_STALE_TIME = 10 * 60 * 1000;
+const ROLE_STALE_TIME = 30 * 60 * 1000;
 
 type AppRoute =
   | { kind: 'home' }
@@ -20,13 +28,14 @@ type AppRoute =
   | { kind: 'summoner'; platform?: string; gameName?: string; tagLine?: string };
 
 export function App() {
+  const queryClient = useQueryClient();
   const [route, setRoute] = useState<AppRoute>(() => readRoute());
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
-  const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions });
-  const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: Infinity });
-  const items = useQuery({ queryKey: ['items'], queryFn: getItems });
-  const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells });
-  const runes = useQuery({ queryKey: ['runes'], queryFn: getRunes });
+  const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions, staleTime: STATIC_STALE_TIME });
+  const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: STATIC_STALE_TIME });
+  const items = useQuery({ queryKey: ['items'], queryFn: getItems, staleTime: STATIC_STALE_TIME });
+  const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells, staleTime: STATIC_STALE_TIME });
+  const runes = useQuery({ queryKey: ['runes'], queryFn: getRunes, staleTime: STATIC_STALE_TIME });
 
   useEffect(() => {
     const onPopState = () => setRoute(readRoute());
@@ -47,6 +56,67 @@ export function App() {
   }, []);
 
   const goHome = useCallback(() => navigate({ kind: 'home' }), [navigate]);
+  const prefetchChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
+    const championId = Number(champion.key);
+    const patch = patchBucketFromVersion(champions.data?.version);
+    if (!championId || !patch) return;
+
+    warmImage(championImageUrl(champions.data, championId));
+    warmImage(championSplashUrl(champions.data, championId));
+
+    const prefetchForRole = (roleValue?: string) => {
+      const role = normalizeRole(roleValue ?? '') || 'MIDDLE';
+      const itemContext = itemContextForRole(role);
+      void queryClient.prefetchQuery({
+        queryKey: ['champion-guide', championId, role, patch, ''],
+        queryFn: () => getChampionGuide({ championId, role, patch, rankBucket: '', minGames: 5, limit: 12 }),
+        staleTime: GUIDE_STALE_TIME,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: ['guide-build-advice', championId, role, patch, '', 0],
+        queryFn: () => getBuildAdvice({
+          championId,
+          role,
+          itemContext,
+          patch,
+          rankBucket: '',
+          minGames: 5,
+          championMinGames: 10,
+          limit: 4,
+        }),
+        staleTime: GUIDE_STALE_TIME,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: ['champion-guide-index', role, patch, ''],
+        queryFn: () => getChampionGuideIndex({ role, patch, rankBucket: '', minGames: 1, limit: 250 }),
+        staleTime: GUIDE_STALE_TIME,
+      });
+    };
+
+    const normalizedPreferredRole = normalizeRole(preferredRole ?? '');
+    if (normalizedPreferredRole) {
+      prefetchForRole(normalizedPreferredRole);
+    }
+
+    void queryClient.ensureQueryData({
+      queryKey: ['champion-main-role', championId],
+      queryFn: () => getChampionRoleRates([championId], DEFAULT_QUEUE_ID),
+      staleTime: ROLE_STALE_TIME,
+    }).then((data) => {
+      const detectedRole = mainChampionRole(data.results ?? [], championId);
+      if (!normalizedPreferredRole || detectedRole !== normalizedPreferredRole) {
+        prefetchForRole(detectedRole);
+      }
+    }).catch(() => {
+      if (!normalizedPreferredRole) {
+        prefetchForRole('MIDDLE');
+      }
+    });
+  }, [champions.data, queryClient]);
+  const openChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
+    prefetchChampionGuide(champion, preferredRole);
+    navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
+  }, [navigate, prefetchChampionGuide]);
   const activeSection = route.kind === 'champion' ? 'champions' : route.kind === 'tier-list' ? 'tier-list' : route.kind === 'summoner' ? 'summoners' : 'home';
   const initialChampionId = useMemo(() => (
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
@@ -106,12 +176,14 @@ export function App() {
       {route.kind === 'tier-list' ? (
         <TierListPage
           champions={champions.data}
-          onSelectChampion={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+          onChampionIntent={prefetchChampionGuide}
+          onSelectChampion={openChampionGuide}
         />
       ) : route.kind === 'champion' && !route.championSlug ? (
         <ChampionDirectoryPage
           champions={champions.data}
-          onSelectChampion={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+          onChampionIntent={prefetchChampionGuide}
+          onSelectChampion={openChampionGuide}
         />
       ) : route.kind === 'champion' ? (
         <BuildGuidePage
@@ -120,7 +192,7 @@ export function App() {
           spells={spells.data}
           runes={runes.data}
           initialChampionId={initialChampionId}
-          onChampionChange={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+          onChampionChange={openChampionGuide}
         />
       ) : route.kind === 'summoner' ? (
         <SummonerProfilePage
@@ -143,11 +215,42 @@ export function App() {
           runes={runes.data}
           loading={false}
           onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
-          onChampionSearch={(champion) => navigate({ kind: 'champion', championSlug: championRouteSlug(champion) })}
+          onChampionSearch={openChampionGuide}
         />
       )}
     </main>
   );
+}
+
+function patchBucketFromVersion(version?: string) {
+  const parts = (version ?? '').split('.');
+  if (parts.length >= 2) {
+    return `${parts[0]}.${parts[1]}`;
+  }
+  return '';
+}
+
+function itemContextForRole(role: string): 'JUNGLE' | 'SUPPORT' | undefined {
+  if (role === 'JUNGLE') return 'JUNGLE';
+  if (role === 'UTILITY') return 'SUPPORT';
+  return undefined;
+}
+
+function mainChampionRole(rows: ChampionRoleRate[], championId: number) {
+  const ranked = rows
+    .filter((row) => row.championId === championId && normalizeRole(row.role))
+    .sort((a, b) => {
+      if (a.games !== b.games) return b.games - a.games;
+      return b.pickRate - a.pickRate;
+    });
+  return normalizeRole(ranked[0]?.role);
+}
+
+function warmImage(src: string) {
+  if (!src) return;
+  const image = new Image();
+  image.decoding = 'async';
+  image.src = src;
 }
 
 function appShellClass(route: AppRoute) {
