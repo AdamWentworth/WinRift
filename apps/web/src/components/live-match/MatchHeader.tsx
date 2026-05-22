@@ -28,24 +28,28 @@ export function MatchHeader({
   const searchedName = searchedParticipant?.riotId || searchedParticipant?.summonerName || 'Live player';
   return (
     <header className={`match-header ${yourSide}-side`}>
-      <div className="match-header-main">
+      <div className="match-header-player">
         <div className="match-kicker">{queueLabel(liveGame.gameQueueConfigId)} · {liveGame.platform}</div>
-        <h2>{searchedName}</h2>
-        {profileAction ? (
-          <button className="match-header-action" onClick={profileAction.onClick} type="button">
-            {profileAction.label}
-          </button>
-        ) : null}
+        <div className="match-header-identity">
+          <h2>{searchedName}</h2>
+          {profileAction ? (
+            <button className="match-header-action" onClick={profileAction.onClick} type="button">
+              {profileAction.label}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div className="match-header-context">
         <div className="match-subline">
           <span>{liveGame.gameMode}</span>
           <span>{yourSide === 'blue' ? 'Blue side' : 'Red side'}</span>
           {patch ? <span>Patch {patch}</span> : null}
         </div>
-      </div>
-      <div className="match-header-stats" aria-label="Live match context">
-        <HeaderStat label="Clock" value={matchClock(liveGame.gameStartTime, now)} />
-        <HeaderStat label="Blue Avg" value={blueAverage.label} detail={blueAverage.detail} tone="blue" />
-        <HeaderStat label="Red Avg" value={redAverage.label} detail={redAverage.detail} tone="red" />
+        <div className="match-header-stats" aria-label="Live match context">
+          <HeaderStat label="Clock" value={matchClock(liveGame.gameStartTime, now)} />
+          <HeaderStat label="Blue Avg" value={blueAverage.label} detail={blueAverage.detail} tone="blue" />
+          <HeaderStat label="Red Avg" value={redAverage.label} detail={redAverage.detail} tone="red" />
+        </div>
       </div>
     </header>
   );
