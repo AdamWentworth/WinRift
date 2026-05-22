@@ -78,7 +78,7 @@ export function FocusedBuildPanel({
 
   return (
     <section className={`focused-build-panel ${selection.side}`} aria-label="Focused build matchup">
-      <div className="focused-build-header">
+      <div className="focused-build-command-row">
         <div className="focused-build-owner-card">
           {championUrl ? <img src={championUrl} alt={championName} /> : null}
           <span>
@@ -98,22 +98,8 @@ export function FocusedBuildPanel({
               <em>{opponentName}</em>
             </span>
           </div>
-          <p>Both build panels below are for {championName}. The opponent only narrows the matchup sample.</p>
+          <p>Opponent filters the matchup sample. Build cards below remain for {championName}.</p>
         </div>
-      </div>
-      <div className="focused-build-intent">
-        <span>
-          <strong>{championName} item reads</strong>
-          <em>Left is matchup-specific when enough games exist. Right is the broader champion baseline for comparison.</em>
-        </span>
-        <span className="focused-build-intent-vs">
-          {championUrl ? <img src={championUrl} alt="" /> : null}
-          <b>vs</b>
-          {opponentUrl ? <img src={opponentUrl} alt="" /> : null}
-          <small>{opponentChampionName}</small>
-        </span>
-      </div>
-      <div className="focused-build-controls">
         <BuildParticipantPicker
           title="Build For"
           options={selection.participantOptions}

@@ -3673,11 +3673,12 @@ button {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%), 0 0 18px rgb(240 128 128 / 16%);
 }
 
-.focused-build-header {
+.focused-build-command-row {
   align-items: center;
   display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 8px;
+  grid-template-columns: minmax(190px, 0.68fr) minmax(210px, 0.78fr) minmax(430px, 1.35fr) minmax(330px, 1fr);
+  min-width: 0;
 }
 
 .focused-build-owner-card,
@@ -3692,18 +3693,18 @@ button {
 .focused-build-owner-card {
   align-items: center;
   display: grid;
-  gap: 12px;
-  grid-template-columns: 72px minmax(0, 1fr);
-  min-height: 92px;
-  padding: 10px;
+  gap: 9px;
+  grid-template-columns: 54px minmax(0, 1fr);
+  min-height: 78px;
+  padding: 8px;
 }
 
 .focused-build-owner-card > img {
   border: 1px solid rgb(255 255 255 / 18%);
   box-shadow: 0 2px 8px rgb(0 0 0 / 44%);
-  height: 72px;
+  height: 54px;
   object-fit: cover;
-  width: 72px;
+  width: 54px;
 }
 
 .focused-build-owner-card > span,
@@ -3729,7 +3730,7 @@ button {
 
 .focused-build-owner-card strong {
   color: #fff;
-  font-size: clamp(22px, 2vw, 30px);
+  font-size: clamp(18px, 1.5vw, 24px);
   font-weight: 900;
   line-height: 1;
   overflow: hidden;
@@ -3739,7 +3740,7 @@ button {
 
 .focused-build-owner-card em {
   color: #c9d3d8;
-  font-size: 11px;
+  font-size: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: none;
@@ -3756,29 +3757,29 @@ button {
 .focused-build-context-card {
   align-content: center;
   display: grid;
-  gap: 7px;
-  min-height: 92px;
-  padding: 10px;
+  gap: 5px;
+  min-height: 78px;
+  padding: 8px;
 }
 
 .focused-build-context-card > div {
   align-items: center;
   display: grid;
-  gap: 8px;
-  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 7px;
+  grid-template-columns: 34px minmax(0, 1fr);
   min-width: 0;
 }
 
 .focused-build-context-card img {
   border: 1px solid rgb(255 255 255 / 16%);
-  height: 42px;
+  height: 34px;
   object-fit: cover;
-  width: 42px;
+  width: 34px;
 }
 
 .focused-build-context-card strong {
   color: #fff;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
   line-height: 1.05;
   overflow: hidden;
@@ -3796,72 +3797,10 @@ button {
 
 .focused-build-context-card p {
   color: #b7c4cb;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.25;
-  margin: 0;
-}
-
-.focused-build-intent {
-  align-items: center;
-  background:
-    linear-gradient(90deg, rgb(100 239 232 / 10%), rgb(255 255 255 / 3%)),
-    rgb(0 0 0 / 18%);
-  border: 1px solid rgb(100 239 232 / 16%);
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-width: 0;
-  padding: 8px 10px;
-}
-
-.focused-build-intent > span:first-child {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.focused-build-intent strong {
-  color: #fff;
-  font-size: 13px;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.focused-build-intent em {
-  color: #b7c4cb;
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 800;
-  line-height: 1.25;
-}
-
-.focused-build-intent-vs {
-  align-items: center;
-  background: rgb(0 0 0 / 24%);
-  border: 1px solid rgb(255 255 255 / 9%);
-  display: flex;
-  gap: 5px;
-  min-height: 32px;
-  padding: 4px 6px;
-}
-
-.focused-build-intent-vs img {
-  border: 1px solid rgb(255 255 255 / 14%);
-  height: 24px;
-  object-fit: cover;
-  width: 24px;
-}
-
-.focused-build-intent-vs b,
-.focused-build-intent-vs small {
-  color: #dce5ea;
   font-size: 9px;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: uppercase;
-  white-space: nowrap;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0;
 }
 
 .focused-build-player {
@@ -3957,15 +3896,10 @@ button {
   min-width: 0;
 }
 
-.focused-build-controls,
 .focused-build-results {
   display: grid;
   gap: 10px;
   min-width: 0;
-}
-
-.focused-build-controls {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .focused-build-results {
@@ -4026,9 +3960,10 @@ button {
   background: rgb(0 0 0 / 18%);
   border: 1px solid rgb(255 255 255 / 9%);
   display: grid;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
-  padding: 7px;
+  min-height: 78px;
+  padding: 6px;
 }
 
 .focused-build-picker > span {
@@ -4042,9 +3977,11 @@ button {
 }
 
 .focused-build-picker > div {
-  display: grid;
+  display: flex;
   gap: 5px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 1px;
 }
 
 .focused-build-picker button {
@@ -4056,9 +3993,10 @@ button {
   gap: 4px;
   grid-template-columns: 28px minmax(0, 1fr);
   grid-template-rows: auto auto auto;
+  flex: 0 0 88px;
   justify-items: start;
   min-width: 0;
-  min-height: 54px;
+  min-height: 52px;
   padding: 5px;
   text-align: left;
 }
@@ -6786,7 +6724,7 @@ button {
     display: none;
   }
 
-  .focused-build-header {
+  .focused-build-command-row {
     grid-template-columns: 1fr;
   }
 
@@ -6800,17 +6738,11 @@ button {
     text-align: left;
   }
 
-  .focused-build-controls,
   .build-setup-strip,
-  .focused-build-intent,
   .focused-build-results,
   .focused-build-result-body,
   .focused-build-result > header {
     grid-template-columns: 1fr;
-  }
-
-  .focused-build-intent-vs {
-    justify-self: start;
   }
 
   .build-setup-block {
@@ -6821,8 +6753,7 @@ button {
     justify-items: start;
   }
 
-  .focused-build-panel .build-side,
-  .focused-build-picker > div {
+  .focused-build-panel .build-side {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
