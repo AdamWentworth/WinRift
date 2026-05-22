@@ -236,6 +236,39 @@ func (s *Service) OpeningItemIDs(ctx context.Context, patch string, includeJungl
 	})
 }
 
+func (s *Service) OpeningItemCosts(ctx context.Context, patch string, includeJungle, includeSupport bool) (map[uint32]uint32, error) {
+	payload, err := s.Get(ctx, "items", patch)
+	if err != nil {
+		return nil, err
+	}
+	data, ok := payload["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected item data payload")
+	}
+	items, ok := data["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected item data shape")
+	}
+	costs := map[uint32]uint32{}
+	for rawID, rawItem := range items {
+		id64, err := strconv.ParseUint(rawID, 10, 32)
+		if err != nil {
+			continue
+		}
+		item, ok := rawItem.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := uint32(id64)
+		if !isOpeningItem(id, item, includeJungle, includeSupport) {
+			continue
+		}
+		totalGold, _ := itemGold(item)
+		costs[id] = uint32(totalGold)
+	}
+	return costs, nil
+}
+
 func (s *Service) itemIDs(ctx context.Context, patch string, include func(uint32, map[string]any) bool) ([]uint32, error) {
 	payload, err := s.Get(ctx, "items", patch)
 	if err != nil {

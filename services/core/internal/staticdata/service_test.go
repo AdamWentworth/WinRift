@@ -227,6 +227,36 @@ func TestOpeningItemIDsIncludesConsumables(t *testing.T) {
 	if got, want := supportIDs, []uint32{1001, 1056, 2003, 2055, 3870}; !sameUint32s(got, want) {
 		t.Fatalf("support opening IDs = %v, want %v", got, want)
 	}
+
+	defaultCosts, err := service.OpeningItemCosts(context.Background(), "", false, false)
+	if err != nil {
+		t.Fatalf("OpeningItemCosts default returned error: %v", err)
+	}
+	if got, want := defaultCosts[1056], uint32(400); got != want {
+		t.Fatalf("Doran opening cost = %d, want %d", got, want)
+	}
+	if got, want := defaultCosts[2003], uint32(50); got != want {
+		t.Fatalf("potion opening cost = %d, want %d", got, want)
+	}
+	if _, ok := defaultCosts[1102]; ok {
+		t.Fatalf("default opening costs should not include jungle item")
+	}
+
+	jungleCosts, err := service.OpeningItemCosts(context.Background(), "", true, false)
+	if err != nil {
+		t.Fatalf("OpeningItemCosts jungle returned error: %v", err)
+	}
+	if got, want := jungleCosts[1102], uint32(450); got != want {
+		t.Fatalf("jungle opening cost = %d, want %d", got, want)
+	}
+
+	supportCosts, err := service.OpeningItemCosts(context.Background(), "", false, true)
+	if err != nil {
+		t.Fatalf("OpeningItemCosts support returned error: %v", err)
+	}
+	if got, want := supportCosts[3870], uint32(400); got != want {
+		t.Fatalf("support opening cost = %d, want %d", got, want)
+	}
 }
 
 func sameUint32s(left, right []uint32) bool {

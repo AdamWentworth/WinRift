@@ -44,7 +44,7 @@ Build variant labeling:
 - Variant labels are intentionally broad. If several core item families resolve to the same label, such as multiple Katarina AP paths, those rows should be summed into one player-facing build family.
 - The `Recommended` tab is not a variant lane. It should use the broad champion/matchup build-advice data and the highest-support aggregate setup, while alternative tabs intentionally narrow to their detected family.
 - Recommended item slots use a support-aware score, with samples ramping toward full trust around 200 games, so tiny hot samples do not outrank much larger, well-supported choices.
-- The champion page should keep the lower item panels as the primary build presentation. The first panel is opening purchases from the first two minutes; core, fourth, fifth, and sixth panels are finished-item slots. It should dedupe core items and avoid showing the same core item again as a late option unless no better option exists.
+- The champion page should keep the lower item panels as the primary build presentation. The first panel is the legal fountain opener from the first shop burst, while core, fourth, fifth, and sixth panels are finished-item slots. It should dedupe core items and avoid showing the same core item again as a late option unless no better option exists.
 - Future refinement: add a small curated champion override map for cases where community jargon is specific and stable, such as Katarina AD/On Hit/Tank or Shyvana AP/Tank.
 
 Known gaps:
@@ -54,7 +54,7 @@ Known gaps:
 - Tier-list impact is still a correlation-heavy score. It now uses final participant performance fields, but those signals should be validated as the corpus grows. See `docs/product/tier-list-ranking.md`.
 - Item paths use timeline-derived first-three completed item signatures where available, then final inventory signatures for the completed build. Final inventory order is still Riot inventory order, not guaranteed purchase order.
 - Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin. Slot `0` is reserved for starting items; slots `1-6` remain completed-item purchase order.
-- Starting-item display prefers opening loadout signatures from purchases in the first two minutes. That preserves consumables and control wards as part of the opener. If no loadout sample exists, the UI falls back to the older slot `0` single-item rows.
+- Starting-item display prefers opening loadout signatures from the first purchase burst only. The full bundle must fit under the normal starting-gold cap, which preserves legal potion/control-ward openers while filtering out early recall buys such as impossible Doran plus Long Sword bundles. If no loadout sample exists, the UI falls back to the older slot `0` single-item rows.
 - Live matchup slot panels should not mix champion-wide fallback rows into the matchup card. Exact-matchup scope can widen across stored patches, while champion-wide baseline stays in the separate overall card.
 - Displayed slot rows apply a small sanity pass for player readability, including suppressing duplicate boots. The underlying API still returns the candidate rows; the UI chooses a plausible one-boot display.
 - The champion-page bundle is the preferred contract for the champion guide screen. The build-advice endpoint remains the focused contract for live matchup panels and specialty build surfaces. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.

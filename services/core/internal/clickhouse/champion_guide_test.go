@@ -26,6 +26,19 @@ func TestAnalyticsOpponentBucketAggregatesChampionWideRows(t *testing.T) {
 	}
 }
 
+func TestItemCostExpressionSQLIsDeterministic(t *testing.T) {
+	costs := map[uint32]uint32{
+		2003: 50,
+		1056: 400,
+		1001: 300,
+	}
+	got := itemCostExpressionSQL("tie.item_id", costs)
+	want := "multiIf(tie.item_id = 1001, toUInt32(300), tie.item_id = 1056, toUInt32(400), tie.item_id = 2003, toUInt32(50), toUInt32(0))"
+	if got != want {
+		t.Fatalf("item cost expression = %q; want %q", got, want)
+	}
+}
+
 func TestApplyChampionTierScoresRewardsStableWinningSamples(t *testing.T) {
 	rows := applyChampionTierScores([]ChampionGuideSummary{
 		{

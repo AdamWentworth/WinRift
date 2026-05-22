@@ -456,7 +456,7 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 	if err != nil {
 		return nil, err
 	}
-	openingItemIDs, err := s.openingItemIDs(ctx, request.ItemContext)
+	openingItemCosts, err := s.openingItemCosts(ctx, request.ItemContext)
 	if err != nil {
 		return nil, err
 	}
@@ -475,14 +475,14 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 		if err != nil {
 			return nil, err
 		}
-		matchupStartingLoadouts, err = s.repo.QueryStartingItemLoadouts(ctx, buildFilters, openingItemIDs, request.MinGames, request.OptionLimit)
+		matchupStartingLoadouts, err = s.repo.QueryStartingItemLoadouts(ctx, buildFilters, openingItemCosts, request.MinGames, request.OptionLimit)
 		if err != nil {
 			return nil, err
 		}
 	}
 	championFilters := cloneStringMap(buildFilters)
 	championFilters["opponent_champion_id"] = ""
-	championStartingLoadouts, err := s.repo.QueryStartingItemLoadouts(ctx, championFilters, openingItemIDs, request.ChampionMinGames, request.OptionLimit)
+	championStartingLoadouts, err := s.repo.QueryStartingItemLoadouts(ctx, championFilters, openingItemCosts, request.ChampionMinGames, request.OptionLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -692,10 +692,10 @@ func (s Server) queryScopedItemSlots(ctx context.Context, request itemSlotAnalyt
 	return scopedItemSlotRows(rows, itemSlotScope{Key: "requested", Label: "Requested sample"}), nil
 }
 
-func (s Server) openingItemIDs(ctx context.Context, itemContext string) ([]uint32, error) {
+func (s Server) openingItemCosts(ctx context.Context, itemContext string) (map[uint32]uint32, error) {
 	includeJungle := itemContext == "JUNGLE"
 	includeSupport := itemContext == "SUPPORT"
-	return s.static.OpeningItemIDs(ctx, "", includeJungle, includeSupport)
+	return s.static.OpeningItemCosts(ctx, "", includeJungle, includeSupport)
 }
 
 func itemSlotRowsResponse(scopedRows []scopedItemSlotRow) []map[string]any {

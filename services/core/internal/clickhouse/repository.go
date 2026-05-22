@@ -71,6 +71,9 @@ type ItemSlotAnalyticsContext struct {
 }
 
 const startingItemWindowMS uint32 = 120000
+const openingPurchaseFirstWindowMS uint32 = 45000
+const openingPurchaseBurstWindowMS uint32 = 20000
+const openingPurchaseGoldCap uint32 = 500
 
 type PatchSnapshot struct {
 	Patch            string
@@ -390,8 +393,8 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 	return r.queryItemSlotsLiveScan(ctx, filters, completionItemIDs, startingItemIDs, minGames, limit)
 }
 
-func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[string]string, openingItemIDs []uint32, minGames, limit int) ([]StartingItemLoadoutRow, error) {
-	if len(openingItemIDs) == 0 {
+func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[string]string, openingItemCosts map[uint32]uint32, minGames, limit int) ([]StartingItemLoadoutRow, error) {
+	if len(openingItemCosts) == 0 {
 		return nil, nil
 	}
 	if minGames <= 0 {
@@ -400,7 +403,9 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 	if limit <= 0 {
 		limit = 6
 	}
+	openingItemIDs := uint32MapKeysSorted(openingItemCosts)
 	itemList := uint32ListSQL(openingItemIDs)
+	itemCostExpr := itemCostExpressionSQL("tie.item_id", openingItemCosts)
 	patchBucketExpr := "'ALL'"
 	rankBucketExpr := "'ALL'"
 	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
@@ -430,7 +435,7 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 		args = append(args, filters["patch"])
 	}
 	query := fmt.Sprintf(`
-		WITH opening_purchases AS
+		WITH raw_opening_item_events AS
 		(
 			SELECT
 				pm.match_id AS match_id,
@@ -444,7 +449,9 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 					pm.rank_bucket
 				) AS rank_value,
 				pm.win AS win,
-				arraySort(groupArray(toUInt32(tie.item_id))) AS item_ids
+				tie.timestamp_ms AS timestamp_ms,
+				tie.item_id AS item_id,
+				%s AS item_cost
 			FROM participant_matchups AS pm FINAL
 			INNER JOIN timeline_item_events AS tie FINAL
 				ON pm.match_id = tie.match_id
@@ -464,16 +471,46 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 				AND tie.timestamp_ms <= ?
 				AND tie.item_id IN (%s)
 				%s
+		),
+		first_opening_purchases AS
+		(
+			SELECT
+				match_id,
+				participant_id,
+				min(timestamp_ms) AS first_purchase_ms
+			FROM raw_opening_item_events
 			GROUP BY
-				pm.match_id,
-				pm.participant_id,
-				pm.champion_id,
-				pm.role,
-				pm.opponent_champion_id,
-				pm.patch,
-				rank_value,
-				pm.win
-			HAVING length(item_ids) > 0
+				match_id,
+				participant_id
+		),
+		opening_purchases AS
+		(
+			SELECT
+				e.match_id AS match_id,
+				e.participant_id AS participant_id,
+				e.champion_id AS champion_id,
+				e.role AS role,
+				e.opponent_champion_id AS opponent_champion_id,
+				e.patch_value AS patch_value,
+				e.rank_value AS rank_value,
+				e.win AS win,
+				arraySort(groupArray(toUInt32(e.item_id))) AS item_ids,
+				sum(toUInt32(e.item_cost)) AS item_gold
+			FROM raw_opening_item_events AS e
+			INNER JOIN first_opening_purchases AS f
+				ON e.match_id = f.match_id
+				AND e.participant_id = f.participant_id
+			WHERE e.timestamp_ms <= f.first_purchase_ms + ?
+			GROUP BY
+				e.match_id,
+				e.participant_id,
+				e.champion_id,
+				e.role,
+				e.opponent_champion_id,
+				e.patch_value,
+				e.rank_value,
+				e.win
+			HAVING length(item_ids) > 0 AND item_gold <= ?
 		)
 		SELECT
 			champion_id,
@@ -486,8 +523,9 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 			toUInt64(count()) AS games,
 			wins / games AS win_rate
 		FROM opening_purchases
-		WHERE length(item_ids) > 0`, itemList, rawFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
-	queryArgs := append([]any{startingItemWindowMS}, args...)
+		WHERE length(item_ids) > 0`, itemCostExpr, itemList, rawFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+	queryArgs := append([]any{openingPurchaseFirstWindowMS}, args...)
+	queryArgs = append(queryArgs, openingPurchaseBurstWindowMS, openingPurchaseGoldCap)
 	if filters["rank_bucket"] != "" {
 		query += " AND rank_value = ?"
 		queryArgs = append(queryArgs, filters["rank_bucket"])
@@ -1569,6 +1607,32 @@ func uint32ListSQL(values []uint32) string {
 		return "0"
 	}
 	return strings.Join(parts, ",")
+}
+
+func uint32MapKeysSorted(values map[uint32]uint32) []uint32 {
+	keys := make([]uint32, 0, len(values))
+	for key := range values {
+		if key != 0 {
+			keys = append(keys, key)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+	return keys
+}
+
+func itemCostExpressionSQL(column string, costs map[uint32]uint32) string {
+	keys := uint32MapKeysSorted(costs)
+	parts := make([]string, 0, len(keys)*2+1)
+	for _, key := range keys {
+		parts = append(parts,
+			fmt.Sprintf("%s = %d", column, key),
+			fmt.Sprintf("toUInt32(%d)", costs[key]),
+		)
+	}
+	parts = append(parts, "toUInt32(0)")
+	return fmt.Sprintf("multiIf(%s)", strings.Join(parts, ", "))
 }
 
 func removeItemIDs(values, removed []uint32) []uint32 {
