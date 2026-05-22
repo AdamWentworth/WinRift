@@ -184,6 +184,51 @@ func TestStartingItemIDs(t *testing.T) {
 	}
 }
 
+func TestOpeningItemIDsIncludesConsumables(t *testing.T) {
+	client := &fakeRiotClient{
+		payloads: map[string]any{
+			"item.json": map[string]any{
+				"data": map[string]any{
+					"1001": itemFixture(300, true, 0, []string{"Boots"}, nil),
+					"1056": itemFixture(400, true, 0, []string{"Mana", "Lane"}, nil),
+					"1102": itemFixture(450, true, 0, []string{"Jungle"}, nil),
+					"2003": itemFixture(50, true, 0, []string{"Consumable"}, nil),
+					"2055": itemFixture(75, true, 0, []string{"Consumable", "Vision"}, nil),
+					"3340": itemFixture(0, true, 0, []string{"Trinket"}, nil),
+					"3071": itemFixture(3000, true, 3, []string{"Health", "Damage"}, nil),
+					"3870": itemFixture(400, true, 0, []string{"Health", "ManaRegen", "Vision", "GoldPer", "Lane"}, nil),
+				},
+			},
+		},
+		calls: map[string]int{},
+	}
+	service := NewService(client)
+
+	defaultIDs, err := service.OpeningItemIDs(context.Background(), "", false, false)
+	if err != nil {
+		t.Fatalf("OpeningItemIDs default returned error: %v", err)
+	}
+	if got, want := defaultIDs, []uint32{1001, 1056, 2003, 2055}; !sameUint32s(got, want) {
+		t.Fatalf("default opening IDs = %v, want %v", got, want)
+	}
+
+	jungleIDs, err := service.OpeningItemIDs(context.Background(), "", true, false)
+	if err != nil {
+		t.Fatalf("OpeningItemIDs jungle returned error: %v", err)
+	}
+	if got, want := jungleIDs, []uint32{1001, 1056, 1102, 2003, 2055}; !sameUint32s(got, want) {
+		t.Fatalf("jungle opening IDs = %v, want %v", got, want)
+	}
+
+	supportIDs, err := service.OpeningItemIDs(context.Background(), "", false, true)
+	if err != nil {
+		t.Fatalf("OpeningItemIDs support returned error: %v", err)
+	}
+	if got, want := supportIDs, []uint32{1001, 1056, 2003, 2055, 3870}; !sameUint32s(got, want) {
+		t.Fatalf("support opening IDs = %v, want %v", got, want)
+	}
+}
+
 func sameUint32s(left, right []uint32) bool {
 	if len(left) != len(right) {
 		return false

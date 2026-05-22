@@ -18,11 +18,12 @@ The current version can show:
 - complete item-path summaries from `core3_signature` and `final_items_signature` as backend/debug data, not as a separate primary champion-page panel
 - precomputed alternative build variants grouped by meaningful early core items, with player-facing labels such as AP, On Hit, Tank, Crit, Lethality, AD Bruiser, Enchanter, and Support Tank
 - starting-item and completed-item slot panels from the precomputed `item_slot_analytics` read model
+- opening purchase bundles from retained timeline events, so the starting-items panel can show combinations like Doran's Ring plus two potions instead of only the main starter item
 
 Backend contracts:
 
 - `GET /api/analytics/champion-page`: bundled champion guide payload for the frontend champion page. It combines the focused guide, build-advice data, role-rate hints, and guide index in one cached response so champion pages avoid a browser-side request waterfall.
-- `GET /api/analytics/build-advice`: unified build payload for one champion, optional opponent, role, patch, and rank scope. It returns matchup item slots, champion-wide baseline item slots, top build signatures, runes, spells, item paths for diagnostics, sample quality, and fallback notes in one response.
+- `GET /api/analytics/build-advice`: unified build payload for one champion, optional opponent, role, patch, and rank scope. It returns matchup item slots, champion-wide baseline item slots, opening purchase loadouts, top build signatures, runes, spells, item paths for diagnostics, sample quality, and fallback notes in one response.
 - `GET /api/analytics/champion-guides`: index of champion summaries for the current role/patch/rank scope. This powers champion coverage and lets the UI expose every champion we have stored data for.
 - `GET /api/analytics/champion-guide`: focused champion guide payload for one champion and role.
 - `GET /api/analytics/item-slots`: slot-level item read model with matchup-aware fallback.
@@ -53,6 +54,7 @@ Known gaps:
 - Tier-list impact is still a correlation-heavy score. It now uses final participant performance fields, but those signals should be validated as the corpus grows. See `docs/product/tier-list-ranking.md`.
 - Item paths use timeline-derived first-three completed item signatures where available, then final inventory signatures for the completed build. Final inventory order is still Riot inventory order, not guaranteed purchase order.
 - Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin. Slot `0` is reserved for starting items; slots `1-6` remain completed-item purchase order.
+- Starting-item display prefers opening loadout signatures from purchases in the first two minutes. That preserves consumables and control wards as part of the opener. If no loadout sample exists, the UI falls back to the older slot `0` single-item rows.
 - Live matchup slot panels should not mix champion-wide fallback rows into the matchup card. Exact-matchup scope can widen across stored patches, while champion-wide baseline stays in the separate overall card.
 - Displayed slot rows apply a small sanity pass for player readability, including suppressing duplicate boots. The underlying API still returns the candidate rows; the UI chooses a plausible one-boot display.
 - The champion-page bundle is the preferred contract for the champion guide screen. The build-advice endpoint remains the focused contract for live matchup panels and specialty build surfaces. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.

@@ -159,9 +159,26 @@ export type BuildAdviceSample = {
 export type BuildAdviceSection = {
   available?: boolean;
   itemSlots: AnalyticsItemSlot[];
+  startingLoadouts?: StartingItemLoadout[];
   topBuilds: AnalyticsBuild[];
   sample: BuildAdviceSample;
   sampleMode: string;
+};
+
+export type StartingItemLoadout = {
+  championId: number;
+  role: string;
+  opponentChampionId: number;
+  patchBucket: string;
+  rankBucket: string;
+  itemSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+  sampleQuality?: string;
+  sampleQualityLabel?: string;
+  confidencePercentage?: number;
 };
 
 export type BuildAdviceChampionSection = BuildAdviceSection & {

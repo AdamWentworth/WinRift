@@ -456,6 +456,10 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 	if err != nil {
 		return nil, err
 	}
+	openingItemIDs, err := s.openingItemIDs(ctx, request.ItemContext)
+	if err != nil {
+		return nil, err
+	}
 	buildFilters := map[string]string{
 		"champion_id":          strconv.Itoa(int(request.ChampionID)),
 		"role":                 request.Role,
@@ -464,15 +468,24 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 		"rank_bucket":          request.RankBucket,
 	}
 	matchupBuilds := []clickhouse.BuildRow{}
+	matchupStartingLoadouts := []clickhouse.StartingItemLoadoutRow{}
 	if request.OpponentChampionID > 0 {
 		buildFilters["opponent_champion_id"] = strconv.Itoa(int(request.OpponentChampionID))
 		matchupBuilds, err = s.repo.QueryBuilds(ctx, buildFilters, request.MinGames, 8)
 		if err != nil {
 			return nil, err
 		}
+		matchupStartingLoadouts, err = s.repo.QueryStartingItemLoadouts(ctx, buildFilters, openingItemIDs, request.MinGames, request.OptionLimit)
+		if err != nil {
+			return nil, err
+		}
 	}
 	championFilters := cloneStringMap(buildFilters)
 	championFilters["opponent_champion_id"] = ""
+	championStartingLoadouts, err := s.repo.QueryStartingItemLoadouts(ctx, championFilters, openingItemIDs, request.ChampionMinGames, request.OptionLimit)
+	if err != nil {
+		return nil, err
+	}
 	championBuilds, err := s.repo.QueryBuilds(ctx, championFilters, request.ChampionMinGames, 8)
 	if err != nil {
 		return nil, err
@@ -495,23 +508,25 @@ func (s Server) buildAdviceResponse(ctx context.Context, request buildAdviceRequ
 			"limit":              request.OptionLimit,
 		},
 		"matchup": map[string]any{
-			"available":  request.OpponentChampionID > 0,
-			"itemSlots":  itemSlotRowsResponse(matchupSlots),
-			"topBuilds":  buildRowsResponse(matchupBuilds),
-			"sample":     buildAdviceSampleResponse(matchupSlots),
-			"sampleMode": "champion_matchup",
+			"available":        request.OpponentChampionID > 0,
+			"itemSlots":        itemSlotRowsResponse(matchupSlots),
+			"startingLoadouts": startingItemLoadoutRowsResponse(matchupStartingLoadouts),
+			"topBuilds":        buildRowsResponse(matchupBuilds),
+			"sample":           buildAdviceSampleResponse(matchupSlots),
+			"sampleMode":       "champion_matchup",
 		},
 		"champion": map[string]any{
-			"itemSlots":      itemSlotRowsResponse(championSlots),
-			"topBuilds":      buildRowsResponse(championBuilds),
-			"topRunes":       championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
-			"topSpells":      championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
-			"topItemPaths":   championGuideItemPathRowsResponse(guide.TopItemPaths),
-			"buildVariants":  championGuideBuildVariantRowsResponse(guide.BuildVariants),
-			"summary":        championGuideSummaryResponse(guide.Summary),
-			"sample":         buildAdviceSampleResponse(championSlots),
-			"sampleMode":     "champion_overall",
-			"strictRoleUsed": request.Role != "",
+			"itemSlots":        itemSlotRowsResponse(championSlots),
+			"startingLoadouts": startingItemLoadoutRowsResponse(championStartingLoadouts),
+			"topBuilds":        buildRowsResponse(championBuilds),
+			"topRunes":         championGuideSignatureRowsResponse(guide.TopRunes, "runeSignature"),
+			"topSpells":        championGuideSignatureRowsResponse(guide.TopSpells, "spellSignature"),
+			"topItemPaths":     championGuideItemPathRowsResponse(guide.TopItemPaths),
+			"buildVariants":    championGuideBuildVariantRowsResponse(guide.BuildVariants),
+			"summary":          championGuideSummaryResponse(guide.Summary),
+			"sample":           buildAdviceSampleResponse(championSlots),
+			"sampleMode":       "champion_overall",
+			"strictRoleUsed":   request.Role != "",
 		},
 		"diagnostics": map[string]any{
 			"matchup":  buildAdviceItemSlotDiagnostics(matchupSlots),
@@ -677,6 +692,12 @@ func (s Server) queryScopedItemSlots(ctx context.Context, request itemSlotAnalyt
 	return scopedItemSlotRows(rows, itemSlotScope{Key: "requested", Label: "Requested sample"}), nil
 }
 
+func (s Server) openingItemIDs(ctx context.Context, itemContext string) ([]uint32, error) {
+	includeJungle := itemContext == "JUNGLE"
+	includeSupport := itemContext == "SUPPORT"
+	return s.static.OpeningItemIDs(ctx, "", includeJungle, includeSupport)
+}
+
 func itemSlotRowsResponse(scopedRows []scopedItemSlotRow) []map[string]any {
 	results := make([]map[string]any, 0, len(scopedRows))
 	for _, scoped := range scopedRows {
@@ -687,6 +708,28 @@ func itemSlotRowsResponse(scopedRows []scopedItemSlotRow) []map[string]any {
 			"itemSlot": row.ItemSlot, "itemId": row.ItemID,
 			"wins": row.Wins, "games": row.Games, "winRate": round(row.WinRate * 100), "confidence": round(row.Confidence * 100),
 			"sampleScope": scoped.Scope.Key, "sampleScopeLabel": scoped.Scope.Label, "fallback": scoped.Scope.Fallback,
+		})
+	}
+	return results
+}
+
+func startingItemLoadoutRowsResponse(rows []clickhouse.StartingItemLoadoutRow) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"championId":           row.ChampionID,
+			"role":                 row.Role,
+			"opponentChampionId":   row.OpponentChampionID,
+			"patchBucket":          row.PatchBucket,
+			"rankBucket":           row.RankBucket,
+			"itemSignature":        row.ItemSignature,
+			"wins":                 row.Wins,
+			"games":                row.Games,
+			"winRate":              round(row.WinRate * 100),
+			"confidence":           round(row.Confidence * 100),
+			"sampleQuality":        buildAdviceSampleQuality(row.Games),
+			"sampleQualityLabel":   buildAdviceSampleQualityLabel(row.Games),
+			"confidencePercentage": round(row.Confidence * 100),
 		})
 	}
 	return results

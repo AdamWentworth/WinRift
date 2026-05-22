@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChampionPageBundle, getChampionRoleRates } from '../api/client';
-import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
+import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, RuneStyle, StartingItemLoadout, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
   championByKey,
@@ -50,6 +50,7 @@ type Props = {
 };
 
 export type GuideItemSlot = Pick<AnalyticsItemSlot, 'itemSlot' | 'itemId' | 'wins' | 'games' | 'winRate' | 'confidence'>;
+export type GuideStartingLoadout = Pick<StartingItemLoadout, 'itemSignature' | 'wins' | 'games' | 'winRate' | 'confidence'>;
 
 export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, roleRates, onChampionChange }: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
@@ -157,6 +158,9 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const recommendedItemSlots: GuideItemSlot[] = buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
     ? buildAdvice.matchup.itemSlots
     : buildAdvice?.champion.itemSlots ?? [];
+  const recommendedStartingLoadouts: GuideStartingLoadout[] = buildAdvice?.matchup.available && buildAdvice.matchup.startingLoadouts?.length
+    ? buildAdvice.matchup.startingLoadouts
+    : buildAdvice?.champion.startingLoadouts ?? [];
   const selectedVariantItemSlots = selectedBuildVariant ? variantItemSlots(selectedBuildVariant) : [];
   const itemSlots: GuideItemSlot[] = selectedVariantItemSlots.length
     ? withStartingItemRows(recommendedItemSlots, selectedVariantItemSlots)
@@ -267,7 +271,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
 
       <BuildAdviceCoverage buildAdvice={buildAdvice} loading={championPageQuery.isLoading} />
 
-      <ItemGuideGrid rows={itemSlots} items={items} loading={championPageQuery.isLoading} context={itemSlotContext} />
+      <ItemGuideGrid rows={itemSlots} startingLoadouts={recommendedStartingLoadouts} items={items} loading={championPageQuery.isLoading} context={itemSlotContext} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
 
@@ -632,17 +636,39 @@ function SkillPathCard({ guide, variant, championName, loading }: { guide?: Cham
   );
 }
 
-function ItemGuideGrid({ rows, items, loading, context }: { rows: GuideItemSlot[]; items?: ItemData; loading: boolean; context: string }) {
+function ItemGuideGrid({ rows, startingLoadouts, items, loading, context }: { rows: GuideItemSlot[]; startingLoadouts: GuideStartingLoadout[]; items?: ItemData; loading: boolean; context: string }) {
   const { startingRows, coreRows, fourthRows, fifthRows, sixthRows } = selectGuideItemPanelRows(rows);
+  const startingOptions = selectStartingLoadoutRows(startingLoadouts);
   return (
     <section className="guide-item-grid">
-      <GuideItemPanel title="Starting Items" subtitle={context} rows={startingRows.slice(0, 3)} items={items} loading={loading} />
+      <GuideStartingItemPanel title="Starting Items" subtitle={context} loadouts={startingOptions} fallbackRows={startingRows.slice(0, 3)} items={items} loading={loading} />
       <GuideItemPanel title="Core Items" subtitle="Highest-confidence path" rows={coreRows} items={items} loading={loading} linked />
       <GuideItemPanel title="Fourth Item Options" subtitle="Options after core" rows={fourthRows} items={items} loading={loading} />
       <GuideItemPanel title="Fifth Item Options" subtitle="Late build pivots" rows={fifthRows} items={items} loading={loading} />
       <GuideItemPanel title="Sixth Item Options" subtitle="Full-build finishers" rows={sixthRows} items={items} loading={loading} />
     </section>
   );
+}
+
+export function selectStartingLoadoutRows(rows: GuideStartingLoadout[]) {
+  const seen = new Set<string>();
+  return [...rows]
+    .filter((row) => {
+      const signature = normalizedItemSignature(row.itemSignature);
+      if (!signature || seen.has(signature)) return false;
+      seen.add(signature);
+      return true;
+    })
+    .sort((a, b) => {
+      const leftScore = guideStartingLoadoutScore(a);
+      const rightScore = guideStartingLoadoutScore(b);
+      if (leftScore !== rightScore) return rightScore - leftScore;
+      if (a.confidence !== b.confidence) return b.confidence - a.confidence;
+      if (a.winRate !== b.winRate) return b.winRate - a.winRate;
+      if (a.games !== b.games) return b.games - a.games;
+      return normalizedItemSignature(a.itemSignature).localeCompare(normalizedItemSignature(b.itemSignature));
+    })
+    .slice(0, 3);
 }
 
 export function selectGuideItemPanelRows(rows: GuideItemSlot[]) {
@@ -696,6 +722,55 @@ function GuideItemPanel({ title, subtitle, rows, items, loading, linked }: { tit
           ))}
         </div>
       ) : <EmptyState message={loading ? 'Loading items...' : 'No item sample yet.'} />}
+      <small>{subtitle}</small>
+    </PanelCard>
+  );
+}
+
+function GuideStartingItemPanel({ title, subtitle, loadouts, fallbackRows, items, loading }: { title: string; subtitle: string; loadouts: GuideStartingLoadout[]; fallbackRows: GuideItemSlot[]; items?: ItemData; loading: boolean }) {
+  return (
+    <PanelCard className="guide-card guide-item-panel guide-starting-panel">
+      <PanelTitle title={title} />
+      {loadouts.length ? (
+        <div className="guide-item-list">
+          {loadouts.map((row) => {
+            const itemIds = signatureItems(row.itemSignature);
+            return (
+              <div key={`starting-${normalizedItemSignature(row.itemSignature)}`} className="guide-item-option guide-starting-option">
+                <div className="guide-starting-icons">
+                  {itemIds.map((itemId, index) => (
+                    itemImageUrl(items, String(itemId)) ? (
+                      <img key={`${row.itemSignature}-${itemId}-${index}`} src={itemImageUrl(items, String(itemId))} alt={itemName(items, String(itemId))} title={itemName(items, String(itemId))} />
+                    ) : (
+                      <span key={`${row.itemSignature}-${itemId}-${index}`} className="item-pill">{itemId}</span>
+                    )
+                  ))}
+                </div>
+                <div>
+                  <strong>{row.winRate.toFixed(2)}% WR</strong>
+                  <span>{formatNumber(row.games)} matches</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : fallbackRows.length ? (
+        <div className="guide-item-list">
+          {fallbackRows.map((row, index) => (
+            <div key={`${title}-${row.itemSlot}-${row.itemId}-${index}`} className="guide-item-option">
+              {itemImageUrl(items, String(row.itemId)) ? (
+                <img src={itemImageUrl(items, String(row.itemId))} alt={itemName(items, String(row.itemId))} title={itemName(items, String(row.itemId))} />
+              ) : (
+                <span className="item-pill">{row.itemId}</span>
+              )}
+              <div>
+                <strong>{row.winRate.toFixed(2)}% WR</strong>
+                <span>{formatNumber(row.games)} matches</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : <EmptyState message={loading ? 'Loading items...' : 'No starting item sample yet.'} />}
       <small>{subtitle}</small>
     </PanelCard>
   );
@@ -926,8 +1001,17 @@ function addDisplayedItems(used: Set<number>, rows: GuideItemSlot[]) {
   }
 }
 
+function normalizedItemSignature(signature: string) {
+  return signatureItems(signature).join('-');
+}
+
 function guideItemSlotScore(row: GuideItemSlot) {
   const reliability = Math.min(1, Math.sqrt(row.games / 200));
+  return row.confidence * reliability;
+}
+
+function guideStartingLoadoutScore(row: GuideStartingLoadout) {
+  const reliability = Math.min(1, Math.sqrt(row.games / 150));
   return row.confidence * reliability;
 }
 

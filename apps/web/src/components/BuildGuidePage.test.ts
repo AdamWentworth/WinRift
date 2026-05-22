@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { selectGuideItemPanelRows } from './BuildGuidePage';
-import type { GuideItemSlot } from './BuildGuidePage';
+import { selectGuideItemPanelRows, selectStartingLoadoutRows } from './BuildGuidePage';
+import type { GuideItemSlot, GuideStartingLoadout } from './BuildGuidePage';
 
 function slot(itemSlot: number, itemId: number, games: number, winRate = 55, confidence = 50): GuideItemSlot {
   return {
     itemSlot,
     itemId,
+    wins: Math.round((winRate / 100) * games),
+    games,
+    winRate,
+    confidence,
+  };
+}
+
+function loadout(itemSignature: string, games: number, winRate = 55, confidence = 50): GuideStartingLoadout {
+  return {
+    itemSignature,
     wins: Math.round((winRate / 100) * games),
     games,
     winRate,
@@ -35,5 +45,15 @@ describe('selectGuideItemPanelRows', () => {
     expect(panels.fourthRows.map((row) => row.itemId)).toContain(3157);
     expect(panels.fifthRows.map((row) => row.itemId)).not.toContain(3157);
     expect(panels.sixthRows.map((row) => row.itemId)).not.toContain(3135);
+  });
+
+  it('keeps starting item bundles with potion quantities intact', () => {
+    const rows = selectStartingLoadoutRows([
+      loadout('1056-2003-2003', 80, 52, 45),
+      loadout('1056-2003-2003', 75, 53, 44),
+      loadout('1056-2055', 24, 57, 40),
+    ]);
+
+    expect(rows.map((row) => row.itemSignature)).toEqual(['1056-2003-2003', '1056-2055']);
   });
 });

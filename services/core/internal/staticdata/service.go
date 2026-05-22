@@ -230,6 +230,12 @@ func (s *Service) StartingItemIDs(ctx context.Context, patch string, includeJung
 	})
 }
 
+func (s *Service) OpeningItemIDs(ctx context.Context, patch string, includeJungle, includeSupport bool) ([]uint32, error) {
+	return s.itemIDs(ctx, patch, func(id uint32, item map[string]any) bool {
+		return isOpeningItem(id, item, includeJungle, includeSupport)
+	})
+}
+
 func (s *Service) itemIDs(ctx context.Context, patch string, include func(uint32, map[string]any) bool) ([]uint32, error) {
 	payload, err := s.Get(ctx, "items", patch)
 	if err != nil {
@@ -327,6 +333,24 @@ func isStartingItem(id uint32, item map[string]any, includeJungle, includeSuppor
 	return true
 }
 
+func isOpeningItem(id uint32, item map[string]any, includeJungle, includeSupport bool) bool {
+	if isUnavailableShopItem(item) {
+		return false
+	}
+	tags := itemTags(item)
+	if tags["Trinket"] {
+		return false
+	}
+	if tags["Jungle"] {
+		return includeJungle
+	}
+	if isSupportBuildItem(tags) {
+		return includeSupport
+	}
+	totalGold, purchasable := itemGold(item)
+	return purchasable && totalGold > 0 && totalGold <= 650
+}
+
 func isExcludedShopItem(id uint32, item map[string]any) bool {
 	if excludedBuildItems[id] {
 		return true
@@ -334,6 +358,10 @@ func isExcludedShopItem(id uint32, item map[string]any) bool {
 	if consumed, _ := item["consumed"].(bool); consumed {
 		return true
 	}
+	return isUnavailableShopItem(item)
+}
+
+func isUnavailableShopItem(item map[string]any) bool {
 	if maps, ok := item["maps"].(map[string]any); ok {
 		if summonersRift, ok := maps["11"].(bool); ok && !summonersRift {
 			return true

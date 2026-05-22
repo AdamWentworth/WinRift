@@ -51,6 +51,19 @@ type ItemSlotRow struct {
 	Confidence         float64
 }
 
+type StartingItemLoadoutRow struct {
+	ChampionID         uint16
+	Role               string
+	OpponentChampionID uint16
+	PatchBucket        string
+	RankBucket         string
+	ItemSignature      string
+	Wins               int
+	Games              int
+	WinRate            float64
+	Confidence         float64
+}
+
 type ItemSlotAnalyticsContext struct {
 	Key             string
 	ItemIDs         []uint32
@@ -377,6 +390,116 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 	return r.queryItemSlotsLiveScan(ctx, filters, completionItemIDs, startingItemIDs, minGames, limit)
 }
 
+func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[string]string, openingItemIDs []uint32, minGames, limit int) ([]StartingItemLoadoutRow, error) {
+	if len(openingItemIDs) == 0 {
+		return nil, nil
+	}
+	if minGames <= 0 {
+		minGames = 1
+	}
+	if limit <= 0 {
+		limit = 6
+	}
+	itemList := uint32ListSQL(openingItemIDs)
+	patchBucketExpr := "'ALL'"
+	rankBucketExpr := "'ALL'"
+	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
+	if filters["patch"] != "" {
+		patchBucketExpr = "patch_value"
+	}
+	if filters["rank_bucket"] != "" {
+		rankBucketExpr = "rank_value"
+	}
+	roleScope := analyticsRoleScope(filters["role"])
+	rawFilters := ""
+	args := []any{}
+	if filters["champion_id"] != "" {
+		rawFilters += " AND pm.champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if roleScope.whereSQL != "" {
+		rawFilters += " AND " + qualifyRoleWhereSQL(roleScope.whereSQL, "pm.role")
+		args = append(args, roleScope.args...)
+	}
+	if filters["opponent_champion_id"] != "" {
+		rawFilters += " AND pm.opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		rawFilters += " AND pm.patch = ?"
+		args = append(args, filters["patch"])
+	}
+	query := fmt.Sprintf(`
+		WITH opening_purchases AS
+		(
+			SELECT
+				pm.match_id AS match_id,
+				pm.participant_id AS participant_id,
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				pm.opponent_champion_id AS opponent_champion_id,
+				pm.patch AS patch_value,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_value,
+				pm.win AS win,
+				arraySort(groupArray(toUInt32(tie.item_id))) AS item_ids
+			FROM participant_matchups AS pm FINAL
+			INNER JOIN timeline_item_events AS tie FINAL
+				ON pm.match_id = tie.match_id
+				AND pm.participant_id = tie.participant_id
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE tie.event_type = 'ITEM_PURCHASED'
+				AND tie.timestamp_ms <= ?
+				AND tie.item_id IN (%s)
+				%s
+			GROUP BY
+				pm.match_id,
+				pm.participant_id,
+				pm.champion_id,
+				pm.role,
+				pm.opponent_champion_id,
+				pm.patch,
+				rank_value,
+				pm.win
+			HAVING length(item_ids) > 0
+		)
+		SELECT
+			champion_id,
+			%s AS role_bucket,
+			%s AS opponent_champion_id,
+			%s AS patch_bucket,
+			%s AS rank_bucket,
+			arrayStringConcat(arrayMap(item -> toString(item), item_ids), '-') AS item_signature,
+			toUInt64(sum(win)) AS wins,
+			toUInt64(count()) AS games,
+			wins / games AS win_rate
+		FROM opening_purchases
+		WHERE length(item_ids) > 0`, itemList, rawFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+	queryArgs := append([]any{startingItemWindowMS}, args...)
+	if filters["rank_bucket"] != "" {
+		query += " AND rank_value = ?"
+		queryArgs = append(queryArgs, filters["rank_bucket"])
+	}
+	query += `
+		GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, item_signature
+		HAVING games >= ?
+		ORDER BY win_rate DESC, games DESC`
+	queryArgs = append(queryArgs, minGames)
+	return r.scanStartingItemLoadoutRows(ctx, query, queryArgs, limit)
+}
+
 func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]ItemSlotRow, error) {
 	patchBucketExpr := "'ALL'"
 	rankBucketExpr := "'ALL'"
@@ -430,6 +553,27 @@ func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[stri
 		ORDER BY item_slot ASC, win_rate DESC, games DESC`
 	args = append(args, minGames)
 	return r.scanItemSlotRows(ctx, query, args, limit)
+}
+
+func (r *Repository) scanStartingItemLoadoutRows(ctx context.Context, query string, args []any, limit int) ([]StartingItemLoadoutRow, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StartingItemLoadoutRow
+	for rows.Next() {
+		var row StartingItemLoadoutRow
+		if err := rows.Scan(&row.ChampionID, &row.Role, &row.OpponentChampionID, &row.PatchBucket, &row.RankBucket, &row.ItemSignature, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return trimStartingItemLoadoutRows(out, limit), nil
 }
 
 func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[string]string, allowedItemIDs, startingItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
@@ -1497,8 +1641,45 @@ func trimItemSlotRows(rows []ItemSlotRow, limit int) []ItemSlotRow {
 	return out
 }
 
+func trimStartingItemLoadoutRows(rows []StartingItemLoadoutRow, limit int) []StartingItemLoadoutRow {
+	if limit <= 0 || len(rows) == 0 {
+		return rows
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		left := rows[i]
+		right := rows[j]
+		leftScore := startingLoadoutRecommendationScore(left)
+		rightScore := startingLoadoutRecommendationScore(right)
+		if leftScore != rightScore {
+			return leftScore > rightScore
+		}
+		if left.Confidence != right.Confidence {
+			return left.Confidence > right.Confidence
+		}
+		if left.WinRate != right.WinRate {
+			return left.WinRate > right.WinRate
+		}
+		if left.Games != right.Games {
+			return left.Games > right.Games
+		}
+		return left.ItemSignature < right.ItemSignature
+	})
+	if len(rows) > limit {
+		return rows[:limit]
+	}
+	return rows
+}
+
 func itemSlotRecommendationScore(row ItemSlotRow) float64 {
 	reliability := math.Sqrt(float64(row.Games) / 200)
+	if reliability > 1 {
+		reliability = 1
+	}
+	return row.Confidence * reliability
+}
+
+func startingLoadoutRecommendationScore(row StartingItemLoadoutRow) float64 {
+	reliability := math.Sqrt(float64(row.Games) / 150)
 	if reliability > 1 {
 		reliability = 1
 	}

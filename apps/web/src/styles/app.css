@@ -6403,11 +6403,29 @@ button {
   min-width: 0;
 }
 
+.guide-starting-option {
+  align-items: flex-start;
+}
+
+.guide-starting-icons {
+  display: flex;
+  flex: 0 1 102px;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 74px;
+}
+
 .guide-item-option img {
   border: 1px solid rgb(255 255 255 / 16%);
   height: 38px;
   object-fit: cover;
   width: 38px;
+}
+
+.guide-starting-icons img,
+.guide-starting-icons .item-pill {
+  height: 30px;
+  width: 30px;
 }
 
 .guide-item-option div {
