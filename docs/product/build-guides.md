@@ -15,13 +15,13 @@ The current version can show:
 - skill priority/path aggregates from stored `SKILL_LEVEL_UP` timeline events
 - ban-rate estimates derived from champion bans in stored Match-V5 payloads
 - toughest and favorable opponent matchups from stored participant matchup rows
-- complete item-path summaries from `core3_signature` and `final_items_signature`
+- complete item-path summaries from `core3_signature` and `final_items_signature` as backend/debug data, not as a separate primary champion-page panel
 - alternative build variants grouped by meaningful early core items, with player-facing labels such as AP, On Hit, Tank, Crit, Lethality, AD Bruiser, Enchanter, and Support Tank
 - item slot panels from the precomputed `item_slot_analytics` read model
 
 Backend contracts:
 
-- `GET /api/analytics/build-advice`: unified build payload for one champion, optional opponent, role, patch, and rank scope. It returns matchup item slots, champion-wide baseline item slots, top build signatures, runes, spells, item paths, sample quality, and fallback notes in one response.
+- `GET /api/analytics/build-advice`: unified build payload for one champion, optional opponent, role, patch, and rank scope. It returns matchup item slots, champion-wide baseline item slots, top build signatures, runes, spells, item paths for diagnostics, sample quality, and fallback notes in one response.
 - `GET /api/analytics/champion-guides`: index of champion summaries for the current role/patch/rank scope. This powers champion coverage and lets the UI expose every champion we have stored data for.
 - `GET /api/analytics/champion-guide`: focused champion guide payload for one champion and role.
 - `GET /api/analytics/item-slots`: slot-level item read model with matchup-aware fallback.
@@ -35,6 +35,7 @@ Build variant labeling:
 - Variant labels are intentionally broad. If several core item families resolve to the same label, such as multiple Katarina AP paths, those rows should be summed into one player-facing build family.
 - The `Recommended` tab is not a variant lane. It should use the broad champion/matchup build-advice data and the highest-support aggregate setup, while alternative tabs intentionally narrow to their detected family.
 - Recommended item slots use a support-aware score, with samples ramping toward full trust around 200 games, so tiny hot samples do not outrank much larger, well-supported choices.
+- The champion page should keep the lower item panels as the primary build presentation. It should dedupe core items and avoid showing the same core item again as a late option unless no better option exists.
 - Future refinement: add a small curated champion override map for cases where community jargon is specific and stable, such as Katarina AD/On Hit/Tank or Shyvana AP/Tank.
 
 Known gaps:
