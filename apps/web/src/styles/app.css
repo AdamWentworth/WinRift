@@ -3960,6 +3960,9 @@ button {
   font-size: 10px;
   font-style: normal;
   font-weight: 900;
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
   white-space: nowrap;
 }
 
@@ -3977,22 +3980,38 @@ button {
   width: 26px;
 }
 
-.stat-shard-icon-strip {
-  align-items: center;
-  background: rgb(0 0 0 / 22%);
-  border: 1px solid rgb(130 215 255 / 18%);
-  display: inline-flex;
-  gap: 4px;
-  min-width: 0;
-  padding: 3px 5px;
+.build-setup-shards {
+  grid-column: 2 / 4;
+  padding: 6px;
+  width: min(100%, 260px);
 }
 
-.stat-shard-icon-strip b {
-  color: #95b8c1;
+.build-setup-shards .stat-shard-grid-title {
   font-size: 8px;
-  font-weight: 1000;
-  letter-spacing: 0;
-  text-transform: uppercase;
+}
+
+.build-setup-shards .stat-shard-row {
+  gap: 6px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 22px;
+}
+
+.build-setup-shards .stat-shard-row em {
+  font-size: 8px;
+}
+
+.build-setup-shards .stat-shard-row div {
+  gap: 6px;
+}
+
+.build-setup-shards .stat-shard-row .stat-shard-icon {
+  height: 22px;
+  width: 22px;
+}
+
+.build-setup-shards .stat-shard-row .stat-shard-icon img {
+  height: 17px;
+  width: 17px;
 }
 
 .stat-shard-icon {
@@ -5914,7 +5933,9 @@ button {
 
 .guide-stat-shards {
   grid-column: 1 / -1;
-  grid-template-columns: minmax(100px, 0.24fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  justify-self: end;
+  width: calc((100% - 20px) / 2);
 }
 
 .stat-shard-grid-title {
@@ -5943,6 +5964,7 @@ button {
 .stat-shard-row div {
   display: flex;
   gap: 10px;
+  justify-content: flex-start;
   min-width: 0;
 }
 
@@ -6682,6 +6704,7 @@ button {
 
   .guide-stat-shards {
     grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .guide-build-path-card {
@@ -6829,6 +6852,14 @@ button {
 
   .build-setup-block {
     grid-template-columns: 1fr;
+  }
+
+  .build-setup-block em,
+  .build-setup-shards {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+    width: 100%;
   }
 
   .focused-build-result > header div {

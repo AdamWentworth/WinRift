@@ -27,20 +27,6 @@ export function StatShardGrid({ selectedIds, className = '' }: Props) {
   );
 }
 
-export function StatShardIconStrip({ selectedIds, className = '' }: Props) {
-  const ids = selectedIds.slice(0, 3).filter(Boolean);
-  if (!ids.length) return null;
-  const classes = ['stat-shard-icon-strip', className].filter(Boolean).join(' ');
-  return (
-    <span className={classes} aria-label="Stat shards">
-      <b>Shards</b>
-      {ids.map((id, index) => (
-        <StatShardIcon key={`${id}-${index}`} id={id} selected />
-      ))}
-    </span>
-  );
-}
-
 function StatShardIcon({ id, selected }: { id: number; selected?: boolean }) {
   const label = statPerkLabel(id);
   const src = statPerkImageUrl(id);
