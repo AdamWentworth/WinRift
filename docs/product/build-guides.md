@@ -48,6 +48,6 @@ Known gaps:
 - Live matchup slot panels should not mix champion-wide fallback rows into the matchup card. Exact-matchup scope can widen across stored patches, while champion-wide baseline stays in the separate overall card.
 - Displayed slot rows apply a small sanity pass for player readability, including suppressing duplicate boots. The underlying API still returns the candidate rows; the UI chooses a plausible one-boot display.
 - The build-advice endpoint is the preferred contract for future profile/live/champion build UI work. Lower-level item-slot and champion-guide endpoints can stay available for debugging and specialty pages.
-- Skill paths are real timeline-derived paths, but they are still aggregated by champion/role/rank/patch rather than matchup-specific skill paths.
+- Skill paths are real timeline-derived paths, but they are still aggregated by champion/role/rank/patch rather than matchup-specific or build-variant-specific skill paths. The UI keeps ability order outside the build-variant flow for that reason.
 
 The build guide page should remain a reference surface. Live match mode can point users toward contextual matchup stats, while guide mode lets users explore champion-wide and matchup-specific patterns calmly before queueing.

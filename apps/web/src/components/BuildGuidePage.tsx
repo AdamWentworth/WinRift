@@ -261,16 +261,22 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         </div>
       </div>
 
-      <div className="guide-skill-items-row">
-        <SkillGuideCard guide={guide} champion={champion} champions={champions} loading={guideQuery.isLoading} />
-        <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
-      </div>
-
       <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
 
       <ItemGuideGrid rows={itemSlots} items={items} loading={buildAdviceQuery.isLoading} context={itemSlotContext} />
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
+
+      <section className="guide-ability-section" aria-label={`${champion?.name ?? 'Champion'} ability order`}>
+        <div className="guide-section-title">
+          <span>Ability Order</span>
+          <em>Champion-level skill priority from stored timeline level-ups.</em>
+        </div>
+        <div className="guide-skill-items-row">
+          <SkillGuideCard guide={guide} champion={champion} champions={champions} loading={guideQuery.isLoading} />
+          <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
+        </div>
+      </section>
 
       <section className="guide-matchups-section" aria-label={`${champion?.name ?? 'Champion'} matchups`}>
         <div className="guide-section-title">
