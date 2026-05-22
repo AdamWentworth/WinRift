@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"winrift/services/core/internal/analytics"
 )
@@ -264,41 +265,84 @@ func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]
 	if limit <= 0 {
 		limit = 12
 	}
-	summary, err := r.queryChampionGuideSummary(ctx, filters, minGames)
-	if err != nil {
-		return ChampionGuideData{}, err
+	queryCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var (
+		summary       ChampionGuideSummary
+		toughest      []ChampionGuideMatchupRow
+		best          []ChampionGuideMatchupRow
+		runes         []ChampionGuideSignatureRow
+		spells        []ChampionGuideSignatureRow
+		skills        []ChampionGuideSkillOrderRow
+		itemPaths     []ChampionGuideItemPathRow
+		buildVariants []ChampionGuideBuildVariantRow
+		banRates      map[uint16]championBanRate
+		wg            sync.WaitGroup
+		mu            sync.Mutex
+		firstErr      error
+	)
+	run := func(fn func(context.Context) error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(queryCtx); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+					cancel()
+				}
+				mu.Unlock()
+			}
+		}()
 	}
-	toughest, err := r.queryChampionGuideMatchups(ctx, filters, minGames, limit, true)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	best, err := r.queryChampionGuideMatchups(ctx, filters, minGames, limit, false)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	runes, err := r.queryChampionGuideSignatures(ctx, filters, "rune_signature", minGames, limit)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	spells, err := r.queryChampionGuideSignatures(ctx, filters, "spell_signature", minGames, limit)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	skills, err := r.queryChampionGuideSkillOrders(ctx, filters, minGames, limit)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	itemPaths, err := r.queryChampionGuideItemPaths(ctx, filters, minGames, limit)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	buildVariants, err := r.queryChampionGuideBuildVariants(ctx, filters, minGames, limit)
-	if err != nil {
-		return ChampionGuideData{}, err
-	}
-	banRates, err := r.queryChampionBanRates(ctx, filters)
-	if err != nil {
-		return ChampionGuideData{}, err
+	run(func(ctx context.Context) error {
+		var err error
+		summary, err = r.queryChampionGuideSummary(ctx, filters, minGames)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		toughest, err = r.queryChampionGuideMatchups(ctx, filters, minGames, limit, true)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		best, err = r.queryChampionGuideMatchups(ctx, filters, minGames, limit, false)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		runes, err = r.queryChampionGuideSignatures(ctx, filters, "rune_signature", minGames, limit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		spells, err = r.queryChampionGuideSignatures(ctx, filters, "spell_signature", minGames, limit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		skills, err = r.queryChampionGuideSkillOrders(ctx, filters, minGames, limit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		itemPaths, err = r.queryChampionGuideItemPaths(ctx, filters, minGames, limit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		buildVariants, err = r.queryChampionGuideBuildVariants(ctx, filters, minGames, limit)
+		return err
+	})
+	run(func(ctx context.Context) error {
+		var err error
+		banRates, err = r.queryChampionBanRates(ctx, filters)
+		return err
+	})
+	wg.Wait()
+	if firstErr != nil {
+		return ChampionGuideData{}, firstErr
 	}
 	if banRate, ok := banRates[summary.ChampionID]; ok {
 		summary.Bans = banRate.Bans
@@ -837,6 +881,178 @@ func (r *Repository) queryChampionGuideBuildVariants(ctx context.Context, filter
 	if limit <= 0 {
 		limit = 12
 	}
+	rows, hasSummary, err := r.queryChampionGuideBuildVariantsSummary(ctx, filters, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryChampionGuideBuildVariantsLiveScan(ctx, filters, minGames, limit)
+}
+
+func (r *Repository) queryChampionGuideBuildVariantsSummary(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideBuildVariantRow, bool, error) {
+	championID := filterValue(filters["champion_id"])
+	if championID == "" {
+		return nil, false, nil
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	query := `
+		SELECT
+			variant_key,
+			variant_label,
+			variant_tags,
+			core2_signature,
+			core3_signature,
+			final_items_signature,
+			rune_signature,
+			spell_signature,
+			skill_order_signature,
+			skill_order_wins,
+			skill_order_games,
+			wins,
+			games,
+			build_count
+		FROM champion_build_variant_analytics FINAL
+		WHERE platform = 'ALL'
+			AND champion_id = ?`
+	args := []any{championID}
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+
+	type variantAggregate struct {
+		row                 ChampionGuideBuildVariantRow
+		representativeGames int
+		skills              map[string]buildVariantSkillAggregate
+	}
+	scanned := false
+	variants := map[string]*variantAggregate{}
+	for rows.Next() {
+		scanned = true
+		var row ChampionGuideBuildVariantRow
+		if err := rows.Scan(
+			&row.VariantKey,
+			&row.VariantLabel,
+			&row.VariantTags,
+			&row.Core2Signature,
+			&row.Core3Signature,
+			&row.FinalItemsSignature,
+			&row.RuneSignature,
+			&row.SpellSignature,
+			&row.SkillOrderSignature,
+			&row.SkillOrderWins,
+			&row.SkillOrderGames,
+			&row.Wins,
+			&row.Games,
+			&row.BuildCount,
+		); err != nil {
+			return nil, false, err
+		}
+		aggregate := variants[row.VariantKey]
+		if aggregate == nil {
+			aggregate = &variantAggregate{
+				row:                 row,
+				representativeGames: row.Games,
+				skills:              map[string]buildVariantSkillAggregate{},
+			}
+			aggregate.row.SkillOrderSignature = ""
+			aggregate.row.SkillOrderWins = 0
+			aggregate.row.SkillOrderGames = 0
+			variants[row.VariantKey] = aggregate
+		} else {
+			aggregate.row.Wins += row.Wins
+			aggregate.row.Games += row.Games
+			aggregate.row.BuildCount += row.BuildCount
+			aggregate.row.VariantTags = mergeBuildVariantTags(aggregate.row.VariantTags, row.VariantTags)
+			if row.Games > aggregate.representativeGames {
+				aggregate.row.VariantLabel = row.VariantLabel
+				aggregate.row.Core2Signature = row.Core2Signature
+				aggregate.row.Core3Signature = row.Core3Signature
+				aggregate.row.FinalItemsSignature = row.FinalItemsSignature
+				aggregate.row.RuneSignature = row.RuneSignature
+				aggregate.row.SpellSignature = row.SpellSignature
+				aggregate.representativeGames = row.Games
+			}
+		}
+		if row.SkillOrderSignature != "" && row.SkillOrderGames > 0 {
+			current := aggregate.skills[row.SkillOrderSignature]
+			current.Wins += row.SkillOrderWins
+			current.Games += row.SkillOrderGames
+			aggregate.skills[row.SkillOrderSignature] = current
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	if !scanned {
+		return nil, false, nil
+	}
+	skillMinGames := minGames
+	if skillMinGames < buildVariantSkillOrderMinGames {
+		skillMinGames = buildVariantSkillOrderMinGames
+	}
+	out := []ChampionGuideBuildVariantRow{}
+	for _, aggregate := range variants {
+		row := aggregate.row
+		if row.Games < minGames {
+			continue
+		}
+		row.WinRate = float64(row.Wins) / float64(row.Games)
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		bestSignature := ""
+		best := buildVariantSkillAggregate{}
+		for signature, skill := range aggregate.skills {
+			if skill.Games < skillMinGames {
+				continue
+			}
+			if bestSignature == "" || skill.Games > best.Games || (skill.Games == best.Games && skill.Wins > best.Wins) {
+				bestSignature = signature
+				best = skill
+			}
+		}
+		if bestSignature != "" && best.Games > 0 {
+			row.SkillOrderSignature = bestSignature
+			row.SkillOrderWins = best.Wins
+			row.SkillOrderGames = best.Games
+			row.SkillOrderWinRate = float64(best.Wins) / float64(best.Games)
+			row.SkillOrderConfidence = analytics.WilsonLowerBound(best.Wins, best.Games, 1.96)
+		}
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		if out[i].Confidence != out[j].Confidence {
+			return out[i].Confidence > out[j].Confidence
+		}
+		if out[i].WinRate != out[j].WinRate {
+			return out[i].WinRate > out[j].WinRate
+		}
+		return out[i].VariantKey < out[j].VariantKey
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, true, nil
+}
+
+func (r *Repository) queryChampionGuideBuildVariantsLiveScan(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideBuildVariantRow, error) {
 	championID := filterValue(filters["champion_id"])
 	if championID == "" {
 		return nil, nil

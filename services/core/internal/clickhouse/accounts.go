@@ -255,6 +255,42 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ENGINE = ReplacingMergeTree(compiled_at)
 		ORDER BY (patch, platform, queue_id, champion_id)
 	`, `
+		CREATE TABLE IF NOT EXISTS champion_build_variant_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			champion_id UInt16,
+			role LowCardinality(String),
+			rank_bucket LowCardinality(String),
+			variant_key String,
+			variant_label String,
+			variant_tags Array(String),
+			core2_signature String,
+			core3_signature String,
+			final_items_signature String,
+			rune_signature String,
+			spell_signature String,
+			skill_order_signature String,
+			skill_order_wins UInt64,
+			skill_order_games UInt64,
+			wins UInt64,
+			games UInt64,
+			build_count UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			variant_key
+		)
+	`, `
 		CREATE TABLE IF NOT EXISTS participant_performance
 		(
 			match_id String,

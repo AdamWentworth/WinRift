@@ -16,7 +16,7 @@ The current version can show:
 - ban-rate estimates derived from champion bans in stored Match-V5 payloads
 - toughest and favorable opponent matchups from stored participant matchup rows
 - complete item-path summaries from `core3_signature` and `final_items_signature` as backend/debug data, not as a separate primary champion-page panel
-- alternative build variants grouped by meaningful early core items, with player-facing labels such as AP, On Hit, Tank, Crit, Lethality, AD Bruiser, Enchanter, and Support Tank
+- precomputed alternative build variants grouped by meaningful early core items, with player-facing labels such as AP, On Hit, Tank, Crit, Lethality, AD Bruiser, Enchanter, and Support Tank
 - starting-item and completed-item slot panels from the precomputed `item_slot_analytics` read model
 
 Backend contracts:
@@ -26,6 +26,13 @@ Backend contracts:
 - `GET /api/analytics/champion-guide`: focused champion guide payload for one champion and role.
 - `GET /api/analytics/item-slots`: slot-level item read model with matchup-aware fallback.
 - `POST /api/dev/analytics/champion-guides/refresh`: local/dev refresh endpoint. With `backfill: true`, it derives participant performance, skill events, and champion bans from retained raw payloads before rebuilding guide read models.
+
+Read models:
+
+- `champion_build_variant_analytics`: precomputed champion-guide alternative build tabs, representative runes/spells/items, and build-specific skill orders where the sample floor is met.
+- `champion_skill_analytics`: champion/role skill order rows.
+- `champion_ban_analytics`: sample-relative ban-rate rows.
+- `item_slot_analytics`: starting-item and completed-item slot rows used by guide and live build panels.
 
 Build variant labeling:
 

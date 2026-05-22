@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"winrift/services/core/internal/analytics"
@@ -18,6 +19,24 @@ type championBanRate struct {
 	Bans    int
 	Games   int
 	BanRate float64
+}
+
+type championBuildVariantAnalyticsRow struct {
+	ChampionID uint16
+	Role       string
+	RankBucket string
+	ChampionGuideBuildVariantRow
+}
+
+type championBuildVariantRefreshAggregate struct {
+	row                 championBuildVariantAnalyticsRow
+	representativeGames int
+}
+
+type championBuildVariantSkillChoice struct {
+	Signature string
+	Wins      int
+	Games     int
 }
 
 func (r *Repository) BackfillChampionGuideEvents(ctx context.Context, patch string, queueID uint16) (ChampionGuideEventBackfillResult, error) {
@@ -177,10 +196,16 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_ban_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_build_variant_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
 	if err := r.refreshChampionSkillAnalytics(ctx, patch, queueID); err != nil {
 		return err
 	}
-	return r.refreshChampionBanAnalytics(ctx, patch, queueID)
+	if err := r.refreshChampionBanAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
+	return r.refreshChampionBuildVariantAnalytics(ctx, patch, queueID)
 }
 
 func (r *Repository) refreshChampionSkillAnalytics(ctx context.Context, patch string, queueID uint16) error {
@@ -274,6 +299,359 @@ func (r *Repository) refreshChampionBanAnalytics(ctx context.Context, patch stri
 		queueID,
 	)
 	return err
+}
+
+func (r *Repository) refreshChampionBuildVariantAnalytics(ctx context.Context, patch string, queueID uint16) error {
+	skillChoices, err := r.queryChampionBuildVariantSkillChoices(ctx, patch, queueID)
+	if err != nil {
+		return err
+	}
+	sourceRows, err := r.queryChampionBuildVariantSourceRows(ctx, patch, queueID)
+	if err != nil {
+		return err
+	}
+	labelGroups := map[string]*championBuildVariantRefreshAggregate{}
+	for _, source := range sourceRows {
+		coreKey := buildVariantCoreKey(source.Core3Signature, source.FinalItemsSignature, source.Core2Signature)
+		if coreKey == "" {
+			continue
+		}
+		source.VariantKey = coreKey
+		source.Core2Signature = coreKey
+		source.VariantLabel, source.VariantTags = buildVariantLabelAndTags(source.Core2Signature + "-" + source.Core3Signature + "-" + source.FinalItemsSignature)
+		groupKey := buildVariantGroupKey(source.ChampionGuideBuildVariantRow)
+		key := championBuildVariantAnalyticsKey(source.ChampionID, source.Role, source.RankBucket, groupKey)
+		group := labelGroups[key]
+		if group == nil {
+			source.VariantKey = groupKey
+			group = &championBuildVariantRefreshAggregate{
+				row:                 source,
+				representativeGames: source.Games,
+			}
+			labelGroups[key] = group
+			continue
+		}
+		group.row.Wins += source.Wins
+		group.row.Games += source.Games
+		group.row.BuildCount += source.BuildCount
+		group.row.VariantTags = mergeBuildVariantTags(group.row.VariantTags, source.VariantTags)
+		if source.Games > group.representativeGames {
+			group.row.Core2Signature = source.Core2Signature
+			group.row.Core3Signature = source.Core3Signature
+			group.row.FinalItemsSignature = source.FinalItemsSignature
+			group.row.RuneSignature = source.RuneSignature
+			group.row.SpellSignature = source.SpellSignature
+			group.representativeGames = source.Games
+		}
+	}
+	out := make([]championBuildVariantAnalyticsRow, 0, len(labelGroups))
+	for key, group := range labelGroups {
+		if skill, ok := skillChoices[key]; ok {
+			group.row.SkillOrderSignature = skill.Signature
+			group.row.SkillOrderWins = skill.Wins
+			group.row.SkillOrderGames = skill.Games
+		}
+		out = append(out, group.row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].ChampionID != out[j].ChampionID {
+			return out[i].ChampionID < out[j].ChampionID
+		}
+		if out[i].Role != out[j].Role {
+			return out[i].Role < out[j].Role
+		}
+		if out[i].RankBucket != out[j].RankBucket {
+			return out[i].RankBucket < out[j].RankBucket
+		}
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		return out[i].VariantKey < out[j].VariantKey
+	})
+	return r.insertChampionBuildVariantAnalytics(ctx, patch, queueID, out)
+}
+
+func (r *Repository) queryChampionBuildVariantSourceRows(ctx context.Context, patch string, queueID uint16) ([]championBuildVariantAnalyticsRow, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			champion_id,
+			role,
+			rank_bucket,
+			core2_signature,
+			argMax(core3_signature, row_games) AS core3_signature,
+			argMax(final_items_signature, row_games) AS final_items_signature,
+			argMax(rune_signature, row_games) AS rune_signature,
+			argMax(spell_signature, row_games) AS spell_signature,
+			toUInt64(sum(row_wins)) AS wins,
+			toUInt64(sum(row_games)) AS games,
+			count() AS build_count
+		FROM
+		(
+			SELECT
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_bucket,
+				pm.core2_signature AS core2_signature,
+				pm.core3_signature AS core3_signature,
+				pm.final_items_signature AS final_items_signature,
+				pm.rune_signature AS rune_signature,
+				pm.spell_signature AS spell_signature,
+				toUInt64(sum(pm.win)) AS row_wins,
+				toUInt64(count()) AS row_games
+			FROM participant_matchups AS pm FINAL
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE pm.patch = ?
+				AND pm.queue_id = ?
+				AND pm.core2_signature != ''
+				AND pm.final_items_signature != ''
+			GROUP BY
+				pm.champion_id,
+				pm.role,
+				rank_bucket,
+				pm.core2_signature,
+				pm.core3_signature,
+				pm.final_items_signature,
+				pm.rune_signature,
+				pm.spell_signature
+			UNION ALL
+			SELECT
+				champion_id,
+				role,
+				rank_bucket,
+				core2_signature,
+				core3_signature,
+				final_items_signature,
+				rune_signature,
+				spell_signature,
+				toUInt64(sum(wins)) AS row_wins,
+				toUInt64(sum(games)) AS row_games
+			FROM patch_build_metrics FINAL
+			WHERE patch = ?
+				AND queue_id = ?
+				AND core2_signature != ''
+				AND final_items_signature != ''
+			GROUP BY
+				champion_id,
+				role,
+				rank_bucket,
+				core2_signature,
+				core3_signature,
+				final_items_signature,
+				rune_signature,
+				spell_signature
+		)
+		GROUP BY champion_id, role, rank_bucket, core2_signature
+		HAVING games > 0`,
+		patch,
+		queueID,
+		patch,
+		queueID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []championBuildVariantAnalyticsRow{}
+	for rows.Next() {
+		var row championBuildVariantAnalyticsRow
+		if err := rows.Scan(
+			&row.ChampionID,
+			&row.Role,
+			&row.RankBucket,
+			&row.Core2Signature,
+			&row.Core3Signature,
+			&row.FinalItemsSignature,
+			&row.RuneSignature,
+			&row.SpellSignature,
+			&row.Wins,
+			&row.Games,
+			&row.BuildCount,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) queryChampionBuildVariantSkillChoices(ctx context.Context, patch string, queueID uint16) (map[string]championBuildVariantSkillChoice, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		WITH skill_paths AS
+		(
+			SELECT
+				match_id,
+				participant_id,
+				arrayStringConcat(
+					arrayMap(x -> toString(tupleElement(x, 2)),
+						arraySort(x -> tupleElement(x, 1), groupArray((skill_order, skill_slot)))
+					),
+					'-'
+				) AS skill_order_signature
+			FROM timeline_skill_events FINAL
+			WHERE patch = ? AND queue_id = ? AND skill_slot BETWEEN 1 AND 4
+			GROUP BY match_id, participant_id
+			HAVING skill_order_signature != ''
+		)
+		SELECT
+			pm.champion_id,
+			pm.role,
+			multiIf(
+				s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+				pm.rank_bucket
+			) AS rank_bucket,
+			pm.core2_signature,
+			pm.core3_signature,
+			pm.final_items_signature,
+			sp.skill_order_signature,
+			toUInt64(sum(pm.win)) AS wins,
+			toUInt64(count()) AS games
+		FROM participant_matchups AS pm FINAL
+		INNER JOIN skill_paths AS sp
+			ON pm.match_id = sp.match_id
+			AND pm.participant_id = sp.participant_id
+		LEFT JOIN
+		(
+			SELECT
+				platform,
+				puuid,
+				argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+			FROM summoner_rank_snapshots FINAL
+			WHERE queue_type = 'RANKED_SOLO_5x5'
+			GROUP BY platform, puuid
+		) AS s
+			ON s.platform = pm.platform AND s.puuid = pm.puuid
+		WHERE pm.patch = ?
+			AND pm.queue_id = ?
+			AND pm.core2_signature != ''
+			AND pm.final_items_signature != ''
+		GROUP BY
+			pm.champion_id,
+			pm.role,
+			rank_bucket,
+			pm.core2_signature,
+			pm.core3_signature,
+			pm.final_items_signature,
+			sp.skill_order_signature`,
+		patch,
+		queueID,
+		patch,
+		queueID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	byVariant := map[string]map[string]buildVariantSkillAggregate{}
+	for rows.Next() {
+		var (
+			championID          uint16
+			role, rankBucket    string
+			core2, core3, final string
+			signature           string
+			wins, games         int
+		)
+		if err := rows.Scan(&championID, &role, &rankBucket, &core2, &core3, &final, &signature, &wins, &games); err != nil {
+			return nil, err
+		}
+		coreKey := buildVariantCoreKey(core3, final, core2)
+		if coreKey == "" {
+			continue
+		}
+		label, tags := buildVariantLabelAndTags(core2 + "-" + core3 + "-" + final)
+		groupKey := buildVariantGroupKey(ChampionGuideBuildVariantRow{
+			VariantKey:   coreKey,
+			VariantLabel: label,
+			VariantTags:  tags,
+		})
+		key := championBuildVariantAnalyticsKey(championID, role, rankBucket, groupKey)
+		if byVariant[key] == nil {
+			byVariant[key] = map[string]buildVariantSkillAggregate{}
+		}
+		current := byVariant[key][signature]
+		current.Wins += wins
+		current.Games += games
+		byVariant[key][signature] = current
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := map[string]championBuildVariantSkillChoice{}
+	for key, skills := range byVariant {
+		bestSignature := ""
+		best := buildVariantSkillAggregate{}
+		for signature, aggregate := range skills {
+			if aggregate.Games < buildVariantSkillOrderMinGames {
+				continue
+			}
+			if bestSignature == "" || aggregate.Games > best.Games || (aggregate.Games == best.Games && aggregate.Wins > best.Wins) {
+				bestSignature = signature
+				best = aggregate
+			}
+		}
+		if bestSignature == "" || best.Games <= 0 {
+			continue
+		}
+		out[key] = championBuildVariantSkillChoice{
+			Signature: bestSignature,
+			Wins:      best.Wins,
+			Games:     best.Games,
+		}
+	}
+	return out, nil
+}
+
+func (r *Repository) insertChampionBuildVariantAnalytics(ctx context.Context, patch string, queueID uint16, rows []championBuildVariantAnalyticsRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	for _, row := range rows {
+		if _, err := r.db.ExecContext(
+			ctx,
+			`INSERT INTO champion_build_variant_analytics
+			(patch, platform, queue_id, champion_id, role, rank_bucket, variant_key, variant_label, variant_tags, core2_signature, core3_signature, final_items_signature, rune_signature, spell_signature, skill_order_signature, skill_order_wins, skill_order_games, wins, games, build_count)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			patch,
+			"ALL",
+			queueID,
+			row.ChampionID,
+			row.Role,
+			row.RankBucket,
+			row.VariantKey,
+			row.VariantLabel,
+			row.VariantTags,
+			row.Core2Signature,
+			row.Core3Signature,
+			row.FinalItemsSignature,
+			row.RuneSignature,
+			row.SpellSignature,
+			row.SkillOrderSignature,
+			row.SkillOrderWins,
+			row.SkillOrderGames,
+			row.Wins,
+			row.Games,
+			row.BuildCount,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func championBuildVariantAnalyticsKey(championID uint16, role, rankBucket, variantKey string) string {
+	return fmt.Sprintf("%d\x00%s\x00%s\x00%s", championID, role, rankBucket, variantKey)
 }
 
 func (r *Repository) queryChampionGuideSkillOrders(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideSkillOrderRow, error) {

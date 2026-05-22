@@ -79,6 +79,20 @@ Refresh options:
 - Local/dev API: `POST /api/dev/analytics/item-slots/refresh`
 - CLI: `patchctl -action item-slots -patch 16.10 -queue 420`
 
+## `champion_build_variant_analytics`
+
+Current read model for champion-guide alternative build tabs.
+
+One row per patch, champion, role, rank bucket, and detected build family. It stores the player-facing variant key/label/tags, representative core/final item signatures, representative rune and spell signatures, total wins/games/build count, and an optional build-family-specific skill order when that family clears the skill-order sample floor.
+
+The champion guide endpoint reads this table first and only falls back to raw reconstruction if the table has not been populated yet.
+
+Refresh options:
+
+- Worker: `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED=true` with `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES=10`
+- Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
+- CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
+
 ## `patch_power_curve_metrics`
 
 Compact closed-patch participant power-curve metrics at 10, 15, and 20 minutes.

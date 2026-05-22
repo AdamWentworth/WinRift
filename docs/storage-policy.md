@@ -25,6 +25,7 @@ Current read models:
 - `item_slot_analytics`
 - `champion_skill_analytics`
 - `champion_ban_analytics`
+- `champion_build_variant_analytics`
 - `match_team_win_conditions`
 - `patch_win_condition_metrics`
 - `summoner_profile_summary`
