@@ -394,7 +394,7 @@ function RuneTreePanel({ style, selectedRuneIds, runes }: { style?: RuneStyle; s
       </div>
       <div className="guide-rune-slots">
         {(style?.slots ?? []).map((slot, index) => (
-          <div key={`${style?.id}-${index}`} className="guide-rune-slot">
+          <div key={`${style?.id}-${index}`} className={index === 0 ? 'guide-rune-slot keystone' : 'guide-rune-slot'}>
             {slot.runes.map((rune) => {
               const active = selected.has(rune.id);
               const src = runeImageUrl(runes, rune.id);

@@ -5943,6 +5943,19 @@ button {
   transform: scale(1.08);
 }
 
+.guide-rune-slot.keystone img {
+  height: 36px;
+  width: 36px;
+}
+
+.guide-rune-slot.keystone img.selected {
+  filter:
+    drop-shadow(0 0 12px rgb(147 220 235 / 90%))
+    drop-shadow(0 0 22px rgb(147 220 235 / 30%))
+    saturate(1.15);
+  transform: scale(1.14);
+}
+
 .guide-rune-side .guide-rune-tree-title {
   min-height: 44px;
 }
