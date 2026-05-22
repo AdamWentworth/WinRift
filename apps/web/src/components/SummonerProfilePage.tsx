@@ -25,6 +25,10 @@ import {
 } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
 import { RoleIcon, roleLabel } from '../lib/roles';
+import { MetricTile, MiniStat } from './ui/MetricTile';
+import { EmptyState } from './ui/Panel';
+import { RoleTabs } from './ui/RoleTabs';
+import { SegmentedControl } from './ui/SegmentedControl';
 
 type ProfileSection = 'overview' | 'champions' | 'builds' | 'matches';
 type ChampionSort = 'games' | 'winrate' | 'kda';
@@ -40,6 +44,22 @@ const profileSections: { key: ProfileSection; label: string }[] = [
 ];
 
 const profileRoleFilters: MatchRoleFilter[] = ['ALL', 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'];
+const profileRoleFilterOptions = profileRoleFilters.map((role) => ({ value: role, label: roleLabel(role) }));
+const championSortOptions: { value: ChampionSort; label: string }[] = [
+  { value: 'games', label: 'Games' },
+  { value: 'winrate', label: 'Winrate' },
+  { value: 'kda', label: 'KDA' },
+];
+const buildSortOptions: { value: BuildSort; label: string }[] = [
+  { value: 'games', label: 'Games' },
+  { value: 'winrate', label: 'Winrate' },
+  { value: 'champion', label: 'Champion' },
+];
+const matchResultOptions: { value: MatchResultFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'wins', label: 'Wins' },
+  { value: 'losses', label: 'Losses' },
+];
 
 type Props = {
   platform?: string;
@@ -316,13 +336,13 @@ function StoredProfile({
 
       <ProfileFreshnessBanner freshness={freshness} />
 
-      <div className="profile-section-tabs" aria-label="Summoner profile sections">
-        {profileSections.map((candidate) => (
-          <button className={section === candidate.key ? 'selected' : ''} key={candidate.key} onClick={() => onSectionChange(candidate.key)} type="button">
-            {candidate.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        ariaLabel="Summoner profile sections"
+        className="profile-section-tabs"
+        options={profileSections.map((candidate) => ({ value: candidate.key, label: candidate.label }))}
+        value={section}
+        onChange={onSectionChange}
+      />
 
       {section === 'overview' ? (
         <OverviewTab profile={profile} champions={champions} />
@@ -376,9 +396,9 @@ function OverviewTab({ profile, champions }: { profile: SummonerProfile; champio
             </p>
           </div>
           <div className="profile-read-side">
-            <ProfileMetric label="Recent WR" value={recent.length ? `${recentWinRate.toFixed(1)}%` : '--'} />
-            <ProfileMetric label="Recent Games" value={formatNumber(recent.length)} />
-            <ProfileMetric label="Latest Champ" value={recentChampion} />
+            <MetricTile className="profile-metric" label="Recent WR" value={recent.length ? `${recentWinRate.toFixed(1)}%` : '--'} />
+            <MetricTile className="profile-metric" label="Recent Games" value={formatNumber(recent.length)} />
+            <MetricTile className="profile-metric" label="Latest Champ" value={recentChampion} />
           </div>
         </div>
         {recent.length ? (
@@ -416,7 +436,7 @@ function ChampionHighlights({ champions, records }: { champions?: ChampionData; 
           })}
         </div>
       ) : (
-        <ProfileEmptyState title="No champion highlights yet" body="Champion highlights will appear once stored games are attached to this alias." />
+        <EmptyState className="profile-empty-state" icon={false} title="No champion highlights yet" body="Champion highlights will appear once stored games are attached to this alias." />
       )}
     </section>
   );
@@ -441,24 +461,20 @@ function ChampionPoolTab({ champions, records, roleRecords }: { champions?: Cham
             <span>Filter</span>
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Champion name" />
           </label>
-          <div className="profile-tab-actions" aria-label="Champion pool sorting">
-            <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
-            <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />
-            <ProfileToggle label="KDA" selected={sort === 'kda'} onClick={() => setSort('kda')} />
-          </div>
+          <SegmentedControl ariaLabel="Champion pool sorting" options={championSortOptions} value={sort} onChange={setSort} />
         </div>
       </div>
-      <div className="profile-role-filter" aria-label="Champion comfort role filters">
-        {profileRoleFilters.map((role) => (
-          <button key={role} className={roleFilter === role ? 'selected' : ''} onClick={() => setRoleFilter(role)} type="button">
-            {role === 'ALL' ? 'All Roles' : <><RoleIcon role={role} /> {roleLabel(role)}</>}
-          </button>
-        ))}
-      </div>
+      <RoleTabs
+        ariaLabel="Champion comfort role filters"
+        className="profile-role-filter"
+        options={profileRoleFilterOptions}
+        value={roleFilter}
+        onChange={(role) => setRoleFilter(role as MatchRoleFilter)}
+      />
       <div className="profile-tab-summary">
-        <ProfileMetric label="Shown Champions" value={`${formatNumber(filteredRecords.length)} / ${formatNumber(activeRecords.length)}`} />
-        <ProfileMetric label="Tracked Games" value={formatNumber(filteredRecords.reduce((sum, record) => sum + record.games, 0))} />
-        <ProfileMetric label="Best WR" value={bestWinrate ? `${championName(champions, bestWinrate.championId)} ${bestWinrate.winRate.toFixed(1)}%` : '--'} />
+        <MetricTile className="profile-metric" label="Shown Champions" value={`${formatNumber(filteredRecords.length)} / ${formatNumber(activeRecords.length)}`} />
+        <MetricTile className="profile-metric" label="Tracked Games" value={formatNumber(filteredRecords.reduce((sum, record) => sum + record.games, 0))} />
+        <MetricTile className="profile-metric" label="Best WR" value={bestWinrate ? `${championName(champions, bestWinrate.championId)} ${bestWinrate.winRate.toFixed(1)}%` : '--'} />
       </div>
       {sortedRecords.length ? (
         <div className="profile-champion-list">
@@ -467,7 +483,7 @@ function ChampionPoolTab({ champions, records, roleRecords }: { champions?: Cham
           ))}
         </div>
       ) : (
-        <ProfileEmptyState title={championPoolEmptyTitle(records, activeRecords, roleFilter)} body={championPoolEmptyBody(records, activeRecords, roleFilter)} />
+        <EmptyState className="profile-empty-state" icon={false} title={championPoolEmptyTitle(records, activeRecords, roleFilter)} body={championPoolEmptyBody(records, activeRecords, roleFilter)} />
       )}
     </section>
   );
@@ -497,24 +513,20 @@ function BuildsUsedTab({
     <section className="profile-panel profile-wide-panel profile-tab-panel profile-builds-tab">
       <div className="profile-tab-header">
         <PanelHeading icon={<Package size={16} />} title="Builds" />
-        <div className="profile-tab-actions" aria-label="Summoner build sorting">
-          <ProfileToggle label="Games" selected={sort === 'games'} onClick={() => setSort('games')} />
-          <ProfileToggle label="Winrate" selected={sort === 'winrate'} onClick={() => setSort('winrate')} />
-          <ProfileToggle label="Champion" selected={sort === 'champion'} onClick={() => setSort('champion')} />
-        </div>
+        <SegmentedControl ariaLabel="Summoner build sorting" options={buildSortOptions} value={sort} onChange={setSort} />
       </div>
-      <div className="profile-role-filter" aria-label="Summoner build role filters">
-        {(['ALL', 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as MatchRoleFilter[]).map((role) => (
-          <button key={role} className={roleFilter === role ? 'selected' : ''} onClick={() => setRoleFilter(role)} type="button">
-            {role === 'ALL' ? 'All Roles' : <><RoleIcon role={role} /> {roleLabel(role)}</>}
-          </button>
-        ))}
-      </div>
+      <RoleTabs
+        ariaLabel="Summoner build role filters"
+        className="profile-role-filter"
+        options={profileRoleFilterOptions}
+        value={roleFilter}
+        onChange={(role) => setRoleFilter(role as MatchRoleFilter)}
+      />
       <div className="profile-tab-summary">
-        <ProfileMetric label="Build Paths" value={formatNumber(filteredBuilds.length)} />
-        <ProfileMetric label="Tracked Games" value={formatNumber(totalGames)} />
-        <ProfileMetric label="Winrate" value={totalGames ? `${((wins / totalGames) * 100).toFixed(1)}%` : '--'} />
-        <ProfileMetric label="Champions" value={formatNumber(uniqueChampions)} />
+        <MetricTile className="profile-metric" label="Build Paths" value={formatNumber(filteredBuilds.length)} />
+        <MetricTile className="profile-metric" label="Tracked Games" value={formatNumber(totalGames)} />
+        <MetricTile className="profile-metric" label="Winrate" value={totalGames ? `${((wins / totalGames) * 100).toFixed(1)}%` : '--'} />
+        <MetricTile className="profile-metric" label="Champions" value={formatNumber(uniqueChampions)} />
       </div>
       <p className="profile-context-note">
         This is usage history from stored ranked games for this summoner, not generalized build advice.
@@ -533,7 +545,9 @@ function BuildsUsedTab({
           ))}
         </div>
       ) : (
-        <ProfileEmptyState
+        <EmptyState
+          className="profile-empty-state"
+          icon={false}
           title={builds.length ? 'No build paths match these filters' : 'No build paths yet'}
           body={builds.length ? 'Try a different role filter or switch back to all roles.' : 'Build usage appears after this summoner has stored ranked games with complete item paths.'}
         />
@@ -556,23 +570,19 @@ function MatchHistoryTab({ champions, matches }: { champions?: ChampionData; mat
     <section className="profile-panel profile-wide-panel profile-tab-panel">
       <div className="profile-tab-header">
         <PanelHeading icon={<History size={16} />} title="Match History" />
-        <div className="profile-tab-actions" aria-label="Match result filters">
-          <ProfileToggle label="All" selected={resultFilter === 'all'} onClick={() => setResultFilter('all')} />
-          <ProfileToggle label="Wins" selected={resultFilter === 'wins'} onClick={() => setResultFilter('wins')} />
-          <ProfileToggle label="Losses" selected={resultFilter === 'losses'} onClick={() => setResultFilter('losses')} />
-        </div>
+        <SegmentedControl ariaLabel="Match result filters" options={matchResultOptions} value={resultFilter} onChange={setResultFilter} />
       </div>
-      <div className="profile-role-filter" aria-label="Match role filters">
-        {(['ALL', 'TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as MatchRoleFilter[]).map((role) => (
-          <button key={role} className={roleFilter === role ? 'selected' : ''} onClick={() => setRoleFilter(role)} type="button">
-            {role === 'ALL' ? 'All Roles' : <><RoleIcon role={role} /> {roleLabel(role)}</>}
-          </button>
-        ))}
-      </div>
+      <RoleTabs
+        ariaLabel="Match role filters"
+        className="profile-role-filter"
+        options={profileRoleFilterOptions}
+        value={roleFilter}
+        onChange={(role) => setRoleFilter(role as MatchRoleFilter)}
+      />
       <div className="profile-tab-summary">
-        <ProfileMetric label="Shown Games" value={formatNumber(filteredMatches.length)} />
-        <ProfileMetric label="Winrate" value={filteredMatches.length ? `${winRate.toFixed(1)}%` : '--'} />
-        <ProfileMetric label="Window" value={matches.length ? `${formatGameDate(matches[matches.length - 1].gameStartTimestamp)} to ${formatGameDate(matches[0].gameStartTimestamp)}` : '--'} />
+        <MetricTile className="profile-metric" label="Shown Games" value={formatNumber(filteredMatches.length)} />
+        <MetricTile className="profile-metric" label="Winrate" value={filteredMatches.length ? `${winRate.toFixed(1)}%` : '--'} />
+        <MetricTile className="profile-metric" label="Window" value={matches.length ? `${formatGameDate(matches[matches.length - 1].gameStartTimestamp)} to ${formatGameDate(matches[0].gameStartTimestamp)}` : '--'} />
       </div>
       {filteredMatches.length ? (
         <div className="profile-match-list">
@@ -581,20 +591,14 @@ function MatchHistoryTab({ champions, matches }: { champions?: ChampionData; mat
           ))}
         </div>
       ) : (
-        <ProfileEmptyState
+        <EmptyState
+          className="profile-empty-state"
+          icon={false}
           title={matches.length ? 'No matches match these filters' : 'No recent stored matches yet'}
           body={matches.length ? 'Relax the result or role filter to bring games back into view.' : 'Recent match cards appear once the collector reaches this player in ranked Solo/Duo data.'}
         />
       )}
     </section>
-  );
-}
-
-function ProfileToggle({ label, onClick, selected }: { label: string; onClick: () => void; selected: boolean }) {
-  return (
-    <button className={selected ? 'selected' : ''} onClick={onClick} type="button">
-      {label}
-    </button>
   );
 }
 
@@ -627,15 +631,6 @@ function ProfileFreshnessBanner({ freshness }: { freshness: ProfileFreshness }) 
   );
 }
 
-function ProfileEmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="profile-empty-state">
-      <strong>{title}</strong>
-      <span>{body}</span>
-    </div>
-  );
-}
-
 function RankedPanel({ rank }: { rank?: RankedRecord }) {
   return (
     <section className="profile-panel profile-rank-panel">
@@ -649,9 +644,9 @@ function RankedPanel({ rank }: { rank?: RankedRecord }) {
       </div>
       {rank ? (
         <div className="profile-metric-row">
-          <ProfileMetric label="Winrate" value={`${rank.winRate.toFixed(1)}%`} />
-          <ProfileMetric label="Wins" value={formatNumber(rank.wins)} />
-          <ProfileMetric label="Losses" value={formatNumber(rank.losses)} />
+          <MetricTile className="profile-metric" label="Winrate" value={`${rank.winRate.toFixed(1)}%`} />
+          <MetricTile className="profile-metric" label="Wins" value={formatNumber(rank.wins)} />
+          <MetricTile className="profile-metric" label="Losses" value={formatNumber(rank.losses)} />
         </div>
       ) : null}
     </section>
@@ -663,9 +658,9 @@ function FormPanel({ summary }: { summary: SummonerProfile['summary'] }) {
     <section className="profile-panel">
       <PanelHeading icon={<Trophy size={16} />} title="Stored Match Form" />
       <div className="profile-metric-row">
-        <ProfileMetric label="Games" value={formatNumber(summary.games)} />
-        <ProfileMetric label="Winrate" value={`${summary.winRate.toFixed(1)}%`} />
-        <ProfileMetric label="KDA" value={summary.kda ? summary.kda.toFixed(2) : '--'} />
+        <MetricTile className="profile-metric" label="Games" value={formatNumber(summary.games)} />
+        <MetricTile className="profile-metric" label="Winrate" value={`${summary.winRate.toFixed(1)}%`} />
+        <MetricTile className="profile-metric" label="KDA" value={summary.kda ? summary.kda.toFixed(2) : '--'} />
       </div>
       <div className="profile-kda-line">
         {summary.avgKills.toFixed(1)} / {summary.avgDeaths.toFixed(1)} / {summary.avgAssists.toFixed(1)} average across collected ranked games
@@ -679,9 +674,9 @@ function DataWindowPanel({ summary }: { summary: SummonerProfile['summary'] }) {
     <section className="profile-panel profile-window-panel">
       <PanelHeading icon={<CalendarDays size={16} />} title="Stored Data Window" />
       <div className="profile-metric-row">
-        <ProfileMetric label="First Seen" value={formatProfileDate(summary.firstSeen)} />
-        <ProfileMetric label="Last Seen" value={formatProfileDate(summary.lastSeen)} />
-        <ProfileMetric label="Sample" value={`${formatNumber(summary.games)} games`} />
+        <MetricTile className="profile-metric" label="First Seen" value={formatProfileDate(summary.firstSeen)} />
+        <MetricTile className="profile-metric" label="Last Seen" value={formatProfileDate(summary.lastSeen)} />
+        <MetricTile className="profile-metric" label="Sample" value={`${formatNumber(summary.games)} games`} />
       </div>
       <div className="profile-kda-line">
         Profile summaries are compact read-model rows refreshed from retained ranked Solo/Duo matches.
@@ -699,15 +694,6 @@ function PanelHeading({ icon, title }: { icon: ReactNode; title: string }) {
   );
 }
 
-function ProfileMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="profile-metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
 function ChampionComfortRow({ record, champions }: { record: ChampionRecord; champions?: ChampionData }) {
   const champion = championByKey(champions, record.championId);
   return (
@@ -718,9 +704,9 @@ function ChampionComfortRow({ record, champions }: { record: ChampionRecord; cha
         <span>{record.role ? <><RoleIcon role={record.role} /> {roleLabel(record.role)} · </> : null}{record.avgKills.toFixed(1)} / {record.avgDeaths.toFixed(1)} / {record.avgAssists.toFixed(1)} average</span>
       </div>
       <div className="profile-row-stats">
-        <ProfileMiniStat label="WR" value={`${record.winRate.toFixed(1)}%`} />
-        <ProfileMiniStat label="KDA" value={record.kda.toFixed(2)} />
-        <ProfileMiniStat label="Games" value={formatNumber(record.games)} />
+        <MiniStat label="WR" value={`${record.winRate.toFixed(1)}%`} />
+        <MiniStat label="KDA" value={record.kda.toFixed(2)} />
+        <MiniStat label="Games" value={formatNumber(record.games)} />
       </div>
     </div>
   );
@@ -738,9 +724,9 @@ function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; cham
         <span className="profile-match-meta"><RoleIcon role={match.role} /> {roleLabel(match.role)} · Patch {match.patch} · {formatGameDate(match.gameStartTimestamp)} · {formatDuration(match.durationSeconds)}</span>
       </div>
       <div className="profile-row-stats">
-        <ProfileMiniStat label="KDA" value={`${match.kills}/${match.deaths}/${match.assists}`} />
-        <ProfileMiniStat label="Role" value={roleLabel(match.role)} />
-        <ProfileMiniStat label="Duration" value={formatDuration(match.durationSeconds)} />
+        <MiniStat label="KDA" value={`${match.kills}/${match.deaths}/${match.assists}`} />
+        <MiniStat label="Role" value={roleLabel(match.role)} />
+        <MiniStat label="Duration" value={formatDuration(match.durationSeconds)} />
       </div>
     </div>
   );
@@ -810,9 +796,9 @@ function BuildUsageRow({
         </div>
       </div>
       <div className="profile-row-stats">
-        <ProfileMiniStat label="Games" value={formatNumber(build.games)} />
-        <ProfileMiniStat label="WR" value={`${build.winRate.toFixed(1)}%`} />
-        <ProfileMiniStat label="KDA" value={build.kda.toFixed(2)} />
+        <MiniStat label="Games" value={formatNumber(build.games)} />
+        <MiniStat label="WR" value={`${build.winRate.toFixed(1)}%`} />
+        <MiniStat label="KDA" value={build.kda.toFixed(2)} />
       </div>
     </div>
   );
@@ -833,15 +819,6 @@ function ItemIconList({ itemIds, items }: { itemIds: string[]; items?: ItemData 
         );
       })}
     </div>
-  );
-}
-
-function ProfileMiniStat({ label, tone, value }: { label: string; tone?: 'win' | 'loss'; value: string }) {
-  return (
-    <span className={`profile-mini-stat${tone ? ` ${tone}` : ''}`}>
-      <em>{label}</em>
-      <b>{value}</b>
-    </span>
   );
 }
 

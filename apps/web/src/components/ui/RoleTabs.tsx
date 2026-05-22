@@ -18,6 +18,7 @@ export function RoleTabs({ options, value, onChange, ariaLabel = 'Role', classNa
     <div className={className} aria-label={ariaLabel}>
       {options.map((candidate) => (
         <button
+          aria-pressed={candidate.value === value}
           key={candidate.value || 'ALL'}
           className={candidate.value === value ? 'selected' : ''}
           onClick={() => onChange(candidate.value)}

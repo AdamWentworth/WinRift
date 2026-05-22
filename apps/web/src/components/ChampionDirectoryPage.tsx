@@ -43,9 +43,9 @@ export function ChampionDirectoryPage({ champions, onSelectChampion }: Props) {
           <p>Open a champion guide for collected builds, runes, skill paths, and matchup context. Role-based rankings belong in the tier-list view we can add separately.</p>
         </div>
         <div className="champion-directory-summary">
-          <DirectorySummaryStat label="Champions" value={formatNumber(championsByName.length)} />
-          <DirectorySummaryStat label="Patch" value={champions?.version ?? 'Current'} />
-          <DirectorySummaryStat label="Sort" value={sortModes.find((mode) => mode.value === sortMode)?.label ?? 'Name A-Z'} />
+          <MetricTile label="Champions" value={formatNumber(championsByName.length)} />
+          <MetricTile label="Patch" value={champions?.version ?? 'Current'} />
+          <MetricTile label="Sort" value={sortModes.find((mode) => mode.value === sortMode)?.label ?? 'Name A-Z'} />
         </div>
       </div>
 
@@ -97,10 +97,6 @@ function ChampionDirectoryCard({ champion, champions, onSelect }: { champion: Ch
       <span className="directory-card-title">{champion.title ?? 'Champion guide'}</span>
     </button>
   );
-}
-
-function DirectorySummaryStat({ label, value }: { label: string; value: string }) {
-  return <MetricTile label={label} value={value} />;
 }
 
 function sortChampions(a: Champion, b: Champion, sortMode: SortMode) {

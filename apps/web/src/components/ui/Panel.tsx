@@ -22,11 +22,25 @@ export function PanelTitle({ title, detail, className = 'guide-section-title' }:
   );
 }
 
-export function EmptyState({ message, className = 'guide-empty' }: { message: string; className?: string }) {
+export function EmptyState({
+  body,
+  className = 'guide-empty',
+  icon,
+  message,
+  title,
+}: {
+  body?: string;
+  className?: string;
+  icon?: ReactNode | false;
+  message?: string;
+  title?: string;
+}) {
+  const iconNode = icon === false ? null : icon ?? <CircleSlash size={18} />;
   return (
     <div className={className}>
-      <CircleSlash size={18} />
-      <span>{message}</span>
+      {iconNode}
+      {title ? <strong>{title}</strong> : null}
+      <span>{body ?? message}</span>
     </div>
   );
 }

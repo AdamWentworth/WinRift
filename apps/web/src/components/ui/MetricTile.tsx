@@ -9,6 +9,7 @@ type MetricTileProps = {
   primary?: boolean;
   tone?: string;
   valueFirst?: boolean;
+  valueTag?: 'strong' | 'b';
   wide?: boolean;
 };
 
@@ -23,10 +24,12 @@ export function MetricTile({
   primary = false,
   tone,
   valueFirst = false,
+  valueTag = 'strong',
   wide = false,
 }: MetricTileProps) {
   const Tag = as;
   const LabelTag = labelTag;
+  const ValueTag = valueTag;
   const classes = [
     className,
     tone,
@@ -35,7 +38,7 @@ export function MetricTile({
     wide ? 'wide' : '',
   ].filter(Boolean).join(' ');
   const labelNode = <LabelTag>{label}</LabelTag>;
-  const valueNode = <strong>{value}</strong>;
+  const valueNode = <ValueTag>{value}</ValueTag>;
 
   return (
     <Tag className={classes} aria-label={ariaLabel ?? `${label}: ${value}`}>
@@ -65,6 +68,20 @@ export function StatChip({ label, value, primary, wide }: { label: string; value
       value={value}
       valueFirst
       wide={wide}
+    />
+  );
+}
+
+export function MiniStat({ label, tone, value }: { label: string; tone?: string; value: string }) {
+  return (
+    <MetricTile
+      as="span"
+      className="profile-mini-stat"
+      label={label}
+      labelTag="em"
+      tone={tone}
+      value={value}
+      valueTag="b"
     />
   );
 }

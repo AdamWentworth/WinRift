@@ -132,10 +132,10 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
           </p>
         </div>
         <div className="tier-list-hero-stats">
-          <TierHeroStat label="Patch" value={patch || champions?.version || 'Current'} />
-          <TierHeroStat label="Rank" value={selectedRank} />
-          <TierHeroStat label="Matches Indexed" value={formatNumber(matchCount)} />
-          <TierHeroStat label="Champion Games" value={formatNumber(participantSamples)} />
+          <MetricTile label="Patch" value={patch || champions?.version || 'Current'} />
+          <MetricTile label="Rank" value={selectedRank} />
+          <MetricTile label="Matches Indexed" value={formatNumber(matchCount)} />
+          <MetricTile label="Champion Games" value={formatNumber(participantSamples)} />
         </div>
       </div>
 
@@ -212,10 +212,6 @@ export function TierListPage({ champions, onSelectChampion }: Props) {
       </div>
     </section>
   );
-}
-
-function TierHeroStat({ label, value }: { label: string; value: string }) {
-  return <MetricTile label={label} value={value} />;
 }
 
 function TierSortHeader({ active, direction, label, onClick }: { active: boolean; direction: SortDirection; label: string; onClick: () => void }) {
