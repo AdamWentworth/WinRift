@@ -3997,6 +3997,149 @@ button {
   padding: 6px 7px;
 }
 
+.build-path-signals {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%)),
+    rgb(0 0 0 / 18%);
+  border: 1px solid rgb(255 255 255 / 9%);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.build-path-signals.muted {
+  align-content: center;
+  color: #aeb8bf;
+  min-height: 58px;
+  text-align: center;
+}
+
+.build-path-signals.muted strong {
+  color: #f4f6f8;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.build-path-signals.muted span {
+  color: #aeb8bf;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.build-path-signals-title,
+.build-slot-heading span {
+  color: #9fb0b8;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.build-path-signal-row {
+  align-items: center;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(72px, auto);
+  min-width: 0;
+  padding: 6px;
+}
+
+.build-path-signal-row > b {
+  align-items: center;
+  background: rgb(100 239 232 / 14%);
+  border: 1px solid rgb(100 239 232 / 24%);
+  color: #dffffc;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  width: 22px;
+}
+
+.build-path-items {
+  align-items: center;
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.build-path-items img,
+.build-path-items em {
+  border: 1px solid rgb(255 255 255 / 14%);
+  flex: 0 0 auto;
+  height: 28px;
+  width: 28px;
+}
+
+.build-path-items img {
+  object-fit: cover;
+}
+
+.build-path-items em {
+  align-items: center;
+  background: rgb(0 0 0 / 26%);
+  color: #dce5ea;
+  display: inline-flex;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  justify-content: center;
+}
+
+.build-path-items.empty {
+  color: #aeb8bf;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.build-path-stat {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  min-width: 0;
+  text-align: right;
+}
+
+.build-path-stat strong {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.build-path-stat em {
+  color: #aeb8bf;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.build-slot-heading {
+  align-items: end;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 1fr);
+  min-width: 0;
+}
+
+.build-slot-heading em {
+  color: #aeb8bf;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: right;
+}
+
 .build-delta {
   background: rgb(255 255 255 / 7%);
   border: 1px solid rgb(255 255 255 / 13%);

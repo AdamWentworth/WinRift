@@ -1,4 +1,4 @@
-import type { AnalyticsItemSlot, BuildAdviceResponse, BuildFilters, ChampionData, ItemData, LiveParticipant, RuneData, SummonerSpellData } from '../../api/types';
+import type { AnalyticsBuild, AnalyticsItemSlot, BuildAdviceResponse, BuildFilters, ChampionData, ChampionGuideItemPath, ItemData, LiveParticipant, RuneData, SummonerSpellData } from '../../api/types';
 import { RoleIcon, roleLabel } from '../../lib/roles';
 import {
   championByKey,
@@ -10,6 +10,7 @@ import {
   runeName,
   runeStyleImageUrl,
   runeStyleName,
+  signatureItems,
   signatureSpells,
   summonerSpellImageUrl,
   summonerSpellName,
@@ -124,6 +125,7 @@ export function FocusedBuildPanel({
           notes={buildAdvice?.notes}
           side={selection.side}
           itemSlots={matchupItemSlots}
+          buildPaths={buildPathDisplays(buildAdvice?.matchup.topBuilds)}
           loading={loading}
           items={items}
           minGames={BUILD_MATCHUP_MIN_GAMES}
@@ -140,6 +142,7 @@ export function FocusedBuildPanel({
           notes={undefined}
           side={selection.side}
           itemSlots={championItemSlots}
+          buildPaths={buildPathDisplays(buildAdvice?.champion.topBuilds, buildAdvice?.champion.topItemPaths)}
           loading={loading}
           items={items}
           minGames={BUILD_BASELINE_MIN_GAMES}
@@ -249,6 +252,7 @@ function BuildResultCard({
   notes,
   side,
   itemSlots,
+  buildPaths,
   loading,
   items,
   minGames,
@@ -264,6 +268,7 @@ function BuildResultCard({
   notes?: string[];
   side: TeamSide;
   itemSlots: AnalyticsItemSlot[];
+  buildPaths: BuildPathDisplay[];
   loading: boolean;
   items?: ItemData;
   minGames: number;
@@ -294,6 +299,11 @@ function BuildResultCard({
           {notes.slice(0, 2).map((note) => <span key={note}>{note}</span>)}
         </div>
       ) : null}
+      <BuildPathRows paths={buildPaths} items={items} loading={loading} />
+      <div className="build-slot-heading">
+        <span>Best item by completion slot</span>
+        <em>Each slot is evaluated independently, so treat this as item pressure, not a locked six-item script.</em>
+      </div>
       <BuildSide
         side={side}
         itemSlots={itemSlots}
@@ -303,6 +313,60 @@ function BuildResultCard({
         emptySubtitle={emptySubtitle}
       />
     </article>
+  );
+}
+
+type BuildPathDisplay = {
+  key: string;
+  signature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence?: number;
+};
+
+function BuildPathRows({ paths, items, loading }: { paths: BuildPathDisplay[]; items?: ItemData; loading: boolean }) {
+  if (loading) {
+    return <div className="build-path-signals muted">Loading actual build paths...</div>;
+  }
+  if (!paths.length) {
+    return (
+      <div className="build-path-signals muted">
+        <strong>No stable full path yet</strong>
+        <span>Slot signals below are still useful, but this exact path sample is thin.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="build-path-signals" aria-label="Actual build paths from stored games">
+      <span className="build-path-signals-title">Actual build paths</span>
+      {paths.slice(0, 3).map((path, index) => (
+        <div className="build-path-signal-row" key={path.key}>
+          <b>{index + 1}</b>
+          <BuildPathItems signature={path.signature} items={items} />
+          <span className="build-path-stat">
+            <strong>{path.winRate.toFixed(1)}%</strong>
+            <em>{path.games} games</em>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BuildPathItems({ signature, items }: { signature: string; items?: ItemData }) {
+  const ids = signatureItems(signature).slice(0, 6);
+  if (!ids.length) {
+    return <span className="build-path-items empty">No item path</span>;
+  }
+  return (
+    <span className="build-path-items">
+      {ids.map((itemId) => {
+        const imageUrl = itemImageUrl(items, itemId);
+        const name = itemName(items, itemId);
+        return imageUrl ? <img key={itemId} src={imageUrl} alt={name} title={name} /> : <em key={itemId}>{itemId}</em>;
+      })}
+    </span>
   );
 }
 
@@ -482,6 +546,30 @@ function buildPathSummary(itemSlots: AnalyticsItemSlot[]): BuildPathSummary | un
   if (totalGames <= 0) return undefined;
   const weightedWinRate = shownRows.reduce((sum, row) => sum + (row.winRate * row.games), 0) / totalGames;
   return { weightedWinRate, totalGames };
+}
+
+function buildPathDisplays(builds?: AnalyticsBuild[], guidePaths?: ChampionGuideItemPath[]): BuildPathDisplay[] {
+  const rows = builds
+    ?.map((build, index) => ({
+      key: `build-${index}-${build.core3Signature || build.finalItemsSignature}`,
+      signature: build.core3Signature || build.finalItemsSignature,
+      wins: build.wins,
+      games: build.games,
+      winRate: build.winRate,
+      confidence: build.confidence,
+    }))
+    .filter((row) => row.signature && row.games > 0) ?? [];
+  if (rows.length) return rows;
+  return guidePaths
+    ?.map((path, index) => ({
+      key: `guide-${index}-${path.core3Signature || path.finalItemsSignature}`,
+      signature: path.core3Signature || path.finalItemsSignature,
+      wins: path.wins,
+      games: path.games,
+      winRate: path.winRate,
+      confidence: path.confidence,
+    }))
+    .filter((row) => row.signature && row.games > 0) ?? [];
 }
 
 function buildPathDelta(matchup?: BuildPathSummary, baseline?: BuildPathSummary) {
