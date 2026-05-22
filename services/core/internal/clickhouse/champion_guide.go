@@ -11,6 +11,8 @@ import (
 	"winrift/services/core/internal/analytics"
 )
 
+const buildVariantSkillOrderMinGames = 10
+
 type ChampionGuideSummary struct {
 	ChampionID                 uint16
 	Role                       string
@@ -1025,8 +1027,8 @@ func (r *Repository) attachBuildVariantSkillOrders(ctx context.Context, filters 
 		return nil
 	}
 	skillMinGames := minGames
-	if skillMinGames > 2 {
-		skillMinGames = 2
+	if skillMinGames < buildVariantSkillOrderMinGames {
+		skillMinGames = buildVariantSkillOrderMinGames
 	}
 	wanted := map[string]int{}
 	for index, variant := range variants {
