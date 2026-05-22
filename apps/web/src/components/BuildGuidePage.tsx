@@ -48,6 +48,16 @@ type Props = {
 };
 
 type GuideItemSlot = Pick<AnalyticsItemSlot, 'itemSlot' | 'itemId' | 'wins' | 'games' | 'winRate' | 'confidence'>;
+type GuideItemPathDisplay = {
+  core3Signature: string;
+  finalItemsSignature: string;
+  wins: number;
+  games: number;
+  winRate: number;
+  confidence: number;
+  source: 'exact' | 'slot';
+  sampleLabel?: string;
+};
 
 export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, onChampionChange }: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
@@ -118,12 +128,13 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
     : undefined;
   const selectedBuildVariantIndex = selectedBuildVariant ? buildVariants.indexOf(selectedBuildVariant) : -1;
   const selectedBuildVariantLabel = selectedBuildVariant ? buildVariantLabel(selectedBuildVariant, selectedBuildVariantIndex, items) : '';
+  const recommendedItemSlots: GuideItemSlot[] = buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
+    ? buildAdvice.matchup.itemSlots
+    : buildAdvice?.champion.itemSlots ?? [];
   const selectedVariantItemSlots = selectedBuildVariant ? variantItemSlots(selectedBuildVariant) : [];
   const itemSlots: GuideItemSlot[] = selectedVariantItemSlots.length
     ? selectedVariantItemSlots
-    : buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
-      ? buildAdvice.matchup.itemSlots
-      : buildAdvice?.champion.itemSlots ?? [];
+    : recommendedItemSlots;
   const itemSlotContext = selectedVariantItemSlots.length
     ? `${selectedBuildVariantLabel} selected build family`
     : buildAdviceContext(buildAdvice, opponent?.name);
@@ -212,6 +223,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       <BuildVariantTabs
         variants={buildVariants}
         recommendedGuide={guideForBuilds}
+        recommendedItemSlots={recommendedItemSlots}
         selectedKey={selectedBuildVariant?.variantKey ?? RECOMMENDED_BUILD_KEY}
         items={items}
         onSelect={setSelectedBuildVariantKey}
@@ -235,7 +247,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
       </div>
 
-      <ItemPathSummaryCard guide={guideForBuilds} variant={selectedBuildVariant} items={items} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
+      <ItemPathSummaryCard guide={guideForBuilds} variant={selectedBuildVariant} itemSlots={recommendedItemSlots} items={items} loading={buildAdviceQuery.isLoading || guideQuery.isLoading} />
 
       <BuildAdviceCoverage buildAdvice={buildAdvice} loading={buildAdviceQuery.isLoading} />
 
@@ -339,19 +351,23 @@ function GuideFilters({
 function BuildVariantTabs({
   variants,
   recommendedGuide,
+  recommendedItemSlots,
   selectedKey,
   items,
   onSelect,
 }: {
   variants: ChampionGuideBuildVariant[];
   recommendedGuide?: ChampionGuideResponse;
+  recommendedItemSlots: GuideItemSlot[];
   selectedKey: string;
   items?: ItemData;
   onSelect: (key: string) => void;
 }) {
   if (!variants.length && !recommendedGuide) return null;
-  const recommendedPath = recommendedGuide?.topItemPaths[0];
+  const recommendedPath = stableExactItemPaths(recommendedGuide?.topItemPaths ?? [])[0];
+  const recommendedSlotPath = itemPathFromSlots(recommendedItemSlots);
   const recommendedSummary = recommendedGuide?.summary;
+  const recommendedSignature = recommendedPath?.core3Signature ?? recommendedSlotPath?.core3Signature ?? recommendedPath?.finalItemsSignature ?? recommendedSlotPath?.finalItemsSignature ?? '';
   return (
     <div className="guide-build-variant-tabs" role="tablist" aria-label="Build variants">
       <button
@@ -363,7 +379,7 @@ function BuildVariantTabs({
         onClick={() => onSelect('')}
       >
         <span>Recommended</span>
-        <ItemSignatureImages signature={recommendedPath?.core3Signature ?? recommendedPath?.finalItemsSignature ?? ''} items={items} limit={2} />
+        <ItemSignatureImages signature={recommendedSignature} items={items} limit={2} />
         <em>{recommendedSummary?.games ? `${recommendedSummary.winRate.toFixed(1)}% · ${formatNumber(recommendedSummary.games)}` : 'All collected data'}</em>
       </button>
       {variants.slice(0, 5).map((variant, index) => (
@@ -602,14 +618,26 @@ function ItemGuideGrid({ rows, items, loading, context }: { rows: GuideItemSlot[
   );
 }
 
-function ItemPathSummaryCard({ guide, variant, items, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; items?: ItemData; loading: boolean }) {
+function ItemPathSummaryCard({ guide, variant, itemSlots, items, loading }: { guide?: ChampionGuideResponse; variant?: ChampionGuideBuildVariant; itemSlots: GuideItemSlot[]; items?: ItemData; loading: boolean }) {
   const selectedPath = variant ? variantItemPathRow(variant) : undefined;
-  const rows = selectedPath ? [selectedPath, ...(guide?.topItemPaths ?? []).filter((row) => row.core3Signature !== selectedPath.core3Signature).slice(0, 2)] : guide?.topItemPaths ?? [];
+  const exactRows = stableExactItemPaths(guide?.topItemPaths ?? []);
+  const slotPath = itemPathFromSlots(itemSlots);
+  const rows = selectedPath
+    ? [selectedPath, ...exactRows.filter((row) => row.core3Signature !== selectedPath.core3Signature).slice(0, 2)]
+    : exactRows.length
+      ? exactRows
+      : slotPath ? [slotPath] : [];
+  const primaryRow = rows[0];
+  const titleDetail = primaryRow
+    ? primaryRow.source === 'slot'
+      ? `${primaryRow.sampleLabel} from strongest supported item slots`
+      : `${primaryRow.winRate.toFixed(2)}% WR (${formatNumber(primaryRow.games)} matches)${variant ? ' for selected build family' : ' for the strongest stable complete path'}`
+    : loading ? 'Loading...' : 'No item path sample yet';
   return (
     <PanelCard className="guide-card item-path-summary-card">
       <PanelTitle
         title="Item Paths"
-        detail={rows[0] ? `${rows[0].winRate.toFixed(2)}% WR (${formatNumber(rows[0].games)} matches)${variant ? ' for selected build family' : ' for the strongest complete path'}` : loading ? 'Loading...' : 'No complete path sample yet'}
+        detail={titleDetail}
       />
       {rows.length ? (
         <div className="guide-build-path-list">
@@ -627,9 +655,19 @@ function ItemPathSummaryCard({ guide, variant, items, loading }: { guide?: Champ
                 </div>
               </div>
               <div className="guide-build-path-stats">
-                <b>{row.winRate.toFixed(2)}%</b>
-                <span>{formatNumber(row.games)} games</span>
-                <em>{row.confidence.toFixed(1)} confidence</em>
+                {row.source === 'slot' ? (
+                  <>
+                    <b>{row.sampleLabel}</b>
+                    <span>slot-derived</span>
+                    <em>not an exact full path</em>
+                  </>
+                ) : (
+                  <>
+                    <b>{row.winRate.toFixed(2)}%</b>
+                    <span>{formatNumber(row.games)} games</span>
+                    <em>{row.confidence.toFixed(1)} confidence</em>
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -798,7 +836,7 @@ function variantSpellRow(variant: ChampionGuideBuildVariant) {
   };
 }
 
-function variantItemPathRow(variant: ChampionGuideBuildVariant) {
+function variantItemPathRow(variant: ChampionGuideBuildVariant): GuideItemPathDisplay {
   return {
     core3Signature: variant.core3Signature,
     finalItemsSignature: variant.finalItemsSignature,
@@ -806,6 +844,7 @@ function variantItemPathRow(variant: ChampionGuideBuildVariant) {
     games: variant.games,
     winRate: variant.winRate,
     confidence: variant.confidence,
+    source: 'exact',
   };
 }
 
@@ -824,6 +863,52 @@ function variantItemSlots(variant: ChampionGuideBuildVariant): GuideItemSlot[] {
     winRate: variant.winRate,
     confidence: variant.confidence,
   }));
+}
+
+function stableExactItemPaths(rows: { core3Signature: string; finalItemsSignature: string; wins: number; games: number; winRate: number; confidence: number }[]): GuideItemPathDisplay[] {
+  return rows
+    .filter((row) => signatureItems(row.core3Signature).length >= 3 && signatureItems(row.finalItemsSignature).length >= 3)
+    .map((row) => ({ ...row, source: 'exact' as const }));
+}
+
+function itemPathFromSlots(rows: GuideItemSlot[]): GuideItemPathDisplay | undefined {
+  const bySlot = [1, 2, 3, 4, 5, 6]
+    .map((slot) => rows.filter((row) => row.itemSlot === slot).sort((a, b) => {
+      const leftScore = guideItemSlotScore(a);
+      const rightScore = guideItemSlotScore(b);
+      if (leftScore !== rightScore) return rightScore - leftScore;
+      if (a.confidence !== b.confidence) return b.confidence - a.confidence;
+      if (a.games !== b.games) return b.games - a.games;
+      return b.winRate - a.winRate;
+    })[0])
+    .filter(Boolean) as GuideItemSlot[];
+  if (bySlot.length < 2) {
+    return undefined;
+  }
+  const itemIds: number[] = [];
+  for (const row of bySlot) {
+    if (!itemIds.includes(row.itemId)) {
+      itemIds.push(row.itemId);
+    }
+  }
+  const samples = bySlot.map((row) => row.games);
+  const minGames = Math.min(...samples);
+  const maxGames = Math.max(...samples);
+  return {
+    core3Signature: itemIds.slice(0, 3).join('-'),
+    finalItemsSignature: itemIds.slice(0, 6).join('-'),
+    wins: 0,
+    games: minGames,
+    winRate: 0,
+    confidence: Math.min(...bySlot.map((row) => row.confidence)),
+    source: 'slot',
+    sampleLabel: minGames === maxGames ? `${formatNumber(minGames)} samples/item` : `${formatNumber(minGames)}-${formatNumber(maxGames)} samples/item`,
+  };
+}
+
+function guideItemSlotScore(row: GuideItemSlot) {
+  const reliability = Math.min(1, Math.sqrt(row.games / 200));
+  return row.confidence * reliability;
 }
 
 function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, items?: ItemData) {

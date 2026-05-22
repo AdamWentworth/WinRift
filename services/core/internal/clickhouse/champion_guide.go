@@ -733,7 +733,9 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 		FROM patch_build_metrics FINAL
 		WHERE champion_id = ?
 			AND core3_signature != ''
-			AND final_items_signature != ''`
+			AND final_items_signature != ''
+			AND length(splitByChar('-', core3_signature)) >= 3
+			AND length(splitByChar('-', final_items_signature)) >= 3`
 	compiledArgs := []any{filters["champion_id"]}
 	if roleScope.whereSQL != "" {
 		compiledWhere += " AND " + roleScope.whereSQL
@@ -764,6 +766,8 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 			` + rawSQL + `
 				AND core3_signature != ''
 				AND final_items_signature != ''
+				AND length(splitByChar('-', core3_signature)) >= 3
+				AND length(splitByChar('-', final_items_signature)) >= 3
 			GROUP BY core3_signature, final_items_signature
 			UNION ALL
 			SELECT

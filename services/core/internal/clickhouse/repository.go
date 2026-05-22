@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -309,8 +310,8 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 		query += " AND rank_bucket = ?"
 		args = append(args, filters["rank_bucket"])
 	}
-	query += ` GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature HAVING games >= ? ORDER BY win_rate DESC, games DESC LIMIT ?`
-	args = append(args, minGames, limit)
+	query += ` GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature HAVING games >= ? ORDER BY games DESC, win_rate DESC LIMIT ?`
+	args = append(args, minGames, limit*5)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -326,7 +327,22 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
 		out = append(out, row)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Confidence != out[j].Confidence {
+			return out[i].Confidence > out[j].Confidence
+		}
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		return out[i].WinRate > out[j].WinRate
+	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
@@ -1287,6 +1303,11 @@ func trimItemSlotRows(rows []ItemSlotRow, limit int) []ItemSlotRow {
 		if left.ItemSlot != right.ItemSlot {
 			return left.ItemSlot < right.ItemSlot
 		}
+		leftScore := itemSlotRecommendationScore(left)
+		rightScore := itemSlotRecommendationScore(right)
+		if leftScore != rightScore {
+			return leftScore > rightScore
+		}
 		if left.Confidence != right.Confidence {
 			return left.Confidence > right.Confidence
 		}
@@ -1308,6 +1329,14 @@ func trimItemSlotRows(rows []ItemSlotRow, limit int) []ItemSlotRow {
 		out = append(out, row)
 	}
 	return out
+}
+
+func itemSlotRecommendationScore(row ItemSlotRow) float64 {
+	reliability := math.Sqrt(float64(row.Games) / 200)
+	if reliability > 1 {
+		reliability = 1
+	}
+	return row.Confidence * reliability
 }
 
 func patchLess(left, right string) bool {
