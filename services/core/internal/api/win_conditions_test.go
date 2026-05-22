@@ -146,3 +146,15 @@ func TestBuildAdviceSampleQualityLabels(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildAdviceNotesCallOutAllFallbackItemSlots(t *testing.T) {
+	matchupSlots := []scopedItemSlotRow{
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 1, Games: 12}, Scope: itemSlotScope{Fallback: true}},
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 2, Games: 20}, Scope: itemSlotScope{Fallback: true}},
+	}
+
+	notes := buildAdviceNotes(true, matchupSlots, []scopedItemSlotRow{{Row: clickhouse.ItemSlotRow{ItemSlot: 1, Games: 50}}})
+	if len(notes) == 0 || notes[0] != "No exact matchup item slots met the threshold yet; showing champion-wide slot signals as a baseline." {
+		t.Fatalf("notes = %+v; wanted all-fallback warning", notes)
+	}
+}

@@ -14,6 +14,18 @@ func TestRoleScopesSeparateBuildAdviceFromChampionRankings(t *testing.T) {
 	}
 }
 
+func TestAnalyticsOpponentBucketAggregatesChampionWideRows(t *testing.T) {
+	overallBucket := analyticsOpponentBucketExpr(map[string]string{"opponent_champion_id": ""})
+	if overallBucket != "toUInt16(0)" {
+		t.Fatalf("overall opponent bucket = %q; wanted champion-wide zero bucket", overallBucket)
+	}
+
+	matchupBucket := analyticsOpponentBucketExpr(map[string]string{"opponent_champion_id": "245"})
+	if matchupBucket != "opponent_champion_id" {
+		t.Fatalf("matchup opponent bucket = %q; wanted exact opponent column", matchupBucket)
+	}
+}
+
 func TestApplyChampionTierScoresRewardsStableWinningSamples(t *testing.T) {
 	rows := applyChampionTierScores([]ChampionGuideSummary{
 		{

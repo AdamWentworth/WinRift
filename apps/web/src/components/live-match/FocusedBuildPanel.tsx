@@ -75,6 +75,7 @@ export function FocusedBuildPanel({
   const activeOpponentKey = selectedOpponentKey || selection.opponentKey;
   const championName = champion?.name ?? String(selection.participant.championId);
   const opponentChampionName = opponentChampion?.name ?? String(selection.opponent.championId);
+  const matchupHasExactSlots = matchupItemSlots.some((row) => !row.fallback);
 
   return (
     <section className={`focused-build-panel ${selection.side}`} aria-label="Focused build matchup">
@@ -122,11 +123,13 @@ export function FocusedBuildPanel({
       <BuildAdviceSetupStrip buildAdvice={buildAdvice} spells={spells} runes={runes} loading={loading} />
       <div className="focused-build-results">
         <BuildResultCard
-          title={`Best ${championName} build vs ${opponentChampionName}`}
-          description={`Matchup-specific items for ${championName} into ${opponentChampionName}`}
+          title={matchupHasExactSlots ? `Best ${championName} build vs ${opponentChampionName}` : `${championName} baseline vs ${opponentChampionName}`}
+          description={matchupHasExactSlots
+            ? `Matchup-specific items for ${championName} into ${opponentChampionName}`
+            : `Exact ${opponentChampionName} samples are thin; showing ${championName}'s strongest baseline slot reads`}
           sample={matchupSample}
           summary={matchupSummary}
-          comparison={matchupDelta}
+          comparison={matchupHasExactSlots ? matchupDelta : 'Baseline fallback'}
           scopeLabel={matchupScopeLabel}
           notes={buildAdvice?.notes}
           side={selection.side}

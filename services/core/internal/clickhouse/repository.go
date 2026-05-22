@@ -90,6 +90,13 @@ func analyticsRoleScope(role string) roleAnalyticsScope {
 	}
 }
 
+func analyticsOpponentBucketExpr(filters map[string]string) string {
+	if strings.TrimSpace(filters["opponent_champion_id"]) != "" {
+		return "opponent_champion_id"
+	}
+	return "toUInt16(0)"
+}
+
 // strictAnalyticsRoleScope keeps champion strength and guide rankings in their
 // selected role so mid-lane picks do not leak into top-lane tier lists.
 func strictAnalyticsRoleScope(role string) roleAnalyticsScope {
@@ -192,11 +199,12 @@ func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.
 
 func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, error) {
 	roleScope := analyticsRoleScope(filters["role"])
+	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
 	query := fmt.Sprintf(`
 		SELECT
 			champion_id,
 			%s AS role_bucket,
-			opponent_champion_id,
+			%s AS opponent_champion_id,
 			patch_bucket,
 			rank_bucket,
 			final_items_signature,
@@ -279,7 +287,7 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 				games
 			FROM patch_build_metrics FINAL
 		)
-		WHERE 1 = 1`, roleScope.selectExpr)
+		WHERE 1 = 1`, roleScope.selectExpr, opponentBucketExpr)
 	args := []any{}
 	if filters["champion_id"] != "" {
 		query += " AND champion_id = ?"
@@ -349,6 +357,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]ItemSlotRow, error) {
 	patchBucketExpr := "'ALL'"
 	rankBucketExpr := "'ALL'"
+	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
 	if filters["patch"] != "" {
 		patchBucketExpr = "patch"
 	}
@@ -360,7 +369,7 @@ func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[stri
 		SELECT
 			champion_id,
 			%s AS role_bucket,
-			opponent_champion_id,
+			%s AS opponent_champion_id,
 			%s AS patch_bucket,
 			%s AS rank_bucket,
 			item_slot,
@@ -370,7 +379,7 @@ func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[stri
 			wins / games AS win_rate
 		FROM item_slot_analytics FINAL
 		WHERE item_context = ?
-			AND item_id > 0`, roleScope.selectExpr, patchBucketExpr, rankBucketExpr)
+			AND item_id > 0`, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
 	args := []any{itemContext}
 	if filters["champion_id"] != "" {
 		query += " AND champion_id = ?"
@@ -407,6 +416,7 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 	itemList := uint32ListSQL(allowedItemIDs)
 	patchBucketExpr := "'ALL'"
 	rankBucketExpr := "'ALL'"
+	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
 	if filters["patch"] != "" {
 		patchBucketExpr = "patch_value"
 	}
@@ -531,7 +541,7 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 		SELECT
 			champion_id,
 			%s AS role_bucket,
-			opponent_champion_id,
+			%s AS opponent_champion_id,
 			%s AS patch_bucket,
 			%s AS rank_bucket,
 			item_slot,
@@ -545,7 +555,7 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 			UNION ALL
 			SELECT * FROM compiled_item_slots WHERE item_slot <= 6
 		)
-		WHERE item_id > 0`, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, patchBucketExpr, rankBucketExpr)
+		WHERE item_id > 0`, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
 	args = append(args, compiledArgs...)
 	if filters["rank_bucket"] != "" {
 		query += " AND rank_value = ?"

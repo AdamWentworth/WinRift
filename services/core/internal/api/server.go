@@ -657,7 +657,9 @@ func buildAdviceNotes(hasOpponent bool, matchupSlots, championSlots []scopedItem
 	if hasOpponent && len(matchupSlots) == 0 {
 		notes = append(notes, "No matchup-specific build sample met the requested threshold yet.")
 	}
-	if hasOpponent && buildAdviceSampleResponse(matchupSlots)["fallbackUsed"] == true {
+	if hasOpponent && allItemSlotRowsAreFallback(matchupSlots) {
+		notes = append(notes, "No exact matchup item slots met the threshold yet; showing champion-wide slot signals as a baseline.")
+	} else if hasOpponent && buildAdviceSampleResponse(matchupSlots)["fallbackUsed"] == true {
 		notes = append(notes, "Some matchup slots use broader fallback data where exact samples are thin.")
 	}
 	if len(championSlots) == 0 {
@@ -667,6 +669,15 @@ func buildAdviceNotes(hasOpponent bool, matchupSlots, championSlots []scopedItem
 		notes = append(notes, "Build advice is compiled from stored ranked Solo/Duo games and refreshed summary tables.")
 	}
 	return notes
+}
+
+func allItemSlotRowsAreFallback(rows []scopedItemSlotRow) bool {
+	for _, row := range rows {
+		if !row.Scope.Fallback {
+			return false
+		}
+	}
+	return len(rows) > 0
 }
 
 func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
