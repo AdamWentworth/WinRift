@@ -27,7 +27,7 @@ Status: items 1-10 and the first ops/documentation pass have been addressed. The
 
 ## New Follow-Ups
 
-13. Validate build-card ranking against a larger set of champion/opponent examples. We fixed one integrity class, but still need spot checks for jungle starters, support items, transformed/Ornn-style item IDs, item reworks, and unusual inventory events.
+13. Validate build-card ranking against a larger set of champion/opponent examples. Current pass complete: starting items now use their own first-two-minutes slot instead of being treated as the first finished item. Still need spot checks for support quest upgrades, transformed/Ornn-style item IDs, item reworks, and unusual inventory events.
 14. Decide how to present missing exact-matchup slots. Current behavior leaves slots blank once exact matchup data runs out. That is honest, but the UI may eventually need a softer "baseline available below" treatment.
 15. Add diagnostics for build-advice scope composition. Current pass complete: the build-advice API now returns a non-UI diagnostics block with selected rows, missing slots, fallback slots, exact/current/all-patch slot buckets, champion-wide slot flags, and scope row counts.
 16. Revisit actual full build paths once samples are denser. Slot reads are useful, but a completed path is easier for players to digest when the sample is strong enough.

@@ -154,7 +154,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
     : buildAdvice?.champion.itemSlots ?? [];
   const selectedVariantItemSlots = selectedBuildVariant ? variantItemSlots(selectedBuildVariant) : [];
   const itemSlots: GuideItemSlot[] = selectedVariantItemSlots.length
-    ? selectedVariantItemSlots
+    ? withStartingItemRows(recommendedItemSlots, selectedVariantItemSlots)
     : recommendedItemSlots;
   const itemSlotContext = selectedVariantItemSlots.length
     ? `${selectedBuildVariantLabel} selected build family`
@@ -624,16 +624,17 @@ function SkillPathCard({ guide, championName, loading }: { guide?: ChampionGuide
 }
 
 function ItemGuideGrid({ rows, items, loading, context }: { rows: GuideItemSlot[]; items?: ItemData; loading: boolean; context: string }) {
-  const slotRows = [1, 2, 3, 4, 5, 6].map((slot) => sortedSlotCandidates(rows, slot));
-  const coreRows = pickUniqueCoreRows(slotRows.slice(0, 3));
+  const startingRows = sortedSlotCandidates(rows, 0);
+  const completedSlotRows = [1, 2, 3, 4, 5, 6].map((slot) => sortedSlotCandidates(rows, slot));
+  const coreRows = pickUniqueCoreRows(completedSlotRows.slice(0, 3));
   const coreItemIds = new Set(coreRows.map((row) => row.itemId));
   return (
     <section className="guide-item-grid">
-      <GuideItemPanel title="First Slot" subtitle={context} rows={slotRows[0]?.slice(0, 1) ?? []} items={items} loading={loading} />
+      <GuideItemPanel title="Starting Items" subtitle={context} rows={startingRows.slice(0, 3)} items={items} loading={loading} />
       <GuideItemPanel title="Core Items" subtitle="Highest-confidence path" rows={coreRows} items={items} loading={loading} linked />
-      <GuideItemPanel title="Fourth Item Options" subtitle="Options after core" rows={optionRows(slotRows[3] ?? [], coreItemIds)} items={items} loading={loading} />
-      <GuideItemPanel title="Fifth Item Options" subtitle="Late build pivots" rows={optionRows(slotRows[4] ?? [], coreItemIds)} items={items} loading={loading} />
-      <GuideItemPanel title="Sixth Item Options" subtitle="Full-build finishers" rows={optionRows(slotRows[5] ?? [], coreItemIds)} items={items} loading={loading} />
+      <GuideItemPanel title="Fourth Item Options" subtitle="Options after core" rows={optionRows(completedSlotRows[3] ?? [], coreItemIds)} items={items} loading={loading} />
+      <GuideItemPanel title="Fifth Item Options" subtitle="Late build pivots" rows={optionRows(completedSlotRows[4] ?? [], coreItemIds)} items={items} loading={loading} />
+      <GuideItemPanel title="Sixth Item Options" subtitle="Full-build finishers" rows={optionRows(completedSlotRows[5] ?? [], coreItemIds)} items={items} loading={loading} />
     </section>
   );
 }
@@ -820,6 +821,11 @@ function variantItemSlots(variant: ChampionGuideBuildVariant): GuideItemSlot[] {
     winRate: variant.winRate,
     confidence: variant.confidence,
   }));
+}
+
+function withStartingItemRows(startingSource: GuideItemSlot[], buildRows: GuideItemSlot[]) {
+  const startingRows = startingSource.filter((row) => row.itemSlot === 0);
+  return startingRows.length ? [...startingRows, ...buildRows] : buildRows;
 }
 
 function stableExactItemPaths(rows: { core3Signature: string; finalItemsSignature: string }[]) {

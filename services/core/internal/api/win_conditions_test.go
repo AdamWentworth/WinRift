@@ -144,8 +144,12 @@ func TestItemSlotFallbackCompleteRequiresEverySlotToReachLimit(t *testing.T) {
 		t.Fatal("fallback should not be complete until slot 6 reaches the requested option limit")
 	}
 	covered[6] = 2
+	if itemSlotFallbackComplete(covered, 2) {
+		t.Fatal("fallback should not be complete until starting items reach the requested option limit")
+	}
+	covered[0] = 2
 	if !itemSlotFallbackComplete(covered, 2) {
-		t.Fatal("fallback should be complete when all six slots reach the requested option limit")
+		t.Fatal("fallback should be complete when starting items and all six finished slots reach the requested option limit")
 	}
 }
 

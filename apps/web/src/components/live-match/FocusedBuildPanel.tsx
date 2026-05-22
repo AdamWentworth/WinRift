@@ -583,11 +583,12 @@ function topItemSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
 }
 
 export function selectBuildSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
-  const slotRows = [1, 2, 3, 4, 5, 6].map((slot) => itemSlots.filter((candidate) => candidate.itemSlot === slot));
+  const displayedSlots = [0, 1, 2, 3, 4, 5, 6];
+  const slotRows = displayedSlots.map((slot) => itemSlots.filter((candidate) => candidate.itemSlot === slot));
   const initialRows = slotRows.map((rows) => rows[0]).filter((row): row is AnalyticsItemSlot => Boolean(row));
   const selectedBoot = selectSingleBootRow(initialRows, items);
   return slotRows.map((rows, index) => {
-    const slot = index + 1;
+    const slot = displayedSlots[index];
     const filteredRows = selectedBoot
       ? rows.filter((row) => !isBootItem(items, row.itemId) || sameItemSlotRow(row, selectedBoot))
       : rows;
@@ -670,6 +671,7 @@ function buildSampleQuality(samples: number) {
 }
 
 function ordinal(value: number) {
+  if (value === 0) return 'Start';
   if (value === 1) return '1st';
   if (value === 2) return '2nd';
   if (value === 3) return '3rd';

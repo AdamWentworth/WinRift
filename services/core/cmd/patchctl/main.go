@@ -79,7 +79,15 @@ func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Serv
 	if err != nil {
 		return nil, err
 	}
+	defaultStartingItems, err := staticService.StartingItemIDs(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
 	jungleItems, err := staticService.BuildItemIDs(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleStartingItems, err := staticService.StartingItemIDs(ctx, "", true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +95,13 @@ func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Serv
 	if err != nil {
 		return nil, err
 	}
+	supportStartingItems, err := staticService.StartingItemIDs(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
 	return []clickhouse.ItemSlotAnalyticsContext{
-		{Key: "DEFAULT", ItemIDs: defaultItems},
-		{Key: "JUNGLE", ItemIDs: jungleItems},
-		{Key: "SUPPORT", ItemIDs: supportItems},
+		{Key: "DEFAULT", ItemIDs: defaultItems, StartingItemIDs: defaultStartingItems},
+		{Key: "JUNGLE", ItemIDs: jungleItems, StartingItemIDs: jungleStartingItems},
+		{Key: "SUPPORT", ItemIDs: supportItems, StartingItemIDs: supportStartingItems},
 	}, nil
 }

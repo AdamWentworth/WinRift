@@ -63,6 +63,8 @@ Compact closed-patch item timing metrics for first, second, and third non-trinke
 
 Current read model for live build matchup cards. One row per patch, item context, champion, role, opponent champion, rank bucket, item slot, and item id.
 
+`item_slot = 0` is reserved for starting items bought in the opening two minutes. Slots `1-6` are completed build items in timeline purchase order.
+
 `item_context` is one of:
 
 - `DEFAULT`: lane build items, excluding jungle/support-specific starts.

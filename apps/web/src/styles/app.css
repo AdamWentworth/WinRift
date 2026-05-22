@@ -4549,7 +4549,7 @@ button {
   border: 1px solid rgb(255 255 255 / 12%);
   display: grid;
   gap: 4px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   min-height: 80px;
   min-width: 0;
   padding: 6px 5px;

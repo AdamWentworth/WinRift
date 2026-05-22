@@ -550,10 +550,14 @@ func (s Server) queryScopedItemSlots(ctx context.Context, request itemSlotAnalyt
 	if err != nil {
 		return nil, err
 	}
-	if request.Fallback {
-		return s.queryItemSlotFallbacks(ctx, filters, itemContext, buildItemIDs, minGames, limit, request.SuppressChampionFallback)
+	startingItemIDs, err := s.static.StartingItemIDs(ctx, "", includeJungle, includeSupport)
+	if err != nil {
+		return nil, err
 	}
-	rows, err := s.repo.QueryItemSlots(ctx, filters, itemContext, buildItemIDs, minGames, limit)
+	if request.Fallback {
+		return s.queryItemSlotFallbacks(ctx, filters, itemContext, buildItemIDs, startingItemIDs, minGames, limit, request.SuppressChampionFallback)
+	}
+	rows, err := s.repo.QueryItemSlots(ctx, filters, itemContext, buildItemIDs, startingItemIDs, minGames, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -996,12 +1000,12 @@ type scopedItemSlotRow struct {
 	Scope itemSlotScope
 }
 
-func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, itemContext string, buildItemIDs []uint32, minGames, limit int, suppressChampionFallback bool) ([]scopedItemSlotRow, error) {
+func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, itemContext string, buildItemIDs, startingItemIDs []uint32, minGames, limit int, suppressChampionFallback bool) ([]scopedItemSlotRow, error) {
 	scopes := itemSlotFallbackScopesWithOptions(filters, suppressChampionFallback)
 	out := []scopedItemSlotRow{}
 	coveredSlots := map[uint8]int{}
 	for _, scope := range scopes {
-		rows, err := s.repo.QueryItemSlots(ctx, scope.Filters, itemContext, buildItemIDs, minGames, limit)
+		rows, err := s.repo.QueryItemSlots(ctx, scope.Filters, itemContext, buildItemIDs, startingItemIDs, minGames, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -1023,7 +1027,7 @@ func itemSlotFallbackComplete(coveredSlots map[uint8]int, limit int) bool {
 	if limit <= 0 {
 		limit = 1
 	}
-	for slot := uint8(1); slot <= 6; slot++ {
+	for slot := uint8(0); slot <= 6; slot++ {
 		if coveredSlots[slot] < limit {
 			return false
 		}
@@ -1553,7 +1557,15 @@ func (s Server) itemSlotRefreshContexts(ctx context.Context) ([]clickhouse.ItemS
 	if err != nil {
 		return nil, err
 	}
+	defaultStartingItems, err := s.static.StartingItemIDs(ctx, "", false, false)
+	if err != nil {
+		return nil, err
+	}
 	jungleItems, err := s.static.BuildItemIDs(ctx, "", true, false)
+	if err != nil {
+		return nil, err
+	}
+	jungleStartingItems, err := s.static.StartingItemIDs(ctx, "", true, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1561,10 +1573,14 @@ func (s Server) itemSlotRefreshContexts(ctx context.Context) ([]clickhouse.ItemS
 	if err != nil {
 		return nil, err
 	}
+	supportStartingItems, err := s.static.StartingItemIDs(ctx, "", false, true)
+	if err != nil {
+		return nil, err
+	}
 	return []clickhouse.ItemSlotAnalyticsContext{
-		{Key: "DEFAULT", ItemIDs: defaultItems},
-		{Key: "JUNGLE", ItemIDs: jungleItems},
-		{Key: "SUPPORT", ItemIDs: supportItems},
+		{Key: "DEFAULT", ItemIDs: defaultItems, StartingItemIDs: defaultStartingItems},
+		{Key: "JUNGLE", ItemIDs: jungleItems, StartingItemIDs: jungleStartingItems},
+		{Key: "SUPPORT", ItemIDs: supportItems, StartingItemIDs: supportStartingItems},
 	}, nil
 }
 

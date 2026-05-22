@@ -52,9 +52,12 @@ type ItemSlotRow struct {
 }
 
 type ItemSlotAnalyticsContext struct {
-	Key     string
-	ItemIDs []uint32
+	Key             string
+	ItemIDs         []uint32
+	StartingItemIDs []uint32
 }
+
+const startingItemWindowMS uint32 = 120000
 
 type PatchSnapshot struct {
 	Patch            string
@@ -345,7 +348,11 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 	return out, nil
 }
 
-func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
+func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs, startingItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
+	completionItemIDs := removeItemIDs(allowedItemIDs, startingItemIDs)
+	if len(completionItemIDs) == 0 && len(startingItemIDs) == 0 {
+		return nil, nil
+	}
 	if minGames <= 0 {
 		minGames = 1
 	}
@@ -367,7 +374,7 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 	if hasSummary {
 		return rows, nil
 	}
-	return r.queryItemSlotsLiveScan(ctx, filters, allowedItemIDs, minGames, limit)
+	return r.queryItemSlotsLiveScan(ctx, filters, completionItemIDs, startingItemIDs, minGames, limit)
 }
 
 func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]ItemSlotRow, error) {
@@ -425,11 +432,12 @@ func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[stri
 	return r.scanItemSlotRows(ctx, query, args, limit)
 }
 
-func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[string]string, allowedItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
-	if len(allowedItemIDs) == 0 {
+func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[string]string, allowedItemIDs, startingItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
+	if len(allowedItemIDs) == 0 && len(startingItemIDs) == 0 {
 		return nil, nil
 	}
 	itemList := uint32ListSQL(allowedItemIDs)
+	startingItemList := uint32ListSQL(startingItemIDs)
 	patchBucketExpr := "'ALL'"
 	rankBucketExpr := "'ALL'"
 	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
@@ -463,9 +471,55 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 		compiledFilters += " AND patch = ?"
 		args = append(args, filters["patch"])
 	}
+	rawArgs := append([]any{}, args...)
 	compiledArgs := append([]any{}, args...)
 	query := fmt.Sprintf(`
-		WITH raw_item_purchases AS
+		WITH raw_starting_items AS
+		(
+			SELECT
+				pm.match_id AS match_id,
+				pm.participant_id AS participant_id,
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				pm.opponent_champion_id AS opponent_champion_id,
+				pm.patch AS patch_value,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_value,
+				pm.win AS win,
+				tie.item_id AS item_id
+			FROM participant_matchups AS pm FINAL
+			INNER JOIN timeline_item_events AS tie FINAL
+				ON pm.match_id = tie.match_id
+				AND pm.participant_id = tie.participant_id
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE tie.event_type = 'ITEM_PURCHASED'
+				AND tie.timestamp_ms <= ?
+				AND tie.item_id IN (%s)
+				%s
+			GROUP BY
+				pm.match_id,
+				pm.participant_id,
+				pm.champion_id,
+				pm.role,
+				pm.opponent_champion_id,
+				pm.patch,
+				rank_value,
+				pm.win,
+				tie.item_id
+		),
+		raw_item_purchases AS
 		(
 			SELECT
 				pm.match_id AS match_id,
@@ -567,11 +621,25 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 			wins / games AS win_rate
 		FROM
 		(
+			SELECT
+				champion_id,
+				role,
+				opponent_champion_id,
+				patch_value,
+				rank_value,
+				toUInt8(0) AS item_slot,
+				item_id,
+				toUInt64(win) AS wins,
+				toUInt64(1) AS games
+			FROM raw_starting_items
+			UNION ALL
 			SELECT * FROM raw_item_slots WHERE item_slot <= 6
 			UNION ALL
 			SELECT * FROM compiled_item_slots WHERE item_slot <= 6
 		)
-		WHERE item_id > 0`, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+		WHERE item_id > 0`, startingItemList, rawFilters, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+	args = append([]any{startingItemWindowMS}, rawArgs...)
+	args = append(args, rawArgs...)
 	args = append(args, compiledArgs...)
 	if filters["rank_bucket"] != "" {
 		query += " AND rank_value = ?"
@@ -622,7 +690,8 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 	}
 	for _, itemContext := range contexts {
 		key := normalizedItemContext(itemContext.Key)
-		if len(itemContext.ItemIDs) == 0 {
+		completionItemIDs := removeItemIDs(itemContext.ItemIDs, itemContext.StartingItemIDs)
+		if len(completionItemIDs) == 0 && len(itemContext.StartingItemIDs) == 0 {
 			continue
 		}
 		if _, err := r.db.ExecContext(
@@ -634,13 +703,61 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 		); err != nil {
 			return err
 		}
-		itemList := uint32ListSQL(itemContext.ItemIDs)
+		itemList := uint32ListSQL(completionItemIDs)
+		startingItemList := uint32ListSQL(itemContext.StartingItemIDs)
 		_, err := r.db.ExecContext(
 			ctx,
 			fmt.Sprintf(`
 				INSERT INTO item_slot_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games)
-				WITH raw_item_purchases AS
+				WITH raw_starting_items AS
+				(
+					SELECT
+						pm.patch AS patch,
+						'ALL' AS platform,
+						pm.queue_id AS queue_id,
+						? AS item_context,
+						pm.champion_id AS champion_id,
+						pm.role AS role,
+						pm.opponent_champion_id AS opponent_champion_id,
+						multiIf(
+							s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+							pm.rank_bucket
+						) AS rank_bucket,
+						toUInt8(0) AS item_slot,
+						tie.item_id AS item_id,
+						pm.win AS win
+					FROM participant_matchups AS pm FINAL
+					INNER JOIN timeline_item_events AS tie FINAL
+						ON pm.match_id = tie.match_id
+						AND pm.participant_id = tie.participant_id
+					LEFT JOIN
+					(
+						SELECT
+							platform,
+							puuid,
+							argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+						FROM summoner_rank_snapshots FINAL
+						WHERE queue_type = 'RANKED_SOLO_5x5'
+						GROUP BY platform, puuid
+					) AS s
+						ON s.platform = pm.platform AND s.puuid = pm.puuid
+					WHERE pm.patch = ?
+						AND pm.queue_id = ?
+						AND tie.event_type = 'ITEM_PURCHASED'
+						AND tie.timestamp_ms <= ?
+						AND tie.item_id IN (%s)
+					GROUP BY
+						pm.patch,
+						pm.queue_id,
+						pm.champion_id,
+						pm.role,
+						pm.opponent_champion_id,
+						rank_bucket,
+						pm.win,
+						tie.item_id
+				),
+				raw_item_purchases AS
 				(
 					SELECT
 						pm.match_id AS match_id,
@@ -729,7 +846,37 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					opponent_champion_id,
 					rank_bucket,
 					item_slot,
-					item_id`, itemList),
+					item_id
+				UNION ALL
+				SELECT
+					patch,
+					platform,
+					queue_id,
+					item_context,
+					champion_id,
+					role,
+					opponent_champion_id,
+					rank_bucket,
+					item_slot,
+					item_id,
+					toUInt64(sum(win)) AS wins,
+					toUInt64(count()) AS games
+				FROM raw_starting_items
+				GROUP BY
+					patch,
+					platform,
+					queue_id,
+					item_context,
+					champion_id,
+					role,
+					opponent_champion_id,
+					rank_bucket,
+					item_slot,
+					item_id`, startingItemList, itemList),
+			key,
+			patch,
+			queueID,
+			startingItemWindowMS,
 			patch,
 			queueID,
 			key,
@@ -1276,6 +1423,23 @@ func uint32ListSQL(values []uint32) string {
 		return "0"
 	}
 	return strings.Join(parts, ",")
+}
+
+func removeItemIDs(values, removed []uint32) []uint32 {
+	if len(removed) == 0 {
+		return values
+	}
+	removedSet := make(map[uint32]bool, len(removed))
+	for _, value := range removed {
+		removedSet[value] = true
+	}
+	out := make([]uint32, 0, len(values))
+	for _, value := range values {
+		if value != 0 && !removedSet[value] {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func normalizedItemContext(value string) string {

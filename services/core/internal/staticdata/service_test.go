@@ -139,6 +139,63 @@ func TestIsBuildItem(t *testing.T) {
 	}
 }
 
+func TestStartingItemIDs(t *testing.T) {
+	client := &fakeRiotClient{
+		payloads: map[string]any{
+			"item.json": map[string]any{
+				"data": map[string]any{
+					"1001": itemFixture(300, true, 0, []string{"Boots"}, nil),
+					"1036": itemFixture(350, true, 0, []string{"Damage"}, []string{"3071"}),
+					"1055": itemFixture(450, true, 0, []string{"Health", "Damage", "Lane"}, nil),
+					"1101": itemFixture(450, true, 0, []string{"Jungle"}, nil),
+					"2003": itemFixture(50, true, 0, []string{"Consumable"}, nil),
+					"2055": itemFixture(75, true, 0, []string{"Consumable", "Vision"}, nil),
+					"3071": itemFixture(3000, true, 3, []string{"Health", "Damage"}, nil),
+					"3870": itemFixture(400, true, 0, []string{"Health", "ManaRegen", "Vision", "GoldPer", "Lane"}, nil),
+				},
+			},
+		},
+		calls: map[string]int{},
+	}
+	service := NewService(client)
+
+	defaultIDs, err := service.StartingItemIDs(context.Background(), "", false, false)
+	if err != nil {
+		t.Fatalf("StartingItemIDs default returned error: %v", err)
+	}
+	if got, want := defaultIDs, []uint32{1001, 1036, 1055}; !sameUint32s(got, want) {
+		t.Fatalf("default starting IDs = %v, want %v", got, want)
+	}
+
+	jungleIDs, err := service.StartingItemIDs(context.Background(), "", true, false)
+	if err != nil {
+		t.Fatalf("StartingItemIDs jungle returned error: %v", err)
+	}
+	if got, want := jungleIDs, []uint32{1001, 1036, 1055, 1101}; !sameUint32s(got, want) {
+		t.Fatalf("jungle starting IDs = %v, want %v", got, want)
+	}
+
+	supportIDs, err := service.StartingItemIDs(context.Background(), "", false, true)
+	if err != nil {
+		t.Fatalf("StartingItemIDs support returned error: %v", err)
+	}
+	if got, want := supportIDs, []uint32{1001, 1036, 1055, 3870}; !sameUint32s(got, want) {
+		t.Fatalf("support starting IDs = %v, want %v", got, want)
+	}
+}
+
+func sameUint32s(left, right []uint32) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
 func itemFixture(totalGold int, purchasable bool, depth int, tags []string, into []string) map[string]any {
 	item := map[string]any{
 		"gold": map[string]any{

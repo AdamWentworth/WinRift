@@ -219,6 +219,18 @@ func isChromaVariant(skinName string) bool {
 }
 
 func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle, includeSupport bool) ([]uint32, error) {
+	return s.itemIDs(ctx, patch, func(id uint32, item map[string]any) bool {
+		return isBuildItem(id, item, includeJungle, includeSupport)
+	})
+}
+
+func (s *Service) StartingItemIDs(ctx context.Context, patch string, includeJungle, includeSupport bool) ([]uint32, error) {
+	return s.itemIDs(ctx, patch, func(id uint32, item map[string]any) bool {
+		return isStartingItem(id, item, includeJungle, includeSupport)
+	})
+}
+
+func (s *Service) itemIDs(ctx context.Context, patch string, include func(uint32, map[string]any) bool) ([]uint32, error) {
 	payload, err := s.Get(ctx, "items", patch)
 	if err != nil {
 		return nil, err
@@ -242,7 +254,7 @@ func (s *Service) BuildItemIDs(ctx context.Context, patch string, includeJungle,
 			continue
 		}
 		id := uint32(id64)
-		if isBuildItem(id, item, includeJungle, includeSupport) {
+		if include(id, item) {
 			ids = append(ids, id)
 		}
 	}
@@ -264,16 +276,8 @@ func numberAsInt(value any) (int, bool) {
 }
 
 func isBuildItem(id uint32, item map[string]any, includeJungle, includeSupport bool) bool {
-	if excludedBuildItems[id] {
+	if isExcludedShopItem(id, item) {
 		return false
-	}
-	if consumed, _ := item["consumed"].(bool); consumed {
-		return false
-	}
-	if maps, ok := item["maps"].(map[string]any); ok {
-		if summonersRift, ok := maps["11"].(bool); ok && !summonersRift {
-			return false
-		}
 	}
 	tags := itemTags(item)
 	if tags["Consumable"] || tags["Trinket"] {
@@ -298,6 +302,42 @@ func isBuildItem(id uint32, item map[string]any, includeJungle, includeSupport b
 	}
 	if !hasItemTargets(item) && totalGold >= 1500 {
 		return true
+	}
+	return false
+}
+
+func isStartingItem(id uint32, item map[string]any, includeJungle, includeSupport bool) bool {
+	if isExcludedShopItem(id, item) {
+		return false
+	}
+	tags := itemTags(item)
+	if tags["Consumable"] || tags["Trinket"] {
+		return false
+	}
+	if tags["Jungle"] {
+		return includeJungle
+	}
+	totalGold, purchasable := itemGold(item)
+	if !purchasable || totalGold <= 0 || totalGold > 650 {
+		return false
+	}
+	if isSupportBuildItem(tags) {
+		return includeSupport
+	}
+	return true
+}
+
+func isExcludedShopItem(id uint32, item map[string]any) bool {
+	if excludedBuildItems[id] {
+		return true
+	}
+	if consumed, _ := item["consumed"].(bool); consumed {
+		return true
+	}
+	if maps, ok := item["maps"].(map[string]any); ok {
+		if summonersRift, ok := maps["11"].(bool); ok && !summonersRift {
+			return true
+		}
 	}
 	return false
 }

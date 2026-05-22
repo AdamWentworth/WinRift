@@ -32,12 +32,15 @@ function slot(row: Partial<AnalyticsItemSlot> & Pick<AnalyticsItemSlot, 'itemSlo
 describe('selectBuildSlotRows', () => {
   it('keeps only one boots item in the displayed slot read', () => {
     const selected = selectBuildSlotRows([
+      slot({ itemSlot: 0, itemId: 1055, games: 50, winRate: 51, confidence: 55 }),
       slot({ itemSlot: 4, itemId: 3047, games: 5, winRate: 80, confidence: 45 }),
       slot({ itemSlot: 4, itemId: 3053, games: 12, winRate: 58, confidence: 40 }),
       slot({ itemSlot: 5, itemId: 3111, games: 34, winRate: 68, confidence: 58 }),
       slot({ itemSlot: 5, itemId: 3026, games: 20, winRate: 55, confidence: 42 }),
     ], items);
 
+    expect(selected[0]?.slot).toBe(0);
+    expect(selected[0]?.row?.itemId).toBe(1055);
     expect(selected.find((row) => row.slot === 4)?.row?.itemId).toBe(3053);
     expect(selected.find((row) => row.slot === 5)?.row?.itemId).toBe(3111);
     expect(selected.flatMap((row) => row.row ? [row.row.itemId] : []).filter((itemId) => itemId === 3047 || itemId === 3111)).toHaveLength(1);
