@@ -172,6 +172,12 @@ describe('App', () => {
   });
 
   it('opens the alphabetical champion directory and links into build guides', async () => {
+    vi.mocked(getChampionRoleRates).mockResolvedValueOnce({
+      results: [
+        { championId: 62, role: 'JUNGLE', games: 120, totalGames: 140, pickRate: 85.71 },
+        { championId: 62, role: 'MIDDLE', games: 20, totalGames: 140, pickRate: 14.29 },
+      ],
+    });
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },

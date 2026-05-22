@@ -2,8 +2,8 @@ import { Database, Filter, Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getBuildAdvice, getChampionGuide, getChampionGuideIndex } from '../api/client';
-import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
+import { getBuildAdvice, getChampionGuide, getChampionGuideIndex, getChampionRoleRates } from '../api/client';
+import type { AnalyticsItemSlot, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, RuneStyle, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
   championByKey,
@@ -19,7 +19,7 @@ import {
   summonerSpellImageUrl,
   summonerSpellName,
 } from '../lib/staticData';
-import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
+import { normalizeRole, ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { championTier } from '../lib/tiers';
 import { MetricTile } from './ui/MetricTile';
 import { EmptyState, PanelCard, PanelTitle } from './ui/Panel';
@@ -37,6 +37,7 @@ const ranks = [
 ];
 
 const RECOMMENDED_BUILD_KEY = 'recommended';
+const DEFAULT_QUEUE_ID = 420;
 
 type Props = {
   champions?: ChampionData;
@@ -56,18 +57,27 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
     return Number(wukong?.key ?? championsByName[0]?.key ?? 62);
   }, [championsByName]);
   const [championId, setChampionId] = useState(initialChampionId ?? defaultChampionId);
-  const [role, setRole] = useState('JUNGLE');
+  const [role, setRole] = useState('');
+  const [roleTouched, setRoleTouched] = useState(false);
   const [rankBucket, setRankBucket] = useState('');
   const [opponentChampionId, setOpponentChampionId] = useState(0);
   const [selectedBuildVariantKey, setSelectedBuildVariantKey] = useState('');
   const patch = patchBucket(champions?.version);
   const champion = championByKey(champions, championId);
   const opponent = opponentChampionId ? championByKey(champions, opponentChampionId) : undefined;
+  const roleRatesQuery = useQuery({
+    queryKey: ['champion-main-role', championId],
+    queryFn: () => getChampionRoleRates([championId], DEFAULT_QUEUE_ID),
+    enabled: Boolean(championId),
+    staleTime: 30 * 60 * 1000,
+  });
+  const mainRole = useMemo(() => mainChampionRole(roleRatesQuery.data?.results ?? [], championId), [roleRatesQuery.data?.results, championId]);
+  const defaultRole = mainRole || (roleRatesQuery.isSuccess || roleRatesQuery.isError ? 'MIDDLE' : '');
   const itemContext = itemContextForRole(role);
   const guideQuery = useQuery({
     queryKey: ['champion-guide', championId, role, patch, rankBucket],
     queryFn: () => getChampionGuide({ championId, role, patch, rankBucket, minGames: 5, limit: 12 }),
-    enabled: Boolean(championId && patch),
+    enabled: Boolean(championId && patch && role),
     staleTime: 5 * 60 * 1000,
   });
   const buildAdviceQuery = useQuery({
@@ -83,30 +93,51 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
       championMinGames: 10,
       limit: 4,
     }),
-    enabled: Boolean(championId && patch),
+    enabled: Boolean(championId && patch && role),
     staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
     if (initialChampionId && championByKey(champions, initialChampionId) && initialChampionId !== championId) {
+      setRoleTouched(false);
+      setRole('');
       setChampionId(initialChampionId);
       return;
     }
     if (defaultChampionId && !championByKey(champions, championId)) {
+      setRoleTouched(false);
+      setRole('');
       setChampionId(defaultChampionId);
     }
   }, [champions, championId, defaultChampionId, initialChampionId]);
+
+  useEffect(() => {
+    setRoleTouched(false);
+    setRole('');
+  }, [championId]);
+
+  useEffect(() => {
+    if (!roleTouched && defaultRole && defaultRole !== role) {
+      setRole(defaultRole);
+    }
+  }, [defaultRole, role, roleTouched]);
 
   useEffect(() => {
     setSelectedBuildVariantKey('');
   }, [championId, role, rankBucket]);
 
   const updateChampion = (value: number) => {
+    setRoleTouched(false);
+    setRole('');
     setChampionId(value);
     const nextChampion = championByKey(champions, value);
     if (nextChampion) {
       onChampionChange?.(nextChampion);
     }
+  };
+  const updateRole = (value: string) => {
+    setRoleTouched(true);
+    setRole(value);
   };
 
   const guide = guideQuery.data;
@@ -135,7 +166,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const guideIndexQuery = useQuery({
     queryKey: ['champion-guide-index', role, patch, rankBucket],
     queryFn: () => getChampionGuideIndex({ role, patch, rankBucket, minGames: 1, limit: 250 }),
-    enabled: Boolean(patch),
+    enabled: Boolean(patch && role),
     staleTime: 5 * 60 * 1000,
   });
   const guideIndex = guideIndexQuery.data?.results ?? [];
@@ -188,7 +219,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         rankBucket={rankBucket}
         opponentChampionId={opponentChampionId}
         onChampionChange={updateChampion}
-        onRoleChange={setRole}
+        onRoleChange={updateRole}
         onRankChange={setRankBucket}
         onOpponentChange={setOpponentChampionId}
       />
@@ -690,6 +721,16 @@ function patchBucket(version?: string) {
     return `${parts[0]}.${parts[1]}`;
   }
   return '';
+}
+
+function mainChampionRole(rows: ChampionRoleRate[], championId: number) {
+  const ranked = rows
+    .filter((row) => row.championId === championId && normalizeRole(row.role))
+    .sort((a, b) => {
+      if (a.games !== b.games) return b.games - a.games;
+      return b.pickRate - a.pickRate;
+    });
+  return normalizeRole(ranked[0]?.role);
 }
 
 function guideTier(guide?: ChampionGuideResponse) {
