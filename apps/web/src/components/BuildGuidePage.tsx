@@ -261,8 +261,6 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
         </div>
       </div>
 
-      <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={guideQuery.isLoading} />
-
       <div className="guide-skill-items-row">
         <SkillGuideCard guide={guide} champion={champion} champions={champions} loading={guideQuery.isLoading} />
         <SkillPathCard guide={guide} championName={champion?.name ?? 'this champion'} loading={guideQuery.isLoading} />
@@ -274,7 +272,16 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
 
       {role === 'JUNGLE' ? <RoleQuestCard /> : null}
 
-      <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={guideQuery.isLoading} />
+      <section className="guide-matchups-section" aria-label={`${champion?.name ?? 'Champion'} matchups`}>
+        <div className="guide-section-title">
+          <span>Matchups</span>
+          <em>Counter picks and favorable opponents from stored ranked games.</em>
+        </div>
+        <div className="guide-matchups-grid">
+          <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={guideQuery.isLoading} />
+          <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={guideQuery.isLoading} />
+        </div>
+      </section>
     </section>
   );
 }

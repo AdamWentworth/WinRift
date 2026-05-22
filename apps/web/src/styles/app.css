@@ -6127,6 +6127,20 @@ button {
   margin-top: 12px;
 }
 
+.guide-matchups-section {
+  margin-top: 18px;
+}
+
+.guide-matchups-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.guide-matchups-grid .matchup-strip {
+  margin-top: 0;
+}
+
 .guide-matchup-row {
   display: grid;
   gap: 10px;
@@ -6501,7 +6515,8 @@ button {
   }
 
   .guide-primary-grid,
-  .guide-skill-items-row {
+  .guide-skill-items-row,
+  .guide-matchups-grid {
     grid-template-columns: 1fr;
   }
 
