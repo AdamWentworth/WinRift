@@ -49,6 +49,7 @@ export type ItemData = {
 export type Item = {
   name: string;
   plaintext?: string;
+  tags?: string[];
   image?: {
     full: string;
   };

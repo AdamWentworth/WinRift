@@ -314,16 +314,17 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 	}
 	itemContext := normalizedItemContext(strings.ToUpper(query.Get("itemContext")), role)
 	matchupRequest := itemSlotAnalyticsRequest{
-		Key:                "matchup",
-		ChampionID:         championID,
-		Role:               role,
-		ItemContext:        itemContext,
-		OpponentChampionID: opponentChampionID,
-		Patch:              patch,
-		RankBucket:         rankBucket,
-		MinGames:           minGames,
-		Limit:              optionLimit,
-		Fallback:           true,
+		Key:                      "matchup",
+		ChampionID:               championID,
+		Role:                     role,
+		ItemContext:              itemContext,
+		OpponentChampionID:       opponentChampionID,
+		Patch:                    patch,
+		RankBucket:               rankBucket,
+		MinGames:                 minGames,
+		Limit:                    optionLimit,
+		Fallback:                 true,
+		SuppressChampionFallback: true,
 	}
 	championRequest := matchupRequest
 	championRequest.Key = "champion"
@@ -499,16 +500,17 @@ func (s Server) analyticsItemSlotsBatch(w http.ResponseWriter, r *http.Request) 
 }
 
 type itemSlotAnalyticsRequest struct {
-	Key                string `json:"key"`
-	ChampionID         uint16 `json:"championId"`
-	Role               string `json:"role"`
-	ItemContext        string `json:"itemContext"`
-	OpponentChampionID uint16 `json:"opponentChampionId"`
-	Patch              string `json:"patch"`
-	RankBucket         string `json:"rankBucket"`
-	MinGames           int    `json:"minGames"`
-	Limit              int    `json:"limit"`
-	Fallback           bool   `json:"fallback"`
+	Key                      string `json:"key"`
+	ChampionID               uint16 `json:"championId"`
+	Role                     string `json:"role"`
+	ItemContext              string `json:"itemContext"`
+	OpponentChampionID       uint16 `json:"opponentChampionId"`
+	Patch                    string `json:"patch"`
+	RankBucket               string `json:"rankBucket"`
+	MinGames                 int    `json:"minGames"`
+	Limit                    int    `json:"limit"`
+	Fallback                 bool   `json:"fallback"`
+	SuppressChampionFallback bool   `json:"suppressChampionFallback"`
 }
 
 func (request itemSlotAnalyticsRequest) filters() map[string]string {
@@ -544,7 +546,7 @@ func (s Server) queryScopedItemSlots(ctx context.Context, request itemSlotAnalyt
 		return nil, err
 	}
 	if request.Fallback {
-		return s.queryItemSlotFallbacks(ctx, filters, itemContext, buildItemIDs, minGames, limit)
+		return s.queryItemSlotFallbacks(ctx, filters, itemContext, buildItemIDs, minGames, limit, request.SuppressChampionFallback)
 	}
 	rows, err := s.repo.QueryItemSlots(ctx, filters, itemContext, buildItemIDs, minGames, limit)
 	if err != nil {
@@ -657,8 +659,10 @@ func buildAdviceNotes(hasOpponent bool, matchupSlots, championSlots []scopedItem
 	if hasOpponent && len(matchupSlots) == 0 {
 		notes = append(notes, "No matchup-specific build sample met the requested threshold yet.")
 	}
-	if hasOpponent && allItemSlotRowsAreFallback(matchupSlots) {
+	if hasOpponent && allItemSlotRowsAreFallback(matchupSlots) && hasChampionWideItemSlotFallback(matchupSlots) {
 		notes = append(notes, "No exact matchup item slots met the threshold yet; showing champion-wide slot signals as a baseline.")
+	} else if hasOpponent && allItemSlotRowsAreFallback(matchupSlots) {
+		notes = append(notes, "No current-patch matchup item slots met the threshold yet; showing exact-matchup rows from broader patch scope.")
 	} else if hasOpponent && buildAdviceSampleResponse(matchupSlots)["fallbackUsed"] == true {
 		notes = append(notes, "Some matchup slots use broader fallback data where exact samples are thin.")
 	}
@@ -678,6 +682,15 @@ func allItemSlotRowsAreFallback(rows []scopedItemSlotRow) bool {
 		}
 	}
 	return len(rows) > 0
+}
+
+func hasChampionWideItemSlotFallback(rows []scopedItemSlotRow) bool {
+	for _, row := range rows {
+		if row.Scope.Key == "patch_champion" || row.Scope.Key == "all_champion" || row.Row.OpponentChampionID == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func championGuideResponse(guide clickhouse.ChampionGuideData) map[string]any {
@@ -818,8 +831,8 @@ type scopedItemSlotRow struct {
 	Scope itemSlotScope
 }
 
-func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, itemContext string, buildItemIDs []uint32, minGames, limit int) ([]scopedItemSlotRow, error) {
-	scopes := itemSlotFallbackScopes(filters)
+func (s Server) queryItemSlotFallbacks(ctx context.Context, filters map[string]string, itemContext string, buildItemIDs []uint32, minGames, limit int, suppressChampionFallback bool) ([]scopedItemSlotRow, error) {
+	scopes := itemSlotFallbackScopesWithOptions(filters, suppressChampionFallback)
 	out := []scopedItemSlotRow{}
 	coveredSlots := map[uint8]int{}
 	for _, scope := range scopes {
@@ -871,6 +884,10 @@ func normalizedItemContext(itemContext, role string) string {
 }
 
 func itemSlotFallbackScopes(filters map[string]string) []itemSlotScope {
+	return itemSlotFallbackScopesWithOptions(filters, false)
+}
+
+func itemSlotFallbackScopesWithOptions(filters map[string]string, suppressChampionFallback bool) []itemSlotScope {
 	patch := strings.TrimSpace(filters["patch"])
 	opponent := strings.TrimSpace(filters["opponent_champion_id"])
 	scopes := []itemSlotScope{
@@ -890,12 +907,12 @@ func itemSlotFallbackScopes(filters map[string]string) []itemSlotScope {
 		allPatchMatchup["patch"] = ""
 		addScope("all_patch_matchup", "Exact matchup, all stored patches", allPatchMatchup)
 	}
-	if opponent != "" {
+	if opponent != "" && !suppressChampionFallback {
 		championPatch := cloneStringMap(filters)
 		championPatch["opponent_champion_id"] = ""
 		addScope("patch_champion", itemSlotChampionScopeLabel(patch != ""), championPatch)
 	}
-	if patch != "" || opponent != "" {
+	if (patch != "" || opponent != "") && !suppressChampionFallback {
 		championAll := cloneStringMap(filters)
 		championAll["patch"] = ""
 		championAll["opponent_champion_id"] = ""

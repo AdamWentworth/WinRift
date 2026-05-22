@@ -110,6 +110,30 @@ func TestItemSlotFallbackScopesExpandWithoutDuplicates(t *testing.T) {
 	}
 }
 
+func TestItemSlotFallbackScopesCanSuppressChampionWideFallback(t *testing.T) {
+	filters := map[string]string{
+		"champion_id":          "421",
+		"role":                 "JUNGLE",
+		"opponent_champion_id": "950",
+		"patch":                "16.10",
+		"rank_bucket":          "",
+	}
+
+	got := itemSlotFallbackScopesWithOptions(filters, true)
+	wantKeys := []string{"exact_patch_matchup", "all_patch_matchup"}
+	if len(got) != len(wantKeys) {
+		t.Fatalf("scopes = %d, want %d: %+v", len(got), len(wantKeys), got)
+	}
+	for index, want := range wantKeys {
+		if got[index].Key != want {
+			t.Fatalf("scope[%d] = %q, want %q", index, got[index].Key, want)
+		}
+	}
+	if got[1].Filters["opponent_champion_id"] != "950" {
+		t.Fatalf("fallback filters = %+v; wanted exact opponent retained", got[1].Filters)
+	}
+}
+
 func TestItemSlotFallbackCompleteRequiresEverySlotToReachLimit(t *testing.T) {
 	covered := map[uint8]int{1: 2, 2: 2, 3: 2, 4: 2, 5: 2}
 	if itemSlotFallbackComplete(covered, 2) {
@@ -149,12 +173,23 @@ func TestBuildAdviceSampleQualityLabels(t *testing.T) {
 
 func TestBuildAdviceNotesCallOutAllFallbackItemSlots(t *testing.T) {
 	matchupSlots := []scopedItemSlotRow{
-		{Row: clickhouse.ItemSlotRow{ItemSlot: 1, Games: 12}, Scope: itemSlotScope{Fallback: true}},
-		{Row: clickhouse.ItemSlotRow{ItemSlot: 2, Games: 20}, Scope: itemSlotScope{Fallback: true}},
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 1, OpponentChampionID: 0, Games: 12}, Scope: itemSlotScope{Key: "patch_champion", Fallback: true}},
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 2, OpponentChampionID: 0, Games: 20}, Scope: itemSlotScope{Key: "patch_champion", Fallback: true}},
 	}
 
 	notes := buildAdviceNotes(true, matchupSlots, []scopedItemSlotRow{{Row: clickhouse.ItemSlotRow{ItemSlot: 1, Games: 50}}})
 	if len(notes) == 0 || notes[0] != "No exact matchup item slots met the threshold yet; showing champion-wide slot signals as a baseline." {
 		t.Fatalf("notes = %+v; wanted all-fallback warning", notes)
+	}
+}
+
+func TestBuildAdviceNotesCallOutAllPatchMatchupFallback(t *testing.T) {
+	matchupSlots := []scopedItemSlotRow{
+		{Row: clickhouse.ItemSlotRow{ItemSlot: 1, OpponentChampionID: 950, Games: 12}, Scope: itemSlotScope{Key: "all_patch_matchup", Fallback: true}},
+	}
+
+	notes := buildAdviceNotes(true, matchupSlots, []scopedItemSlotRow{{Row: clickhouse.ItemSlotRow{ItemSlot: 1, Games: 50}}})
+	if len(notes) == 0 || notes[0] != "No current-patch matchup item slots met the threshold yet; showing exact-matchup rows from broader patch scope." {
+		t.Fatalf("notes = %+v; wanted exact-matchup broader-patch warning", notes)
 	}
 }

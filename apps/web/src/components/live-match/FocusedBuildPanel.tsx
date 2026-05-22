@@ -68,8 +68,8 @@ export function FocusedBuildPanel({
   const championSample = buildAdviceSample(buildAdvice?.champion.sample, championItemSlots);
   const matchupScopeLabel = buildScopeLabel(matchupItemSlots, buildAdvice?.matchup.sample.scopeLabels);
   const championScopeLabel = buildScopeLabel(championItemSlots, buildAdvice?.champion.sample.scopeLabels);
-  const matchupSummary = buildPathSummary(matchupItemSlots);
-  const championSummary = buildPathSummary(championItemSlots);
+  const matchupSummary = buildPathSummary(matchupItemSlots, items);
+  const championSummary = buildPathSummary(championItemSlots, items);
   const matchupDelta = buildPathDelta(matchupSummary, championSummary);
   const activeParticipantKey = selectedParticipantKey || selection.participantKey;
   const activeOpponentKey = selectedOpponentKey || selection.opponentKey;
@@ -464,14 +464,7 @@ function BuildSide({
     );
   }
 
-  const bestBySlot = [1, 2, 3, 4, 5, 6].map((slot) => {
-    const slotRows = itemSlots.filter((candidate) => candidate.itemSlot === slot);
-    return {
-      slot,
-      row: slotRows[0],
-      commonRow: mostPlayedItemSlot(slotRows),
-    };
-  });
+  const bestBySlot = selectBuildSlotRows(itemSlots, items);
 
   return (
     <div className={`build-side ${side}`}>
@@ -556,8 +549,8 @@ function highestSlotSample(itemSlots: AnalyticsItemSlot[]) {
   return itemSlots.reduce((max, row) => Math.max(max, row.games), 0);
 }
 
-function buildPathSummary(itemSlots: AnalyticsItemSlot[]): BuildPathSummary | undefined {
-  const shownRows = topItemSlotRows(itemSlots);
+function buildPathSummary(itemSlots: AnalyticsItemSlot[], items?: ItemData): BuildPathSummary | undefined {
+  const shownRows = topItemSlotRows(itemSlots, items);
   const totalGames = shownRows.reduce((sum, row) => sum + row.games, 0);
   if (totalGames <= 0) return undefined;
   const weightedWinRate = shownRows.reduce((sum, row) => sum + (row.winRate * row.games), 0) / totalGames;
@@ -595,10 +588,48 @@ function buildPathDelta(matchup?: BuildPathSummary, baseline?: BuildPathSummary)
   return `${sign}${delta.toFixed(1)} pts vs baseline`;
 }
 
-function topItemSlotRows(itemSlots: AnalyticsItemSlot[]) {
-  return [1, 2, 3, 4, 5, 6]
-    .map((slot) => itemSlots.find((candidate) => candidate.itemSlot === slot))
+function topItemSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
+  return selectBuildSlotRows(itemSlots, items)
+    .map((slot) => slot.row)
     .filter((row): row is AnalyticsItemSlot => Boolean(row));
+}
+
+function selectBuildSlotRows(itemSlots: AnalyticsItemSlot[], items?: ItemData) {
+  const slotRows = [1, 2, 3, 4, 5, 6].map((slot) => itemSlots.filter((candidate) => candidate.itemSlot === slot));
+  const initialRows = slotRows.map((rows) => rows[0]).filter((row): row is AnalyticsItemSlot => Boolean(row));
+  const selectedBoot = selectSingleBootRow(initialRows, items);
+  return slotRows.map((rows, index) => {
+    const slot = index + 1;
+    const filteredRows = selectedBoot
+      ? rows.filter((row) => !isBootItem(items, row.itemId) || sameItemSlotRow(row, selectedBoot))
+      : rows;
+    return {
+      slot,
+      row: filteredRows[0],
+      commonRow: mostPlayedItemSlot(filteredRows),
+    };
+  });
+}
+
+function selectSingleBootRow(rows: AnalyticsItemSlot[], items?: ItemData) {
+  const bootRows = rows.filter((row) => isBootItem(items, row.itemId));
+  if (bootRows.length <= 1) return bootRows[0];
+  return bootRows.reduce((best, row) => {
+    if (row.confidence !== best.confidence) return row.confidence > best.confidence ? row : best;
+    if (row.games !== best.games) return row.games > best.games ? row : best;
+    if (row.winRate !== best.winRate) return row.winRate > best.winRate ? row : best;
+    return row.itemSlot < best.itemSlot ? row : best;
+  });
+}
+
+function sameItemSlotRow(a: AnalyticsItemSlot, b: AnalyticsItemSlot) {
+  return a.itemSlot === b.itemSlot && a.itemId === b.itemId;
+}
+
+function isBootItem(items: ItemData | undefined, itemId: number) {
+  const item = items?.data.data[String(itemId)];
+  if (item?.tags?.some((tag) => tag.toLowerCase() === 'boots')) return true;
+  return BOOT_ITEM_IDS.has(itemId);
 }
 
 function mostPlayedItemSlot(rows: AnalyticsItemSlot[]) {
@@ -609,6 +640,26 @@ function mostPlayedItemSlot(rows: AnalyticsItemSlot[]) {
     return row.itemId < best.itemId ? row : best;
   }, undefined);
 }
+
+const BOOT_ITEM_IDS = new Set([
+  1001,
+  3006,
+  3008,
+  3009,
+  3020,
+  3047,
+  3111,
+  3117,
+  3158,
+  3171,
+  223006,
+  223008,
+  223009,
+  223020,
+  223047,
+  223111,
+  223158,
+]);
 
 function buildAdviceSample(sample: BuildAdviceResponse['matchup']['sample'] | undefined, itemSlots: AnalyticsItemSlot[]) {
   if (sample) {
