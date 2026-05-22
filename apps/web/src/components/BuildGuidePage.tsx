@@ -108,7 +108,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const guide = guideQuery.data;
   const buildAdvice = buildAdviceQuery.data;
   const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
-  const buildVariants = guideForBuilds?.buildVariants ?? [];
+  const buildVariants = useMemo(() => groupBuildVariantsForDisplay(guideForBuilds?.buildVariants ?? [], items), [guideForBuilds?.buildVariants, items]);
   const selectedBuildVariant = buildVariants.find((variant) => variant.variantKey === selectedBuildVariantKey) ?? buildVariants[0];
   const itemSlots = buildAdvice?.matchup.available && buildAdvice.matchup.itemSlots.length
     ? buildAdvice.matchup.itemSlots
@@ -708,6 +708,45 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
+function groupBuildVariantsForDisplay(variants: ChampionGuideBuildVariant[], items?: ItemData) {
+  const groups = new Map<string, ChampionGuideBuildVariant>();
+  const representativeGames = new Map<string, number>();
+  for (const variant of variants) {
+    const familyLabel = buildVariantFamilyLabel(variant, items);
+    const key = familyLabel ? `label:${familyLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : `core:${variant.variantKey}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { ...variant, variantKey: key, variantLabel: familyLabel || variant.variantLabel });
+      representativeGames.set(key, variant.games);
+      continue;
+    }
+    const wins = existing.wins + variant.wins;
+    const games = existing.games + variant.games;
+    const next: ChampionGuideBuildVariant = {
+      ...existing,
+      wins,
+      games,
+      winRate: games ? (wins / games) * 100 : 0,
+      confidence: Math.max(existing.confidence, variant.confidence),
+      buildCount: existing.buildCount + variant.buildCount,
+      variantTags: Array.from(new Set([...(existing.variantTags ?? []), ...(variant.variantTags ?? [])])),
+    };
+    if (variant.games > (representativeGames.get(key) ?? 0)) {
+      next.core2Signature = variant.core2Signature;
+      next.core3Signature = variant.core3Signature;
+      next.finalItemsSignature = variant.finalItemsSignature;
+      next.runeSignature = variant.runeSignature;
+      next.spellSignature = variant.spellSignature;
+      representativeGames.set(key, variant.games);
+    }
+    groups.set(key, next);
+  }
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.games !== b.games) return b.games - a.games;
+    return b.winRate - a.winRate;
+  });
+}
+
 function variantRuneRow(variant: ChampionGuideBuildVariant) {
   return {
     runeSignature: variant.runeSignature,
@@ -741,6 +780,12 @@ function variantItemPathRow(variant: ChampionGuideBuildVariant) {
 
 function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, items?: ItemData) {
   if (index === 0) return 'Recommended';
+  const familyLabel = buildVariantFamilyLabel(variant, items);
+  if (familyLabel) return familyLabel;
+  return `Variant ${index + 1}`;
+}
+
+function buildVariantFamilyLabel(variant: ChampionGuideBuildVariant, items?: ItemData) {
   if (variant.variantLabel) return variant.variantLabel;
   const names = signatureItems(`${variant.core2Signature}-${variant.core3Signature}-${variant.finalItemsSignature}`)
     .map((itemId) => itemName(items, String(itemId)).toLowerCase());
@@ -760,7 +805,7 @@ function buildVariantLabel(variant: ChampionGuideBuildVariant, index: number, it
   const coreNames = signatureItems(variant.core2Signature)
     .map((itemId) => itemName(items, String(itemId)))
     .filter((name) => !/^\d+$/.test(name));
-  return coreNames[0] ? coreNames[0].replace(/'s\b.*$/, '') : `Variant ${index + 1}`;
+  return coreNames[0] ? coreNames[0].replace(/'s\b.*$/, '') : '';
 }
 
 function skillSlots(signature: string) {
