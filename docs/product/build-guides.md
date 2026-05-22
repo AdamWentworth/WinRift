@@ -32,7 +32,7 @@ Build variant labeling:
 - Variants should come from WinRift's own match corpus, not from a runtime scrape of another stats site.
 - External guide pages can be used as research inspiration for common player language, but the production path should remain our own classifier plus curated overrides where the data needs champion-specific wording.
 - The first pass ignores boots, starter items, jungle pets, support quest items, consumables, and common components when deciding the variant identity.
-- Variant labels are intentionally broad. For example, two Katarina AP paths can both be AP, while the UI can add the anchor item name to make the tabs readable.
+- Variant labels are intentionally broad. If several core item families resolve to the same label, such as multiple Katarina AP paths, those rows should be summed into one player-facing build family.
 - Future refinement: add a small curated champion override map for cases where community jargon is specific and stable, such as Katarina AD/On Hit/Tank or Shyvana AP/Tank.
 
 Known gaps:

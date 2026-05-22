@@ -944,15 +944,45 @@ func (r *Repository) queryChampionGuideBuildVariants(ctx context.Context, filter
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	out := []ChampionGuideBuildVariantRow{}
+	labelGroups := map[string]*variantAggregate{}
 	for _, aggregate := range variants {
+		row := aggregate.row
+		if row.Games < minGames {
+			continue
+		}
+		row.VariantLabel, row.VariantTags = buildVariantLabelAndTags(row.Core2Signature + "-" + row.Core3Signature + "-" + row.FinalItemsSignature)
+		groupKey := buildVariantGroupKey(row)
+		group := labelGroups[groupKey]
+		if group == nil {
+			row.VariantKey = groupKey
+			group = &variantAggregate{
+				row:                 row,
+				representativeGames: aggregate.representativeGames,
+			}
+			labelGroups[groupKey] = group
+			continue
+		}
+		group.row.Wins += row.Wins
+		group.row.Games += row.Games
+		group.row.BuildCount += row.BuildCount
+		group.row.VariantTags = mergeBuildVariantTags(group.row.VariantTags, row.VariantTags)
+		if aggregate.representativeGames > group.representativeGames {
+			group.row.Core2Signature = row.Core2Signature
+			group.row.Core3Signature = row.Core3Signature
+			group.row.FinalItemsSignature = row.FinalItemsSignature
+			group.row.RuneSignature = row.RuneSignature
+			group.row.SpellSignature = row.SpellSignature
+			group.representativeGames = aggregate.representativeGames
+		}
+	}
+	out := []ChampionGuideBuildVariantRow{}
+	for _, aggregate := range labelGroups {
 		row := aggregate.row
 		if row.Games < minGames {
 			continue
 		}
 		row.WinRate = float64(row.Wins) / float64(row.Games)
 		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
-		row.VariantLabel, row.VariantTags = buildVariantLabelAndTags(row.Core2Signature + "-" + row.Core3Signature + "-" + row.FinalItemsSignature)
 		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -992,6 +1022,30 @@ func buildVariantCoreKey(signatures ...string) string {
 		return ""
 	}
 	return joinItemSignature(items)
+}
+
+func buildVariantGroupKey(row ChampionGuideBuildVariantRow) string {
+	label := strings.TrimSpace(row.VariantLabel)
+	if label == "" {
+		return "core:" + row.VariantKey
+	}
+	return "label:" + strings.ToLower(strings.Join(strings.Fields(label), "-"))
+}
+
+func mergeBuildVariantTags(existing, next []string) []string {
+	if len(existing) == 0 {
+		return next
+	}
+	seen := map[string]bool{}
+	merged := make([]string, 0, len(existing)+len(next))
+	for _, tag := range append(existing, next...) {
+		if tag == "" || seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		merged = append(merged, tag)
+	}
+	return merged
 }
 
 func parseItemSignature(signature string) []int {
