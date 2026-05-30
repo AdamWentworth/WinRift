@@ -193,7 +193,7 @@ RIOT_AUTH_FAILURE_EXIT=true
 RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
 ```
 
-Keep `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false` until the patch was compiled or backed up. Turn it on deliberately when the retention policy is ready to prune old raw rows.
+Keep `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false` until the patch was archived or backed up. Turn it on deliberately only after `patchctl -action archive` has marked old platforms `closed`; startup pruning now deletes raw payload/timeline detail only, but an explicit archive command is easier to audit.
 
 ## Riot Key Failure Behavior
 
@@ -255,6 +255,18 @@ Near-term rule:
 - For destructive changes, write a one-off migration/runbook before applying it to the production volume.
 
 Longer-term improvement: add a formal migration command so CI/CD can run `migrate up` before starting the API.
+
+## Old Patch Archive
+
+When a patch falls outside the active two-patch collection window, close it on the server before deleting raw payloads:
+
+```bash
+cd /srv/winrift
+docker compose --env-file /srv/winrift/.env run --rm api \
+  /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
+```
+
+Archive refreshes summaries first, then prunes only bulky raw match/timeline/event rows. It intentionally keeps `participants`, `participant_matchups`, and `participant_performance` until every app page has a dedicated closed-patch read model.
 
 ## Health Checks
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"winrift/services/core/internal/clickhouse"
@@ -15,16 +16,17 @@ import (
 )
 
 func main() {
-	action := flag.String("action", "", "one of: collecting, compile, win-conditions, item-slots, champion-guides, delete-raw")
+	action := flag.String("action", "", "one of: collecting, compile, archive, win-conditions, item-slots, champion-guides, delete-raw")
 	patch := flag.String("patch", "", "patch bucket, for example 16.10")
-	platform := flag.String("platform", "NA1", "platform route")
+	platform := flag.String("platform", "NA1", "platform route, or ALL for archive/delete-raw")
 	queueID := flag.Int("queue", 420, "queue id")
 	retainDays := flag.Int("retain-days", 30, "raw retention window after compile")
 	backfill := flag.Bool("backfill", false, "backfill retained raw payload data before refreshing derived analytics")
+	pruneRaw := flag.Bool("prune-raw", true, "delete archived raw payload/timeline rows after archive compilation")
 	flag.Parse()
 
 	if *action == "" || *patch == "" {
-		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|win-conditions|item-slots|champion-guides|delete-raw -patch 16.10 [-platform NA1] [-queue 420] [-retain-days 30] [-backfill]")
+		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|archive|win-conditions|item-slots|champion-guides|delete-raw -patch 16.10 [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
 		os.Exit(2)
 	}
 
@@ -44,6 +46,9 @@ func main() {
 	case "compile":
 		retainedUntil := time.Now().Add(time.Duration(*retainDays) * 24 * time.Hour)
 		err = repo.CompilePatchMetrics(ctx, *patch, normalizedPlatform, uint16(*queueID), retainedUntil)
+	case "archive":
+		retainedUntil := time.Now().Add(time.Duration(*retainDays) * 24 * time.Hour)
+		err = archivePatch(ctx, repo, staticService, *patch, normalizedPlatform, uint16(*queueID), retainedUntil, *pruneRaw)
 	case "win-conditions":
 		err = repo.RefreshWinConditionMetrics(ctx, *patch, normalizedPlatform, uint16(*queueID))
 	case "item-slots":
@@ -72,7 +77,7 @@ func main() {
 		}
 		err = repo.RefreshChampionGuideDerivedAnalytics(ctx, *patch, uint16(*queueID))
 	case "delete-raw":
-		err = repo.DeleteRawPatchData(ctx, *patch, normalizedPlatform, uint16(*queueID))
+		err = deleteRawPatchData(ctx, repo, *patch, normalizedPlatform, uint16(*queueID))
 	default:
 		err = fmt.Errorf("unknown action %q", *action)
 	}
@@ -80,6 +85,96 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("patchctl action=%s patch=%s platform=%s queue=%d complete", *action, *patch, normalizedPlatform, *queueID)
+}
+
+func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticService *staticdata.Service, patch, platform string, queueID uint16, retainedUntil time.Time, pruneRaw bool) error {
+	platforms, err := patchPlatforms(ctx, repo, patch, platform, queueID)
+	if err != nil {
+		return err
+	}
+	log.Printf("patch archive start patch=%s platforms=%s queue=%d prune_raw=%t", patch, strings.Join(platforms, ","), queueID, pruneRaw)
+
+	performance, err := repo.BackfillParticipantPerformance(ctx, patch, queueID)
+	if err != nil {
+		return fmt.Errorf("participant performance backfill: %w", err)
+	}
+	log.Printf("patch archive participant performance patch=%s rows=%d", patch, performance.Rows)
+
+	events, err := repo.BackfillChampionGuideEvents(ctx, patch, queueID)
+	if err != nil {
+		return fmt.Errorf("champion guide event backfill: %w", err)
+	}
+	log.Printf("patch archive champion guide events patch=%s matches=%d skill_events=%d bans=%d", patch, events.Matches, events.SkillEvents, events.Bans)
+
+	itemContexts, err := itemSlotRefreshContexts(ctx, staticService)
+	if err != nil {
+		return fmt.Errorf("item slot contexts: %w", err)
+	}
+	if err := repo.RefreshItemSlotAnalytics(ctx, patch, queueID, itemContexts); err != nil {
+		return fmt.Errorf("item slot analytics: %w", err)
+	}
+	loadoutContexts, err := startingLoadoutRefreshContexts(ctx, staticService)
+	if err != nil {
+		return fmt.Errorf("starting loadout contexts: %w", err)
+	}
+	if err := repo.RefreshStartingLoadoutAnalytics(ctx, patch, queueID, loadoutContexts); err != nil {
+		return fmt.Errorf("starting loadout analytics: %w", err)
+	}
+	log.Printf("patch archive item summaries patch=%s item_contexts=%d loadout_contexts=%d", patch, len(itemContexts), len(loadoutContexts))
+
+	if err := repo.RefreshChampionGuideDerivedAnalytics(ctx, patch, queueID); err != nil {
+		return fmt.Errorf("champion guide derived analytics: %w", err)
+	}
+	log.Printf("patch archive champion guide summaries patch=%s complete", patch)
+
+	profiles, err := repo.RefreshSummonerProfileAnalytics(ctx, queueID)
+	if err != nil {
+		return fmt.Errorf("summoner profile analytics: %w", err)
+	}
+	log.Printf("patch archive summoner profile summaries queue=%d profiles=%d champions=%d champion_roles=%d", queueID, profiles.ProfileRows, profiles.ChampionRows, profiles.ChampionRoleRows)
+
+	for _, platform := range platforms {
+		log.Printf("patch archive compile platform patch=%s platform=%s queue=%d", patch, platform, queueID)
+		if err := repo.CompilePatchMetrics(ctx, patch, platform, queueID, retainedUntil); err != nil {
+			return fmt.Errorf("compile %s: %w", platform, err)
+		}
+	}
+	if pruneRaw {
+		for _, platform := range platforms {
+			log.Printf("patch archive raw prune patch=%s platform=%s queue=%d", patch, platform, queueID)
+			if err := repo.DeleteRawPatchData(ctx, patch, platform, queueID); err != nil {
+				return fmt.Errorf("raw prune %s: %w", platform, err)
+			}
+		}
+	}
+	return nil
+}
+
+func deleteRawPatchData(ctx context.Context, repo *clickhouse.Repository, patch, platform string, queueID uint16) error {
+	platforms, err := patchPlatforms(ctx, repo, patch, platform, queueID)
+	if err != nil {
+		return err
+	}
+	for _, platform := range platforms {
+		if err := repo.DeleteRawPatchData(ctx, patch, platform, queueID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func patchPlatforms(ctx context.Context, repo *clickhouse.Repository, patch, platform string, queueID uint16) ([]string, error) {
+	if strings.EqualFold(strings.TrimSpace(platform), "ALL") {
+		platforms, err := repo.PatchPlatforms(ctx, patch, queueID)
+		if err != nil {
+			return nil, err
+		}
+		if len(platforms) == 0 {
+			return nil, fmt.Errorf("patch %s has no stored platforms for queue %d", patch, queueID)
+		}
+		return platforms, nil
+	}
+	return []string{platform}, nil
 }
 
 func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Service) ([]clickhouse.ItemSlotAnalyticsContext, error) {

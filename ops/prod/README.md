@@ -37,3 +37,15 @@ VITE_API_URL=http://SERVER_LAN_IP:8000 npm run dev
 ```
 
 See [Deployment And Operations](../../docs/ops-deployment.md) for the full runbook.
+
+## Archive An Old Patch
+
+After a Riot patch rolls over and the collector window moves on, archive the old patch before pruning:
+
+```bash
+cd /srv/winrift
+docker compose --env-file /srv/winrift/.env run --rm api \
+  /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
+```
+
+This keeps app summaries and the small normalized lookup index, while deleting bulky raw/timeline payloads.

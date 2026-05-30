@@ -404,6 +404,14 @@ func (r *Repository) queryChampionBuildVariantSourceRows(ctx context.Context, pa
 			FROM participant_matchups AS pm FINAL
 			LEFT JOIN
 			(
+				SELECT DISTINCT patch, platform, queue_id
+				FROM patch_build_metrics FINAL
+			) AS cbm
+				ON cbm.patch = pm.patch
+				AND cbm.platform = pm.platform
+				AND cbm.queue_id = pm.queue_id
+			LEFT JOIN
+			(
 				SELECT
 					platform,
 					puuid,
@@ -415,6 +423,7 @@ func (r *Repository) queryChampionBuildVariantSourceRows(ctx context.Context, pa
 				ON s.platform = pm.platform AND s.puuid = pm.puuid
 			WHERE pm.patch = ?
 				AND pm.queue_id = ?
+				AND cbm.patch = ''
 				AND pm.core2_signature != ''
 				AND pm.final_items_signature != ''
 			GROUP BY

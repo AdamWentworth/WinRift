@@ -1,6 +1,6 @@
 # Patch Lifecycle
 
-WinRift treats patches as hard analytics boundaries. Current patch data keeps raw payloads and detailed normalized rows; closed patches keep compact metrics.
+WinRift treats patches as hard analytics boundaries. Current patch data keeps raw payloads and detailed normalized rows. Closed patches keep app-facing summaries plus a small normalized lookup index so old patch pages keep working after bulky raw payloads are pruned.
 
 ## States
 
@@ -10,31 +10,57 @@ WinRift treats patches as hard analytics boundaries. Current patch data keeps ra
 
 Tracked in `patch_snapshots`.
 
-## Compile A Patch
+## Archive A Patch
+
+Use archive when a patch falls out of the active collection window. This is the safe closeout path:
+
+1. Backfill participant performance from raw match payloads.
+2. Backfill skill-order and ban events from raw payloads.
+3. Refresh item slot and starting-loadout summaries.
+4. Refresh champion guide variants, skills, and ban summaries.
+5. Refresh summoner profile summaries.
+6. Compile per-platform build, item timing, power curve, and win-condition metrics.
+7. Delete only raw payload/timeline detail if `-prune-raw=true`.
+
+Docker:
+
+```bash
+docker compose run --rm api /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
+```
 
 Local Go:
 
 ```bash
 cd services/core
-go run ./cmd/patchctl -action compile -patch 16.10 -platform NA1 -queue 420 -retain-days 30
+go run ./cmd/patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
 ```
 
-Docker:
-
-```bash
-docker compose run --rm api /winrift-patchctl -action compile -patch 16.10 -platform NA1 -queue 420 -retain-days 30
-```
-
-Compile writes:
+Archive writes or refreshes:
 
 - `patch_build_metrics`
 - `patch_item_timing_metrics`
 - `patch_power_curve_metrics`
+- `item_slot_analytics`
+- `starting_loadout_analytics`
+- `champion_skill_analytics`
+- `champion_ban_analytics`
+- `champion_build_variant_analytics`
+- `summoner_profile_summary`
+- `summoner_champion_summary`
+- `summoner_champion_role_summary`
 - `match_team_win_conditions`
 - `patch_win_condition_metrics`
 - `patch_snapshots`
 
-It also clears that patch from the live `build_analytics_mv` so closed patch results come from compact metrics and do not double-count.
+It also clears that patch from the live `build_analytics_mv` so closed patch results come from compact metrics and do not double-count. Build queries explicitly avoid counting both `participant_matchups` and `patch_build_metrics` for the same compiled platform.
+
+## Compile One Platform Only
+
+Compile is still available when you want to close one platform without running the full archive pipeline:
+
+```bash
+docker compose run --rm api /winrift-patchctl -action compile -patch 16.10 -platform NA1 -queue 420 -retain-days 30
+```
 
 ## Refresh Win-Condition Metrics Only
 
@@ -50,26 +76,31 @@ The refresh writes patch/platform rows and also refreshes `platform = ALL` rollu
 
 ## Delete Raw Closed-Patch Data
 
-Run this only after compile succeeds and the retention window has passed:
+Run this only after archive or compile succeeds and the retention window has passed:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action delete-raw -patch 16.10 -platform NA1 -queue 420
+docker compose run --rm api /winrift-patchctl -action delete-raw -patch 16.10 -platform ALL -queue 420
 ```
 
-This removes raw/detailed rows for the patch:
+This removes bulky raw/timeline rows for the patch:
 
 - raw matches and timelines
-- participant rows
-- matchup rows
 - timeline frames/events
-- live build aggregate rows
+- raw champion ban events
 
-Compact patch metrics remain.
+Compact patch metrics remain. The normalized app index also remains:
 
-Derived win-condition rows and metrics also remain:
+- `participants`
+- `participant_matchups`
+- `participant_performance`
+
+Those retained normalized rows are intentionally much smaller than raw payloads and keep champion guide, tier list, profile, and matchup views useful for old patches. We can prune them later only after equivalent durable read models exist.
+
+Derived summary rows and metrics also remain:
 
 - `match_team_win_conditions`
 - `patch_win_condition_metrics`
+- build, item, skill, ban, and profile summary tables
 
 ## Start A Patch
 

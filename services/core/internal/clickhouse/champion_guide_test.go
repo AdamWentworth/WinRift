@@ -1,6 +1,9 @@
 package clickhouse
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRoleScopesSeparateBuildAdviceFromChampionRankings(t *testing.T) {
 	buildScope := analyticsRoleScope("TOP")
@@ -23,6 +26,23 @@ func TestAnalyticsOpponentBucketAggregatesChampionWideRows(t *testing.T) {
 	matchupBucket := analyticsOpponentBucketExpr(map[string]string{"opponent_champion_id": "245"})
 	if matchupBucket != "opponent_champion_id" {
 		t.Fatalf("matchup opponent bucket = %q; wanted exact opponent column", matchupBucket)
+	}
+}
+
+func TestChampionGuideBaseSQLCanExcludeCompiledBuildRows(t *testing.T) {
+	query, _ := championGuideBaseSQLExcludingCompiledBuilds(map[string]string{"champion_id": "266"}, strictAnalyticsRoleScope("TOP"), true)
+	if !strings.Contains(query, "patch_build_metrics") {
+		t.Fatalf("query should join compiled patch contexts so raw build rows are not double-counted")
+	}
+	if !strings.Contains(query, "cbm.patch = ''") {
+		t.Fatalf("query should exclude participant_matchups rows once compiled patch metrics exist")
+	}
+}
+
+func TestChampionGuideBaseSQLDefaultKeepsRetainedRows(t *testing.T) {
+	query, _ := championGuideBaseSQL(map[string]string{"champion_id": "266"}, strictAnalyticsRoleScope("TOP"), true)
+	if strings.Contains(query, "cbm.patch = ''") {
+		t.Fatalf("default guide base query should keep retained normalized rows for summary and matchup reads")
 	}
 }
 

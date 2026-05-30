@@ -2,7 +2,7 @@
 
 WinRift intentionally stores both raw Riot payloads and normalized analytics rows for active patches. ClickHouse compression makes this practical, and raw payloads let us rebuild read models when we improve the model later.
 
-The policy is not "store everything forever." The policy is "keep raw current enough to iterate, compile old patches into metrics, then prune raw detail."
+The policy is not "store everything forever." The policy is "keep raw current enough to iterate, compile old patches into summaries, then prune raw payload and timeline detail."
 
 ## Data Classes
 
@@ -23,6 +23,7 @@ Hot raw/current data:
 Current read models:
 
 - `item_slot_analytics`
+- `starting_loadout_analytics`
 - `champion_skill_analytics`
 - `champion_ban_analytics`
 - `champion_build_variant_analytics`
@@ -39,6 +40,14 @@ Historical compact metrics:
 - `patch_power_curve_metrics`
 - `patch_win_condition_metrics`
 - `patch_snapshots`
+
+Historical normalized app index:
+
+- `participants`
+- `participant_matchups`
+- `participant_performance`
+
+This index is intentionally retained after raw pruning for now. It is far smaller than raw match/timeline payloads and keeps old patch pages, champion guides, tier lists, profiles, and matchup drilldowns alive. Only prune it after we add equivalent durable summary tables for every app surface.
 
 Operational/cache tables:
 
@@ -63,29 +72,35 @@ With those settings, the worker accepts `16.10` and `16.9`. When the current pat
 
 The worker stops walking a PUUID's match history when it reaches a patch older than the active window. That saves request budget and avoids filling the database with stale matches.
 
-Only set this after confirming the old patch has been compiled or backed up:
+Only set this after confirming the old patch has been archived or backed up:
 
 ```text
 COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true
 ```
 
-Pruning deletes raw/detailed rows outside the active patch window. It should not be treated as a casual startup default on a production server.
+Startup pruning is raw-only and requires patches to be marked `closed`. It should not be treated as a casual startup default on a production server; prefer running `patchctl -action archive` deliberately.
 
 ## Closing A Patch
 
 When a patch is done:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action compile -patch 16.10 -platform NA1 -queue 420 -retain-days 30
+docker compose run --rm api /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
 ```
 
-The compile step writes compact metrics for build, item timing, power curve, and win-condition reads. After compile and whatever backup window you want:
+The archive step writes compact metrics and app-facing summaries, then prunes raw/timeline detail by default. To do the compile/summary pass first and inspect counts before deleting raw rows:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action delete-raw -patch 16.10 -platform NA1 -queue 420
+docker compose run --rm api /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 7 -prune-raw=false
 ```
 
-Run those commands once per platform in `COLLECTOR_PLATFORMS`. The current `patchctl` CLI is platform-specific for compile/delete. The worker's scheduled win-condition refresh can produce `platform = ALL` rollups for live reads, but closing raw patch data remains a per-platform operation.
+Then prune raw rows later:
+
+```bash
+docker compose run --rm api /winrift-patchctl -action delete-raw -patch 16.9 -platform ALL -queue 420
+```
+
+`platform = ALL` resolves the patch's stored platforms from ClickHouse. Single-platform compile/delete still exists for emergency or partial repairs.
 
 ## Disk Placement
 
@@ -174,6 +189,8 @@ Do not start the worker until the restored database has been checked. A restore 
 Keep indefinitely:
 
 - closed-patch compact metrics
+- app-facing summary tables
+- normalized app index until equivalent durable summaries exist
 - `patch_snapshots`
 - win-condition profile JSON and narrative docs
 - enough metadata to explain how a metric was produced
@@ -183,7 +200,7 @@ Keep only for active/current analysis:
 - raw matches and raw timelines
 - per-frame timeline rows
 - item/combat/objective event detail
-- participant rows outside the active two-patch window
+- raw champion ban rows
 
 This gives us trend history per patch without letting raw payloads grow forever.
 

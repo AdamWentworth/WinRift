@@ -779,7 +779,7 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 		limit = 12
 	}
 	roleScope := strictAnalyticsRoleScope(filters["role"])
-	rawSQL, rawArgs := championGuideBaseSQL(filters, roleScope, true)
+	rawSQL, rawArgs := championGuideBaseSQLExcludingCompiledBuilds(filters, roleScope, true)
 	compiledWhere := `
 		FROM patch_build_metrics FINAL
 		WHERE champion_id = ?
@@ -1058,7 +1058,7 @@ func (r *Repository) queryChampionGuideBuildVariantsLiveScan(ctx context.Context
 		return nil, nil
 	}
 	roleScope := strictAnalyticsRoleScope(filters["role"])
-	rawSQL, rawArgs := championGuideBaseSQL(filters, roleScope, true)
+	rawSQL, rawArgs := championGuideBaseSQLExcludingCompiledBuilds(filters, roleScope, true)
 	compiledWhere := `
 		FROM patch_build_metrics FINAL
 		WHERE champion_id = ?
@@ -1660,6 +1660,14 @@ func (r *Repository) queryChampionGuideSignatures(ctx context.Context, filters m
 }
 
 func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScope, includeChampion bool) (string, []any) {
+	return championGuideBaseSQLInternal(filters, roleScope, includeChampion, false)
+}
+
+func championGuideBaseSQLExcludingCompiledBuilds(filters map[string]string, roleScope roleAnalyticsScope, includeChampion bool) (string, []any) {
+	return championGuideBaseSQLInternal(filters, roleScope, includeChampion, true)
+}
+
+func championGuideBaseSQLInternal(filters map[string]string, roleScope roleAnalyticsScope, includeChampion bool, excludeCompiledBuilds bool) (string, []any) {
 	query := `
 		FROM
 		(
@@ -1727,6 +1735,21 @@ func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScop
 				GROUP BY platform, puuid
 			) AS s
 				ON s.platform = pm.platform AND s.puuid = pm.puuid
+`
+	if excludeCompiledBuilds {
+		query += `
+			LEFT JOIN
+			(
+				SELECT DISTINCT patch, platform, queue_id
+				FROM patch_build_metrics FINAL
+			) AS cbm
+				ON cbm.patch = pm.patch
+				AND cbm.platform = pm.platform
+				AND cbm.queue_id = pm.queue_id
+			WHERE cbm.patch = ''
+`
+	}
+	query += `
 		)
 		WHERE 1 = 1`
 	args := []any{}

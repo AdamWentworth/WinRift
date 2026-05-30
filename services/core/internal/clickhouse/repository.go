@@ -275,6 +275,14 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 				FROM participant_matchups AS pm FINAL
 				LEFT JOIN
 				(
+					SELECT DISTINCT patch, platform, queue_id
+					FROM patch_build_metrics FINAL
+				) AS cbm
+					ON cbm.patch = pm.patch
+					AND cbm.platform = pm.platform
+					AND cbm.queue_id = pm.queue_id
+				LEFT JOIN
+				(
 					SELECT
 						platform,
 						puuid,
@@ -284,6 +292,7 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 					GROUP BY platform, puuid
 				) AS s
 					ON s.platform = pm.platform AND s.puuid = pm.puuid
+				WHERE cbm.patch = ''
 			)
 			GROUP BY
 				champion_id,
@@ -1315,6 +1324,9 @@ func (r *Repository) MarkPatchCollecting(ctx context.Context, patch, platform st
 }
 
 func (r *Repository) CompilePatchMetrics(ctx context.Context, patch, platform string, queueID uint16, rawRetainedUntil time.Time) error {
+	if err := r.deleteCompiledPatchMetrics(ctx, patch, platform, queueID); err != nil {
+		return err
+	}
 	if err := r.markPatchCompiling(ctx, patch, platform, queueID); err != nil {
 		return err
 	}
@@ -1343,20 +1355,15 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 	statements := []string{
 		`ALTER TABLE raw_timelines DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE raw_matches DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
-		`ALTER TABLE participants DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
-		`ALTER TABLE participant_matchups DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
-		`ALTER TABLE participant_performance DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
-		`ALTER TABLE build_analytics_mv DELETE WHERE patch_bucket = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_participant_frames DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_item_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_skill_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_combat_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
-		`ALTER TABLE starting_loadout_analytics DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 	}
 	for _, statement := range statements {
-		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
+		if _, err := r.db.ExecContext(ctx, statement+` SETTINGS mutations_sync = 2`, patch, platform, queueID); err != nil {
 			return err
 		}
 	}
@@ -1380,10 +1387,61 @@ func (r *Repository) DeletePatchesOutsideWindow(ctx context.Context, currentPatc
 	if len(prune) == 0 {
 		return nil, nil
 	}
-	if err := r.DeletePatches(ctx, prune); err != nil {
-		return nil, err
+	for _, patch := range prune {
+		platforms, err := r.PatchPlatforms(ctx, patch, analytics.RankedSoloQueueID)
+		if err != nil {
+			return nil, err
+		}
+		for _, platform := range platforms {
+			if err := r.DeleteRawPatchData(ctx, patch, platform, analytics.RankedSoloQueueID); err != nil {
+				return nil, err
+			}
+		}
 	}
 	return prune, nil
+}
+
+func (r *Repository) PatchPlatforms(ctx context.Context, patch string, queueID uint16) ([]string, error) {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		return nil, nil
+	}
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT platform
+		FROM
+		(
+			SELECT platform FROM raw_matches WHERE patch = ? AND queue_id = ?
+			UNION ALL SELECT platform FROM participants WHERE patch = ? AND queue_id = ?
+			UNION ALL SELECT platform FROM participant_matchups WHERE patch = ? AND queue_id = ?
+			UNION ALL SELECT platform FROM participant_performance WHERE patch = ? AND queue_id = ?
+			UNION ALL SELECT platform FROM patch_build_metrics WHERE patch = ? AND queue_id = ?
+			UNION ALL SELECT platform FROM patch_snapshots WHERE patch = ? AND queue_id = ?
+		)
+		WHERE platform != ''
+		ORDER BY platform`,
+		patch, queueID,
+		patch, queueID,
+		patch, queueID,
+		patch, queueID,
+		patch, queueID,
+		patch, queueID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	platforms := []string{}
+	for rows.Next() {
+		var platform string
+		if err := rows.Scan(&platform); err != nil {
+			return nil, err
+		}
+		platforms = append(platforms, platform)
+	}
+	return platforms, rows.Err()
 }
 
 func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
@@ -1524,6 +1582,20 @@ func (r *Repository) markPatchClosed(ctx context.Context, patch, platform string
 		patch, platform, queueID, rawRetainedUntil, patch, platform, queueID,
 	)
 	return err
+}
+
+func (r *Repository) deleteCompiledPatchMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	statements := []string{
+		`ALTER TABLE patch_build_metrics DELETE WHERE patch = ? AND platform = ? AND queue_id = ? SETTINGS mutations_sync = 2`,
+		`ALTER TABLE patch_item_timing_metrics DELETE WHERE patch = ? AND platform = ? AND queue_id = ? SETTINGS mutations_sync = 2`,
+		`ALTER TABLE patch_power_curve_metrics DELETE WHERE patch = ? AND platform = ? AND queue_id = ? SETTINGS mutations_sync = 2`,
+	}
+	for _, statement := range statements {
+		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) deleteLiveBuildAggregate(ctx context.Context, patch, platform string, queueID uint16) error {
