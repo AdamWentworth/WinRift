@@ -1,0 +1,198 @@
+name: deploy-core-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: "Image to deploy: full ref, or just tag (latest / sha-<commit>). Empty defaults to latest."
+        required: false
+        default: "latest"
+        type: string
+      deploy_root:
+        description: "Absolute path to the prod deploy state root"
+        required: false
+        default: "/srv/winrift"
+        type: string
+      start_worker:
+        description: "Start/recreate the collector worker after API health passes"
+        required: false
+        default: true
+        type: boolean
+      api_health_url:
+        description: "Private health URL reachable from the server runner"
+        required: false
+        default: "http://127.0.0.1:8000/api/health"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy WinRift Core To Prod
+    runs-on: [self-hosted, linux, x64, prod]
+    environment: production
+    concurrency:
+      group: deploy-winrift-core-prod
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Preflight Checks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DEPLOY_ROOT="${{ inputs.deploy_root }}"
+          COMPOSE_FILE="${GITHUB_WORKSPACE}/ops/prod/docker-compose.yml"
+          ENV_FILE="${DEPLOY_ROOT}/.env"
+          SCHEMA_SOURCE="${GITHUB_WORKSPACE}/services/core/internal/clickhouse/schema.sql"
+          SCHEMA_TARGET="${DEPLOY_ROOT}/schema.sql"
+          REQUIRED_ENV_KEYS="RIOT_API_KEY CLICKHOUSE_PASSWORD CORS_ORIGINS COLLECTOR_PLATFORMS COLLECTOR_CURRENT_PATCH"
+
+          mkdir -p "${DEPLOY_ROOT}" "${DEPLOY_ROOT}/deployments"
+
+          if [[ ! -f "${ENV_FILE}" ]]; then
+            echo "Env file not found: ${ENV_FILE}" >&2
+            echo "Create it from ops/prod/winrift.env.example on the server and put the real Riot key there." >&2
+            exit 1
+          fi
+
+          for key in ${REQUIRED_ENV_KEYS}; do
+            if ! grep -qE "^${key}=" "${ENV_FILE}"; then
+              echo "Required env key missing in ${ENV_FILE}: ${key}" >&2
+              exit 1
+            fi
+          done
+
+          clickhouse_dir="$(grep -E '^WINRIFT_CLICKHOUSE_DATA_DIR=' "${ENV_FILE}" | tail -1 | cut -d= -f2- || true)"
+          runtime_dir="$(grep -E '^WINRIFT_RUNTIME_STATE_DIR=' "${ENV_FILE}" | tail -1 | cut -d= -f2- || true)"
+          clickhouse_dir="${clickhouse_dir:-${DEPLOY_ROOT}/clickhouse}"
+          runtime_dir="${runtime_dir:-${DEPLOY_ROOT}/runtime}"
+          mkdir -p "${clickhouse_dir}" "${runtime_dir}"
+
+          cp "${SCHEMA_SOURCE}" "${SCHEMA_TARGET}"
+
+          docker compose \
+            --project-directory "${DEPLOY_ROOT}" \
+            -f "${COMPOSE_FILE}" \
+            --env-file "${ENV_FILE}" \
+            config >/dev/null
+
+      - name: Deploy API And Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source "${GITHUB_WORKSPACE}/ops/prod/deploy-image-utils.sh"
+
+          DEPLOY_ROOT="${{ inputs.deploy_root }}"
+          COMPOSE_FILE="${GITHUB_WORKSPACE}/ops/prod/docker-compose.yml"
+          ENV_FILE="${DEPLOY_ROOT}/.env"
+          IMAGE_REPO="adamwentworth/winrift-core"
+          RAW_IMAGE_INPUT="${{ inputs.image_ref }}"
+          TARGET_IMAGE="$(resolve_image_ref "${IMAGE_REPO}" "${RAW_IMAGE_INPUT}")"
+          TARGET_DIGEST=""
+          DEPLOY_IMAGE=""
+          CONTAINER_NAME="winrift_api"
+          HEALTH_URL="${{ inputs.api_health_url }}"
+          HEALTH_BODY_FILE="/tmp/winrift_api_health_body.txt"
+          START_WORKER="${{ inputs.start_worker }}"
+
+          compose() {
+            env WINRIFT_CORE_IMAGE="${DEPLOY_IMAGE}" docker compose \
+              --project-directory "${DEPLOY_ROOT}" \
+              -f "${COMPOSE_FILE}" \
+              --env-file "${ENV_FILE}" \
+              "$@"
+          }
+
+          wait_for_clickhouse() {
+            local status=""
+            for _ in $(seq 1 36); do
+              status="$(docker inspect --format '{{.State.Health.Status}}' winrift_clickhouse 2>/dev/null || true)"
+              if [[ "${status}" == "healthy" ]]; then
+                return 0
+              fi
+              sleep 5
+            done
+            echo "ClickHouse did not become healthy. Last status: ${status}" >&2
+            docker logs --tail 200 winrift_clickhouse || true
+            return 1
+          }
+
+          prepare_rollback_image "${IMAGE_REPO}" "winrift-api" "${CONTAINER_NAME}"
+
+          echo "Pulling target image: ${TARGET_IMAGE}"
+          docker pull "${TARGET_IMAGE}"
+          select_deploy_image "${TARGET_IMAGE}" "${IMAGE_REPO}"
+
+          echo "Stopping worker before API deploy so collection is quiet during replacement."
+          compose stop worker || true
+
+          echo "Starting ClickHouse."
+          compose up -d --no-build clickhouse
+          wait_for_clickhouse
+
+          echo "Deploying API with image ${DEPLOY_IMAGE}"
+          compose up -d --no-deps --force-recreate --no-build api
+
+          HEALTH_OK=0
+          LAST_STATUS="000"
+          rm -f "${HEALTH_BODY_FILE}"
+
+          for _ in $(seq 1 30); do
+            LAST_STATUS="$(curl -sS -o "${HEALTH_BODY_FILE}" -w '%{http_code}' "${HEALTH_URL}" || true)"
+            if [[ "${LAST_STATUS}" == "200" ]]; then
+              HEALTH_OK=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [[ "${HEALTH_OK}" -ne 1 ]]; then
+            echo "New API deployment failed health checks (last status: ${LAST_STATUS})." >&2
+            echo "Last API health response body:" >&2
+            cat "${HEALTH_BODY_FILE}" 2>/dev/null || true
+            echo "Recent API logs:" >&2
+            docker logs --tail 200 winrift_api || true
+
+            ROLLBACK_TARGET="${ROLLBACK_IMAGE:-${PREVIOUS_IMAGE}}"
+            if [[ -n "${ROLLBACK_TARGET}" ]]; then
+              echo "Rolling back API to ${ROLLBACK_TARGET}"
+              DEPLOY_IMAGE="${ROLLBACK_TARGET}"
+              compose up -d --no-deps --force-recreate --no-build api
+            fi
+            exit 1
+          fi
+
+          if [[ "${START_WORKER}" == "true" ]]; then
+            echo "Starting worker with image ${DEPLOY_IMAGE}"
+            compose up -d --no-deps --force-recreate --no-build worker
+            sleep 8
+            WORKER_STATUS="$(docker inspect --format '{{.State.Status}}' winrift_worker 2>/dev/null || true)"
+            if [[ "${WORKER_STATUS}" != "running" ]]; then
+              echo "Worker did not stay running. Status: ${WORKER_STATUS}" >&2
+              docker logs --tail 200 winrift_worker || true
+              exit 1
+            fi
+          else
+            echo "Worker start skipped by workflow input."
+          fi
+
+          write_deploy_metadata \
+            "${DEPLOY_ROOT}/deployments/core.json" \
+            "winrift-core" \
+            "${RAW_IMAGE_INPUT}" \
+            "${TARGET_IMAGE}" \
+            "${TARGET_DIGEST}" \
+            "${DEPLOY_IMAGE}" \
+            "${CONTAINER_NAME}" \
+            "${PREVIOUS_IMAGE}" \
+            "${PREVIOUS_IMAGE_ID}" \
+            "${ROLLBACK_IMAGE}"
+
+          rm -f "${HEALTH_BODY_FILE}"
+          echo "Deployment succeeded."

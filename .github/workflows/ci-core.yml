@@ -1,0 +1,139 @@
+name: ci-core
+
+on:
+  pull_request:
+    paths:
+      - "services/core/**"
+      - "ops/prod/**"
+      - ".github/workflows/ci-core.yml"
+      - ".github/workflows/deploy-core-prod.yml"
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "services/core/**"
+      - "ops/prod/**"
+      - ".github/workflows/ci-core.yml"
+      - ".github/workflows/deploy-core-prod.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/core
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+          cache-dependency-path: services/core/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Test
+        run: go test ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Govulncheck
+        run: govulncheck ./...
+
+  container-security-build:
+    runs-on: ubuntu-latest
+    needs: quality-gates
+    env:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      IMAGE_REPO: adamwentworth/winrift-core
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build Container Image
+        run: docker build --pull -t winrift-core:ci-${{ github.sha }} -f services/core/Dockerfile .
+
+      - name: Validate Production Compose
+        run: |
+          trap 'rm -f ops/prod/.env' EXIT
+          cp ops/prod/winrift.env.example ops/prod/.env
+          docker compose --project-directory ops/prod -f ops/prod/docker-compose.yml --env-file ops/prod/winrift.env.example config >/dev/null
+
+      - name: Trivy Filesystem Scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cache/trivy"
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -v "$HOME/.cache/trivy:/root/.cache/" \
+            ghcr.io/aquasecurity/trivy:0.65.0 \
+            fs \
+            --scanners vuln \
+            --pkg-types os,library \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 1 \
+            /workspace/services/core
+
+      - name: Trivy Image Scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cache/trivy"
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$HOME/.cache/trivy:/root/.cache/" \
+            ghcr.io/aquasecurity/trivy:0.65.0 \
+            image \
+            --pkg-types os,library \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 1 \
+            winrift-core:ci-${{ github.sha }}
+
+      - name: Generate SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.cache/trivy"
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/workspace" \
+            -v "$HOME/.cache/trivy:/root/.cache/" \
+            ghcr.io/aquasecurity/trivy:0.65.0 \
+            image \
+            --format cyclonedx \
+            --output /workspace/winrift-core-image-sbom.cdx.json \
+            winrift-core:ci-${{ github.sha }}
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: winrift-core-image-sbom
+          path: winrift-core-image-sbom.cdx.json
+          if-no-files-found: error
+
+      - name: DockerHub Login
+        if: ${{ github.event_name != 'pull_request' && env.DOCKERHUB_TOKEN != '' }}
+        run: |
+          echo "${DOCKERHUB_TOKEN}" | docker login -u "adamwentworth" --password-stdin
+
+      - name: Push Image To DockerHub
+        if: ${{ github.event_name != 'pull_request' && env.DOCKERHUB_TOKEN != '' }}
+        run: |
+          docker tag winrift-core:ci-${{ github.sha }} ${IMAGE_REPO}:sha-${{ github.sha }}
+          docker tag winrift-core:ci-${{ github.sha }} ${IMAGE_REPO}:latest
+          docker push ${IMAGE_REPO}:sha-${{ github.sha }}
+          docker push ${IMAGE_REPO}:latest
+
+      - name: DockerHub Push Skipped
+        if: ${{ github.event_name != 'pull_request' && env.DOCKERHUB_TOKEN == '' }}
+        run: echo "DockerHub push skipped. Set DOCKERHUB_TOKEN repository secret."

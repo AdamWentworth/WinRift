@@ -1,0 +1,63 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.12
+    container_name: winrift_clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-winrift}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-winrift}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-winrift}
+    volumes:
+      - ${WINRIFT_CLICKHOUSE_DATA_DIR:-/srv/winrift/clickhouse}:/var/lib/clickhouse
+      - ${WINRIFT_SCHEMA_FILE:-/srv/winrift/schema.sql}:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    image: ${WINRIFT_CORE_IMAGE:-adamwentworth/winrift-core:latest}
+    container_name: winrift_api
+    command: ["/winrift-api"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      HTTP_ADDR: :8000
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-winrift}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-winrift}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-winrift}
+      RIOT_AUTH_FAILURE_MARKER_PATH: /run/winrift/riot-auth-failed
+    ports:
+      - "${WINRIFT_API_BIND:-127.0.0.1}:${WINRIFT_API_PORT:-8000}:8000"
+    volumes:
+      - ${WINRIFT_RUNTIME_STATE_DIR:-/srv/winrift/runtime}:/run/winrift
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  worker:
+    image: ${WINRIFT_CORE_IMAGE:-adamwentworth/winrift-core:latest}
+    container_name: winrift_worker
+    command: ["/winrift-worker"]
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-winrift}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-winrift}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-winrift}
+      RIOT_AUTH_FAILURE_MARKER_PATH: /run/winrift/riot-auth-failed
+    volumes:
+      - ${WINRIFT_RUNTIME_STATE_DIR:-/srv/winrift/runtime}:/run/winrift
+    depends_on:
+      clickhouse:
+        condition: service_healthy

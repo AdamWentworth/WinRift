@@ -104,6 +104,14 @@ For the home server, prefer this order:
 
 ClickHouse is happier with local disk for active writes. The NAS is a better place for nightly compressed backups and closed-patch archives.
 
+The current laptop ClickHouse volume is about `56G`. Active ClickHouse parts are much smaller than that, so some of the volume is likely merge/temp/detached overhead from heavy ingest and restarts. Treat that as a warning: the server's 256GB SSD is enough for a careful initial deployment, but not a lot of headroom for casual long-term growth. If the server is also carrying the OS, Docker image cache, logs, and backups, add or mount another disk before treating the worker as an always-on production collector.
+
+Use the production env value to move ClickHouse without changing app code:
+
+```text
+WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/winrift-ssd/clickhouse
+```
+
 ## Backup Targets
 
 Suggested NAS layout:

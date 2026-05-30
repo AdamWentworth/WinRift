@@ -67,6 +67,14 @@ npm install
 npm run dev
 ```
 
+To use a server-hosted API while keeping the frontend local, tunnel the private server API and point Vite at it:
+
+```bash
+ssh -N -L 8000:127.0.0.1:8000 your-server
+cd apps/web
+VITE_API_URL=http://127.0.0.1:8000 npm run dev
+```
+
 ## Verification
 
 ```bash
