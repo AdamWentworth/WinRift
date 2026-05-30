@@ -67,7 +67,7 @@ This avoids awkward "which machine has the real dataset?" problems. The server b
 
 The production-like setup mirrors the PokeGoNexus pattern:
 
-- CI builds and pushes `adamwentworth/winrift-core` from `services/core/Dockerfile`.
+- CI builds and pushes `ghcr.io/adamwentworth/winrift-core` from `services/core/Dockerfile`.
 - A manual GitHub Actions deploy runs on the self-hosted runner labeled `self-hosted`, `linux`, `x64`, `prod`.
 - Durable server state lives at `/srv/winrift`.
 - ClickHouse data, logs, and backups live on the mounted storage SSD under `/mnt/storage/clickhouse`.
@@ -131,7 +131,7 @@ Core CI is [ci-core.yml](../.github/workflows/ci-core.yml):
 2. Build the core image.
 3. Validate the production Compose file.
 4. Run Trivy scans and upload an SBOM.
-5. On `main`/`master`, push `adamwentworth/winrift-core:sha-<commit>` and `adamwentworth/winrift-core:latest` when `DOCKERHUB_TOKEN` is configured.
+5. On `main`/`master`, push `ghcr.io/adamwentworth/winrift-core:sha-<commit>` and `ghcr.io/adamwentworth/winrift-core:latest` through GitHub Container Registry.
 
 Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml):
 

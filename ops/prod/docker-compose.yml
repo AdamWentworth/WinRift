@@ -20,7 +20,7 @@ services:
       start_period: 20s
 
   api:
-    image: ${WINRIFT_CORE_IMAGE:-adamwentworth/winrift-core:latest}
+    image: ${WINRIFT_CORE_IMAGE:-ghcr.io/adamwentworth/winrift-core:latest}
     container_name: winrift_api
     command: ["/winrift-api"]
     restart: unless-stopped
@@ -44,7 +44,7 @@ services:
         condition: service_healthy
 
   worker:
-    image: ${WINRIFT_CORE_IMAGE:-adamwentworth/winrift-core:latest}
+    image: ${WINRIFT_CORE_IMAGE:-ghcr.io/adamwentworth/winrift-core:latest}
     container_name: winrift_worker
     command: ["/winrift-worker"]
     restart: "no"

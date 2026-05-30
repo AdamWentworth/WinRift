@@ -8,7 +8,7 @@ This folder contains the private server deployment shape for WinRift core servic
 - `winrift_api`: private-LAN API bound to `0.0.0.0:8000` by default.
 - `winrift_worker`: collector worker. It is started explicitly and uses `restart: "no"` so expired Riot keys do not loop forever.
 
-The frontend is intentionally not deployed here yet. For now, develop it locally and point it at the server API through an SSH tunnel.
+The frontend is intentionally not deployed here yet. For now, develop it locally and point it at the server API over the private LAN.
 
 ## Server Bootstrap
 
