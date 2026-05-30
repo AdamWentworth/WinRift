@@ -1666,8 +1666,8 @@ func (r *Repository) compilePatchItemTimingMetrics(ctx context.Context, patch, p
 				pm.participant_id AS participant_id,
 				tie.item_id AS item_id,
 				min(tie.timestamp_ms) AS first_purchase_ms
-			FROM participant_matchups FINAL AS pm
-			INNER JOIN timeline_item_events FINAL AS tie
+			FROM participant_matchups AS pm FINAL
+			INNER JOIN timeline_item_events AS tie FINAL
 				ON pm.match_id = tie.match_id
 				AND pm.participant_id = tie.participant_id
 			WHERE pm.patch = ? AND pm.platform = ? AND pm.queue_id = ?
@@ -1745,8 +1745,8 @@ func (r *Repository) compilePatchPowerCurveMetrics(ctx context.Context, patch, p
 			avg(tpf.jungle_minions_killed) AS avg_jungle_cs,
 			avg(tpf.total_damage_done_to_champions) AS avg_damage_done_to_champions,
 			avg(tpf.total_damage_taken) AS avg_damage_taken
-		FROM participant_matchups FINAL AS pm
-		INNER JOIN timeline_participant_frames FINAL AS tpf
+		FROM participant_matchups AS pm FINAL
+		INNER JOIN timeline_participant_frames AS tpf FINAL
 			ON pm.match_id = tpf.match_id
 			AND pm.participant_id = tpf.participant_id
 		WHERE pm.patch = ? AND pm.platform = ? AND pm.queue_id = ?
