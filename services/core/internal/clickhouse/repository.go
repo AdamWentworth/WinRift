@@ -261,7 +261,7 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 					pm.champion_id,
 					pm.role,
 					pm.opponent_champion_id,
-					pm.patch,
+					pm.patch AS patch,
 					multiIf(
 						s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
 						pm.rank_bucket
