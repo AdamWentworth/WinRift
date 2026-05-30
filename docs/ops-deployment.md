@@ -70,11 +70,11 @@ The production-like setup mirrors the PokeGoNexus pattern:
 - CI builds and pushes `adamwentworth/winrift-core` from `services/core/Dockerfile`.
 - A manual GitHub Actions deploy runs on the self-hosted runner labeled `self-hosted`, `linux`, `x64`, `prod`.
 - Durable server state lives at `/srv/winrift`.
-- ClickHouse data lives outside the repo checkout, preferably at `/srv/winrift/clickhouse` or a dedicated mounted disk.
-- The API is bound to `127.0.0.1` on the server by default.
+- ClickHouse data, logs, and backups live on the mounted storage SSD under `/mnt/storage/clickhouse`.
+- The API is bound to the private LAN by default. Do not router-forward it.
 - The worker starts only after the API passes health.
 
-This intentionally does not create a public web domain. For now, use the laptop frontend against the server API through an SSH tunnel.
+This intentionally does not create a public web domain. For now, use the laptop frontend against the server API over the private home network.
 The web container is intentionally not part of the production Compose file yet because the current frontend Dockerfile is optimized for local Vite development. When we want a private or public hosted frontend, add a production static-web image and either bind it privately or put it behind the same reverse-proxy pattern used by PokeGoNexus.
 
 Server layout:
@@ -83,9 +83,13 @@ Server layout:
 /srv/winrift/
   .env
   schema.sql
-  clickhouse/
   runtime/
   deployments/
+
+/mnt/storage/clickhouse/
+  data/
+  logs/
+  backups/
 ```
 
 Create the server env from the committed example:
@@ -99,6 +103,17 @@ sudo editor /srv/winrift/.env
 
 Set the real `RIOT_API_KEY`, `CLICKHOUSE_PASSWORD`, current patch, and platform list in `/srv/winrift/.env`. Keep this file server-local and uncommitted.
 The self-hosted GitHub runner user needs write access to `/srv/winrift` and Docker permission.
+
+Before starting ClickHouse on the server, verify the storage mount:
+
+```bash
+findmnt /mnt/storage
+df -hT /mnt/storage
+sudo mkdir -p /mnt/storage/clickhouse/{data,logs,backups}
+sudo chown -R adam:adam /mnt/storage/clickhouse
+```
+
+The deploy workflow also checks that `/mnt/storage` is mounted and refuses to start ClickHouse if the mount is missing. That protects the OS disk from silently receiving database files.
 
 The production Compose file is [ops/prod/docker-compose.yml](../ops/prod/docker-compose.yml). It runs:
 
@@ -132,22 +147,26 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 
 The deploy input `image_ref` accepts `latest`, `sha-<commit>`, or a full image reference.
 
+For the one-time laptop database bootstrap, use [ops/prod/data-migration.md](../ops/prod/data-migration.md). The important rule is to deploy with `start_worker=false`, verify restored match counts, and only then start the worker.
+
 ## Laptop Frontend Against Server API
 
-Keep the API private, then tunnel it to the laptop:
+With `WINRIFT_API_BIND=0.0.0.0`, the API listens on the server's private LAN address. Do not expose or router-forward this port.
 
-```bash
-ssh -N -L 8000:127.0.0.1:8000 your-server
-```
-
-Run the frontend locally:
+Run the frontend locally against the server:
 
 ```bash
 cd apps/web
-VITE_API_URL=http://127.0.0.1:8000 npm run dev
+VITE_API_URL=http://SERVER_LAN_IP:8000 npm run dev
 ```
 
-From the browser's point of view, the API is local, so `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173` is enough. If port `8000` is already used on the laptop, tunnel a different local port and set `VITE_API_URL` to that port.
+The browser origin is still the laptop's Vite server, so this production CORS value is enough for normal local development:
+
+```text
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+
+If you want stricter access later, set `WINRIFT_API_BIND=127.0.0.1` and use an SSH tunnel instead.
 
 ## Environment
 
@@ -159,9 +178,12 @@ Core values to verify before starting the worker:
 RIOT_API_KEY=...
 ENVIRONMENT=production
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
-WINRIFT_API_BIND=127.0.0.1
+WINRIFT_API_BIND=0.0.0.0
 WINRIFT_API_PORT=8000
-WINRIFT_CLICKHOUSE_DATA_DIR=/srv/winrift/clickhouse
+WINRIFT_STORAGE_MOUNT=/mnt/storage
+WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/storage/clickhouse/data
+WINRIFT_CLICKHOUSE_LOG_DIR=/mnt/storage/clickhouse/logs
+WINRIFT_CLICKHOUSE_BACKUP_DIR=/mnt/storage/clickhouse/backups
 WINRIFT_RUNTIME_STATE_DIR=/srv/winrift/runtime
 COLLECTOR_PLATFORMS=NA1,EUW1,EUN1,KR,BR1,LA1,LA2,JP1,OC1,TR1,RU,SG2,TW2,VN2
 COLLECTOR_CURRENT_PATCH=16.10
@@ -260,14 +282,16 @@ The default Compose file uses the named volume `clickhouse_data`. That is fine f
 For production, [ops/prod/docker-compose.yml](../ops/prod/docker-compose.yml) already uses a stable host path:
 
 ```text
-WINRIFT_CLICKHOUSE_DATA_DIR=/srv/winrift/clickhouse
+WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/storage/clickhouse/data
+WINRIFT_CLICKHOUSE_LOG_DIR=/mnt/storage/clickhouse/logs
+WINRIFT_CLICKHOUSE_BACKUP_DIR=/mnt/storage/clickhouse/backups
 ```
 
 Keep hot ClickHouse data on local storage when possible. Use the NAS for backups and archives first. A network mount as the primary ClickHouse data directory can work for hobby traffic, but it is more fragile under write load and network hiccups.
 
-Current local reference point: the dev ClickHouse Docker volume is about `56G`, while active ClickHouse parts are much smaller. Some of that gap is likely merge/temp/detached overhead from heavy ingest and interrupted runs. A 256GB server SSD can run an initial private deployment, but it does not leave a luxurious margin once the OS, Docker images, logs, backups, and future patch growth are included. Before a long unsupervised collection run, prefer either:
+Current local reference point: the dev ClickHouse Docker volume is about `56G`, while active ClickHouse parts are much smaller. Some of that gap is likely merge/temp/detached overhead from heavy ingest and interrupted runs. The server data SSD is about `119G`, so it can run the initial private deployment but does not leave a lot of room for unbounded retention. Before a long unsupervised collection run, prefer either:
 
-- add a dedicated local SSD/HDD and set `WINRIFT_CLICKHOUSE_DATA_DIR` to that mount, or
-- keep the 256GB disk but enforce two-patch retention and put backups/closed-patch exports on the NAS.
+- enforce two-patch retention and put backups/closed-patch exports on the NAS, or
+- add a larger dedicated local SSD/HDD later and move `WINRIFT_CLICKHOUSE_DATA_DIR` to that mount.
 
 See [Storage Policy](storage-policy.md) for retention, backup, and NAS guidance.

@@ -67,11 +67,36 @@ jobs:
             fi
           done
 
-          clickhouse_dir="$(grep -E '^WINRIFT_CLICKHOUSE_DATA_DIR=' "${ENV_FILE}" | tail -1 | cut -d= -f2- || true)"
-          runtime_dir="$(grep -E '^WINRIFT_RUNTIME_STATE_DIR=' "${ENV_FILE}" | tail -1 | cut -d= -f2- || true)"
-          clickhouse_dir="${clickhouse_dir:-${DEPLOY_ROOT}/clickhouse}"
+          env_value() {
+            grep -E "^$1=" "${ENV_FILE}" | tail -1 | cut -d= -f2- || true
+          }
+
+          storage_mount="$(env_value WINRIFT_STORAGE_MOUNT)"
+          clickhouse_dir="$(env_value WINRIFT_CLICKHOUSE_DATA_DIR)"
+          clickhouse_log_dir="$(env_value WINRIFT_CLICKHOUSE_LOG_DIR)"
+          clickhouse_backup_dir="$(env_value WINRIFT_CLICKHOUSE_BACKUP_DIR)"
+          runtime_dir="$(env_value WINRIFT_RUNTIME_STATE_DIR)"
+          storage_mount="${storage_mount:-/mnt/storage}"
+          clickhouse_dir="${clickhouse_dir:-${storage_mount}/clickhouse/data}"
+          clickhouse_log_dir="${clickhouse_log_dir:-${storage_mount}/clickhouse/logs}"
+          clickhouse_backup_dir="${clickhouse_backup_dir:-${storage_mount}/clickhouse/backups}"
           runtime_dir="${runtime_dir:-${DEPLOY_ROOT}/runtime}"
-          mkdir -p "${clickhouse_dir}" "${runtime_dir}"
+
+          if ! findmnt "${storage_mount}" >/dev/null 2>&1; then
+            echo "Storage mount is not mounted: ${storage_mount}" >&2
+            echo "Refusing to start ClickHouse so Docker does not create database files on the OS disk." >&2
+            exit 1
+          fi
+
+          case "${clickhouse_dir}" in
+            "${storage_mount}"/*) ;;
+            *)
+              echo "WINRIFT_CLICKHOUSE_DATA_DIR must live under ${storage_mount}: ${clickhouse_dir}" >&2
+              exit 1
+              ;;
+          esac
+
+          mkdir -p "${clickhouse_dir}" "${clickhouse_log_dir}" "${clickhouse_backup_dir}" "${runtime_dir}"
 
           cp "${SCHEMA_SOURCE}" "${SCHEMA_TARGET}"
 

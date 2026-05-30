@@ -98,25 +98,32 @@ clickhouse_data:/var/lib/clickhouse
 For the home server, prefer this order:
 
 1. Local SSD/NVMe if enough space is available.
-2. Dedicated local HDD/SSD mounted at `/srv/winrift/clickhouse`.
+2. Dedicated local HDD/SSD mounted at `/mnt/storage/clickhouse`.
 3. NAS as backup/archive storage.
 4. NAS as primary ClickHouse storage only if local disk is impossible and you accept slower, more fragile writes.
 
 ClickHouse is happier with local disk for active writes. The NAS is a better place for nightly compressed backups and closed-patch archives.
 
-The current laptop ClickHouse volume is about `56G`. Active ClickHouse parts are much smaller than that, so some of the volume is likely merge/temp/detached overhead from heavy ingest and restarts. Treat that as a warning: the server's 256GB SSD is enough for a careful initial deployment, but not a lot of headroom for casual long-term growth. If the server is also carrying the OS, Docker image cache, logs, and backups, add or mount another disk before treating the worker as an always-on production collector.
+The current laptop ClickHouse volume is about `56G`. Active ClickHouse parts are much smaller than that, so some of the volume is likely merge/temp/detached overhead from heavy ingest and restarts. Treat that as a warning: the server's mounted data SSD is about `119G`, which is enough for the initial migration but not enough for casual unbounded growth.
 
 Use the production env value to move ClickHouse without changing app code:
 
 ```text
-WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/winrift-ssd/clickhouse
+WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/storage/clickhouse/data
+WINRIFT_CLICKHOUSE_LOG_DIR=/mnt/storage/clickhouse/logs
+WINRIFT_CLICKHOUSE_BACKUP_DIR=/mnt/storage/clickhouse/backups
 ```
 
 ## Backup Targets
 
-Suggested NAS layout:
+Suggested server/NAS layout:
 
 ```text
+/mnt/storage/clickhouse/
+  data/
+  logs/
+  backups/
+
 /mnt/nas/winrift/
   backups/
   closed-patch-exports/
