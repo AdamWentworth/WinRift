@@ -102,6 +102,8 @@ Summoner leaderboard|/api/summoners/leaderboard?platform=NA1&limit=50|750|1000
 Champion role rates|/api/analytics/champion-roles?championIds=266,62,103,64,421&queueId=420|500|100
 Champion guide index|/api/analytics/champion-guides?patch=${perf_patch}&rankBucket=ALL&minGames=1|1000|1000
 Aatrox champion page|/api/analytics/champion-page?championId=266&role=TOP&patch=${perf_patch}&rankBucket=ALL&minGames=5&championMinGames=5&guideMinGames=5&guideLimit=25&indexMinGames=1&indexLimit=200&queueId=420|500|1000
+Kled matchup page|/api/analytics/champion-page?championId=240&role=TOP&opponentChampionId=122&patch=${perf_patch}&minGames=3&championMinGames=10&guideMinGames=5&guideLimit=12&indexMinGames=1&indexLimit=250&queueId=420&limit=4|750|1000
+Lee Sin matchup page|/api/analytics/champion-page?championId=64&role=JUNGLE&opponentChampionId=200&patch=${perf_patch}&minGames=3&championMinGames=10&guideMinGames=5&guideLimit=12&indexMinGames=1&indexLimit=250&queueId=420&limit=4|750|1000
 CHECKS
 
 if (( failures > 0 )); then

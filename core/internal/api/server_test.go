@@ -87,4 +87,31 @@ func TestChampionPageBundleCacheKeyCanonicalizesEffectiveRequest(t *testing.T) {
 	if firstKey != secondKey {
 		t.Fatalf("cache keys differ:\nfirst:  %s\nsecond: %s", firstKey, secondKey)
 	}
+
+	noRank, badRequest := parseChampionPageBundleRequest(url.Values{
+		"championId":       {"86"},
+		"role":             {"TOP"},
+		"patch":            {"16.10"},
+		"minGames":         {"5"},
+		"championMinGames": {"10"},
+		"limit":            {"4"},
+	})
+	if badRequest != "" {
+		t.Fatal(badRequest)
+	}
+	allRanks, badRequest := parseChampionPageBundleRequest(url.Values{
+		"championId":       {"86"},
+		"role":             {"TOP"},
+		"patch":            {"16.10"},
+		"rankBucket":       {"ALL"},
+		"minGames":         {"5"},
+		"championMinGames": {"10"},
+		"limit":            {"4"},
+	})
+	if badRequest != "" {
+		t.Fatal(badRequest)
+	}
+	if championPageBundleCacheKey(noRank) != championPageBundleCacheKey(allRanks) {
+		t.Fatalf("cache key with rankBucket=ALL should match omitted all-ranks key")
+	}
 }

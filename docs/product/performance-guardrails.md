@@ -26,6 +26,8 @@ Champion guide refreshes should stage new rows before deleting older compiled ro
 
 After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. The prewarm limit should be broad enough to cover normal champion browsing, not only the five highest-played champions per role. Prewarming covers the retained patch window so the UI's default previous-patch view can stay fast while the current patch is still thin.
 
+Exact opponent-filtered champion pages are the expensive cold path because they assemble the same guide bundle plus matchup-specific item panels. The worker therefore prewarms a bounded number of common opponent bundles per selected champion/role. Keep `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES` conservative; warm responses should be effectively instant, but the first build of an uncached exact matchup can still take seconds.
+
 ## Profiling Checklist
 
 Before treating a page as polished, test the deployed API with `curl` timing output:
@@ -53,6 +55,8 @@ Useful local env vars:
 - `WINRIFT_PERF_PATCH`: patch used by champion/tier analytics checks. Defaults to `16.10` while the current patch is still filling.
 - `WINRIFT_PERF_RUNS`: measured runs per endpoint. Defaults to `3`.
 - `WINRIFT_PERF_WARMUPS`: warmup requests before measured runs. Defaults to `1`.
+
+For exact matchup cold-path checks, temporarily run with `WINRIFT_PERF_WARMUPS=0`. A cold miss can still be slower than a warmed page, but common matchup pages should stop showing multi-second first loads after the worker prewarm lane has run.
 - `WINRIFT_PERF_JSONL`: optional file path for machine-readable JSONL output.
 - `WINRIFT_PERF_STRICT`: fail on threshold warnings when set to `1` or `true`.
 

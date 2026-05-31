@@ -325,11 +325,11 @@ Goal:
 - no page should fan out into many avoidable requests,
 - old patch raw pruning should not break visible historical analytics.
 
-Recent progress: champion guide index, tier-list style reads, and selected champion headers now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request. Champion guide matchup rows, rune pages, spell pairs, and build signatures now use read models after the worker refresh runs. Hot champion-page response bundles are prewarmed for common champion/role pages.
+Recent progress: champion guide index, tier-list style reads, and selected champion headers now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request. Champion guide matchup rows, rune pages, spell pairs, and build signatures now use read models after the worker refresh runs. Hot champion-page response bundles are prewarmed for common champion/role pages and a bounded set of common exact matchup pages.
 
 Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
 
-Outstanding: add a champion role-rate summary if directory/champion navigation starts showing up in timing logs. If deployed timings later show frequent cold misses on exact matchup pages, expand response prewarming to common champion/opponent pairs.
+Outstanding: keep watching exact matchup cold timings as traffic grows. If the bounded prewarm cap is too small, raise it before adding another read model.
 
 ### Patch-Scope UX
 
@@ -398,7 +398,7 @@ Completed:
 - Reuse champion guide summary read models for selected champion headers.
 - Add team-kill summaries for true kill participation in the fast champion guide path.
 - Add build-signature analytics for build-advice and champion item paths.
-- Add hot champion-page bundle prewarming.
+- Add hot champion-page bundle prewarming, including common exact matchup pages.
 - Move patch-scope controls out of the global header and into champion guide/tier-list pages.
 - Add first-pass win-condition validation endpoint and documentation.
 - Split worker lanes by orchestration concern.
@@ -408,7 +408,6 @@ Completed:
 
 Next:
 
-1. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
-2. Apply staged refreshes to item-slot, summoner-profile, or win-condition lanes if timing logs show similar empty-window behavior.
-3. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-4. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+1. Apply staged refreshes to item-slot, summoner-profile, or win-condition lanes if timing logs show similar empty-window behavior.
+2. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.

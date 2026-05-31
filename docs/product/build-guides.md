@@ -39,7 +39,7 @@ Read models:
 - `item_slot_analytics`: completed-item slot rows plus a single-starting-item fallback used by guide and live build panels.
 - `starting_loadout_analytics`: legal fountain-opener bundles used by the starting-items panel before falling back to retained timeline scans.
 - `champion_page_bundle_cache`: short-lived persisted JSON bundles for exact champion-page requests. The API still keeps an in-memory cache, but this table lets warmed pages survive API restarts and keeps repeated page loads close to instant.
-- Worker prewarming: when `CHAMPION_PAGE_PREWARM_ENABLED=true`, the champion-guide refresh lane stores champion/role page bundles for the current patch. The default is broad enough to cover normal champion browsing, with at least 50 role games and all-ranks scope.
+- Worker prewarming: when `CHAMPION_PAGE_PREWARM_ENABLED=true`, the champion-guide refresh lane stores champion/role page bundles for the retained patch window. It also warms a bounded set of common champion/opponent bundles, because matchup-filtered item advice is the cold path users notice most. The default is broad enough to cover normal champion browsing, with at least 50 role games and all-ranks scope.
 
 Build variant labeling:
 

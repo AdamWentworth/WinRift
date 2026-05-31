@@ -521,6 +521,37 @@ func TestChampionGuideMatchupsUseSummaryReadModel(t *testing.T) {
 	}
 }
 
+func TestCommonChampionGuideMatchupsUseSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_matchup_analytics FINAL").
+		WithArgs(sqlmock.AnyArg(), "266", "TOP", "16.11", 15, 3).
+		WillReturnRows(sqlmock.NewRows([]string{"opponent_champion_id", "wins", "games", "win_rate"}).
+			AddRow(122, 8, 15, 0.5333).
+			AddRow(78, 7, 14, 0.5))
+
+	rows, err := repo.QueryCommonChampionGuideMatchups(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.11",
+		"rank_bucket": "ALL",
+	}, 15, 3)
+	if err != nil {
+		t.Fatalf("common champion guide matchups: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d; want 2", len(rows))
+	}
+	if rows[0].OpponentChampionID != 122 || rows[0].Games != 15 || rows[1].OpponentChampionID != 78 {
+		t.Fatalf("common matchup rows = %+v", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestChampionGuideSignaturesUseSummaryReadModel(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()

@@ -94,6 +94,65 @@ func (r *Repository) queryChampionGuideMatchupsSummary(ctx context.Context, filt
 	return out, hasSummary, nil
 }
 
+func (r *Repository) QueryCommonChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideMatchupRow, error) {
+	championID := filterValue(filters["champion_id"])
+	if championID == "" {
+		return nil, nil
+	}
+	if minGames <= 0 {
+		minGames = 15
+	}
+	if limit <= 0 {
+		limit = 2
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	query := fmt.Sprintf(`
+		SELECT
+			opponent_champion_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM champion_matchup_analytics FINAL
+		WHERE platform = 'ALL'
+			AND queue_id = ?
+			AND champion_id = ?
+			AND %s
+			AND opponent_champion_id > 0`,
+		guideRolePredicate(roleScope),
+	)
+	args := []any{analytics.RankedSoloQueueID, championID}
+	args = append(args, roleScope.args...)
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	query += `
+		GROUP BY opponent_champion_id
+		HAVING games >= ?
+		ORDER BY games DESC, opponent_champion_id ASC
+		LIMIT ?`
+	args = append(args, minGames, limit)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ChampionGuideMatchupRow{}
+	for rows.Next() {
+		var row ChampionGuideMatchupRow
+		if err := rows.Scan(&row.OpponentChampionID, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) queryChampionGuideMatchupsLiveScan(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)

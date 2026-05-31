@@ -140,7 +140,7 @@ func championPageBundleCacheKey(request championPageBundleRequest) string {
 	query.Set("itemContext", request.Build.ItemContext)
 	query.Set("opponentChampionId", strconv.Itoa(int(request.Build.OpponentChampionID)))
 	query.Set("patch", request.Build.Patch)
-	query.Set("rankBucket", request.Build.RankBucket)
+	query.Set("rankBucket", canonicalChampionPageRankBucket(request.Build.RankBucket))
 	query.Set("minGames", strconv.Itoa(request.Build.MinGames))
 	query.Set("championMinGames", strconv.Itoa(request.Build.ChampionMinGames))
 	query.Set("limit", strconv.Itoa(request.Build.OptionLimit))
@@ -150,6 +150,14 @@ func championPageBundleCacheKey(request championPageBundleRequest) string {
 	query.Set("indexLimit", strconv.Itoa(request.IndexLimit))
 	query.Set("queueId", strconv.Itoa(int(request.QueueID)))
 	return championPageBundleCacheKeyPrefix + query.Encode()
+}
+
+func canonicalChampionPageRankBucket(rankBucket string) string {
+	rankBucket = strings.ToUpper(strings.TrimSpace(rankBucket))
+	if rankBucket == "ALL" {
+		return ""
+	}
+	return rankBucket
 }
 
 func (s Server) buildChampionPageBundle(ctx context.Context, request championPageBundleRequest) (map[string]any, error) {

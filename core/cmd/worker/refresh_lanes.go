@@ -222,34 +222,46 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 		if cfg.ChampionPagePrewarmEnabled {
 			prewarmStartedAt := time.Now()
 			log.Printf(
-				"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d rank_bucket=%s",
+				"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d matchup_per_champion=%d matchup_min_games=%d matchup_max_bundles=%d rank_bucket=%s",
 				refreshPatch,
 				analytics.RankedSoloQueueID,
 				strings.Join(cfg.ChampionPagePrewarmRoles, ","),
 				cfg.ChampionPagePrewarmPerRole,
 				cfg.ChampionPagePrewarmMinGames,
+				cfg.ChampionPagePrewarmMatchupsPerChampion,
+				cfg.ChampionPagePrewarmMatchupMinGames,
+				cfg.ChampionPagePrewarmMaxMatchupBundles,
 				cfg.ChampionPagePrewarmRankBucket,
 			)
 			result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
-				Patch:      refreshPatch,
-				Roles:      cfg.ChampionPagePrewarmRoles,
-				PerRole:    cfg.ChampionPagePrewarmPerRole,
-				MinGames:   cfg.ChampionPagePrewarmMinGames,
-				RankBucket: cfg.ChampionPagePrewarmRankBucket,
-				QueueID:    analytics.RankedSoloQueueID,
+				Patch:               refreshPatch,
+				Roles:               cfg.ChampionPagePrewarmRoles,
+				PerRole:             cfg.ChampionPagePrewarmPerRole,
+				MinGames:            cfg.ChampionPagePrewarmMinGames,
+				MatchupsPerChampion: cfg.ChampionPagePrewarmMatchupsPerChampion,
+				MatchupMinGames:     cfg.ChampionPagePrewarmMatchupMinGames,
+				MaxMatchupBundles:   cfg.ChampionPagePrewarmMaxMatchupBundles,
+				RankBucket:          cfg.ChampionPagePrewarmRankBucket,
+				QueueID:             analytics.RankedSoloQueueID,
 			})
 			statusDetails["prewarmCandidates"] += result.Candidates
 			statusDetails["prewarmStored"] += result.Stored
 			statusDetails["prewarmSkipped"] += result.Skipped
 			statusDetails["prewarmErrors"] += result.Errors
+			statusDetails["prewarmMatchupCandidates"] += result.MatchupCandidates
+			statusDetails["prewarmMatchupStored"] += result.MatchupStored
+			statusDetails["prewarmMatchupSkipped"] += result.MatchupSkipped
 			if err != nil {
 				log.Printf(
-					"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s err=%v",
+					"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_skipped=%d errors=%d duration=%s err=%v",
 					refreshPatch,
 					analytics.RankedSoloQueueID,
 					result.Candidates,
 					result.Stored,
 					result.Skipped,
+					result.MatchupCandidates,
+					result.MatchupStored,
+					result.MatchupSkipped,
 					result.Errors,
 					time.Since(prewarmStartedAt).Round(time.Millisecond),
 					err,
@@ -259,12 +271,15 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 				}
 			} else {
 				log.Printf(
-					"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s",
+					"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_skipped=%d errors=%d duration=%s",
 					refreshPatch,
 					analytics.RankedSoloQueueID,
 					result.Candidates,
 					result.Stored,
 					result.Skipped,
+					result.MatchupCandidates,
+					result.MatchupStored,
+					result.MatchupSkipped,
 					result.Errors,
 					time.Since(prewarmStartedAt).Round(time.Millisecond),
 				)

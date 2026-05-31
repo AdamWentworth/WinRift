@@ -195,6 +195,9 @@ Safety knobs:
 - `CHAMPION_PAGE_PREWARM_ENABLED`: when true, the worker stores ready-to-serve champion page bundles for champion/role pages after champion-guide refreshes complete. This runs across the retained patch window so the previous patch remains fast while the current patch is still collecting.
 - `CHAMPION_PAGE_PREWARM_PER_ROLE`: number of indexed champion pages to prewarm per configured role. The default is intentionally broad so champion guide pages do not make the first visitor pay for cold bundle assembly.
 - `CHAMPION_PAGE_PREWARM_MIN_GAMES`: minimum role games required before a champion can be selected for prewarming.
+- `CHAMPION_PAGE_PREWARM_MATCHUPS_PER_CHAMPION`: number of common opponent-filtered champion page bundles to prewarm for each selected champion/role. This targets the otherwise slow first load after a user picks a matchup lens.
+- `CHAMPION_PAGE_PREWARM_MATCHUP_MIN_GAMES`: minimum exact matchup games required before an opponent bundle is prewarmed.
+- `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES`: hard cap on exact matchup bundles per patch refresh. Keep this bounded so the worker does not spend the whole refresh cycle building obscure pages.
 - `CHAMPION_PAGE_PREWARM_ROLES`: comma-separated roles to prewarm. Defaults to `TOP,JUNGLE,MIDDLE,BOTTOM,UTILITY`.
 - `CHAMPION_PAGE_PREWARM_RANK_BUCKET`: optional rank bucket for prewarmed pages. Leave blank for the all-ranks pages the frontend usually opens first.
 - `WIN_CONDITION_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `match_team_win_conditions` and `patch_win_condition_metrics` summaries at startup and then after collector sweeps when the interval has elapsed.

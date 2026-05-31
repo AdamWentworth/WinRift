@@ -63,7 +63,7 @@ The current design is policy-safe and usable: matchup rows stay contextual, samp
 - build signatures from `build_signature_analytics` or archived `patch_build_metrics`,
 - rune/spell/build variant context from the champion guide path.
 
-If this endpoint becomes hot under real traffic, the next step is response prewarming for popular champion/opponent pairs, not a request-time aggregation change.
+If this endpoint becomes hot under real traffic, tune the bounded common-matchup prewarm cap before introducing another request-time aggregation or a heavier JSON bundle table.
 
 ## Raw-Pruning Safety
 
@@ -80,6 +80,5 @@ For the MVP, pruning old bulky raw payloads is still acceptable as long as we ac
 
 ## Recommended Order
 
-1. Expand hot-response prewarming to matchup-specific champion pages if deployed timings show frequent cold misses there.
-2. Consider the same staged-refresh pattern for item-slot, summoner-profile, and win-condition summary lanes if timing logs catch empty-window behavior there too.
-3. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.
+1. Consider the same staged-refresh pattern for item-slot, summoner-profile, and win-condition summary lanes if timing logs catch empty-window behavior there too.
+2. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.

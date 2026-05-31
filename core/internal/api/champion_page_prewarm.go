@@ -3,25 +3,32 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"winrift/core/internal/analytics"
 )
 
 type ChampionPagePrewarmOptions struct {
-	Patch      string
-	Roles      []string
-	PerRole    int
-	MinGames   int
-	RankBucket string
-	QueueID    uint16
+	Patch               string
+	Roles               []string
+	PerRole             int
+	MinGames            int
+	MatchupsPerChampion int
+	MatchupMinGames     int
+	MaxMatchupBundles   int
+	RankBucket          string
+	QueueID             uint16
 }
 
 type ChampionPagePrewarmResult struct {
-	Candidates int
-	Stored     int
-	Skipped    int
-	Errors     int
+	Candidates        int
+	Stored            int
+	Skipped           int
+	Errors            int
+	MatchupCandidates int
+	MatchupStored     int
+	MatchupSkipped    int
 }
 
 func (s Server) PrewarmChampionPageBundles(ctx context.Context, options ChampionPagePrewarmOptions) (ChampionPagePrewarmResult, error) {
@@ -40,6 +47,18 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	minGames := options.MinGames
 	if minGames <= 0 {
 		minGames = 50
+	}
+	matchupsPerChampion := options.MatchupsPerChampion
+	if matchupsPerChampion < 0 {
+		matchupsPerChampion = 0
+	}
+	matchupMinGames := options.MatchupMinGames
+	if matchupMinGames <= 0 {
+		matchupMinGames = 15
+	}
+	maxMatchupBundles := options.MaxMatchupBundles
+	if maxMatchupBundles < 0 {
+		maxMatchupBundles = 0
 	}
 	rankBucket := strings.ToUpper(strings.TrimSpace(options.RankBucket))
 	queueID := options.QueueID
@@ -89,24 +108,23 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 				IndexLimit:    250,
 				QueueID:       queueID,
 			}
-			cacheKey := championPageBundleCacheKey(request)
-			if seenKeys[cacheKey] {
-				continue
-			}
-			seenKeys[cacheKey] = true
-			result.Candidates++
-			if body, ok, err := s.repo.CachedChampionPageBundle(ctx, cacheKey); err == nil && ok {
-				s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
-				result.Skipped++
-				continue
-			} else if err != nil {
+			if err := s.prewarmChampionPageBundle(ctx, request, seenKeys, false, &result); err != nil {
 				result.Errors++
 				if firstErr == nil {
 					firstErr = err
 				}
 				continue
 			}
-			body, err := s.buildChampionPageBundleJSON(ctx, request)
+			if matchupsPerChampion <= 0 || (maxMatchupBundles > 0 && result.MatchupCandidates >= maxMatchupBundles) {
+				continue
+			}
+			matchupFilters := map[string]string{
+				"champion_id": strconv.Itoa(int(summary.ChampionID)),
+				"role":        summaryRole,
+				"patch":       patch,
+				"rank_bucket": rankBucket,
+			}
+			matchups, err := s.repo.QueryCommonChampionGuideMatchups(ctx, matchupFilters, matchupMinGames, matchupsPerChampion)
 			if err != nil {
 				result.Errors++
 				if firstErr == nil {
@@ -114,18 +132,61 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 				}
 				continue
 			}
-			if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, championPageBundleCacheTTL); err != nil {
-				result.Errors++
-				if firstErr == nil {
-					firstErr = err
+			for _, matchup := range matchups {
+				if matchup.OpponentChampionID == 0 {
+					continue
 				}
-				continue
+				if maxMatchupBundles > 0 && result.MatchupCandidates >= maxMatchupBundles {
+					break
+				}
+				matchupRequest := request
+				matchupRequest.Build.OpponentChampionID = matchup.OpponentChampionID
+				matchupRequest.Build.MinGames = 3
+				if err := s.prewarmChampionPageBundle(ctx, matchupRequest, seenKeys, true, &result); err != nil {
+					result.Errors++
+					if firstErr == nil {
+						firstErr = err
+					}
+				}
 			}
-			s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
-			result.Stored++
 		}
 	}
 	return result, firstErr
+}
+
+func (s Server) prewarmChampionPageBundle(ctx context.Context, request championPageBundleRequest, seenKeys map[string]bool, matchup bool, result *ChampionPagePrewarmResult) error {
+	cacheKey := championPageBundleCacheKey(request)
+	if seenKeys[cacheKey] {
+		return nil
+	}
+	seenKeys[cacheKey] = true
+	result.Candidates++
+	if matchup {
+		result.MatchupCandidates++
+	}
+	if body, ok, err := s.repo.CachedChampionPageBundle(ctx, cacheKey); err == nil && ok {
+		s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
+		result.Skipped++
+		if matchup {
+			result.MatchupSkipped++
+		}
+		return nil
+	} else if err != nil {
+		return err
+	}
+	body, err := s.buildChampionPageBundleJSON(ctx, request)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, championPageBundleCacheTTL); err != nil {
+		return err
+	}
+	s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
+	result.Stored++
+	if matchup {
+		result.MatchupStored++
+	}
+	return nil
 }
 
 func championPagePrewarmRoles(roles []string) []string {
