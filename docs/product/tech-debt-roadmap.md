@@ -149,9 +149,9 @@ Suggested direction:
 
 Build guide extraction candidates:
 
+- item panels and item selection helpers: first pass complete in `components/build-guide/GuideItemPanels.tsx`
 - hero/header
 - rune panel
-- item slots
 - matchup cards
 - build variants
 - skill path
