@@ -273,6 +273,8 @@ SMTP_TO=your_email@gmail.com
 
 The monitor container should stay up even when the worker exits. It does not spend Riot API budget.
 
+The worker also writes a compact refresh-health snapshot to `WORKER_REFRESH_STATUS_PATH`. On the server this defaults to `/run/winrift/worker-refresh-status.json` and records the latest start/success/failure time, duration, row/context counts, and last error for each summary refresh lane. It is intentionally simple JSON so it can be inspected with `docker exec`, `ssh`, or a future monitor/API endpoint.
+
 ## Deployment Flow
 
 The CI/CD deploy should be the normal server path. A manual emergency deploy can still be:

@@ -55,7 +55,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/dev/analytics/item-slots/refresh", s.refreshItemSlotAnalytics)
 	mux.HandleFunc("POST /api/dev/analytics/champion-guides/refresh", s.refreshChampionGuideAnalytics)
 	mux.HandleFunc("POST /api/dev/analytics/summoner-profiles/refresh", s.refreshSummonerProfileAnalytics)
-	return s.cors(mux)
+	return s.logRequests(s.cors(mux))
 }
 
 func (s Server) health(w http.ResponseWriter, r *http.Request) {

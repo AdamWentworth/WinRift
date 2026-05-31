@@ -56,6 +56,64 @@ func (s Server) cors(next http.Handler) http.Handler {
 	})
 }
 
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+func (w *loggingResponseWriter) WriteHeader(status int) {
+	if w.status != 0 {
+		return
+	}
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *loggingResponseWriter) Write(body []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	n, err := w.ResponseWriter.Write(body)
+	w.bytes += n
+	return n, err
+}
+
+func (s Server) logRequests(next http.Handler) http.Handler {
+	if !s.cfg.APIRequestLogsEnabled {
+		return next
+	}
+	slowThreshold := s.cfg.APISlowRequestThreshold
+	if slowThreshold <= 0 {
+		slowThreshold = 500 * time.Millisecond
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startedAt := time.Now()
+		recorder := &loggingResponseWriter{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		status := recorder.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		duration := time.Since(startedAt)
+		route := r.Pattern
+		if route == "" {
+			route = r.URL.Path
+		}
+		slow := duration >= slowThreshold
+		log.Printf(
+			"api request method=%s route=%s status=%d duration_ms=%d bytes=%d cache=%s slow=%t",
+			r.Method,
+			route,
+			status,
+			duration.Milliseconds(),
+			recorder.bytes,
+			w.Header().Get("X-WinRift-Cache"),
+			slow,
+		)
+	})
+}
+
 func writeRiotError(w http.ResponseWriter, err error) {
 	if riot.IsAuthFailure(err) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{

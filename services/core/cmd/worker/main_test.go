@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"winrift/services/core/internal/config"
 	"winrift/services/core/internal/riot"
+	"winrift/services/core/internal/runstate"
 )
 
 func TestIsRiotAuthError(t *testing.T) {
@@ -129,5 +133,38 @@ func TestCollectorPlatformsNormalizesAndDedupes(t *testing.T) {
 		if platforms[i] != want[i] {
 			t.Fatalf("platform[%d] = %q, want %q; all=%v", i, platforms[i], want[i], platforms)
 		}
+	}
+}
+
+func TestRefreshStatusRecorderWritesSuccessAndFailure(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "refresh.json")
+	recorder := newRefreshStatusRecorder(path)
+	started := recorder.start("champion-guide-analytics", "16.11", 420, "test detail")
+	recorder.succeed("champion-guide-analytics", started.Add(-25*time.Millisecond), map[string]int{"rows": 10})
+	recorder.fail("summoner-profile-analytics", started.Add(-10*time.Millisecond), errors.New("boom"))
+
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var status runstate.WorkerRefreshStatus
+	if err := json.Unmarshal(body, &status); err != nil {
+		t.Fatal(err)
+	}
+	if len(status.Refreshes) != 2 {
+		t.Fatalf("refresh count = %d, want 2", len(status.Refreshes))
+	}
+	byName := map[string]runstate.RefreshStatus{}
+	for _, refresh := range status.Refreshes {
+		byName[refresh.Name] = refresh
+	}
+	if byName["champion-guide-analytics"].Patch != "16.11" {
+		t.Fatalf("patch = %q, want 16.11", byName["champion-guide-analytics"].Patch)
+	}
+	if byName["champion-guide-analytics"].Rows["rows"] != 10 {
+		t.Fatalf("rows = %d, want 10", byName["champion-guide-analytics"].Rows["rows"])
+	}
+	if byName["summoner-profile-analytics"].LastError != "boom" {
+		t.Fatalf("last error = %q, want boom", byName["summoner-profile-analytics"].LastError)
 	}
 }

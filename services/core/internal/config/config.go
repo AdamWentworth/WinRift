@@ -19,6 +19,8 @@ type Config struct {
 	ClickHouseUser                 string
 	ClickHousePassword             string
 	CORSOrigins                    []string
+	APIRequestLogsEnabled          bool
+	APISlowRequestThreshold        time.Duration
 	DefaultPlatform                string
 	RiotMinRequestInterval         time.Duration
 	RiotRateLimitMaxRetries        int
@@ -64,6 +66,7 @@ type Config struct {
 	MonitorAPIHealthURL            string
 	MonitorInterval                time.Duration
 	MonitorWorkerHeartbeatPath     string
+	WorkerRefreshStatusPath        string
 	MonitorWorkerRequired          bool
 	MonitorWorkerStaleAfter        time.Duration
 	MonitorWorkerContainerName     string
@@ -93,6 +96,8 @@ func Load() Config {
 		ClickHouseUser:                 env("CLICKHOUSE_USER", "winrift"),
 		ClickHousePassword:             env("CLICKHOUSE_PASSWORD", "winrift"),
 		CORSOrigins:                    splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
+		APIRequestLogsEnabled:          envBool("API_REQUEST_LOGS_ENABLED", true),
+		APISlowRequestThreshold:        time.Duration(envInt("API_SLOW_REQUEST_MS", 500)) * time.Millisecond,
 		DefaultPlatform:                defaultPlatform,
 		RiotMinRequestInterval:         time.Duration(envInt("RIOT_MIN_REQUEST_INTERVAL_MS", 75)) * time.Millisecond,
 		RiotRateLimitMaxRetries:        envInt("RIOT_RATE_LIMIT_MAX_RETRIES", 3),
@@ -138,6 +143,7 @@ func Load() Config {
 		MonitorAPIHealthURL:            env("MONITOR_API_HEALTH_URL", "http://api:8000/api/health"),
 		MonitorInterval:                time.Duration(envInt("MONITOR_INTERVAL_SECONDS", 60)) * time.Second,
 		MonitorWorkerHeartbeatPath:     env("MONITOR_WORKER_HEARTBEAT_PATH", "/run/winrift/worker-heartbeat.json"),
+		WorkerRefreshStatusPath:        env("WORKER_REFRESH_STATUS_PATH", "/run/winrift/worker-refresh-status.json"),
 		MonitorWorkerRequired:          envBool("MONITOR_WORKER_REQUIRED", false),
 		MonitorWorkerStaleAfter:        time.Duration(envInt("MONITOR_WORKER_STALE_AFTER_MINUTES", 15)) * time.Minute,
 		MonitorWorkerContainerName:     env("MONITOR_WORKER_CONTAINER_NAME", ""),

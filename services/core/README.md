@@ -75,6 +75,8 @@ COLLECTOR_CURRENT_PATCH=16.11
 
 | Key | Default | Notes |
 |-----|---------|-------|
+| `API_REQUEST_LOGS_ENABLED` | `true` | Emits route, status, duration, byte count, and cache marker per API request. |
+| `API_SLOW_REQUEST_MS` | `500` | Marks API request log lines as slow after this threshold. |
 | `RIOT_AUTH_FAILURE_EXIT` | `true` | Stops the worker on 401/403 so an expired key does not loop. |
 | `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS` | `120` | Maximum backoff after Riot rate-limit responses. |
 | `COLLECTOR_RATE_LIMIT_REQUESTS` | `100` | Request budget per rate-limit window. |
@@ -82,6 +84,7 @@ COLLECTOR_CURRENT_PATCH=16.11
 | `COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS` | `10` | Keeps headroom for non-collector requests. |
 | `COLLECTOR_PATCH_RETENTION_COUNT` | `2` | Raw current + recent patch retention target. |
 | `MONITOR_WORKER_STALE_AFTER_MINUTES` | `15` | Heartbeat age before the monitor logs a stale observation. |
+| `WORKER_REFRESH_STATUS_PATH` | `/run/winrift/worker-refresh-status.json` | Runtime JSON snapshot of summary-refresh health. |
 | `MONITOR_WORKER_CONTAINER_NAME` | empty | Optional Docker container name for worker-down alerts. |
 | `MONITOR_STARTUP_GRACE_SECONDS` | `120` | Grace window before startup worker-down alerts. |
 | `ALERT_EMAIL_ENABLED` | `false` | Enables SMTP email alerts from `/winrift-monitor`. |

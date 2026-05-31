@@ -62,6 +62,8 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `WINRIFT_STORAGE_MOUNT` | Mount guard, usually `/mnt/storage`. |
 | `WINRIFT_CLICKHOUSE_DATA_DIR` | ClickHouse data directory on storage SSD. |
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
+| `API_REQUEST_LOGS_ENABLED` | Enables grep-friendly API timing logs. |
+| `WORKER_REFRESH_STATUS_PATH` | Runtime JSON file for worker refresh health. |
 | `MONITOR_WORKER_REQUIRED` | Set `true` when the collector is expected to be running. |
 | `MONITOR_WORKER_CONTAINER_NAME` | Set to `winrift_worker` so the monitor emails only when the worker container is actually down. |
 | `MONITOR_STARTUP_GRACE_SECONDS` | Short deploy/startup grace window before worker-down emails are eligible. |

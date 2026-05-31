@@ -75,10 +75,24 @@ func TestLoadPatchRetentionConfig(t *testing.T) {
 	}
 }
 
+func TestLoadAPIObservabilityConfig(t *testing.T) {
+	t.Setenv("API_REQUEST_LOGS_ENABLED", "false")
+	t.Setenv("API_SLOW_REQUEST_MS", "750")
+
+	cfg := Load()
+	if cfg.APIRequestLogsEnabled {
+		t.Fatal("expected API request logs disabled")
+	}
+	if cfg.APISlowRequestThreshold != 750*time.Millisecond {
+		t.Fatalf("slow request threshold = %s, want 750ms", cfg.APISlowRequestThreshold)
+	}
+}
+
 func TestLoadMonitorConfig(t *testing.T) {
 	t.Setenv("MONITOR_API_HEALTH_URL", "http://api:8000/api/health")
 	t.Setenv("MONITOR_INTERVAL_SECONDS", "30")
 	t.Setenv("MONITOR_WORKER_HEARTBEAT_PATH", "/run/winrift/worker.json")
+	t.Setenv("WORKER_REFRESH_STATUS_PATH", "/run/winrift/refresh.json")
 	t.Setenv("MONITOR_WORKER_REQUIRED", "true")
 	t.Setenv("MONITOR_WORKER_STALE_AFTER_MINUTES", "20")
 	t.Setenv("MONITOR_WORKER_CONTAINER_NAME", "winrift_worker")
@@ -100,6 +114,9 @@ func TestLoadMonitorConfig(t *testing.T) {
 	}
 	if cfg.MonitorWorkerHeartbeatPath != "/run/winrift/worker.json" {
 		t.Fatalf("heartbeat path = %q", cfg.MonitorWorkerHeartbeatPath)
+	}
+	if cfg.WorkerRefreshStatusPath != "/run/winrift/refresh.json" {
+		t.Fatalf("refresh status path = %q", cfg.WorkerRefreshStatusPath)
 	}
 	if cfg.MonitorWorkerContainerName != "winrift_worker" {
 		t.Fatalf("worker container = %q", cfg.MonitorWorkerContainerName)

@@ -35,3 +35,22 @@ func TestWriteRiotErrorKeepsRateLimitStatus(t *testing.T) {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
 	}
 }
+
+func TestLoggingResponseWriterCapturesFirstStatusAndBytes(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writer := &loggingResponseWriter{ResponseWriter: recorder}
+
+	writer.WriteHeader(http.StatusCreated)
+	writer.WriteHeader(http.StatusInternalServerError)
+	_, _ = writer.Write([]byte("ok"))
+
+	if writer.status != http.StatusCreated {
+		t.Fatalf("captured status = %d, want %d", writer.status, http.StatusCreated)
+	}
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("recorder status = %d, want %d", recorder.Code, http.StatusCreated)
+	}
+	if writer.bytes != 2 {
+		t.Fatalf("bytes = %d, want 2", writer.bytes)
+	}
+}

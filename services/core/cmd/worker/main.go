@@ -83,10 +83,11 @@ func main() {
 	var lastChampionGuideRefresh time.Time
 	var lastWinConditionRefresh time.Time
 	var lastSummonerProfileRefresh time.Time
-	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, &lastItemSlotRefresh)
-	maybeRefreshChampionGuideAnalytics(context.Background(), cfg, repo, &lastChampionGuideRefresh)
-	maybeRefreshWinConditionAnalytics(context.Background(), cfg, repo, platforms, &lastWinConditionRefresh)
-	maybeRefreshSummonerProfileAnalytics(context.Background(), cfg, repo, &lastSummonerProfileRefresh)
+	refreshStatus := newRefreshStatusRecorder(cfg.WorkerRefreshStatusPath)
+	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, refreshStatus, &lastItemSlotRefresh)
+	maybeRefreshChampionGuideAnalytics(context.Background(), cfg, repo, refreshStatus, &lastChampionGuideRefresh)
+	maybeRefreshWinConditionAnalytics(context.Background(), cfg, repo, refreshStatus, platforms, &lastWinConditionRefresh)
+	maybeRefreshSummonerProfileAnalytics(context.Background(), cfg, repo, refreshStatus, &lastSummonerProfileRefresh)
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
@@ -182,10 +183,10 @@ func main() {
 			}
 		}
 
-		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, &lastItemSlotRefresh)
-		maybeRefreshChampionGuideAnalytics(ctx, cfg, repo, &lastChampionGuideRefresh)
-		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, platforms, &lastWinConditionRefresh)
-		maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, &lastSummonerProfileRefresh)
+		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, refreshStatus, &lastItemSlotRefresh)
+		maybeRefreshChampionGuideAnalytics(ctx, cfg, repo, refreshStatus, &lastChampionGuideRefresh)
+		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, refreshStatus, platforms, &lastWinConditionRefresh)
+		maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, refreshStatus, &lastSummonerProfileRefresh)
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
 		writeWorkerHeartbeat(cfg, "active", len(platforms), platformsWithWork, requestsThisSweep, "sleep="+sleepFor.Round(time.Second).String())
 		log.Printf(
@@ -304,7 +305,70 @@ func runPlatformPass(ctx context.Context, cfg config.Config, matchCollector coll
 	return passResult
 }
 
-func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, staticService *staticdata.Service, repo *clickhouse.Repository, lastRefresh *time.Time) {
+type refreshStatusRecorder struct {
+	path     string
+	statuses map[string]runstate.RefreshStatus
+}
+
+func newRefreshStatusRecorder(path string) *refreshStatusRecorder {
+	return &refreshStatusRecorder{path: path, statuses: map[string]runstate.RefreshStatus{}}
+}
+
+func (r *refreshStatusRecorder) start(name, patch string, queueID int, detail string) time.Time {
+	startedAt := time.Now()
+	if r == nil {
+		return startedAt
+	}
+	status := r.statuses[name]
+	status.Name = name
+	status.Patch = patch
+	status.QueueID = queueID
+	status.LastStartedAt = startedAt.UTC()
+	status.Detail = detail
+	r.statuses[name] = status
+	r.flush()
+	return startedAt
+}
+
+func (r *refreshStatusRecorder) succeed(name string, startedAt time.Time, rows map[string]int) {
+	if r == nil {
+		return
+	}
+	status := r.statuses[name]
+	status.Name = name
+	status.LastSucceededAt = time.Now().UTC()
+	status.LastDurationMS = time.Since(startedAt).Milliseconds()
+	status.LastError = ""
+	status.Rows = rows
+	r.statuses[name] = status
+	r.flush()
+}
+
+func (r *refreshStatusRecorder) fail(name string, startedAt time.Time, err error) {
+	if r == nil {
+		return
+	}
+	status := r.statuses[name]
+	status.Name = name
+	status.LastFailedAt = time.Now().UTC()
+	status.LastDurationMS = time.Since(startedAt).Milliseconds()
+	if err != nil {
+		status.LastError = err.Error()
+	}
+	r.statuses[name] = status
+	r.flush()
+}
+
+func (r *refreshStatusRecorder) flush() {
+	if r == nil {
+		return
+	}
+	if err := runstate.WriteWorkerRefreshStatus(r.path, r.statuses); err != nil {
+		log.Printf("worker refresh status write failed path=%s err=%v", r.path, err)
+	}
+}
+
+func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, staticService *staticdata.Service, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, lastRefresh *time.Time) {
 	if !cfg.ItemSlotRefreshEnabled {
 		return
 	}
@@ -319,7 +383,7 @@ func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, stati
 	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
 		return
 	}
-	startedAt := time.Now()
+	startedAt := refreshStatus.start("item-slot-analytics", patch, analytics.RankedSoloQueueID, "item slots and starting loadouts")
 	log.Printf("item slot analytics scheduled refresh start patch=%s queue=%d interval=%s", patch, analytics.RankedSoloQueueID, interval)
 	defer func() {
 		*lastRefresh = time.Now()
@@ -327,22 +391,27 @@ func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, stati
 	contexts, err := itemSlotRefreshContexts(ctx, staticService)
 	if err != nil {
 		log.Printf("item slot analytics scheduled refresh skipped patch=%s err=%v", patch, err)
+		refreshStatus.fail("item-slot-analytics", startedAt, err)
 		return
 	}
 	if err := repo.RefreshItemSlotAnalytics(ctx, patch, analytics.RankedSoloQueueID, contexts); err != nil {
 		log.Printf("item slot analytics scheduled refresh failed patch=%s queue=%d contexts=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(contexts), time.Since(startedAt).Round(time.Millisecond), err)
+		refreshStatus.fail("item-slot-analytics", startedAt, err)
 		return
 	}
 	loadoutContexts, err := startingLoadoutRefreshContexts(ctx, staticService)
 	if err != nil {
 		log.Printf("starting loadout analytics scheduled refresh skipped patch=%s err=%v", patch, err)
+		refreshStatus.fail("item-slot-analytics", startedAt, err)
 		return
 	}
 	if err := repo.RefreshStartingLoadoutAnalytics(ctx, patch, analytics.RankedSoloQueueID, loadoutContexts); err != nil {
 		log.Printf("starting loadout analytics scheduled refresh failed patch=%s queue=%d contexts=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(loadoutContexts), time.Since(startedAt).Round(time.Millisecond), err)
+		refreshStatus.fail("item-slot-analytics", startedAt, err)
 		return
 	}
 	log.Printf("item slot analytics scheduled refresh complete patch=%s queue=%d item_contexts=%d loadout_contexts=%d duration=%s", patch, analytics.RankedSoloQueueID, len(contexts), len(loadoutContexts), time.Since(startedAt).Round(time.Millisecond))
+	refreshStatus.succeed("item-slot-analytics", startedAt, map[string]int{"itemContexts": len(contexts), "loadoutContexts": len(loadoutContexts)})
 }
 
 func itemSlotRefreshContexts(ctx context.Context, staticService *staticdata.Service) ([]clickhouse.ItemSlotAnalyticsContext, error) {
@@ -397,7 +466,7 @@ func startingLoadoutRefreshContexts(ctx context.Context, staticService *staticda
 	}, nil
 }
 
-func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, lastRefresh *time.Time) {
+func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, lastRefresh *time.Time) {
 	if !cfg.ChampionGuideRefreshEnabled {
 		return
 	}
@@ -412,19 +481,21 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
 		return
 	}
-	startedAt := time.Now()
+	startedAt := refreshStatus.start("champion-guide-analytics", patch, analytics.RankedSoloQueueID, "champion guide read models")
 	log.Printf("champion guide analytics scheduled refresh start patch=%s queue=%d interval=%s", patch, analytics.RankedSoloQueueID, interval)
 	defer func() {
 		*lastRefresh = time.Now()
 	}()
 	if err := repo.RefreshChampionGuideDerivedAnalytics(ctx, patch, analytics.RankedSoloQueueID); err != nil {
 		log.Printf("champion guide analytics scheduled refresh failed patch=%s queue=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), err)
+		refreshStatus.fail("champion-guide-analytics", startedAt, err)
 		return
 	}
 	log.Printf("champion guide analytics scheduled refresh complete patch=%s queue=%d duration=%s", patch, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond))
+	refreshStatus.succeed("champion-guide-analytics", startedAt, nil)
 }
 
-func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, platforms []string, lastRefresh *time.Time) {
+func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, platforms []string, lastRefresh *time.Time) {
 	if !cfg.WinConditionRefreshEnabled {
 		return
 	}
@@ -439,19 +510,21 @@ func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, r
 	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
 		return
 	}
-	startedAt := time.Now()
+	startedAt := refreshStatus.start("win-condition-analytics", patch, analytics.RankedSoloQueueID, "win condition read models")
 	log.Printf("win condition analytics scheduled refresh start patch=%s queue=%d platforms=%d interval=%s", patch, analytics.RankedSoloQueueID, len(platforms), interval)
 	defer func() {
 		*lastRefresh = time.Now()
 	}()
 	if err := repo.RefreshWinConditionMetricsForPlatforms(ctx, patch, platforms, analytics.RankedSoloQueueID); err != nil {
 		log.Printf("win condition analytics scheduled refresh failed patch=%s queue=%d platforms=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, len(platforms), time.Since(startedAt).Round(time.Millisecond), err)
+		refreshStatus.fail("win-condition-analytics", startedAt, err)
 		return
 	}
 	log.Printf("win condition analytics scheduled refresh complete patch=%s queue=%d platforms=%d duration=%s", patch, analytics.RankedSoloQueueID, len(platforms), time.Since(startedAt).Round(time.Millisecond))
+	refreshStatus.succeed("win-condition-analytics", startedAt, map[string]int{"platforms": len(platforms)})
 }
 
-func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, lastRefresh *time.Time) {
+func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, lastRefresh *time.Time) {
 	if !cfg.SummonerProfileRefreshEnabled {
 		return
 	}
@@ -462,7 +535,7 @@ func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config
 	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
 		return
 	}
-	startedAt := time.Now()
+	startedAt := refreshStatus.start("summoner-profile-analytics", "", analytics.RankedSoloQueueID, "summoner profile read models")
 	log.Printf("summoner profile analytics scheduled refresh start queue=%d interval=%s", analytics.RankedSoloQueueID, interval)
 	defer func() {
 		*lastRefresh = time.Now()
@@ -470,9 +543,16 @@ func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config
 	result, err := repo.RefreshSummonerProfileAnalytics(ctx, analytics.RankedSoloQueueID)
 	if err != nil {
 		log.Printf("summoner profile analytics scheduled refresh failed queue=%d duration=%s err=%v", analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), err)
+		refreshStatus.fail("summoner-profile-analytics", startedAt, err)
 		return
 	}
 	log.Printf("summoner profile analytics scheduled refresh complete queue=%d identity_rows=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", analytics.RankedSoloQueueID, result.IdentityRows, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
+	refreshStatus.succeed("summoner-profile-analytics", startedAt, map[string]int{
+		"identityRows":     result.IdentityRows,
+		"profileRows":      result.ProfileRows,
+		"championRows":     result.ChampionRows,
+		"championRoleRows": result.ChampionRoleRows,
+	})
 }
 
 func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, rankRequests int) collector.Result {

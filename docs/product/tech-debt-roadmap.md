@@ -232,6 +232,8 @@ Add lightweight request timing logs for API endpoints:
 
 This should be structured enough to grep from Docker logs, without adding a full logging stack yet.
 
+Status: first pass complete. The API now logs method, route, status, duration, byte count, cache marker, and slow flag behind `API_REQUEST_LOGS_ENABLED`.
+
 ### Worker Refresh Metrics
 
 Worker logs are useful, but we should make refresh health easier to inspect:
@@ -242,6 +244,8 @@ Worker logs are useful, but we should make refresh health easier to inspect:
 - last error.
 
 This can start as a ClickHouse table or a small runtime-state JSON file. It would make monitor alerts more precise.
+
+Status: first pass complete. The worker now writes `WORKER_REFRESH_STATUS_PATH` with latest start/success/failure timestamps, duration, row/context counts where available, and last error per refresh lane.
 
 ## Priority 7: Product/Data Debt
 
@@ -310,11 +314,14 @@ Completed:
 - Add frontend CI.
 - Add a manual/local performance smoke script.
 - Split `app.css` by page surface.
+- Split `server.go` by handler domain.
+- Extract `BuildGuidePage.tsx` sections.
+- Extract `SummonerProfilePage.tsx` sections.
+- Add first-pass observability for API timing and worker refresh health.
 
 Next:
 
-1. Split `server.go` by handler domain.
-2. Extract `BuildGuidePage.tsx` sections.
-3. Extract `SummonerProfilePage.tsx` sections.
-4. Decide whether to rename `services/core` to `core`.
-8. Add observability for API timing and worker refresh health.
+1. Decide whether to rename `services/core` to `core`.
+2. Add frontend regression tests for the highest-risk UI surfaces.
+3. Add backend query tests around read-model endpoints and patch retention.
+4. Create the read-model coverage audit.

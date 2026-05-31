@@ -163,6 +163,7 @@ Safety knobs:
 - `RIOT_AUTH_FAILURE_EXIT`: when true, the worker stops when a Riot auth failure marker appears. The API does not exit; it reports Riot-backed endpoints as unavailable.
 - `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate auth-failure behavior.
 - `MONITOR_WORKER_HEARTBEAT_PATH`: worker heartbeat JSON file used by the monitor.
+- `WORKER_REFRESH_STATUS_PATH`: worker-written JSON file with latest refresh start/success/failure times, durations, row/context counts, and last errors.
 - `MONITOR_WORKER_REQUIRED`: when true, missing heartbeat is an alert condition.
 - `MONITOR_WORKER_STALE_AFTER_MINUTES`: max heartbeat age before the monitor logs a stale-heartbeat observation.
 - `MONITOR_WORKER_CONTAINER_NAME`: optional Docker container name used by the monitor to detect that the collector worker is actually down.
