@@ -21,51 +21,61 @@ func (r *Repository) PatchStats(ctx context.Context, queueID uint16) ([]PatchSta
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
 			patch,
-			greatest(max(raw_matches), max(participant_matches), max(snapshot_matches)) AS matches,
-			greatest(max(participant_samples), max(snapshot_participants)) AS participant_samples,
-			max(raw_matches) AS raw_matches,
-			max(snapshot_matches) AS compiled_matches
+			greatest(raw_matches, participant_matches, snapshot_matches) AS matches,
+			greatest(participant_samples, snapshot_participants) AS participant_samples,
+			raw_matches,
+			snapshot_matches AS compiled_matches
 		FROM
 		(
 			SELECT
 				patch,
-				uniqExact(match_id) AS raw_matches,
-				toUInt64(0) AS participant_matches,
-				toUInt64(0) AS snapshot_matches,
-				toUInt64(0) AS participant_samples,
-				toUInt64(0) AS snapshot_participants
-			FROM raw_matches FINAL
-			WHERE queue_id = ?
-			GROUP BY patch
+				max(raw_match_count) AS raw_matches,
+				max(participant_match_count) AS participant_matches,
+				max(snapshot_match_count) AS snapshot_matches,
+				max(participant_sample_count) AS participant_samples,
+				max(snapshot_participant_count) AS snapshot_participants
+			FROM
+			(
+				SELECT
+					patch,
+					uniqExact(match_id) AS raw_match_count,
+					toUInt64(0) AS participant_match_count,
+					toUInt64(0) AS snapshot_match_count,
+					toUInt64(0) AS participant_sample_count,
+					toUInt64(0) AS snapshot_participant_count
+				FROM raw_matches FINAL
+				WHERE queue_id = ?
+				GROUP BY patch
 
-			UNION ALL
+				UNION ALL
 
-			SELECT
-				patch,
-				toUInt64(0) AS raw_matches,
-				uniqExact(match_id) AS participant_matches,
-				toUInt64(0) AS snapshot_matches,
-				count() AS participant_samples,
-				toUInt64(0) AS snapshot_participants
-			FROM participants FINAL
-			WHERE queue_id = ?
-			GROUP BY patch
+				SELECT
+					patch,
+					toUInt64(0) AS raw_match_count,
+					uniqExact(match_id) AS participant_match_count,
+					toUInt64(0) AS snapshot_match_count,
+					count() AS participant_sample_count,
+					toUInt64(0) AS snapshot_participant_count
+				FROM participants FINAL
+				WHERE queue_id = ?
+				GROUP BY patch
 
-			UNION ALL
+				UNION ALL
 
-			SELECT
-				patch,
-				toUInt64(0) AS raw_matches,
-				toUInt64(0) AS participant_matches,
-				sum(matches) AS snapshot_matches,
-				toUInt64(0) AS participant_samples,
-				sum(participants) AS snapshot_participants
-			FROM patch_snapshots FINAL
-			WHERE queue_id = ?
+				SELECT
+					patch,
+					toUInt64(0) AS raw_match_count,
+					toUInt64(0) AS participant_match_count,
+					sum(matches) AS snapshot_match_count,
+					toUInt64(0) AS participant_sample_count,
+					sum(participants) AS snapshot_participant_count
+				FROM patch_snapshots FINAL
+				WHERE queue_id = ?
+				GROUP BY patch
+			)
+			WHERE patch != ''
 			GROUP BY patch
 		)
-		WHERE patch != ''
-		GROUP BY patch
 		ORDER BY
 			toUInt16OrZero(arrayElement(splitByChar('.', patch), 1)) DESC,
 			toUInt16OrZero(arrayElement(splitByChar('.', patch), 2)) DESC`,
