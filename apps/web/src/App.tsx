@@ -13,6 +13,7 @@ import {
   championRouteSlug,
   summonerPath,
 } from './lib/lookup';
+import { CHAMPION_PAGE_QUERY_VERSION } from './lib/queryVersions';
 import { normalizeRole } from './lib/roles';
 import { championImageUrl, championSplashUrl } from './lib/staticData';
 
@@ -101,7 +102,7 @@ export function App() {
       const role = normalizeRole(roleValue ?? '') || 'MIDDLE';
       const itemContext = itemContextForRole(role);
       void queryClient.prefetchQuery({
-        queryKey: ['champion-page', championId, role, patch, '', 0],
+        queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role, patch, '', 0],
         queryFn: () => getChampionPageBundle({
           championId,
           role,

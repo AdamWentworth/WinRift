@@ -19,6 +19,7 @@ import {
   summonerSpellImageUrl,
   summonerSpellName,
 } from '../lib/staticData';
+import { CHAMPION_PAGE_QUERY_VERSION } from '../lib/queryVersions';
 import { normalizeRole, ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { championTier } from '../lib/tiers';
 import { MetricTile } from './ui/MetricTile';
@@ -83,7 +84,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const defaultRole = mainRole || (roleRatesSettled ? 'MIDDLE' : '');
   const itemContext = itemContextForRole(role);
   const championPageQuery = useQuery({
-    queryKey: ['champion-page', championId, role, patch, rankBucket, opponentChampionId],
+    queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role, patch, rankBucket, opponentChampionId],
     queryFn: () => getChampionPageBundle({
       championId,
       role,

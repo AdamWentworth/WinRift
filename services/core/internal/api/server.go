@@ -24,6 +24,7 @@ import (
 const defaultItemSlotMinGames = 5
 const summonerAccountSnapshotTTL = 7 * 24 * time.Hour
 const analyticsResponseCacheTTL = 10 * time.Minute
+const championPageBundleCacheKeyPrefix = "champion-page:v3:"
 
 type Server struct {
 	cfg           config.Config
@@ -326,7 +327,7 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 	indexMinGames := queryInt(query.Get("indexMinGames"), 1)
 	indexLimit := queryInt(query.Get("indexLimit"), 250)
 	queueID := uint16(queryInt(query.Get("queueId"), analytics.RankedSoloQueueID))
-	cacheKey := "champion-page:" + r.URL.RequestURI()
+	cacheKey := championPageBundleCacheKeyPrefix + r.URL.RequestURI()
 	if body, ok := s.responseCache.get(cacheKey); ok {
 		writeJSONBytes(w, http.StatusOK, body, true)
 		return
