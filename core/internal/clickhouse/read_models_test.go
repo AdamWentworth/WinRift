@@ -286,6 +286,86 @@ func TestQueryBuildsUsesBuildSignatureReadModel(t *testing.T) {
 	}
 }
 
+func TestQueryItemSlotsUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM item_slot_analytics FINAL").
+		WithArgs("DEFAULT", "266", "122", "16.10", 5).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role_bucket",
+			"opponent_champion_id",
+			"patch_bucket",
+			"rank_bucket",
+			"item_slot",
+			"item_id",
+			"wins",
+			"games",
+			"win_rate",
+		}).AddRow(266, "TOP", 122, "16.10", "ALL", 2, 3071, 8, 12, 0.6667))
+
+	rows, err := repo.QueryItemSlots(context.Background(), map[string]string{
+		"champion_id":          "266",
+		"role":                 "TOP",
+		"opponent_champion_id": "122",
+		"patch":                "16.10",
+	}, "DEFAULT", []uint32{3071, 3053}, nil, 5, 4)
+	if err != nil {
+		t.Fatalf("query item slots: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.ChampionID != 266 || row.OpponentChampionID != 122 || row.ItemSlot != 2 || row.ItemID != 3071 || row.Games != 12 {
+		t.Fatalf("item slot row = %+v; want summary-backed item slot", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestQueryStartingItemLoadoutsUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM starting_loadout_analytics FINAL").
+		WithArgs("DEFAULT", "266", "16.10", 5).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role_bucket",
+			"opponent_champion_id",
+			"patch_bucket",
+			"rank_bucket",
+			"item_signature",
+			"wins",
+			"games",
+			"win_rate",
+		}).AddRow(266, "TOP", 0, "16.10", "ALL", "1055-2003", 10, 18, 0.5556))
+
+	rows, err := repo.QueryStartingItemLoadouts(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.10",
+	}, "DEFAULT", map[uint32]uint32{1055: 450, 2003: 50}, 5, 4)
+	if err != nil {
+		t.Fatalf("query starting loadouts: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.ChampionID != 266 || row.ItemSignature != "1055-2003" || row.Games != 18 {
+		t.Fatalf("starting loadout row = %+v; want summary-backed loadout", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestChampionGuideItemPathsUseBuildSignatureReadModel(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()
@@ -339,6 +419,192 @@ func TestPatchStatsIncludesCompiledSnapshotsAfterRawPrune(t *testing.T) {
 	oldPatch := stats[1]
 	if oldPatch.Patch != "16.9" || oldPatch.RawMatches != 0 || oldPatch.CompiledMatches != 500 || oldPatch.Matches != 500 {
 		t.Fatalf("old patch stats = %+v; want compiled 16.9 data with raw pruned", oldPatch)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCachedChampionPageBundleUsesPersistentCache(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_page_bundle_cache FINAL").
+		WithArgs("champion-page:test").
+		WillReturnRows(sqlmock.NewRows([]string{"payload_json"}).AddRow(`{"ok":true}`))
+
+	body, ok, err := repo.CachedChampionPageBundle(context.Background(), "champion-page:test")
+	if err != nil {
+		t.Fatalf("cached champion page bundle: %v", err)
+	}
+	if !ok || string(body) != `{"ok":true}` {
+		t.Fatalf("cached bundle ok=%t body=%s; want cached payload", ok, string(body))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSummonerRankLeaderboardUsesIdentityAndProfileSummaries(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+	now := time.Date(2026, 5, 31, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery("(?s)FROM summoner_rank_snapshots FINAL.*FROM riot_account_aliases FINAL.*FROM summoner_account_snapshots FINAL.*FROM summoner_identity_summary FINAL.*FROM summoner_profile_summary FINAL").
+		WithArgs("NA1", rankedSoloQueueType, "NA1", "NA1", "NA1", "NA1", uint16(420), 25).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"puuid",
+			"platform",
+			"game_name",
+			"tag_line",
+			"tier",
+			"division",
+			"league_points",
+			"wins",
+			"losses",
+			"rank_bucket",
+			"latest_fetched_at",
+			"expires_at",
+			"latest_seen_at",
+			"profile_icon_id",
+			"summoner_level",
+			"stored_games",
+			"stored_wins",
+		}).AddRow("puuid-1", "NA1", "Example", "NA1", "MASTER", "I", 88, 120, 90, "MASTER+", now, now.Add(time.Hour), now, 456, 321, 42, 24))
+
+	rows, err := repo.SummonerRankLeaderboard(context.Background(), "NA1", 25)
+	if err != nil {
+		t.Fatalf("summoner rank leaderboard: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.GameName != "Example" || row.ProfileIconID != 456 || row.StoredGames != 42 || row.StoredWins != 24 {
+		t.Fatalf("leaderboard row = %+v; want identity/profile summary data", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSummonerProfileStatsUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+	firstSeen := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	lastSeen := time.Date(2026, 5, 31, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery("(?s)FROM summoner_profile_summary FINAL").
+		WithArgs("NA1", "puuid-1", uint16(420)).
+		WillReturnRows(sqlmock.NewRows([]string{"games", "wins", "kills", "deaths", "assists", "first_seen_at", "last_seen_at"}).
+			AddRow(20, 12, 140, 60, 180, firstSeen, lastSeen))
+
+	stats, err := repo.SummonerProfileStats(context.Background(), "NA1", "puuid-1", 420)
+	if err != nil {
+		t.Fatalf("summoner profile stats: %v", err)
+	}
+	if stats.Games != 20 || stats.Wins != 12 || stats.Losses != 8 || stats.KDA <= 5.3 {
+		t.Fatalf("profile stats = %+v; want summary-backed stats", stats)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSummonerTopChampionsUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM summoner_champion_summary FINAL").
+		WithArgs("NA1", "puuid-1", uint16(420), 5).
+		WillReturnRows(sqlmock.NewRows([]string{"champion_id", "games", "wins", "kills", "deaths", "assists"}).
+			AddRow(266, 20, 12, 140, 60, 180))
+
+	rows, err := repo.SummonerTopChampions(context.Background(), "NA1", "puuid-1", 420, 5)
+	if err != nil {
+		t.Fatalf("summoner top champions: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.ChampionID != 266 || row.Games != 20 || row.Wins != 12 || row.KDA <= 5.3 {
+		t.Fatalf("top champion row = %+v; want summary-backed champion performance", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSummonerTopChampionRolesUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM summoner_champion_role_summary FINAL").
+		WithArgs("NA1", "puuid-1", uint16(420), 30).
+		WillReturnRows(sqlmock.NewRows([]string{"champion_id", "role", "games", "wins", "kills", "deaths", "assists"}).
+			AddRow(266, "TOP", 18, 11, 120, 55, 170))
+
+	rows, err := repo.SummonerTopChampionRoles(context.Background(), "NA1", "puuid-1", 420, 30)
+	if err != nil {
+		t.Fatalf("summoner top champion roles: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.ChampionID != 266 || row.Role != "TOP" || row.Games != 18 || row.Wins != 11 {
+		t.Fatalf("top champion role row = %+v; want role summary-backed champion performance", row)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestQueryWinConditionMetricsUsesPatchSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM patch_win_condition_metrics FINAL").
+		WithArgs(uint16(420), "ALL", "ALL", "16.10").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"patch",
+			"platform",
+			"queue_id",
+			"rank_bucket",
+			"team_condition",
+			"team_rating",
+			"opponent_condition",
+			"opponent_rating",
+			"team_primary",
+			"game_length_bucket",
+			"wins",
+			"games",
+			"win_rate_percent",
+			"confidence_percent",
+		}).AddRow("16.10", "ALL", 420, "ALL", "SplitPush", "B", "Control", "B+", 1, "25-30", 32, 58, 55.17, 61.2))
+
+	rows, err := repo.QueryWinConditionMetrics(context.Background(), WinConditionMetricFilters{
+		Patch:      "16.10",
+		Platform:   "ALL",
+		QueueID:    420,
+		RankBucket: "ALL",
+	})
+	if err != nil {
+		t.Fatalf("query win condition metrics: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.TeamCondition != "SplitPush" || row.OpponentCondition != "Control" || row.Games != 58 || row.Confidence != 61.2 {
+		t.Fatalf("win condition metric = %+v; want patch summary metric", row)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)

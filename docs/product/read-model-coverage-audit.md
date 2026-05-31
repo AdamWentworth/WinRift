@@ -81,4 +81,4 @@ For the MVP, pruning old bulky raw payloads is still acceptable as long as we ac
 ## Recommended Order
 
 1. Consider the same staged-refresh pattern for item-slot, summoner-profile, and win-condition summary lanes if timing logs catch empty-window behavior there too.
-2. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.
+2. Keep expanding backend tests whenever a new public endpoint or page bundle is added. Current guardrails already cover champion guide summaries/cache, build signatures, item slots, starting loadouts, summoner leaderboard/profile summaries, summoner recent/build summaries, champion matchups/signatures, direct win-condition metrics, and patch-retained snapshots.

@@ -282,7 +282,7 @@ Good candidates:
 - build-advice exact matchup rows do not silently borrow champion-wide data,
 - current/recent patch retention preserves summaries before pruning raw data.
 
-Status: first pass in place. Repository tests now assert champion guide indexes use the precomputed guide/scope/ban summary tables when present, and patch stats include compiled `patch_snapshots` rows after raw rows are pruned.
+Status: expanded coverage is in place for the main public read paths. Repository tests now assert champion guide indexes use the precomputed guide/scope/ban summary tables when present, patch stats include compiled `patch_snapshots` rows after raw rows are pruned, and the page-facing paths use the intended cache/summary tables. Tests also pin champion-page persistent bundle cache reads, summoner leaderboard/profile/champion summaries, build item-slot and starting-loadout summaries, direct win-condition metric reads, summoner recent matches/builds, champion guide matchups/signatures, and build-signature analytics. The suite is intentionally table-name focused so future regressions back toward raw/request-time scans are noisy.
 
 ## Priority 6: Observability
 
@@ -389,7 +389,7 @@ Completed:
 - Add first-pass observability for API timing and worker refresh health.
 - Rename `services/core` to `core`.
 - Add first-pass frontend regression tests for the highest-risk UI surfaces.
-- Add first-pass backend query tests for read-model usage and patch-retained summaries.
+- Add first-pass and expanded backend query tests for read-model usage and patch-retained summaries.
 - Add first-pass frontend request/cache guardrails.
 - Add first-pass Playwright browser route timing.
 - Create the read-model coverage audit.
