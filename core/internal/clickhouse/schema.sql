@@ -665,6 +665,26 @@ CREATE TABLE IF NOT EXISTS winrift.champion_ban_analytics
 ENGINE = ReplacingMergeTree(compiled_at)
 ORDER BY (patch, platform, queue_id, champion_id);
 
+CREATE TABLE IF NOT EXISTS winrift.team_kill_summary
+(
+    match_id String,
+    platform LowCardinality(String),
+    patch LowCardinality(String),
+    queue_id UInt16,
+    team_id UInt16,
+    kills UInt64,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY
+(
+    patch,
+    platform,
+    queue_id,
+    match_id,
+    team_id
+);
+
 CREATE TABLE IF NOT EXISTS winrift.champion_guide_summary_analytics
 (
     patch LowCardinality(String),

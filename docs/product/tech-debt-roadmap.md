@@ -266,7 +266,7 @@ Recent progress: champion guide index, tier-list style reads, and selected champ
 
 Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
 
-Outstanding: add a small team-kills read model so champion guide summaries can include true kill participation without nesting aggregate functions inside the same ClickHouse refresh query.
+Outstanding: add build-advice and item-path summaries so champion pages can avoid the remaining heavier cold-cache work.
 
 ### Patch-Scope UX
 
@@ -330,9 +330,10 @@ Completed:
 - Add summoner recent-match and summoner build summaries.
 - Add champion matchup/rune/spell read models for cold champion-page loads.
 - Reuse champion guide summary read models for selected champion headers.
+- Add team-kill summaries for true kill participation in the fast champion guide path.
 
 Next:
 
-1. Add a team-kill summary for true kill participation in the fast guide path.
-2. Add a build-advice bundle summary for live build mode and champion pages.
-3. Add a compact item-path summary for archived champion pages.
+1. Add a build-advice bundle summary for live build mode and champion pages.
+2. Add a compact item-path summary for archived champion pages.
+3. Add champion role-rate summaries if directory/tier navigation needs them.

@@ -69,6 +69,18 @@ One row per platform, queue, PUUID, champion, role, final/core item signatures, 
 
 Short-lived persisted JSON cache for exact champion-page API requests. The API also keeps these payloads in memory, but this table lets warmed pages remain fast across API restarts until the cache expiry.
 
+## `team_kill_summary`
+
+Current read model for team kill totals.
+
+One row per patch, platform, queue, match, and team. It stores total team kills and compile time. Champion guide summary refreshes use this table to calculate true kill participation without nesting team-level aggregates inside the champion-level aggregate query.
+
+## `champion_guide_summary_analytics`
+
+Current read model for champion guide headers, tier-list rows, and champion ranking data.
+
+One row per patch, queue, champion, role, and rank bucket. It stores wins, games, performance sums, and summed kill-participation contribution. The API turns these into winrate, confidence, pick rate, impact score, and role rank without scanning participant rows during normal champion-page or tier-list loads.
+
 ## `champion_matchup_analytics`
 
 Current read model for champion guide matchup rows.
@@ -133,7 +145,7 @@ Refresh options:
 - Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
 - CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
 
-The same refresh lane also populates `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, and `champion_signature_analytics`.
+The same refresh lane also populates `team_kill_summary`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, and `champion_signature_analytics`.
 
 ## `patch_power_curve_metrics`
 

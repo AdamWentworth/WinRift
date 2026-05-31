@@ -196,6 +196,9 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_ban_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE team_kill_summary DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_summary_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
@@ -215,6 +218,9 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 		return err
 	}
 	if err := r.refreshChampionBanAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
+	if err := r.refreshTeamKillSummary(ctx, patch, queueID); err != nil {
 		return err
 	}
 	if err := r.refreshChampionGuideSummaryAnalytics(ctx, patch, queueID); err != nil {
@@ -325,6 +331,31 @@ func (r *Repository) refreshChampionBanAnalytics(ctx context.Context, patch stri
 	return err
 }
 
+func (r *Repository) refreshTeamKillSummary(ctx context.Context, patch string, queueID uint16) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO team_kill_summary
+		(match_id, platform, patch, queue_id, team_id, kills)
+		SELECT
+			match_id,
+			platform,
+			patch,
+			queue_id,
+			team_id,
+			toUInt64(sum(kills)) AS kills
+		FROM participants FINAL
+		WHERE patch = ? AND queue_id = ?
+		GROUP BY
+			match_id,
+			platform,
+			patch,
+			queue_id,
+			team_id`,
+		patch,
+		queueID,
+	)
+	return err
+}
+
 func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, patch string, queueID uint16) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO champion_guide_summary_analytics
@@ -360,8 +391,10 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 		(
 			SELECT
 				pm.match_id AS match_id,
+				pm.platform AS platform,
 				pm.patch AS patch,
 				pm.queue_id AS queue_id,
+				pm.team_id AS team_id,
 				pm.champion_id AS champion_id,
 				pm.role AS role,
 				multiIf(
@@ -392,12 +425,19 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 				multiIf(pp.baron_kills > 0, pp.baron_kills, pm.baron_kills) AS baron_kills,
 				multiIf(pp.objectives_stolen > 0, pp.objectives_stolen, pm.objectives_stolen) AS objectives_stolen,
 				multiIf(pp.total_time_spent_dead > 0, pp.total_time_spent_dead, pm.total_time_spent_dead) AS total_time_spent_dead,
-				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played
+				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played,
+				ifNull(tks.kills, toUInt64(0)) AS team_kills
 			FROM participant_matchups AS pm FINAL
 			LEFT JOIN participant_performance AS pp FINAL
 				ON pp.match_id = pm.match_id
 				AND pp.platform = pm.platform
 				AND pp.participant_id = pm.participant_id
+			LEFT JOIN team_kill_summary AS tks FINAL
+				ON tks.match_id = pm.match_id
+				AND tks.platform = pm.platform
+				AND tks.patch = pm.patch
+				AND tks.queue_id = pm.queue_id
+				AND tks.team_id = pm.team_id
 			LEFT JOIN
 			(
 				SELECT
@@ -437,7 +477,7 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 			toUInt64(sum(dragon_kills + baron_kills + objectives_stolen)) AS objective_takedowns_sum,
 			toUInt64(sum(total_time_spent_dead)) AS total_time_spent_dead_sum,
 			toUInt64(sum(time_played)) AS time_played_sum,
-			toFloat64(0) AS kill_participation_sum
+			sum(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation_sum
 		FROM participant_rows
 		GROUP BY patch, queue_id, champion_id, role, rank_bucket`,
 		patch,

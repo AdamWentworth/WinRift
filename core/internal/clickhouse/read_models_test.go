@@ -88,6 +88,26 @@ func TestQueryChampionGuideSummaryUsesSummaryReadModelWhenPresent(t *testing.T) 
 	if summary.RoleRank != 1 || summary.RoleRankTotal != 1 {
 		t.Fatalf("summary rank = %d/%d; want 1/1", summary.RoleRank, summary.RoleRankTotal)
 	}
+	if summary.KillParticipation != 0.62 {
+		t.Fatalf("kill participation = %.2f; want 0.62 from summary read model", summary.KillParticipation)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestRefreshTeamKillSummaryUsesParticipants(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectExec("(?s)INSERT INTO team_kill_summary.*FROM participants FINAL").
+		WithArgs("16.11", uint16(420)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repo.refreshTeamKillSummary(context.Background(), "16.11", 420); err != nil {
+		t.Fatalf("refresh team kill summary: %v", err)
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
 	}
