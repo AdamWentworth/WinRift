@@ -204,6 +204,7 @@ cp apps/web/.env.example apps/web/.env.local
 | `RIOT_AUTH_FAILURE_EXIT` | Makes the worker stop on 401/403 auth failures. |
 | `MONITOR_WORKER_STALE_AFTER_MINUTES` | Heartbeat age before stale-worker log observations. |
 | `MONITOR_WORKER_CONTAINER_NAME` | Optional Docker container name for actual worker-down alerts. |
+| `MONITOR_STARTUP_GRACE_SECONDS` | Grace window that avoids worker-down email noise during monitor/deploy startup. |
 | `ALERT_EMAIL_ENABLED` | Enables SMTP alerts from the monitor. |
 | `CLICKHOUSE_*` | ClickHouse host, port, database, user, and password. |
 | `CORS_ORIGINS` | Browser origins allowed to call the API. |

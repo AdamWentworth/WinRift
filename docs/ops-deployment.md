@@ -207,6 +207,7 @@ MONITOR_WORKER_REQUIRED=true
 MONITOR_WORKER_STALE_AFTER_MINUTES=15
 MONITOR_WORKER_CONTAINER_NAME=winrift_worker
 MONITOR_DOCKER_SOCKET_PATH=/var/run/docker.sock
+MONITOR_STARTUP_GRACE_SECONDS=120
 ALERT_EMAIL_ENABLED=true
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -256,7 +257,7 @@ The monitor is a tiny Go process built into the core image as `/winrift-monitor`
 - `MONITOR_WORKER_CONTAINER_NAME` through the Docker socket when configured
 - `MONITOR_WORKER_HEARTBEAT_PATH`
 
-It sends an alert when an email-worthy check fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`. Recoveries are logged and clear monitor state, but they do not send email.
+It sends an alert when an email-worthy check fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`. `MONITOR_STARTUP_GRACE_SECONDS` suppresses worker-down alerts briefly after the monitor starts so deploy ordering does not send noise. Recoveries are logged and clear monitor state, but they do not send email.
 
 For Gmail or another SMTP provider, use an app password rather than your normal account password:
 

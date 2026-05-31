@@ -167,6 +167,7 @@ Safety knobs:
 - `MONITOR_WORKER_STALE_AFTER_MINUTES`: max heartbeat age before the monitor logs a stale-heartbeat observation.
 - `MONITOR_WORKER_CONTAINER_NAME`: optional Docker container name used by the monitor to detect that the collector worker is actually down.
 - `MONITOR_DOCKER_SOCKET_PATH`: Docker socket path used when `MONITOR_WORKER_CONTAINER_NAME` is set.
+- `MONITOR_STARTUP_GRACE_SECONDS`: short grace window after monitor startup before worker-down container checks send email.
 - `ALERT_EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TO`: SMTP email alert settings used by the monitor.
 - `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
 - `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.10`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch.

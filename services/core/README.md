@@ -83,6 +83,7 @@ COLLECTOR_CURRENT_PATCH=16.11
 | `COLLECTOR_PATCH_RETENTION_COUNT` | `2` | Raw current + recent patch retention target. |
 | `MONITOR_WORKER_STALE_AFTER_MINUTES` | `15` | Heartbeat age before the monitor logs a stale observation. |
 | `MONITOR_WORKER_CONTAINER_NAME` | empty | Optional Docker container name for worker-down alerts. |
+| `MONITOR_STARTUP_GRACE_SECONDS` | `120` | Grace window before startup worker-down alerts. |
 | `ALERT_EMAIL_ENABLED` | `false` | Enables SMTP email alerts from `/winrift-monitor`. |
 | `RANK_ENRICHMENT_ENABLED` | `false` | Background rank enrichment lane. |
 | `LIVE_RANK_ENRICHMENT_ENABLED` | `true` | Rank enrichment for live-game response context. |

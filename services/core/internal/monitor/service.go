@@ -29,6 +29,7 @@ type Service struct {
 	client   *http.Client
 	notifier Notifier
 	now      func() time.Time
+	started  time.Time
 }
 
 type Issue struct {
@@ -53,6 +54,7 @@ func NewService(cfg config.Config, notifier Notifier) Service {
 		client:   &http.Client{Timeout: 10 * time.Second},
 		notifier: notifier,
 		now:      func() time.Time { return time.Now().UTC() },
+		started:  time.Now().UTC(),
 	}
 }
 
@@ -246,6 +248,10 @@ func (s Service) checkWorkerContainer(ctx context.Context) Issue {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
+		if s.inStartupGrace() {
+			log.Printf("monitor worker container down during startup grace container=%q status=not_found", containerName)
+			return Issue{}
+		}
 		return Issue{
 			Key:     "worker-container-down",
 			Subject: "WinRift collector worker is down",
@@ -262,6 +268,10 @@ func (s Service) checkWorkerContainer(ctx context.Context) Issue {
 		return Issue{}
 	}
 	if inspect.State.Running {
+		return Issue{}
+	}
+	if s.inStartupGrace() {
+		log.Printf("monitor worker container down during startup grace container=%q status=%s exit_code=%d", containerName, inspect.State.Status, inspect.State.ExitCode)
 		return Issue{}
 	}
 	detail := []string{
@@ -282,6 +292,15 @@ func (s Service) checkWorkerContainer(ctx context.Context) Issue {
 		Subject: "WinRift collector worker is down",
 		Body:    strings.Join(detail, "\n"),
 	}
+}
+
+func (s Service) inStartupGrace() bool {
+	grace := s.cfg.MonitorStartupGrace
+	if grace <= 0 || s.started.IsZero() {
+		return false
+	}
+	age := s.now().Sub(s.started)
+	return age >= 0 && age < grace
 }
 
 func (s Service) checkWorkerHeartbeat() Issue {

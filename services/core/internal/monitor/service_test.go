@@ -66,6 +66,31 @@ func TestCheckLogsStaleWorkerHeartbeatWithoutAlert(t *testing.T) {
 }
 
 func TestCheckReportsDownWorkerContainer(t *testing.T) {
+	service, cleanup := newDockerContainerMonitor(t, false)
+	defer cleanup()
+
+	issue := service.Check(context.Background())
+	if issue.Key != "worker-container-down" {
+		t.Fatalf("issue key = %q, want worker-container-down", issue.Key)
+	}
+}
+
+func TestCheckSuppressesDownWorkerContainerDuringStartupGrace(t *testing.T) {
+	service, cleanup := newDockerContainerMonitor(t, false)
+	defer cleanup()
+	started := time.Date(2026, 5, 30, 10, 0, 0, 0, time.UTC)
+	service.started = started
+	service.now = func() time.Time { return started.Add(30 * time.Second) }
+	service.cfg.MonitorStartupGrace = 2 * time.Minute
+
+	issue := service.Check(context.Background())
+	if issue.Key != "" {
+		t.Fatalf("issue key = %q, want startup grace suppression", issue.Key)
+	}
+}
+
+func newDockerContainerMonitor(t *testing.T, running bool) (Service, func()) {
+	t.Helper()
 	dir := t.TempDir()
 	socketPath := filepath.Join(dir, "docker.sock")
 	listener, err := net.Listen("unix", socketPath)
@@ -81,7 +106,7 @@ func TestCheckReportsDownWorkerContainer(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"Name": "/winrift_worker",
 				"State": map[string]any{
-					"Running":    false,
+					"Running":    running,
 					"Status":     "exited",
 					"ExitCode":   1,
 					"FinishedAt": "2026-05-30T10:00:00Z",
@@ -92,9 +117,6 @@ func TestCheckReportsDownWorkerContainer(t *testing.T) {
 	go func() {
 		_ = server.Serve(listener)
 	}()
-	t.Cleanup(func() {
-		_ = server.Close()
-	})
 
 	service := NewService(config.Config{
 		RiotAuthFailureMarkerPath:  filepath.Join(dir, "missing-marker"),
@@ -102,10 +124,8 @@ func TestCheckReportsDownWorkerContainer(t *testing.T) {
 		MonitorWorkerContainerName: "winrift_worker",
 		MonitorDockerSocketPath:    socketPath,
 	}, nil)
-
-	issue := service.Check(context.Background())
-	if issue.Key != "worker-container-down" {
-		t.Fatalf("issue key = %q, want worker-container-down", issue.Key)
+	return service, func() {
+		_ = server.Close()
 	}
 }
 

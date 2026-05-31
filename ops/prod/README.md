@@ -64,6 +64,7 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
 | `MONITOR_WORKER_REQUIRED` | Set `true` when the collector is expected to be running. |
 | `MONITOR_WORKER_CONTAINER_NAME` | Set to `winrift_worker` so the monitor emails only when the worker container is actually down. |
+| `MONITOR_STARTUP_GRACE_SECONDS` | Short deploy/startup grace window before worker-down emails are eligible. |
 | `ALERT_EMAIL_ENABLED` | Enables SMTP email alerts for auth failure or down worker state. |
 | `SMTP_TO` | Comma-separated alert recipient list. |
 

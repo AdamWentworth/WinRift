@@ -200,9 +200,6 @@ jobs:
             exit 1
           fi
 
-          echo "Starting monitor with image ${DEPLOY_IMAGE}"
-          compose up -d --no-deps --force-recreate --no-build monitor
-
           if [[ "${START_WORKER}" == "true" ]]; then
             echo "Starting worker with image ${DEPLOY_IMAGE}"
             compose up -d --no-deps --force-recreate --no-build worker
@@ -216,6 +213,9 @@ jobs:
           else
             echo "Worker start skipped by workflow input."
           fi
+
+          echo "Starting monitor with image ${DEPLOY_IMAGE}"
+          compose up -d --no-deps --force-recreate --no-build monitor
 
           write_deploy_metadata \
             "${DEPLOY_ROOT}/deployments/core.json" \

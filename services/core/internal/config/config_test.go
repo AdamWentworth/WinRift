@@ -83,6 +83,7 @@ func TestLoadMonitorConfig(t *testing.T) {
 	t.Setenv("MONITOR_WORKER_STALE_AFTER_MINUTES", "20")
 	t.Setenv("MONITOR_WORKER_CONTAINER_NAME", "winrift_worker")
 	t.Setenv("MONITOR_DOCKER_SOCKET_PATH", "/var/run/docker.sock")
+	t.Setenv("MONITOR_STARTUP_GRACE_SECONDS", "45")
 	t.Setenv("MONITOR_ALERT_STATE_PATH", "/run/winrift/alerts.json")
 	t.Setenv("MONITOR_ALERT_COOLDOWN_MINUTES", "90")
 	t.Setenv("ALERT_EMAIL_ENABLED", "true")
@@ -105,6 +106,9 @@ func TestLoadMonitorConfig(t *testing.T) {
 	}
 	if cfg.MonitorDockerSocketPath != "/var/run/docker.sock" {
 		t.Fatalf("docker socket = %q", cfg.MonitorDockerSocketPath)
+	}
+	if cfg.MonitorStartupGrace != 45*time.Second {
+		t.Fatalf("startup grace = %s, want 45s", cfg.MonitorStartupGrace)
 	}
 	if !cfg.MonitorWorkerRequired {
 		t.Fatal("expected worker required")

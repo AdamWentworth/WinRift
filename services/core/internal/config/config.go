@@ -68,6 +68,7 @@ type Config struct {
 	MonitorWorkerStaleAfter        time.Duration
 	MonitorWorkerContainerName     string
 	MonitorDockerSocketPath        string
+	MonitorStartupGrace            time.Duration
 	MonitorAlertStatePath          string
 	MonitorAlertCooldown           time.Duration
 	AlertEmailEnabled              bool
@@ -141,6 +142,7 @@ func Load() Config {
 		MonitorWorkerStaleAfter:        time.Duration(envInt("MONITOR_WORKER_STALE_AFTER_MINUTES", 15)) * time.Minute,
 		MonitorWorkerContainerName:     env("MONITOR_WORKER_CONTAINER_NAME", ""),
 		MonitorDockerSocketPath:        env("MONITOR_DOCKER_SOCKET_PATH", "/var/run/docker.sock"),
+		MonitorStartupGrace:            time.Duration(envInt("MONITOR_STARTUP_GRACE_SECONDS", 120)) * time.Second,
 		MonitorAlertStatePath:          env("MONITOR_ALERT_STATE_PATH", "/run/winrift/monitor-alert-state.json"),
 		MonitorAlertCooldown:           time.Duration(envInt("MONITOR_ALERT_COOLDOWN_MINUTES", 360)) * time.Minute,
 		AlertEmailEnabled:              envBool("ALERT_EMAIL_ENABLED", false),
