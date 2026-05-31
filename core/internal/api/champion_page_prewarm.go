@@ -20,6 +20,7 @@ type ChampionPagePrewarmOptions struct {
 type ChampionPagePrewarmResult struct {
 	Candidates int
 	Stored     int
+	Skipped    int
 	Errors     int
 }
 
@@ -34,7 +35,7 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	roles := championPagePrewarmRoles(options.Roles)
 	perRole := options.PerRole
 	if perRole <= 0 {
-		perRole = 5
+		perRole = 200
 	}
 	minGames := options.MinGames
 	if minGames <= 0 {
@@ -94,6 +95,17 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 			}
 			seenKeys[cacheKey] = true
 			result.Candidates++
+			if body, ok, err := s.repo.CachedChampionPageBundle(ctx, cacheKey); err == nil && ok {
+				s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
+				result.Skipped++
+				continue
+			} else if err != nil {
+				result.Errors++
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
 			body, err := s.buildChampionPageBundleJSON(ctx, request)
 			if err != nil {
 				result.Errors++
@@ -102,14 +114,14 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 				}
 				continue
 			}
-			if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, analyticsResponseCacheTTL); err != nil {
+			if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, championPageBundleCacheTTL); err != nil {
 				result.Errors++
 				if firstErr == nil {
 					firstErr = err
 				}
 				continue
 			}
-			s.responseCache.set(cacheKey, body, analyticsResponseCacheTTL)
+			s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
 			result.Stored++
 		}
 	}

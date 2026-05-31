@@ -17,6 +17,7 @@ import (
 
 const defaultItemSlotMinGames = 5
 const analyticsResponseCacheTTL = 10 * time.Minute
+const championPageBundleCacheTTL = 2 * time.Hour
 const championPageBundleCacheKeyPrefix = "champion-page:v4:"
 
 func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +72,7 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 	if body, ok, err := s.repo.CachedChampionPageBundle(r.Context(), cacheKey); err != nil {
 		log.Printf("champion page persistent cache lookup failed key=%s err=%v", cacheKey, err)
 	} else if ok {
-		s.responseCache.set(cacheKey, body, analyticsResponseCacheTTL)
+		s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
 		writeJSONBytes(w, http.StatusOK, body, true)
 		return
 	}
@@ -80,7 +81,7 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.writeCachedChampionPageJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+	s.writeCachedChampionPageJSON(w, http.StatusOK, cacheKey, championPageBundleCacheTTL, response)
 }
 
 type championPageBundleRequest struct {

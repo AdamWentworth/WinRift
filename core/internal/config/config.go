@@ -142,7 +142,7 @@ func Load() Config {
 		ChampionGuideRefreshEnabled:    envBool("CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED", true),
 		ChampionGuideRefreshInterval:   time.Duration(envInt("CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
 		ChampionPagePrewarmEnabled:     envBool("CHAMPION_PAGE_PREWARM_ENABLED", true),
-		ChampionPagePrewarmPerRole:     envInt("CHAMPION_PAGE_PREWARM_PER_ROLE", 5),
+		ChampionPagePrewarmPerRole:     envInt("CHAMPION_PAGE_PREWARM_PER_ROLE", 200),
 		ChampionPagePrewarmMinGames:    envInt("CHAMPION_PAGE_PREWARM_MIN_GAMES", 50),
 		ChampionPagePrewarmRoles:       splitList(env("CHAMPION_PAGE_PREWARM_ROLES", "TOP,JUNGLE,MIDDLE,BOTTOM,UTILITY")),
 		ChampionPagePrewarmRankBucket:  strings.ToUpper(env("CHAMPION_PAGE_PREWARM_RANK_BUCKET", "")),

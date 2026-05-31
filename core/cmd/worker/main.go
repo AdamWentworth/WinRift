@@ -518,25 +518,28 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 		})
 		statusDetails["prewarmCandidates"] = result.Candidates
 		statusDetails["prewarmStored"] = result.Stored
+		statusDetails["prewarmSkipped"] = result.Skipped
 		statusDetails["prewarmErrors"] = result.Errors
 		if err != nil {
 			log.Printf(
-				"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d errors=%d duration=%s err=%v",
+				"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s err=%v",
 				patch,
 				analytics.RankedSoloQueueID,
 				result.Candidates,
 				result.Stored,
+				result.Skipped,
 				result.Errors,
 				time.Since(prewarmStartedAt).Round(time.Millisecond),
 				err,
 			)
 		} else {
 			log.Printf(
-				"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d errors=%d duration=%s",
+				"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s",
 				patch,
 				analytics.RankedSoloQueueID,
 				result.Candidates,
 				result.Stored,
+				result.Skipped,
 				result.Errors,
 				time.Since(prewarmStartedAt).Round(time.Millisecond),
 			)

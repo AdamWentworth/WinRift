@@ -148,7 +148,7 @@ The champion guide endpoint reads this table first and only falls back to raw re
 Refresh options:
 
 - Worker: `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED=true` with `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES=10`
-- Worker page cache: `CHAMPION_PAGE_PREWARM_ENABLED=true` precomputes the most-used champion page bundles after this refresh so common champion pages can be served from `champion_page_bundle_cache`.
+- Worker page cache: `CHAMPION_PAGE_PREWARM_ENABLED=true` precomputes champion page bundles after this refresh so pages with enough stored games can be served from `champion_page_bundle_cache`.
 - Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
 - CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
 
