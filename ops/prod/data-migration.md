@@ -9,7 +9,7 @@ Prefer the direct LAN stream below. It avoids creating a huge temporary archive 
 On the laptop:
 
 ```bash
-cd /home/adam/Projects/WinRift
+cd /path/to/WinRift
 make down
 docker compose --profile worker ps
 ```
@@ -19,15 +19,15 @@ The `ps` output should be empty. The worker must not be writing while the archiv
 ## 2. Confirm SSH Access
 
 ```bash
-ssh adam@192.168.1.77 'hostname && findmnt /mnt/storage && df -hT /mnt/storage'
+ssh <server-user>@<server-lan-ip> 'hostname && findmnt /mnt/storage && df -hT /mnt/storage'
 ```
 
-If SSH key auth is not enabled, add the laptop's public key to `/home/adam/.ssh/authorized_keys` on the server.
+If SSH key auth is not enabled, add the laptop's public key to `/home/<server-user>/.ssh/authorized_keys` on the server.
 
 ## 3. Prepare Server Directories
 
 ```bash
-ssh adam@192.168.1.77 '
+ssh <server-user>@<server-lan-ip> '
   set -e
   findmnt /mnt/storage
   mkdir -p /mnt/storage/clickhouse/{data,logs,backups}
@@ -45,7 +45,7 @@ Do not start the worker yet.
 ```bash
 docker run --rm -v winrift_clickhouse_data:/data:ro busybox \
   tar -cf - -C /data . \
-  | ssh adam@192.168.1.77 \
+  | ssh <server-user>@<server-lan-ip> \
       'docker run --rm -i -v /mnt/storage/clickhouse/data:/restore busybox tar -xf - -C /restore'
 ```
 

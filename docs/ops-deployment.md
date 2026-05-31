@@ -110,7 +110,7 @@ Before starting ClickHouse on the server, verify the storage mount:
 findmnt /mnt/storage
 df -hT /mnt/storage
 sudo mkdir -p /mnt/storage/clickhouse/{data,logs,backups}
-sudo chown -R adam:adam /mnt/storage/clickhouse
+sudo chown -R $USER:$USER /mnt/storage/clickhouse
 ```
 
 The deploy workflow also checks that `/mnt/storage` is mounted and refuses to start ClickHouse if the mount is missing. That protects the OS disk from silently receiving database files.
