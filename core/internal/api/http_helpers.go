@@ -257,6 +257,17 @@ func queryInt(value string, fallback int) int {
 	return parsed
 }
 
+func queryFloat(value string, fallback float64) float64 {
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
 func queryBool(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "1", "true", "yes", "y", "on":

@@ -337,9 +337,10 @@ Completed:
 - Add build-signature analytics for build-advice and champion item paths.
 - Add hot champion-page bundle prewarming.
 - Move patch-scope controls out of the global header and into champion guide/tier-list pages.
+- Add first-pass win-condition validation endpoint and documentation.
 
 Next:
 
 1. Add champion role-rate summaries if directory/tier navigation needs them.
 2. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
-3. Continue win-condition validation against the stored corpus.
+3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.

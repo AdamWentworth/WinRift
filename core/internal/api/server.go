@@ -50,6 +50,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/analytics/patches", s.analyticsPatches)
 	mux.HandleFunc("POST /api/analytics/win-conditions", s.analyticsWinConditions)
 	mux.HandleFunc("GET /api/analytics/win-conditions/diagnostics", s.analyticsWinConditionDiagnostics)
+	mux.HandleFunc("GET /api/analytics/win-conditions/validation", s.analyticsWinConditionValidation)
 	mux.HandleFunc("GET /api/static/{kind}", s.staticData)
 	mux.HandleFunc("POST /api/dev/collector/seed", s.seedCollector)
 	mux.HandleFunc("POST /api/dev/analytics/item-slots/refresh", s.refreshItemSlotAnalytics)

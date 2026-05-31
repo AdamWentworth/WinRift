@@ -219,6 +219,28 @@ func (s Server) analyticsWinConditionDiagnostics(w http.ResponseWriter, r *http.
 	writeJSON(w, http.StatusOK, diagnostics)
 }
 
+func (s Server) analyticsWinConditionValidation(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	queueID := uint16(queryInt(query.Get("queueId"), 420))
+	minGames := queryInt(query.Get("minGames"), 50)
+	weakSignalWinRate := queryFloat(query.Get("weakSignalWinRate"), 55)
+	limit := queryInt(query.Get("limit"), 25)
+	validation, err := s.repo.QueryWinConditionValidation(r.Context(), clickhouse.WinConditionValidationFilters{
+		QueueID:           queueID,
+		Patch:             strings.TrimSpace(query.Get("patch")),
+		Platform:          strings.ToUpper(strings.TrimSpace(query.Get("platform"))),
+		RankBucket:        strings.ToUpper(strings.TrimSpace(query.Get("rankBucket"))),
+		MinGames:          minGames,
+		WeakSignalWinRate: weakSignalWinRate,
+		Limit:             limit,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, validation)
+}
+
 func buildCompiledWinConditionMatchups(rows []clickhouse.WinConditionMetricRow, team winconditions.TeamProfile, opponent winconditions.TeamProfile, minGames int) []winConditionMetricResponse {
 	index := indexCompiledWinConditionRows(rows)
 	out := make([]winConditionMetricResponse, 0, len(team.Axes)*len(opponent.Axes))

@@ -179,7 +179,7 @@ The simplest near-term improvement is to keep raw score plus letter grade visibl
 
 ### Current Diagnostic Hook
 
-The API exposes a diagnostics report so this can be checked against collected data:
+The API exposes a diagnostics report so distributions can be checked against collected data:
 
 ```bash
 curl 'http://localhost:8000/api/analytics/win-conditions/diagnostics?queueId=420&patch=16.10' | jq
@@ -192,7 +192,15 @@ The report includes:
 - primary margin buckets,
 - total teams and matches included.
 
-This should be the first place to look before changing the grading scale.
+The API also exposes a validation report for direct outcome checks:
+
+```bash
+curl 'http://localhost:8000/api/analytics/win-conditions/validation?queueId=420&patch=16.10&minGames=50' | jq
+```
+
+That report compares ratings, score deltas, primary strategy matchups, primary-margin buckets, and suspicious low-rated/high-winrate rows against real win/loss outcomes. See [Win Condition Validation](../product/win-condition-validation.md).
+
+Diagnostics should be the first place to look before changing the grading scale. Validation should be the first place to look before claiming the model has predictive signal.
 
 ## Building Block 6: Primary And Alternative Conditions
 

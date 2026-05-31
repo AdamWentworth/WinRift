@@ -234,6 +234,74 @@ func TestPatchStatsIncludesCompiledSnapshotsAfterRawPrune(t *testing.T) {
 	}
 }
 
+func TestQueryWinConditionValidationBuildsCorpusReport(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)SELECT.*uniqExact\\(match_id\\).*FROM match_team_win_conditions FINAL").
+		WillReturnRows(sqlmock.NewRows([]string{"resolved_patch", "teams", "matches"}).AddRow("16.10", 200, 100))
+	mock.ExpectQuery("(?s)SELECT.*axis.*rating.*avg_score.*UNION ALL").
+		WillReturnRows(sqlmock.NewRows([]string{"axis", "rating", "games", "wins", "avg_score", "min_score", "max_score"}).
+			AddRow("Pick", "B", 120, 66, 14.2, 13, 16).
+			AddRow("TeamFight", "C", 80, 36, 9.5, 8, 11))
+	mock.ExpectQuery("(?s)arrayJoin.*delta_bucket").
+		WillReturnRows(sqlmock.NewRows([]string{"axis", "delta_bucket", "games", "wins", "avg_delta"}).
+			AddRow("Pick", "1..3", 70, 40, 2.1).
+			AddRow("Pick", "-3..-1", 65, 28, -2.0))
+	mock.ExpectQuery("(?s)primary_condition.*opponent_primary_condition").
+		WillReturnRows(sqlmock.NewRows([]string{"primary_condition", "primary_rating", "opponent_primary_condition", "opponent_primary_rating", "games", "wins"}).
+			AddRow("Pick", "B", "TeamFight", "C", 55, 31))
+	mock.ExpectQuery("(?s)primary_margin.*margin_bucket").
+		WillReturnRows(sqlmock.NewRows([]string{"margin_bucket", "games", "wins", "avg_margin"}).
+			AddRow("2-3", 90, 48, 2.4))
+	mock.ExpectQuery("(?s)FROM patch_win_condition_metrics FINAL").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"patch",
+			"platform",
+			"queue_id",
+			"rank_bucket",
+			"team_condition",
+			"team_rating",
+			"opponent_condition",
+			"opponent_rating",
+			"team_primary",
+			"game_length_bucket",
+			"wins",
+			"games",
+			"win_rate_percent",
+			"confidence_percent",
+		}).AddRow("16.10", "ALL", 420, "ALL", "SplitPush", "C", "Control", "B", 21, "ALL", 35, 60, 58.33, 45.12))
+
+	report, err := repo.QueryWinConditionValidation(context.Background(), WinConditionValidationFilters{
+		Patch:             "16.10",
+		MinGames:          50,
+		WeakSignalWinRate: 55,
+		Limit:             10,
+	})
+	if err != nil {
+		t.Fatalf("query win condition validation: %v", err)
+	}
+	if report.Patch != "16.10" || report.Matches != 100 || report.Teams != 200 {
+		t.Fatalf("report scope = %+v; want patch 16.10, 100 matches, 200 teams", report)
+	}
+	if len(report.RatingOutcomes) != 2 || report.RatingOutcomes[0].Axis != "Pick" || report.RatingOutcomes[0].WinRate != 55 {
+		t.Fatalf("rating outcomes = %+v; want Pick 55%% first", report.RatingOutcomes)
+	}
+	if len(report.ScoreDeltaOutcomes) != 2 {
+		t.Fatalf("score delta outcomes = %d; want 2", len(report.ScoreDeltaOutcomes))
+	}
+	if len(report.WeakSignalWarnings) != 1 || report.WeakSignalWarnings[0].Condition != "SplitPush" {
+		t.Fatalf("weak warnings = %+v; want SplitPush warning", report.WeakSignalWarnings)
+	}
+	if len(report.Findings) == 0 {
+		t.Fatal("expected generated validation findings")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestSummonerRecentMatchesUsesSummaryReadModel(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()
