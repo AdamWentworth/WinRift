@@ -64,6 +64,11 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, badRequest)
 		return
 	}
+	request, err := s.resolveChampionPageBundleRequest(r.Context(), request)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	cacheKey := championPageBundleCacheKey(request)
 	if body, ok := s.responseCache.get(cacheKey); ok {
 		writeJSONBytes(w, http.StatusOK, body, true)
@@ -217,6 +222,32 @@ func (s Server) buildChampionPageBundle(ctx context.Context, request championPag
 		"roleRates": championRoleRatesResponse(roleRates),
 	}
 	return response, nil
+}
+
+func (s Server) resolveChampionPageBundleRequest(ctx context.Context, request championPageBundleRequest) (championPageBundleRequest, error) {
+	request.Build.Role = strings.ToUpper(strings.TrimSpace(request.Build.Role))
+	if request.Build.Role == "" {
+		roleRates, err := s.repo.ChampionRoleRates(ctx, []uint16{request.Build.ChampionID}, request.QueueID)
+		if err != nil {
+			return request, err
+		}
+		request.Build.Role = primaryChampionRole(roleRates, request.Build.ChampionID)
+	}
+	request.Build.ItemContext = normalizedItemContext(request.Build.ItemContext, request.Build.Role)
+	return request, nil
+}
+
+func primaryChampionRole(rows []clickhouse.ChampionRoleRate, championID uint16) string {
+	best := clickhouse.ChampionRoleRate{}
+	for _, row := range rows {
+		if row.ChampionID != championID || strings.TrimSpace(row.Role) == "" {
+			continue
+		}
+		if best.Role == "" || row.Games > best.Games || (row.Games == best.Games && row.PickRate > best.PickRate) {
+			best = row
+		}
+	}
+	return strings.ToUpper(strings.TrimSpace(best.Role))
 }
 
 type buildAdviceRequest struct {

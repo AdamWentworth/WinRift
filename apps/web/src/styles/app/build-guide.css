@@ -240,6 +240,10 @@
   padding: 12px;
 }
 
+.guide-fast-load-gap {
+  min-height: 220px;
+}
+
 .guide-filter-label {
   align-items: center;
   color: #edf7fa;

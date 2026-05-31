@@ -2,7 +2,7 @@ import { Database, Filter, Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getChampionPageBundle, getChampionRoleRates } from '../api/client';
+import { getChampionPageBundle } from '../api/client';
 import type { AnalyticsPatchStat, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
@@ -86,22 +86,13 @@ export function BuildGuidePage({
   const seededRoleRates = useMemo(() => (
     roleRates?.filter((row) => row.championId === championId) ?? []
   ), [championId, roleRates]);
-  const roleRatesQuery = useQuery({
-    queryKey: ['champion-main-role', championId],
-    queryFn: ({ signal }) => getChampionRoleRates([championId], DEFAULT_QUEUE_ID, { signal }),
-    enabled: Boolean(championId && !seededRoleRates.length),
-    staleTime: queryStaleTime.championRoleRates,
-  });
-  const activeRoleRates = seededRoleRates.length ? seededRoleRates : roleRatesQuery.data?.results ?? [];
-  const mainRole = useMemo(() => mainChampionRole(activeRoleRates, championId), [activeRoleRates, championId]);
-  const roleRatesSettled = seededRoleRates.length > 0 || roleRatesQuery.isSuccess || roleRatesQuery.isError;
-  const defaultRole = mainRole || (roleRatesSettled ? 'MIDDLE' : '');
-  const itemContext = itemContextForRole(role);
+  const queryRole = roleTouched ? role : '';
+  const itemContext = roleTouched ? itemContextForRole(role) : undefined;
   const championPageQuery = useQuery({
-    queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role, patch, rankBucket, opponentChampionId],
+    queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, queryRole || 'AUTO', patch, rankBucket, opponentChampionId],
     queryFn: ({ signal }) => getChampionPageBundle({
       championId,
-      role,
+      role: queryRole || undefined,
       itemContext,
       opponentChampionId: opponentChampionId || undefined,
       patch,
@@ -115,9 +106,16 @@ export function BuildGuidePage({
       queueId: DEFAULT_QUEUE_ID,
       limit: 4,
     }, { signal }),
-    enabled: Boolean(championId && patch && role),
+    enabled: Boolean(championId && patch && (!roleTouched || role)),
     staleTime: queryStaleTime.championGuide,
   });
+  const bundleRoleRates = championPageQuery.data?.roleRates.results ?? [];
+  const activeRoleRates = seededRoleRates.length ? seededRoleRates : bundleRoleRates;
+  const mainRole = useMemo(() => mainChampionRole(activeRoleRates, championId), [activeRoleRates, championId]);
+  const resolvedRole = championPageQuery.data?.filters.role || mainRole || '';
+  const displayRole = roleTouched ? role : resolvedRole;
+  const visibleLoading = useDelayedFlag(championPageQuery.isLoading && !championPageQuery.data, 180);
+  const showGuideData = Boolean(championPageQuery.data) || visibleLoading;
 
   useEffect(() => {
     if (initialChampionId && championByKey(champions, initialChampionId) && initialChampionId !== championId) {
@@ -139,14 +137,8 @@ export function BuildGuidePage({
   }, [championId]);
 
   useEffect(() => {
-    if (!roleTouched && defaultRole && defaultRole !== role) {
-      setRole(defaultRole);
-    }
-  }, [defaultRole, role, roleTouched]);
-
-  useEffect(() => {
     setSelectedBuildVariantKey('');
-  }, [championId, role, rankBucket, patch]);
+  }, [championId, queryRole, rankBucket, patch]);
 
   const updateChampion = (value: number) => {
     setRoleTouched(false);
@@ -184,10 +176,6 @@ export function BuildGuidePage({
   const itemSlotContext = selectedVariantItemSlots.length
     ? `${selectedBuildVariantLabel} selected build family`
     : buildAdviceContext(buildAdvice, opponent?.name);
-  const splash = championSplashUrl(champions, championId);
-  const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
-  const titleRole = roleLabel(role);
-  const sampleContext = opponent ? `${champion?.name ?? championId} vs ${opponent.name}` : `${champion?.name ?? championId} overall`;
   const guideIndex = championPageQuery.data?.guideIndex.results ?? [];
   const coverageByChampionId = useMemo(() => {
     const map = new Map<number, ChampionGuideSummary>();
@@ -198,6 +186,13 @@ export function BuildGuidePage({
   }, [guideIndex]);
   const currentCoverage = coverageByChampionId.get(championId);
   const coveredGames = guideIndex.reduce((total, summary) => total + summary.games, 0);
+  const splash = championSplashUrl(champions, championId);
+  const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
+  const titleRole = displayRole ? roleLabel(displayRole) : 'Role';
+  const heroGamesLabel = championPageQuery.data
+    ? `${formatNumber(currentCoverage?.games ?? 0)} role games`
+    : visibleLoading ? 'Loading role sample' : '\u00a0';
+  const sampleContext = opponent ? `${champion?.name ?? championId} vs ${opponent.name}` : `${champion?.name ?? championId} overall`;
 
   return (
     <section className="build-guide-page">
@@ -210,7 +205,7 @@ export function BuildGuidePage({
           <div className="guide-title-block">
             <span className="guide-kicker">WinRift Build Atlas</span>
             <h2>
-              <span>{champion?.name ?? 'Champion'}</span> <em><RoleIcon role={role} /> {titleRole} patterns</em>
+              <span>{champion?.name ?? 'Champion'}</span> <em><RoleIcon role={displayRole} /> {titleRole} patterns</em>
             </h2>
             <div className="guide-ability-row">
               <AbilityIcon champions={champions} ability={champion?.passive} label="P" />
@@ -235,7 +230,7 @@ export function BuildGuidePage({
           <div className="guide-hero-scope-card">
             <span>Rank Scope</span>
             <b>{rankLabel}</b>
-            <em>{formatNumber(currentCoverage?.games ?? 0)} role games</em>
+            <em>{heroGamesLabel}</em>
           </div>
         </div>
       </div>
@@ -244,7 +239,7 @@ export function BuildGuidePage({
         champions={championsByName}
         coverage={coverageByChampionId}
         championId={championId}
-        role={role}
+        role={displayRole}
         rankBucket={rankBucket}
         opponentChampionId={opponentChampionId}
         onChampionChange={updateChampion}
@@ -253,66 +248,85 @@ export function BuildGuidePage({
         onOpponentChange={setOpponentChampionId}
       />
 
-      <GuideStats guide={guideForBuilds} loading={championPageQuery.isLoading} />
-      <GuideCoverage
-        loading={championPageQuery.isLoading}
-        championCount={guideIndex.length}
-        totalGames={coveredGames}
-        selectedGames={currentCoverage?.games ?? 0}
-        role={titleRole}
-        rankLabel={rankLabel}
-        patch={patch}
-      />
-
-      <div className="guide-context-banner">
-        <span>Current Sample</span>
-        <b>{sampleContext}</b>
-        <em>{opponent ? 'matchup-filtered where possible, then widened carefully' : 'champion-wide until a matchup is selected'}</em>
-      </div>
-
-      <BuildVariantTabs
-        variants={buildVariants}
-        recommendedGuide={guideForBuilds}
-        recommendedItemSlots={recommendedItemSlots}
-        selectedKey={selectedBuildVariant?.variantKey ?? RECOMMENDED_BUILD_KEY}
-        items={items}
-        onSelect={setSelectedBuildVariantKey}
-      />
-
-      <div className="guide-primary-grid">
-        <RuneGuideCard guide={guideForBuilds} variant={selectedBuildVariant} runes={runes} loading={championPageQuery.isLoading} />
-        <div className="guide-side-stack">
-          <SpellGuideCard guide={guideForBuilds} variant={selectedBuildVariant} spells={spells} loading={championPageQuery.isLoading} />
-          <GuideMiniNote
-            title="Matchup Lens"
-            body={buildAdvice?.notes[0] ?? (opponent ? `Item panels are narrowed to ${opponent.name} when the sample exists, then fall back to broader ${champion?.name ?? 'champion'} data.` : 'Choose a matchup filter to compare item choices into a specific opponent.')}
+      {showGuideData ? (
+        <>
+          <GuideStats guide={guideForBuilds} loading={visibleLoading} />
+          <GuideCoverage
+            loading={visibleLoading}
+            championCount={guideIndex.length}
+            totalGames={coveredGames}
+            selectedGames={currentCoverage?.games ?? 0}
+            role={titleRole}
+            rankLabel={rankLabel}
+            patch={patch}
           />
-        </div>
-      </div>
 
-      <div className="guide-skill-items-row build-linked">
-        <SkillGuideCard guide={guide} variant={selectedBuildVariant} champion={champion} champions={champions} loading={championPageQuery.isLoading} />
-        <SkillPathCard guide={guide} variant={selectedBuildVariant} championName={champion?.name ?? 'this champion'} loading={championPageQuery.isLoading} />
-      </div>
+          <div className="guide-context-banner">
+            <span>Current Sample</span>
+            <b>{sampleContext}</b>
+            <em>{opponent ? 'matchup-filtered where possible, then widened carefully' : 'champion-wide until a matchup is selected'}</em>
+          </div>
 
-      <BuildAdviceCoverage buildAdvice={buildAdvice} loading={championPageQuery.isLoading} />
+          <BuildVariantTabs
+            variants={buildVariants}
+            recommendedGuide={guideForBuilds}
+            recommendedItemSlots={recommendedItemSlots}
+            selectedKey={selectedBuildVariant?.variantKey ?? RECOMMENDED_BUILD_KEY}
+            items={items}
+            onSelect={setSelectedBuildVariantKey}
+          />
 
-      <ItemGuideGrid rows={itemSlots} startingLoadouts={recommendedStartingLoadouts} items={items} loading={championPageQuery.isLoading} context={itemSlotContext} />
+          <div className="guide-primary-grid">
+            <RuneGuideCard guide={guideForBuilds} variant={selectedBuildVariant} runes={runes} loading={visibleLoading} />
+            <div className="guide-side-stack">
+              <SpellGuideCard guide={guideForBuilds} variant={selectedBuildVariant} spells={spells} loading={visibleLoading} />
+              <GuideMiniNote
+                title="Matchup Lens"
+                body={buildAdvice?.notes[0] ?? (opponent ? `Item panels are narrowed to ${opponent.name} when the sample exists, then fall back to broader ${champion?.name ?? 'champion'} data.` : 'Choose a matchup filter to compare item choices into a specific opponent.')}
+              />
+            </div>
+          </div>
 
-      {role === 'JUNGLE' ? <RoleQuestCard /> : null}
+          <div className="guide-skill-items-row build-linked">
+            <SkillGuideCard guide={guide} variant={selectedBuildVariant} champion={champion} champions={champions} loading={visibleLoading} />
+            <SkillPathCard guide={guide} variant={selectedBuildVariant} championName={champion?.name ?? 'this champion'} loading={visibleLoading} />
+          </div>
 
-      <section className="guide-matchups-section" aria-label={`${champion?.name ?? 'Champion'} matchups`}>
-        <div className="guide-section-title">
-          <span>Matchups</span>
-          <em>Counter picks and favorable opponents from stored ranked games.</em>
-        </div>
-        <div className="guide-matchups-grid">
-          <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={championPageQuery.isLoading} />
-          <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={championPageQuery.isLoading} />
-        </div>
-      </section>
+          <BuildAdviceCoverage buildAdvice={buildAdvice} loading={visibleLoading} />
+
+          <ItemGuideGrid rows={itemSlots} startingLoadouts={recommendedStartingLoadouts} items={items} loading={visibleLoading} context={itemSlotContext} />
+
+          {displayRole === 'JUNGLE' ? <RoleQuestCard /> : null}
+
+          <section className="guide-matchups-section" aria-label={`${champion?.name ?? 'Champion'} matchups`}>
+            <div className="guide-section-title">
+              <span>Matchups</span>
+              <em>Counter picks and favorable opponents from stored ranked games.</em>
+            </div>
+            <div className="guide-matchups-grid">
+              <MatchupStrip title="Toughest Matchups" subtitle={`These champions have performed best into ${champion?.name ?? 'this champion'}`} rows={guide?.toughestMatchups ?? []} champions={champions} tone="bad" loading={visibleLoading} />
+              <MatchupStrip title="Favorable Matchups" subtitle={`${champion?.name ?? 'This champion'} has performed well into these opponents`} rows={guide?.bestMatchups ?? []} champions={champions} tone="good" loading={visibleLoading} />
+            </div>
+          </section>
+        </>
+      ) : (
+        <div className="guide-fast-load-gap" aria-hidden="true" />
+      )}
     </section>
   );
+}
+
+function useDelayedFlag(active: boolean, delayMs: number) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setVisible(false);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setVisible(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [active, delayMs]);
+  return visible;
 }
 
 function BuildAdviceCoverage({ buildAdvice, loading }: { buildAdvice?: BuildAdviceResponse; loading: boolean }) {
@@ -449,12 +463,12 @@ function GuideStats({ guide, loading }: { guide?: ChampionGuideResponse; loading
   return (
     <div className="guide-stat-strip">
       <MetricTile className="guide-stat" label="Tier" value={loading ? '...' : guideTier(guide)} tone="tier" />
-      <MetricTile className="guide-stat" label="Win Rate" value={summary?.games ? `${summary.winRate.toFixed(2)}%` : '--'} />
-      <MetricTile className="guide-stat" label="Rank" value={summary?.roleRank ? `${summary.roleRank} / ${summary.roleRankTotal}` : '--'} />
-      <MetricTile className="guide-stat" label="Pick Rate" value={summary?.games ? `${summary.pickRate.toFixed(2)}%` : '--'} />
-      <MetricTile className="guide-stat" label="Ban Rate" value={summary?.banRate ? `${summary.banRate.toFixed(2)}%` : '--'} />
-      <MetricTile className="guide-stat" label="Confidence" value={summary?.games ? `${summary.confidence.toFixed(1)}%` : '--'} />
-      <MetricTile className="guide-stat" label="Matches" value={formatNumber(summary?.games ?? 0)} />
+      <MetricTile className="guide-stat" label="Win Rate" value={loading ? '...' : summary?.games ? `${summary.winRate.toFixed(2)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Rank" value={loading ? '...' : summary?.roleRank ? `${summary.roleRank} / ${summary.roleRankTotal}` : '--'} />
+      <MetricTile className="guide-stat" label="Pick Rate" value={loading ? '...' : summary?.games ? `${summary.pickRate.toFixed(2)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Ban Rate" value={loading ? '...' : summary?.banRate ? `${summary.banRate.toFixed(2)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Confidence" value={loading ? '...' : summary?.games ? `${summary.confidence.toFixed(1)}%` : '--'} />
+      <MetricTile className="guide-stat" label="Matches" value={loading ? '...' : formatNumber(summary?.games ?? 0)} />
     </div>
   );
 }

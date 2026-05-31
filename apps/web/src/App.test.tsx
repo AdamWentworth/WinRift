@@ -369,7 +369,9 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(await screen.findByLabelText('Analytics data patch')).toBeInTheDocument();
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
-    await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' }), withAbortSignal()));
+    await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, patch: '16.10' }), withAbortSignal()));
+    const latestChampionPageRequest = vi.mocked(getChampionPageBundle).mock.calls[vi.mocked(getChampionPageBundle).mock.calls.length - 1]?.[0];
+    expect(latestChampionPageRequest?.role).toBeUndefined();
     queryClient.clear();
   });
 

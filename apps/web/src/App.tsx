@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAnalyticsPatches, getChampionPageBundle, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import { getAnalyticsPatches, getChampionPageBundle, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
 import type { Champion } from './api/types';
 import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
 import {
@@ -9,7 +9,7 @@ import {
 } from './lib/lookup';
 import { recommendedAnalyticsPatch, storedAnalyticsPatch, storeAnalyticsPatch } from './lib/analyticsPatch';
 import { appShellClass, pathForRoute, readRoute, type AppRoute } from './lib/appRouting';
-import { itemContextForRole, mainChampionRole } from './lib/championRoles';
+import { itemContextForRole } from './lib/championRoles';
 import { patchBucketFromVersion } from './lib/patches';
 import { queryGcTime, queryStaleTime } from './lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from './lib/queryVersions';
@@ -96,13 +96,13 @@ export function App() {
     warmImage(championSplashUrl(champions.data, championId));
 
     const prefetchForRole = (roleValue?: string) => {
-      const role = normalizeRole(roleValue ?? '') || 'MIDDLE';
+      const role = normalizeRole(roleValue ?? '');
       const itemContext = itemContextForRole(role);
       void queryClient.prefetchQuery({
-        queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role, patch, '', 0],
+        queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role || 'AUTO', patch, '', 0],
         queryFn: ({ signal }) => getChampionPageBundle({
           championId,
-          role,
+          role: role || undefined,
           itemContext,
           patch,
           rankBucket: '',
@@ -124,17 +124,7 @@ export function App() {
       prefetchForRole(normalizedPreferredRole);
       return;
     }
-
-    void queryClient.ensureQueryData({
-      queryKey: ['champion-main-role', championId],
-      queryFn: ({ signal }) => getChampionRoleRates([championId], DEFAULT_QUEUE_ID, { signal }),
-      staleTime: queryStaleTime.championRoleRates,
-    }).then((data) => {
-      const detectedRole = mainChampionRole(data.results ?? [], championId);
-      prefetchForRole(detectedRole);
-    }).catch(() => {
-      prefetchForRole('MIDDLE');
-    });
+    prefetchForRole();
   }, [activeAnalyticsPatch, champions.data, queryClient]);
   const openChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
     prefetchChampionGuide(champion, preferredRole);
