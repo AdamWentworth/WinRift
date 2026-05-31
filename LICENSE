@@ -1,0 +1,29 @@
+WinRift Source-Available License
+
+Copyright (c) 2026 Adam Wentworth. All rights reserved.
+
+This repository is public for portfolio review, technical discussion, and
+source transparency only.
+
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, sell, host, deploy, or create derivative works from this software
+or associated documentation without prior written permission from the copyright
+holder.
+
+You may view this repository on GitHub, and you may fork it only to the extent
+required by GitHub's Terms of Service for public repositories. Those platform
+rights do not grant permission to use, run, redistribute, deploy, or derive
+work from this project outside that limited GitHub functionality.
+
+Please do not clone, reuse, repackage, or deploy this project as your own work.
+
+Riot Games assets, names, trademarks, artwork, and API/Data Dragon materials
+referenced by this project remain the property of Riot Games and are not
+licensed by this repository. See NOTICE.md for third-party notices.
+
+THE SOFTWARE AND DOCUMENTATION ARE PROVIDED FOR REVIEW "AS IS", WITHOUT
+WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
+CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM REVIEW OF THIS REPOSITORY OR
+ANY UNAUTHORIZED USE OF THE SOFTWARE.

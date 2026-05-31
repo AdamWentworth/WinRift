@@ -8,6 +8,20 @@ The original 2023 prototype has been retired from the working tree. Its useful p
 
 ---
 
+## 📸 Screenshots
+
+These screenshots use a deterministic local mock API for public documentation; production data is collected privately through the worker.
+
+| Universal lookup | Champion guide |
+|------------------|----------------|
+| ![WinRift universal lookup homepage](docs/assets/screenshots/homepage.png) | ![WinRift champion guide page](docs/assets/screenshots/champion-guide.png) |
+
+| Live match scout |
+|------------------|
+| ![WinRift live match analysis page](docs/assets/screenshots/live-match.png) |
+
+---
+
 ## 📦 Monorepo Structure
 
 ```plaintext
@@ -52,6 +66,21 @@ Go is used for the API and collector because the target deployment is a lightwei
 - **Tier list**: rank champions by role using winrate, pick/ban pressure, and normalized performance signals.
 - **Summoner profiles**: show stored ranked summaries, champion performance, and recently used builds.
 - **Win-condition mode**: revive the legacy five-axis model: split push, pick, siege, control, and teamfight.
+
+---
+
+## 🧭 Project Status
+
+WinRift is an active MVP rebuild. The core collection pipeline, ClickHouse schema, private deployment flow, live-match UI, champion guides, tier list, summoner profiles, and win-condition analytics are implemented enough to demonstrate the product direction.
+
+The app is not yet a public hosted service. Current production-style use is private-LAN first: the server owns ClickHouse, API, and worker collection, while frontend development can happen from a laptop against that private API.
+
+Near-term work:
+
+- add worker health/email alerting for Riot key expiry and stale collection,
+- tighten public deployment/auth policy before any internet-facing API,
+- continue validating tier-list and win-condition scoring against larger samples,
+- add more frontend smoke/e2e coverage around live-match and champion-guide flows.
 
 ---
 
@@ -282,6 +311,10 @@ curl http://localhost:8000/api/health
 - Production API/worker deployment is currently private-LAN oriented, not a public internet service.
 
 WinRift is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties.
+
+This repository is source-available for portfolio review and technical discussion, but it is not open source. Reuse, deployment, redistribution, or derivative work requires prior written permission; see [LICENSE](LICENSE).
+
+Riot-owned names, icons, splash art, and screenshots containing Riot imagery are not licensed by this repository; see [NOTICE.md](NOTICE.md).
 
 ---
 
