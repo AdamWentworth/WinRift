@@ -28,7 +28,7 @@ jobs:
         working-directory: core
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v5
         with:
@@ -55,7 +55,7 @@ jobs:
       IMAGE_REPO: ghcr.io/adamwentworth/winrift-core
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Build Container Image
         run: docker build --pull -t winrift-core:ci-${{ github.sha }} -f core/Dockerfile .
