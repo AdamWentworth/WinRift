@@ -341,15 +341,25 @@ func (r *Repository) refreshTeamKillSummary(ctx context.Context, patch string, q
 			patch,
 			queue_id,
 			team_id,
-			toUInt64(sum(kills)) AS kills
-		FROM participants FINAL
-		WHERE patch = ? AND queue_id = ?
-		GROUP BY
-			match_id,
-			platform,
-			patch,
-			queue_id,
-			team_id`,
+			team_kills
+		FROM
+		(
+			SELECT
+				match_id,
+				platform,
+				patch,
+				queue_id,
+				team_id,
+				toUInt64(sum(kills)) AS team_kills
+			FROM participants FINAL
+			WHERE patch = ? AND queue_id = ?
+			GROUP BY
+				match_id,
+				platform,
+				patch,
+				queue_id,
+				team_id
+		)`,
 		patch,
 		queueID,
 	)
@@ -402,9 +412,9 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 					pm.rank_bucket
 				) AS rank_bucket,
 				pm.win AS win,
-				pm.kills AS kills,
-				pm.deaths AS deaths,
-				pm.assists AS assists,
+				pm.kills AS participant_kills,
+				pm.deaths AS participant_deaths,
+				pm.assists AS participant_assists,
 				multiIf(pp.gold_earned > 0, pp.gold_earned, pm.gold_earned) AS gold_earned,
 				multiIf(pp.total_minions_killed > 0, pp.total_minions_killed, pm.total_minions_killed) AS total_minions_killed,
 				multiIf(pp.neutral_minions_killed > 0, pp.neutral_minions_killed, pm.neutral_minions_killed) AS neutral_minions_killed,
@@ -460,9 +470,9 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 			rank_bucket,
 			toUInt64(sum(win)) AS wins,
 			toUInt64(count()) AS games,
-			toUInt64(sum(kills)) AS kills,
-			toUInt64(sum(deaths)) AS deaths,
-			toUInt64(sum(assists)) AS assists,
+			toUInt64(sum(participant_kills)) AS kills,
+			toUInt64(sum(participant_deaths)) AS deaths,
+			toUInt64(sum(participant_assists)) AS assists,
 			toUInt64(sum(gold_earned)) AS gold_earned_sum,
 			toUInt64(sum(total_minions_killed + neutral_minions_killed)) AS cs_sum,
 			toUInt64(sum(total_damage_dealt_to_champions)) AS damage_dealt_to_champions_sum,
@@ -477,7 +487,7 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 			toUInt64(sum(dragon_kills + baron_kills + objectives_stolen)) AS objective_takedowns_sum,
 			toUInt64(sum(total_time_spent_dead)) AS total_time_spent_dead_sum,
 			toUInt64(sum(time_played)) AS time_played_sum,
-			sum(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation_sum
+			sum(multiIf(team_kills > 0, toFloat64(participant_kills + participant_assists) / toFloat64(team_kills), 0)) AS kill_participation_sum
 		FROM participant_rows
 		GROUP BY patch, queue_id, champion_id, role, rank_bucket`,
 		patch,
