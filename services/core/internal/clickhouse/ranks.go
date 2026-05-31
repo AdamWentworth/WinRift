@@ -197,7 +197,7 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 				argMax(wins, fetched_at) AS wins,
 				argMax(losses, fetched_at) AS losses,
 				argMax(rank_bucket, fetched_at) AS rank_bucket,
-				max(fetched_at) AS fetched_at,
+				max(fetched_at) AS latest_fetched_at,
 				argMax(expires_at, fetched_at) AS expires_at
 			FROM summoner_rank_snapshots FINAL
 			WHERE platform = ? AND queue_type = ?
@@ -210,7 +210,7 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 				platform,
 				argMax(game_name, last_seen_at) AS game_name,
 				argMax(tag_line, last_seen_at) AS tag_line,
-				max(last_seen_at) AS last_seen_at
+				max(last_seen_at) AS latest_seen_at
 			FROM riot_account_aliases FINAL
 			WHERE platform = ?
 			GROUP BY platform, puuid
@@ -248,9 +248,9 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			r.wins,
 			r.losses,
 			r.rank_bucket,
-			r.fetched_at,
+			r.latest_fetched_at,
 			r.expires_at,
-			a.last_seen_at,
+			a.latest_seen_at,
 			ifNull(s.profile_icon_id, 0) AS profile_icon_id,
 			ifNull(s.summoner_level, 0) AS summoner_level,
 			ifNull(p.stored_games, 0) AS stored_games,
