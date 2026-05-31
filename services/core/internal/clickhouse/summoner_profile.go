@@ -255,7 +255,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 				platform,
 				argMax(game_name, last_seen_at) AS game_name,
 				argMax(tag_line, last_seen_at) AS tag_line,
-				max(last_seen_at) AS last_seen_at
+				max(last_seen_at) AS alias_last_seen_at
 			FROM riot_account_aliases FINAL
 			GROUP BY platform, puuid
 		),
@@ -296,7 +296,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			a.tag_line,
 			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
 			ifNull(s.summoner_level, 0) AS summoner_level,
-			a.last_seen_at,
+			a.alias_last_seen_at,
 			now() AS compiled_at
 		FROM latest_alias AS a
 		LEFT JOIN latest_account AS s
