@@ -479,6 +479,10 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 	if patch == "" {
 		return
 	}
+	patches := analytics.PatchWindow(patch, cfg.CollectorPatchRetention)
+	if len(patches) == 0 {
+		patches = []string{patch}
+	}
 	interval := cfg.ChampionGuideRefreshInterval
 	if interval <= 0 {
 		interval = 10 * time.Minute
@@ -486,66 +490,89 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 	if !lastRefresh.IsZero() && time.Since(*lastRefresh) < interval {
 		return
 	}
-	startedAt := refreshStatus.start("champion-guide-analytics", patch, analytics.RankedSoloQueueID, "champion guide read models")
-	log.Printf("champion guide analytics scheduled refresh start patch=%s queue=%d interval=%s", patch, analytics.RankedSoloQueueID, interval)
+	patchLabel := strings.Join(patches, ",")
+	startedAt := refreshStatus.start("champion-guide-analytics", patchLabel, analytics.RankedSoloQueueID, "champion guide read models")
+	log.Printf("champion guide analytics scheduled refresh start patches=%s queue=%d interval=%s", patchLabel, analytics.RankedSoloQueueID, interval)
 	defer func() {
 		*lastRefresh = time.Now()
 	}()
-	if err := repo.RefreshChampionGuideDerivedAnalytics(ctx, patch, analytics.RankedSoloQueueID); err != nil {
-		log.Printf("champion guide analytics scheduled refresh failed patch=%s queue=%d duration=%s err=%v", patch, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), err)
-		refreshStatus.fail("champion-guide-analytics", startedAt, err)
-		return
-	}
-	statusDetails := map[string]int{}
-	if cfg.ChampionPagePrewarmEnabled {
-		prewarmStartedAt := time.Now()
-		log.Printf(
-			"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d rank_bucket=%s",
-			patch,
-			analytics.RankedSoloQueueID,
-			strings.Join(cfg.ChampionPagePrewarmRoles, ","),
-			cfg.ChampionPagePrewarmPerRole,
-			cfg.ChampionPagePrewarmMinGames,
-			cfg.ChampionPagePrewarmRankBucket,
-		)
-		result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
-			Patch:      patch,
-			Roles:      cfg.ChampionPagePrewarmRoles,
-			PerRole:    cfg.ChampionPagePrewarmPerRole,
-			MinGames:   cfg.ChampionPagePrewarmMinGames,
-			RankBucket: cfg.ChampionPagePrewarmRankBucket,
-			QueueID:    analytics.RankedSoloQueueID,
-		})
-		statusDetails["prewarmCandidates"] = result.Candidates
-		statusDetails["prewarmStored"] = result.Stored
-		statusDetails["prewarmSkipped"] = result.Skipped
-		statusDetails["prewarmErrors"] = result.Errors
-		if err != nil {
+	statusDetails := map[string]int{"patches": len(patches)}
+	var firstErr error
+	for _, refreshPatch := range patches {
+		refreshStartedAt := time.Now()
+		if err := repo.RefreshChampionGuideDerivedAnalytics(ctx, refreshPatch, analytics.RankedSoloQueueID); err != nil {
 			log.Printf(
-				"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s err=%v",
-				patch,
+				"champion guide analytics scheduled refresh failed patch=%s queue=%d duration=%s err=%v",
+				refreshPatch,
 				analytics.RankedSoloQueueID,
-				result.Candidates,
-				result.Stored,
-				result.Skipped,
-				result.Errors,
-				time.Since(prewarmStartedAt).Round(time.Millisecond),
+				time.Since(refreshStartedAt).Round(time.Millisecond),
 				err,
 			)
-		} else {
+			statusDetails["refreshErrors"]++
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		statusDetails["refreshedPatches"]++
+		if cfg.ChampionPagePrewarmEnabled {
+			prewarmStartedAt := time.Now()
 			log.Printf(
-				"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s",
-				patch,
+				"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d rank_bucket=%s",
+				refreshPatch,
 				analytics.RankedSoloQueueID,
-				result.Candidates,
-				result.Stored,
-				result.Skipped,
-				result.Errors,
-				time.Since(prewarmStartedAt).Round(time.Millisecond),
+				strings.Join(cfg.ChampionPagePrewarmRoles, ","),
+				cfg.ChampionPagePrewarmPerRole,
+				cfg.ChampionPagePrewarmMinGames,
+				cfg.ChampionPagePrewarmRankBucket,
 			)
+			result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
+				Patch:      refreshPatch,
+				Roles:      cfg.ChampionPagePrewarmRoles,
+				PerRole:    cfg.ChampionPagePrewarmPerRole,
+				MinGames:   cfg.ChampionPagePrewarmMinGames,
+				RankBucket: cfg.ChampionPagePrewarmRankBucket,
+				QueueID:    analytics.RankedSoloQueueID,
+			})
+			statusDetails["prewarmCandidates"] += result.Candidates
+			statusDetails["prewarmStored"] += result.Stored
+			statusDetails["prewarmSkipped"] += result.Skipped
+			statusDetails["prewarmErrors"] += result.Errors
+			if err != nil {
+				log.Printf(
+					"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s err=%v",
+					refreshPatch,
+					analytics.RankedSoloQueueID,
+					result.Candidates,
+					result.Stored,
+					result.Skipped,
+					result.Errors,
+					time.Since(prewarmStartedAt).Round(time.Millisecond),
+					err,
+				)
+				if firstErr == nil {
+					firstErr = err
+				}
+			} else {
+				log.Printf(
+					"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d skipped=%d errors=%d duration=%s",
+					refreshPatch,
+					analytics.RankedSoloQueueID,
+					result.Candidates,
+					result.Stored,
+					result.Skipped,
+					result.Errors,
+					time.Since(prewarmStartedAt).Round(time.Millisecond),
+				)
+			}
 		}
 	}
-	log.Printf("champion guide analytics scheduled refresh complete patch=%s queue=%d duration=%s", patch, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond))
+	if firstErr != nil {
+		log.Printf("champion guide analytics scheduled refresh completed with errors patches=%s queue=%d duration=%s err=%v", patchLabel, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), firstErr)
+		refreshStatus.fail("champion-guide-analytics", startedAt, firstErr)
+		return
+	}
+	log.Printf("champion guide analytics scheduled refresh complete patches=%s queue=%d duration=%s", patchLabel, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond))
 	refreshStatus.succeed("champion-guide-analytics", startedAt, statusDetails)
 }
 

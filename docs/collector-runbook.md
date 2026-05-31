@@ -192,7 +192,7 @@ Safety knobs:
 - `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch item-slot and starting-loadout summary refreshes. This is ClickHouse work plus cached Data Dragon item metadata lookup, not Riot match/league API budget.
 - `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes champion-guide read models, including champion skill paths, ban rates, build signatures, and alternative build variants.
 - `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled champion-guide read-model refreshes. This is ClickHouse/local aggregation work, not Riot API budget.
-- `CHAMPION_PAGE_PREWARM_ENABLED`: when true, the worker stores ready-to-serve champion page bundles for champion/role pages after champion-guide refreshes complete.
+- `CHAMPION_PAGE_PREWARM_ENABLED`: when true, the worker stores ready-to-serve champion page bundles for champion/role pages after champion-guide refreshes complete. This runs across the retained patch window so the previous patch remains fast while the current patch is still collecting.
 - `CHAMPION_PAGE_PREWARM_PER_ROLE`: number of indexed champion pages to prewarm per configured role. The default is intentionally broad so champion guide pages do not make the first visitor pay for cold bundle assembly.
 - `CHAMPION_PAGE_PREWARM_MIN_GAMES`: minimum role games required before a champion can be selected for prewarming.
 - `CHAMPION_PAGE_PREWARM_ROLES`: comma-separated roles to prewarm. Defaults to `TOP,JUNGLE,MIDDLE,BOTTOM,UTILITY`.
