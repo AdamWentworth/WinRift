@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getAnalyticsPatches, getBuildAdvice, getChampionGuideIndex, getChampionPageBundle, getChampionRoleRates, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getAnalyticsPatches, getBuildAdvice, getChampionGuideIndex, getChampionPageBundle, getChampionRoleRates, getLiveGame, getSummonerLeaderboard, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 const buildAdviceFixture = vi.hoisted(() => () => ({
@@ -110,6 +110,36 @@ vi.mock('./api/client', () => ({
   getRunes: vi.fn(async () => ({ version: 'test', data: [] })),
   getSummonerSpells: vi.fn(async () => ({ version: 'test', data: { data: {} } })),
   getLiveGame: vi.fn(),
+  getSummonerLeaderboard: vi.fn(async () => ({
+    platform: 'NA1',
+    queueType: 'RANKED_SOLO_5x5',
+    results: [
+      {
+        rank: 1,
+        puuid: 'leader-puuid',
+        platform: 'NA1',
+        gameName: 'Leaderboard Pro',
+        tagLine: 'NA1',
+        ranked: {
+          queueType: 'RANKED_SOLO_5x5',
+          tier: 'CHALLENGER',
+          division: 'I',
+          leaguePoints: 922,
+          wins: 120,
+          losses: 80,
+          totalGames: 200,
+          winRate: 60,
+          rankBucket: 'CHALLENGER',
+        },
+        profileIconId: 0,
+        summonerLevel: 0,
+        rankedGames: 200,
+        storedGames: 24,
+        storedWins: 15,
+        storedWinRate: 62.5,
+      },
+    ],
+  })),
   getSummonerProfile: vi.fn(async () => ({
     account: { puuid: 'profile-puuid', platform: 'NA1', gameName: 'Test Summoner', tagLine: 'NA1' },
     summary: { puuid: 'profile-puuid', platform: 'NA1', queueId: 420, games: 0, wins: 0, losses: 0, kills: 0, deaths: 0, assists: 0, avgKills: 0, avgDeaths: 0, avgAssists: 0, kda: 0, winRate: 0 },
@@ -126,6 +156,7 @@ describe('App', () => {
     cleanup();
     window.history.replaceState({}, '', '/');
     vi.mocked(getLiveGame).mockReset();
+    vi.mocked(getSummonerLeaderboard).mockReset();
     vi.mocked(getSummonerProfile).mockReset();
     vi.mocked(getChampionRoleRates).mockReset();
     vi.mocked(getChampionGuideIndex).mockReset();
@@ -136,6 +167,36 @@ describe('App', () => {
     vi.mocked(resolveAccountAlias).mockReset();
     vi.mocked(searchAccountAliases).mockReset();
     vi.mocked(getLiveGame).mockRejectedValue(new Error('Player is not currently in a live game'));
+    vi.mocked(getSummonerLeaderboard).mockResolvedValue({
+      platform: 'NA1',
+      queueType: 'RANKED_SOLO_5x5',
+      results: [
+        {
+          rank: 1,
+          puuid: 'leader-puuid',
+          platform: 'NA1',
+          gameName: 'Leaderboard Pro',
+          tagLine: 'NA1',
+          ranked: {
+            queueType: 'RANKED_SOLO_5x5',
+            tier: 'CHALLENGER',
+            division: 'I',
+            leaguePoints: 922,
+            wins: 120,
+            losses: 80,
+            totalGames: 200,
+            winRate: 60,
+            rankBucket: 'CHALLENGER',
+          },
+          profileIconId: 0,
+          summonerLevel: 0,
+          rankedGames: 200,
+          storedGames: 24,
+          storedWins: 15,
+          storedWinRate: 62.5,
+        },
+      ],
+    });
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
     vi.mocked(getChampionGuideIndex).mockResolvedValue(championGuideIndexFixture());
     vi.mocked(getChampionPageBundle).mockResolvedValue(championPageBundleFixture());
@@ -179,6 +240,34 @@ describe('App', () => {
     await waitFor(() => expect(screen.queryByText('Build Explorer')).not.toBeInTheDocument());
     expect(screen.queryByText('Contextual Patterns')).not.toBeInTheDocument();
     expect(screen.queryByText(/buy this/i)).not.toBeInTheDocument();
+    queryClient.clear();
+  });
+
+  it('turns the summoners page into a searchable ranked ladder hub', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summoners' }));
+
+    expect(await screen.findByText('Profiles and Stored Ranked Ladder')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Riot ID, e.g. Sneaky#NA69')).toBeInTheDocument();
+    await waitFor(() => expect(getSummonerLeaderboard).toHaveBeenCalledWith('NA1', 50));
+    expect(await screen.findByText('Leaderboard Pro')).toBeInTheDocument();
+    expect(screen.getByText('CHALLENGER I')).toBeInTheDocument();
+    expect(screen.getByText('24 stored · 62.5% WR')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Leaderboard Pro/i }));
+    await waitFor(() => expect(window.location.pathname).toBe('/summoners/NA1/Leaderboard%20Pro/NA1'));
     queryClient.clear();
   });
 

@@ -490,6 +490,177 @@ button {
   padding: 12px;
 }
 
+.summoner-hub {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  position: relative;
+}
+
+.summoner-hub-intro {
+  background:
+    radial-gradient(ellipse at 20% 0, rgb(140 236 255 / 16%), transparent 48%),
+    linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(0 0 0 / 18%));
+  border: 1px solid rgb(140 236 255 / 18%);
+  padding: 16px;
+  text-align: center;
+}
+
+.summoner-hub-intro span,
+.summoner-leaderboard-header span {
+  color: #8fbfca;
+  display: block;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.summoner-hub-intro strong,
+.summoner-leaderboard-header strong {
+  color: #fff;
+  display: block;
+  font-size: 22px;
+  font-weight: 1000;
+  line-height: 1.05;
+}
+
+.summoner-hub-intro p {
+  color: #c1d2d8;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  margin: 8px auto 0;
+  max-width: 680px;
+}
+
+.summoner-hub-search {
+  width: min(760px, 100%);
+}
+
+.summoner-server-options,
+.summoner-search-autocomplete {
+  left: auto;
+  margin: -6px auto 0;
+  position: relative;
+  top: auto;
+  transform: none;
+}
+
+.summoner-leaderboard-panel {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 4%), rgb(0 0 0 / 14%)),
+    rgb(0 0 0 / 18%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.summoner-leaderboard-header {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.summoner-leaderboard-header em {
+  color: #9fc3ca;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  text-align: right;
+}
+
+.summoner-leaderboard-list {
+  display: grid;
+  gap: 7px;
+}
+
+.summoner-leaderboard-row {
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgb(140 236 255 / 8%), transparent 38%),
+    rgb(0 0 0 / 22%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #f5fbff;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 52px 44px minmax(150px, 1fr) minmax(128px, auto) minmax(130px, auto) minmax(160px, auto);
+  min-height: 64px;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.summoner-leaderboard-row:hover,
+.summoner-leaderboard-row:focus-visible {
+  background:
+    radial-gradient(ellipse at 0 50%, rgb(140 236 255 / 20%), transparent 58%),
+    linear-gradient(90deg, rgb(140 236 255 / 12%), rgb(0 0 0 / 18%));
+  border-color: rgb(140 236 255 / 42%);
+  outline: none;
+}
+
+.summoner-leaderboard-row img,
+.summoner-ladder-icon-fallback {
+  background: rgb(0 0 0 / 40%);
+  border: 1px solid rgb(140 236 255 / 24%);
+  height: 42px;
+  object-fit: cover;
+  width: 42px;
+}
+
+.summoner-ladder-icon-fallback {
+  align-items: center;
+  color: #8cecff;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.summoner-ladder-rank {
+  color: #8cecff;
+  font-size: 16px;
+  font-weight: 1000;
+  text-align: center;
+}
+
+.summoner-ladder-name,
+.summoner-ladder-tier,
+.summoner-ladder-record {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.summoner-ladder-name strong,
+.summoner-ladder-tier strong,
+.summoner-ladder-record strong {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 1000;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summoner-ladder-name em,
+.summoner-ladder-tier em,
+.summoner-ladder-record em,
+.summoner-ladder-stored {
+  color: #9fc3ca;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.summoner-ladder-stored {
+  justify-self: end;
+  text-align: right;
+}
+
 .profile-data-grid {
   display: grid;
   gap: 10px;
@@ -6710,6 +6881,16 @@ button {
   .profile-build-loadout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .summoner-leaderboard-row {
+    grid-template-columns: 46px 42px minmax(160px, 1fr) minmax(110px, auto) minmax(130px, auto);
+  }
+
+  .summoner-ladder-stored {
+    grid-column: 3 / -1;
+    justify-self: start;
+    text-align: left;
+  }
 }
 
 @media (max-width: 760px) {
@@ -6775,6 +6956,23 @@ button {
 
   .profile-card {
     width: 100%;
+  }
+
+  .summoner-leaderboard-header,
+  .summoner-leaderboard-row {
+    grid-template-columns: 1fr;
+  }
+
+  .summoner-leaderboard-header em,
+  .summoner-ladder-rank,
+  .summoner-ladder-stored {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .summoner-leaderboard-row img,
+  .summoner-ladder-icon-fallback {
+    grid-row: auto;
   }
 
   .profile-action-row,

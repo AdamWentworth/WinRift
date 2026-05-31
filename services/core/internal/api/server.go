@@ -51,6 +51,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/account/alias", s.accountAlias)
 	mux.HandleFunc("GET /api/account/aliases", s.accountAliases)
 	mux.HandleFunc("GET /api/summoner/profile", s.summonerProfile)
+	mux.HandleFunc("GET /api/summoners/leaderboard", s.summonerLeaderboard)
 	mux.HandleFunc("GET /api/live-game", s.liveGame)
 	mux.HandleFunc("GET /api/analytics/builds", s.analyticsBuilds)
 	mux.HandleFunc("GET /api/analytics/build-advice", s.analyticsBuildAdvice)
@@ -232,6 +233,28 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (s Server) summonerLeaderboard(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	platform := s.defaultPlatform(query.Get("platform"))
+	limit := queryInt(query.Get("limit"), 50)
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	rows, err := s.repo.SummonerRankLeaderboard(r.Context(), platform, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"platform":  platform,
+		"queueType": "RANKED_SOLO_5x5",
+		"results":   summonerLeaderboardRowsResponse(rows),
+	})
 }
 
 func (s Server) liveGame(w http.ResponseWriter, r *http.Request) {
@@ -2415,6 +2438,44 @@ func summonerBuildRowsResponse(rows []clickhouse.SummonerBuildRecord) []map[stri
 			"avgAssists":          round(row.AvgAssists),
 			"kda":                 round(row.KDA),
 			"winRate":             round(row.WinRate * 100),
+		})
+	}
+	return out
+}
+
+func summonerLeaderboardRowsResponse(rows []clickhouse.SummonerLeaderboardRow) []map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for index, row := range rows {
+		totalGames := row.Wins + row.Losses
+		rank := analytics.RankSnapshot{
+			QueueType:    "RANKED_SOLO_5x5",
+			Tier:         row.Tier,
+			Division:     row.Division,
+			LeaguePoints: row.LeaguePoints,
+			Wins:         row.Wins,
+			Losses:       row.Losses,
+			RankBucket:   row.RankBucket,
+			FetchedAt:    row.FetchedAt,
+			ExpiresAt:    row.ExpiresAt,
+		}
+		storedWinRate := 0.0
+		if row.StoredGames > 0 {
+			storedWinRate = round(float64(row.StoredWins) / float64(row.StoredGames) * 100)
+		}
+		out = append(out, map[string]any{
+			"rank":          index + 1,
+			"puuid":         row.PUUID,
+			"platform":      row.Platform,
+			"gameName":      row.GameName,
+			"tagLine":       row.TagLine,
+			"ranked":        rankSnapshotResponse(rank),
+			"profileIconId": row.ProfileIconID,
+			"summonerLevel": row.SummonerLevel,
+			"rankedGames":   totalGames,
+			"storedGames":   row.StoredGames,
+			"storedWins":    row.StoredWins,
+			"storedWinRate": storedWinRate,
+			"lastSeenAt":    row.LastSeenAt,
 		})
 	}
 	return out

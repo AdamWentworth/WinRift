@@ -11,6 +11,26 @@ import (
 
 const rankedSoloQueueType = "RANKED_SOLO_5x5"
 
+type SummonerLeaderboardRow struct {
+	PUUID         string
+	Platform      string
+	GameName      string
+	TagLine       string
+	Tier          string
+	Division      string
+	LeaguePoints  int
+	Wins          int
+	Losses        int
+	RankBucket    string
+	FetchedAt     time.Time
+	ExpiresAt     time.Time
+	LastSeenAt    time.Time
+	ProfileIconID uint32
+	SummonerLevel uint64
+	StoredGames   int
+	StoredWins    int
+}
+
 func (r *Repository) FetchRankCandidates(ctx context.Context, platform string, limit int, now time.Time) ([]analytics.RankCandidate, error) {
 	if limit <= 0 {
 		return nil, nil
@@ -158,4 +178,162 @@ func (r *Repository) InsertRankSnapshot(ctx context.Context, snapshot analytics.
 		snapshot.ExpiresAt,
 	)
 	return err
+}
+
+func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform string, limit int) ([]SummonerLeaderboardRow, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		`WITH latest_rank AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(tier, fetched_at) AS tier,
+				argMax(division, fetched_at) AS division,
+				argMax(league_points, fetched_at) AS league_points,
+				argMax(wins, fetched_at) AS wins,
+				argMax(losses, fetched_at) AS losses,
+				argMax(rank_bucket, fetched_at) AS rank_bucket,
+				max(fetched_at) AS fetched_at,
+				argMax(expires_at, fetched_at) AS expires_at
+			FROM summoner_rank_snapshots FINAL
+			WHERE platform = ? AND queue_type = ?
+			GROUP BY platform, puuid
+		),
+		latest_alias AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(game_name, last_seen_at) AS game_name,
+				argMax(tag_line, last_seen_at) AS tag_line,
+				max(last_seen_at) AS last_seen_at
+			FROM riot_account_aliases FINAL
+			WHERE platform = ?
+			GROUP BY platform, puuid
+		),
+		latest_account AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(profile_icon_id, fetched_at) AS profile_icon_id,
+				argMax(summoner_level, fetched_at) AS summoner_level
+			FROM summoner_account_snapshots FINAL
+			WHERE platform = ?
+			GROUP BY platform, puuid
+		),
+		latest_profile AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(games, compiled_at) AS stored_games,
+				argMax(wins, compiled_at) AS stored_wins
+			FROM summoner_profile_summary FINAL
+			WHERE platform = ? AND queue_id = ?
+			GROUP BY platform, puuid
+		)
+		SELECT
+			r.puuid,
+			r.platform,
+			a.game_name,
+			a.tag_line,
+			r.tier,
+			r.division,
+			r.league_points,
+			r.wins,
+			r.losses,
+			r.rank_bucket,
+			r.fetched_at,
+			r.expires_at,
+			a.last_seen_at,
+			ifNull(s.profile_icon_id, 0) AS profile_icon_id,
+			ifNull(s.summoner_level, 0) AS summoner_level,
+			ifNull(p.stored_games, 0) AS stored_games,
+			ifNull(p.stored_wins, 0) AS stored_wins
+		FROM latest_rank AS r
+		INNER JOIN latest_alias AS a
+			ON a.platform = r.platform AND a.puuid = r.puuid
+		LEFT JOIN latest_account AS s
+			ON s.platform = r.platform AND s.puuid = r.puuid
+		LEFT JOIN latest_profile AS p
+			ON p.platform = r.platform AND p.puuid = r.puuid
+		WHERE a.game_name != '' AND a.tag_line != '' AND r.tier != '' AND r.tier != 'UNRANKED'
+		ORDER BY
+			multiIf(
+				r.tier = 'CHALLENGER', 0,
+				r.tier = 'GRANDMASTER', 1,
+				r.tier = 'MASTER', 2,
+				r.tier = 'DIAMOND', 3,
+				r.tier = 'EMERALD', 4,
+				r.tier = 'PLATINUM', 5,
+				r.tier = 'GOLD', 6,
+				r.tier = 'SILVER', 7,
+				r.tier = 'BRONZE', 8,
+				r.tier = 'IRON', 9,
+				10
+			) ASC,
+			multiIf(
+				r.division = 'I', 1,
+				r.division = 'II', 2,
+				r.division = 'III', 3,
+				r.division = 'IV', 4,
+				0
+			) ASC,
+			r.league_points DESC,
+			r.wins DESC,
+			r.losses ASC,
+			a.game_name ASC
+		LIMIT ?`,
+		platform,
+		rankedSoloQueueType,
+		platform,
+		platform,
+		platform,
+		analytics.RankedSoloQueueID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SummonerLeaderboardRow{}
+	for rows.Next() {
+		var row SummonerLeaderboardRow
+		var leaguePoints int16
+		var wins, losses uint32
+		var storedGames, storedWins uint64
+		if err := rows.Scan(
+			&row.PUUID,
+			&row.Platform,
+			&row.GameName,
+			&row.TagLine,
+			&row.Tier,
+			&row.Division,
+			&leaguePoints,
+			&wins,
+			&losses,
+			&row.RankBucket,
+			&row.FetchedAt,
+			&row.ExpiresAt,
+			&row.LastSeenAt,
+			&row.ProfileIconID,
+			&row.SummonerLevel,
+			&storedGames,
+			&storedWins,
+		); err != nil {
+			return nil, err
+		}
+		row.LeaguePoints = int(leaguePoints)
+		row.Wins = int(wins)
+		row.Losses = int(losses)
+		row.StoredGames = int(storedGames)
+		row.StoredWins = int(storedWins)
+		out = append(out, row)
+	}
+	return out, rows.Err()
 }

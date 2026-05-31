@@ -249,6 +249,7 @@ export function App() {
           runes={runes.data}
           analyticsPatch={activeAnalyticsPatch}
           onUseAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine })}
+          onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
           onResolvedAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine }, { replace: true })}
           onBackgroundChampionScopeChange={setSummonerBackgroundChampionIds}
         />

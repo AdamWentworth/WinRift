@@ -588,6 +588,28 @@ export type RankedRecord = {
   rankAvailable?: boolean;
 };
 
+export type SummonerLeaderboardRow = {
+  rank: number;
+  puuid: string;
+  platform: string;
+  gameName: string;
+  tagLine: string;
+  ranked: RankedRecord;
+  profileIconId?: number;
+  summonerLevel?: number;
+  rankedGames: number;
+  storedGames: number;
+  storedWins: number;
+  storedWinRate: number;
+  lastSeenAt?: string;
+};
+
+export type SummonerLeaderboardResponse = {
+  platform: string;
+  queueType: string;
+  results: SummonerLeaderboardRow[];
+};
+
 export type ChampionRecord = {
   queueId: number;
   championId: number;
