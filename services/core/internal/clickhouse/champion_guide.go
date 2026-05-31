@@ -513,7 +513,7 @@ func (r *Repository) rankChampionGuideSummaries(ctx context.Context, filters map
 	if len(rows) == 0 {
 		return rows, nil
 	}
-	banRates, err := r.queryChampionBanRates(ctx, filters)
+	banRates, err := r.queryChampionBanRates(ctx, championGuideRankingFilters(filters))
 	if err != nil {
 		return nil, err
 	}
@@ -548,6 +548,15 @@ func (r *Repository) rankChampionGuideSummaries(ctx context.Context, filters map
 		rows[index].RoleRankTotal = totalRanked
 	}
 	return rows, nil
+}
+
+func championGuideRankingFilters(filters map[string]string) map[string]string {
+	out := make(map[string]string, len(filters))
+	for key, value := range filters {
+		out[key] = value
+	}
+	delete(out, "champion_id")
+	return out
 }
 
 func applyCombatAverages(row *ChampionGuideSummary, kills, deaths, assists int) {
@@ -758,15 +767,21 @@ func applyChampionTierScores(rows []ChampionGuideSummary) []ChampionGuideSummary
 		rows[index].PickScore = normalizedShareScore(rows[index].PickRate, maxPickRate)
 		rows[index].BanScore = normalizedShareScore(rows[index].BanRate, maxBanRate)
 		applyChampionImpactScores(&rows[index], refs)
-		rows[index].TierScore = clampFloat(
-			0.64*rows[index].WinScore+
-				0.12*rows[index].SampleScore+
-				0.09*rows[index].PickScore+
-				0.04*rows[index].BanScore+
-				0.11*rows[index].ImpactScore,
-			0,
-			100,
-		)
+		presenceScore := 0.70*rows[index].PickScore + 0.30*rows[index].BanScore
+		tierScore := 0.70*rows[index].WinScore +
+			0.08*rows[index].SampleScore +
+			0.05*presenceScore +
+			0.17*rows[index].ImpactScore
+		if rows[index].WinRate < 0.50 {
+			tierScore -= (0.50 - rows[index].WinRate) * 250
+		}
+		if rows[index].WinRate < 0.49 {
+			tierScore -= (0.49 - rows[index].WinRate) * 250
+		}
+		if rows[index].Confidence < 0.47 {
+			tierScore -= (0.47 - rows[index].Confidence) * 80
+		}
+		rows[index].TierScore = clampFloat(tierScore, 0, 100)
 	}
 	return rows
 }

@@ -16,19 +16,21 @@ Current score components:
 
 Current weights:
 
-- 64% win score
-- 12% sample score
-- 9% pick score
-- 4% ban score
-- 11% impact score
+- 70% win score
+- 17% impact score
+- 8% sample score
+- 5% presence score, where presence is mostly pick pressure with a smaller ban-pressure component
 
-Raw winrate is shrunk toward 50% until a champion reaches roughly 250 games in the selected scope, and Wilson confidence now carries most of the win score. This intentionally keeps winning as the center of gravity while making tiny hot samples less likely to outrank broad, stable performers. Popularity, stability, ban respect, and player impact then break ties. Ban rate is deliberately a smaller signal because it can represent frustration, fame, or matchup avoidance rather than actual winning strength.
+Raw winrate is shrunk toward 50% until a champion reaches roughly 250 games in the selected scope, and Wilson confidence now carries most of the win score. This intentionally keeps winning as the center of gravity while making tiny hot samples less likely to outrank broad, stable performers. Popularity, stability, ban respect, and player impact then break ties. Ban rate is deliberately a small signal because it can represent frustration, fame, or matchup avoidance rather than actual winning strength.
+
+The score also applies a losing-performance guardrail. If a champion is below 50% winrate, especially below 49%, the score is pulled down so pick/ban pressure and broad sample size cannot crown a losing pick as an elite performer by themselves. This keeps "popular and feared" separate from "actually winning enough to deserve the top tier."
 
 ## Tiers
 
 The frontend maps WinRift rank into presentation tiers. `S+` is not a fixed number of champions per role, and it is not awarded from raw winrate alone. It is earned from the same composite score that drives the tier-list ordering:
 
 - `tierScore >= 59`
+- winrate at least 50%
 - fallback only when `tierScore` is unavailable: top 5% by role rank
 
 This keeps `S+` attainable when the data clearly supports it, without reserving slots or forcing every role to have the same count. A champion with a flashy raw winrate still needs enough total performance signal to cross the composite threshold. After `S+`, the remaining tiers use broad percentile bands:
@@ -40,6 +42,8 @@ This keeps `S+` attainable when the data clearly supports it, without reserving 
 - `D`: remaining rows
 
 The tier label is a presentation bucket. The backend `tierScore` is the actual sortable number.
+
+When a backend score is available, the frontend maps tiers directly from `tierScore` before falling back to rank percentile. It also caps losing records: a sub-49% champion cannot display as `S` or `S+` from presence alone. A champion can still rank highly enough to be watched, but the visual tier should not imply elite performance when the stored games say it is losing.
 
 ## Impact Normalization
 
