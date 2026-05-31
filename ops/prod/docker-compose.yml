@@ -63,3 +63,21 @@ services:
     depends_on:
       clickhouse:
         condition: service_healthy
+
+  monitor:
+    image: ${WINRIFT_CORE_IMAGE:-ghcr.io/adamwentworth/winrift-core:latest}
+    container_name: winrift_monitor
+    command: ["/winrift-monitor"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      MONITOR_API_HEALTH_URL: http://api:8000/api/health
+      RIOT_AUTH_FAILURE_MARKER_PATH: /run/winrift/riot-auth-failed
+      MONITOR_WORKER_HEARTBEAT_PATH: /run/winrift/worker-heartbeat.json
+      MONITOR_ALERT_STATE_PATH: /run/winrift/monitor-alert-state.json
+    volumes:
+      - ${WINRIFT_RUNTIME_STATE_DIR:-/srv/winrift/runtime}:/run/winrift
+    depends_on:
+      - api

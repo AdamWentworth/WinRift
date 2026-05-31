@@ -29,7 +29,7 @@ WinRift/
 ├── apps/
 │   └── web/                 # Vite + React + TypeScript frontend
 ├── services/
-│   └── core/                # Go API, collector worker, patch archive tool
+│   └── core/                # Go API, collector worker, monitor, patch archive tool
 ├── docs/                    # Architecture, product notes, runbooks, data docs
 ├── ops/
 │   └── prod/                # Private server Docker Compose and deploy notes
@@ -48,6 +48,7 @@ WinRift/
 | Frontend | Vite, React, TypeScript, TanStack Query | Live match, champion guides, tier list, summoner profiles |
 | Core API | Go `net/http` | Typed handlers, Riot proxying, static-data cache, analytics read APIs |
 | Collector | Go worker | Riot rate-limit aware match, timeline, rank, and alias ingestion |
+| Monitor | Go worker-side monitor | API health, auth marker, stale-worker heartbeat, and SMTP alerting |
 | Analytics Store | ClickHouse | Raw payload retention plus normalized tables and precomputed read models |
 | Deployment | Docker Compose, GHCR, GitHub Actions | Private LAN API/worker deployment to a lightweight home server |
 | Static Assets | Riot Data Dragon CDN | Champion, item, rune, spell, splash, and profile icon images |
@@ -77,7 +78,7 @@ The app is not yet a public hosted service. Current production-style use is priv
 
 Near-term work:
 
-- add worker health/email alerting for Riot key expiry and stale collection,
+- validate worker health/email alerting on the production server,
 - tighten public deployment/auth policy before any internet-facing API,
 - continue validating tier-list and win-condition scoring against larger samples,
 - add more frontend smoke/e2e coverage around live-match and champion-guide flows.
@@ -135,6 +136,13 @@ Stop the full local stack, including the profiled worker:
 make down
 ```
 
+Run the local monitor profile when testing alert behavior:
+
+```bash
+make up-monitor
+make logs-monitor
+```
+
 ---
 
 ## 🧪 Local Development
@@ -188,6 +196,8 @@ VITE_API_URL=http://SERVER_LAN_IP:8000 npm run dev
 | `COLLECTOR_RATE_LIMIT_REQUESTS` | Per-window request budget per Riot route region. |
 | `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS` | Rate-limit window, commonly `120`. |
 | `RIOT_AUTH_FAILURE_EXIT` | Makes the worker stop on 401/403 auth failures. |
+| `MONITOR_WORKER_STALE_AFTER_MINUTES` | Heartbeat age before stale-worker alerts. |
+| `ALERT_EMAIL_ENABLED` | Enables SMTP alerts from the monitor. |
 | `CLICKHOUSE_*` | ClickHouse host, port, database, user, and password. |
 | `CORS_ORIGINS` | Browser origins allowed to call the API. |
 | `VITE_API_URL` | Frontend API base URL. |
@@ -209,6 +219,7 @@ flowchart LR
   API --> Web[React frontend]
 
   Worker -->|401/403| Stop[auth marker + worker exit]
+  Stop --> Monitor[monitor email alert]
   Worker -->|429 Retry-After| Backoff[rate-limit sleep]
 ```
 
@@ -305,6 +316,7 @@ curl http://localhost:8000/api/health
 
 - Real Riot keys live only in local/server `.env` files.
 - The worker exits on Riot auth failure when `RIOT_AUTH_FAILURE_EXIT=true`.
+- The monitor can email on Riot auth failure, API failure, or stale worker heartbeat.
 - Riot 429 responses honor `Retry-After` and back off before continuing.
 - The collector has per-platform request budgeting and reserve capacity.
 - The public app should present contextual statistics, not automated real-time commands.
@@ -337,6 +349,7 @@ Typical lifecycle:
 The current production shape is intentionally private:
 
 - ClickHouse, API, and worker run on the home server.
+- The monitor runs beside them and sends private SMTP alerts.
 - The worker collects from the server only.
 - The API is available on the private LAN.
 - The frontend can be developed on a laptop while pointing to the server API.

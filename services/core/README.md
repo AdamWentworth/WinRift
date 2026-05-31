@@ -1,10 +1,10 @@
 # Core Service (Go) ⚙️
 
-`services/core` contains WinRift's Go runtime: the private API, Riot collector worker, ClickHouse schema, analytics read models, and patch archive tool.
+`services/core` contains WinRift's Go runtime: the private API, Riot collector worker, health monitor, ClickHouse schema, analytics read models, and patch archive tool.
 
 ## ✨ Highlights
 
-- Single Go module with separate `api`, `worker`, and `patchctl` binaries.
+- Single Go module with separate `api`, `worker`, `monitor`, and `patchctl` binaries.
 - Riot API client with route/platform mapping, `Retry-After` handling, auth-failure tripwire, and request logging.
 - ClickHouse repository layer for raw payloads, normalized participants, build analytics, win-condition metrics, and summoner profiles.
 - Collector frontier system for long-running match discovery without random API probing.
@@ -16,6 +16,7 @@
 services/core/
 ├── cmd/
 │   ├── api/          # HTTP API entrypoint
+│   ├── monitor/      # Runtime health and email alert monitor
 │   ├── worker/       # Riot collector + analytics refresh worker
 │   └── patchctl/     # Patch archive/prune command
 ├── internal/
@@ -80,6 +81,8 @@ COLLECTOR_CURRENT_PATCH=16.11
 | `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS` | `120` | Riot development-key window used by the worker budget. |
 | `COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS` | `10` | Keeps headroom for non-collector requests. |
 | `COLLECTOR_PATCH_RETENTION_COUNT` | `2` | Raw current + recent patch retention target. |
+| `MONITOR_WORKER_STALE_AFTER_MINUTES` | `15` | Heartbeat age before the monitor alerts. |
+| `ALERT_EMAIL_ENABLED` | `false` | Enables SMTP email alerts from `/winrift-monitor`. |
 | `RANK_ENRICHMENT_ENABLED` | `false` | Background rank enrichment lane. |
 | `LIVE_RANK_ENRICHMENT_ENABLED` | `true` | Rank enrichment for live-game response context. |
 | `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES` | `10` | Item slot read-model refresh cadence. |
@@ -106,6 +109,13 @@ Run the worker:
 ```bash
 cd services/core
 go run ./cmd/worker
+```
+
+Run the monitor:
+
+```bash
+cd services/core
+MONITOR_API_HEALTH_URL=http://localhost:8000/api/health go run ./cmd/monitor
 ```
 
 Run patch archive tooling:

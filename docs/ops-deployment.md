@@ -9,9 +9,11 @@ WinRift has four Docker services:
 - `clickhouse`: persistent analytics database.
 - `api`: Go HTTP API for the frontend, static metadata, live lookups, and read models.
 - `worker`: Go collector loop. This is the only service that continuously spends Riot API budget.
+- `monitor`: Go health monitor that watches API health, the Riot auth-failure marker, and the worker heartbeat.
 - `web`: Vite/React frontend.
 
 The `worker` is behind the Compose `worker` profile and has `restart: "no"`. That is intentional. A bad or expired Riot key should stop collection instead of creating an infinite retry loop.
+The `monitor` does not call Riot. It reads local runtime state and sends SMTP alerts when the API is unhealthy, the Riot key has failed, or the worker heartbeat is stale.
 
 ## Local Development
 
@@ -33,6 +35,13 @@ Watch collection:
 
 ```bash
 make logs-worker
+```
+
+Start and watch the local monitor profile:
+
+```bash
+make up-monitor
+make logs-monitor
 ```
 
 Pause only collection:
@@ -120,8 +129,10 @@ The production Compose file is [ops/prod/docker-compose.yml](../ops/prod/docker-
 - `winrift_clickhouse`
 - `winrift_api`
 - `winrift_worker`
+- `winrift_monitor`
 
 The worker uses `restart: "no"` on purpose. If the Riot key expires and the worker exits, Docker should not repeatedly restart it and spend requests against a bad key.
+The monitor uses `restart: unless-stopped` because it is the thing that tells you the worker stopped.
 
 ## CI/CD
 
@@ -142,8 +153,9 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 5. Stops the worker.
 6. Starts ClickHouse.
 7. Recreates the API and waits for `/api/health`.
-8. Starts the worker if `start_worker=true`.
-9. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
+8. Recreates the monitor.
+9. Starts the worker if `start_worker=true`.
+10. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
 
 The deploy input `image_ref` accepts `latest`, `sha-<commit>`, or a full image reference.
 
@@ -191,6 +203,15 @@ COLLECTOR_PATCH_RETENTION_COUNT=2
 COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false
 RIOT_AUTH_FAILURE_EXIT=true
 RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
+MONITOR_WORKER_REQUIRED=true
+MONITOR_WORKER_STALE_AFTER_MINUTES=15
+ALERT_EMAIL_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=...
+SMTP_PASSWORD=...
+SMTP_FROM=...
+SMTP_TO=you@example.com
 ```
 
 Keep `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false` until the patch was archived or backed up. Turn it on deliberately only after `patchctl -action archive` has marked old platforms `closed`; startup pruning now deletes raw payload/timeline detail only, but an explicit archive command is easier to audit.
@@ -203,9 +224,11 @@ If Riot returns 401 or 403:
 
 - The component that saw it writes the marker.
 - The worker exits when the marker appears.
+- The worker writes a heartbeat file under `/run/winrift/worker-heartbeat.json` on startup and after every sweep.
 - The API stays up.
 - Riot-backed endpoints return a service-unavailable response instead of repeatedly hitting Riot.
 - Cached analytics, static pages, and database-backed reads can keep working.
+- The monitor sees the marker or stale heartbeat and sends an email, then suppresses repeats until `MONITOR_ALERT_COOLDOWN_MINUTES` elapses.
 
 After refreshing the key:
 
@@ -216,9 +239,35 @@ make up-worker
 
 Both API and worker clear the marker on startup. If the API is already running and you only restart the worker, the shared marker is still cleared from the runtime volume, but a full `make up` is the cleanest reset after a key refresh.
 
+If you intentionally pause collection for more than `MONITOR_WORKER_STALE_AFTER_MINUTES`, set `MONITOR_WORKER_REQUIRED=false` or stop the monitor too. Otherwise it is correct for the monitor to complain: production is configured under the assumption that the worker should be running.
+
 Riot 404s are not auth failures. A missing Riot ID or a summoner not being in a live game should return a normal not-found/live-game-absent response.
 
 Riot 429s are rate limits. The client sleeps for `Retry-After` when the wait is reasonable, or defers that region when Riot asks for too long.
+
+## Monitor And Email Alerts
+
+The monitor is a tiny Go process built into the core image as `/winrift-monitor`. It checks:
+
+- `GET /api/health`
+- `RIOT_AUTH_FAILURE_MARKER_PATH`
+- `MONITOR_WORKER_HEARTBEAT_PATH`
+
+It sends an alert when one of those checks fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`. Recovery emails are controlled by `MONITOR_RECOVERY_ALERTS`.
+
+For Gmail or another SMTP provider, use an app password rather than your normal account password:
+
+```text
+ALERT_EMAIL_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+SMTP_FROM=your_email@gmail.com
+SMTP_TO=your_email@gmail.com
+```
+
+The monitor container should stay up even when the worker exits. It does not spend Riot API budget.
 
 ## Deployment Flow
 
@@ -237,8 +286,9 @@ Then deploy through GitHub Actions, or pull an image and run the same Compose fi
 1. Build and publish images, or pull the repo and build on the server.
 2. Start/update ClickHouse, API, and web.
 3. Verify `/api/health`.
-4. Start the worker last.
-5. Watch `make logs-worker` long enough to confirm platforms, patch window, request budget, and refresh intervals.
+4. Start the monitor.
+5. Start the worker last.
+6. Watch `make logs-worker` long enough to confirm platforms, patch window, request budget, and refresh intervals.
 
 The worker should be stopped before risky migrations or config changes. API/web changes can usually deploy while the worker is paused.
 

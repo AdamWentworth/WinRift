@@ -61,6 +61,21 @@ type Config struct {
 	WinConditionRefreshInterval    time.Duration
 	SummonerProfileRefreshEnabled  bool
 	SummonerProfileRefreshInterval time.Duration
+	MonitorAPIHealthURL            string
+	MonitorInterval                time.Duration
+	MonitorWorkerHeartbeatPath     string
+	MonitorWorkerRequired          bool
+	MonitorWorkerStaleAfter        time.Duration
+	MonitorAlertStatePath          string
+	MonitorAlertCooldown           time.Duration
+	MonitorRecoveryAlerts          bool
+	AlertEmailEnabled              bool
+	SMTPHost                       string
+	SMTPPort                       int
+	SMTPUsername                   string
+	SMTPPassword                   string
+	SMTPFrom                       string
+	SMTPTo                         []string
 }
 
 func Load() Config {
@@ -118,6 +133,21 @@ func Load() Config {
 		WinConditionRefreshInterval:    time.Duration(envInt("WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES", 15)) * time.Minute,
 		SummonerProfileRefreshEnabled:  envBool("SUMMONER_PROFILE_ANALYTICS_REFRESH_ENABLED", true),
 		SummonerProfileRefreshInterval: time.Duration(envInt("SUMMONER_PROFILE_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
+		MonitorAPIHealthURL:            env("MONITOR_API_HEALTH_URL", "http://api:8000/api/health"),
+		MonitorInterval:                time.Duration(envInt("MONITOR_INTERVAL_SECONDS", 60)) * time.Second,
+		MonitorWorkerHeartbeatPath:     env("MONITOR_WORKER_HEARTBEAT_PATH", "/run/winrift/worker-heartbeat.json"),
+		MonitorWorkerRequired:          envBool("MONITOR_WORKER_REQUIRED", false),
+		MonitorWorkerStaleAfter:        time.Duration(envInt("MONITOR_WORKER_STALE_AFTER_MINUTES", 15)) * time.Minute,
+		MonitorAlertStatePath:          env("MONITOR_ALERT_STATE_PATH", "/run/winrift/monitor-alert-state.json"),
+		MonitorAlertCooldown:           time.Duration(envInt("MONITOR_ALERT_COOLDOWN_MINUTES", 360)) * time.Minute,
+		MonitorRecoveryAlerts:          envBool("MONITOR_RECOVERY_ALERTS", true),
+		AlertEmailEnabled:              envBool("ALERT_EMAIL_ENABLED", false),
+		SMTPHost:                       env("SMTP_HOST", ""),
+		SMTPPort:                       envInt("SMTP_PORT", 587),
+		SMTPUsername:                   env("SMTP_USERNAME", ""),
+		SMTPPassword:                   os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:                       env("SMTP_FROM", ""),
+		SMTPTo:                         splitList(env("SMTP_TO", "")),
 	}
 }
 

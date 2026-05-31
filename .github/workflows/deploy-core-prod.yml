@@ -113,7 +113,7 @@ jobs:
           set -euo pipefail
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Deploy API And Worker
+      - name: Deploy API, Monitor, And Worker
         shell: bash
         run: |
           set -euo pipefail
@@ -199,6 +199,9 @@ jobs:
             fi
             exit 1
           fi
+
+          echo "Starting monitor with image ${DEPLOY_IMAGE}"
+          compose up -d --no-deps --force-recreate --no-build monitor
 
           if [[ "${START_WORKER}" == "true" ]]; then
             echo "Starting worker with image ${DEPLOY_IMAGE}"

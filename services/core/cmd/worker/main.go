@@ -15,6 +15,7 @@ import (
 	"winrift/services/core/internal/collector"
 	"winrift/services/core/internal/config"
 	"winrift/services/core/internal/riot"
+	"winrift/services/core/internal/runstate"
 	"winrift/services/core/internal/staticdata"
 )
 
@@ -44,6 +45,7 @@ func main() {
 	staticService := staticdata.NewService(riotClient)
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
+	writeWorkerHeartbeat(cfg, "starting", len(platforms), 0, 0, "worker startup")
 	log.Printf(
 		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s win_condition_refresh_enabled=%t win_condition_refresh_interval=%s summoner_profile_refresh_enabled=%t summoner_profile_refresh_interval=%s",
 		strings.Join(platforms, ","),
@@ -70,7 +72,7 @@ func main() {
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {
 		if isRiotAuthError(err) {
-			log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+			stopForRiotAuthFailure(cfg, len(platforms))
 		}
 		log.Printf("seed frontier: %v", err)
 	}
@@ -125,7 +127,7 @@ func main() {
 			)
 			result := runPlatformPass(ctx, cfg, matchCollector, repo, platform, budget)
 			if result.AuthFailed {
-				log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+				stopForRiotAuthFailure(cfg, len(platforms))
 			}
 			rateLimitHit := false
 			if result.RateLimited {
@@ -136,7 +138,7 @@ func main() {
 			if !result.AuthFailed && !result.RateLimited && budget.RankRequests > 0 {
 				rankResult = runRankPass(ctx, cfg, matchCollector, repo, platform, budget.RankRequests)
 				if rankResult.AuthFailed {
-					log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+					stopForRiotAuthFailure(cfg, len(platforms))
 				}
 				if rankResult.RateLimited {
 					rateLimitedRegions[region] = true
@@ -160,7 +162,7 @@ func main() {
 					} else {
 						aliasResult = runAccountAliasPass(ctx, cfg, riotClient, repo, platform, aliasRequests)
 						if aliasResult.AuthFailed {
-							log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+							stopForRiotAuthFailure(cfg, len(platforms))
 						}
 						if aliasResult.RateLimited {
 							rateLimitedRegions[accountRegion] = true
@@ -185,6 +187,7 @@ func main() {
 		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, platforms, &lastWinConditionRefresh)
 		maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, &lastSummonerProfileRefresh)
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
+		writeWorkerHeartbeat(cfg, "active", len(platforms), platformsWithWork, requestsThisSweep, "sleep="+sleepFor.Round(time.Second).String())
 		log.Printf(
 			"collector sweep complete platforms=%d active_platforms=%d requests=%d sleep=%s",
 			len(platforms),
@@ -965,6 +968,24 @@ func isRiotAuthError(err error) bool {
 func isRiotRateLimitError(err error) bool {
 	var apiErr riot.APIError
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusTooManyRequests
+}
+
+func stopForRiotAuthFailure(cfg config.Config, platformCount int) {
+	writeWorkerHeartbeat(cfg, "auth_failed", platformCount, 0, 0, "Riot API key is missing, expired, or not authorized")
+	log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+}
+
+func writeWorkerHeartbeat(cfg config.Config, status string, platforms, activePlatforms, requests int, message string) {
+	if err := runstate.WriteWorkerHeartbeat(cfg.MonitorWorkerHeartbeatPath, runstate.WorkerHeartbeat{
+		Timestamp:       time.Now().UTC(),
+		Status:          status,
+		Platforms:       platforms,
+		ActivePlatforms: activePlatforms,
+		Requests:        requests,
+		Message:         message,
+	}); err != nil {
+		log.Printf("collector heartbeat write failed path=%s err=%v", cfg.MonitorWorkerHeartbeatPath, err)
+	}
 }
 
 func frontierStatus(result collector.Result) string {

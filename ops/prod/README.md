@@ -9,6 +9,7 @@
 | `winrift_clickhouse` | Persistent analytics database | Data/logs/backups should live on the storage SSD. |
 | `winrift_api` | Private-LAN API | Bound to `0.0.0.0:8000` by default. |
 | `winrift_worker` | Riot collector worker | Started explicitly, `restart: "no"` to avoid expired-key loops. |
+| `winrift_monitor` | Health and alert monitor | Watches API health, Riot auth marker, and worker heartbeat. |
 
 The frontend is intentionally not deployed here yet. Run it locally with `VITE_API_URL` pointed at the server API.
 
@@ -18,7 +19,7 @@ The frontend is intentionally not deployed here yet. Run it locally with `VITE_A
 /srv/winrift/
 ├── .env              # Server-local secrets/config, never committed
 ├── schema.sql        # Deployed ClickHouse schema
-├── runtime/          # Auth-failure markers and runtime flags
+├── runtime/          # Auth markers, worker heartbeat, monitor alert state
 └── deployments/      # Deployment metadata
 
 /mnt/storage/clickhouse/
@@ -61,6 +62,9 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `WINRIFT_STORAGE_MOUNT` | Mount guard, usually `/mnt/storage`. |
 | `WINRIFT_CLICKHOUSE_DATA_DIR` | ClickHouse data directory on storage SSD. |
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
+| `MONITOR_WORKER_REQUIRED` | Set `true` when the collector is expected to be running. |
+| `ALERT_EMAIL_ENABLED` | Enables SMTP email alerts for auth failure or stale worker state. |
+| `SMTP_TO` | Comma-separated alert recipient list. |
 
 ## 🖥️ Laptop Development Against Server API
 
@@ -89,11 +93,11 @@ See [../../docs/ops-deployment.md](../../docs/ops-deployment.md) for the full ru
 
 ## 🧭 Common Commands
 
-Start API and ClickHouse only:
+Start API, monitor, and ClickHouse:
 
 ```bash
 cd /srv/winrift
-docker compose --env-file /srv/winrift/.env up -d clickhouse api
+docker compose --env-file /srv/winrift/.env up -d clickhouse api monitor
 ```
 
 Start the worker explicitly:
@@ -107,6 +111,12 @@ Follow worker logs:
 
 ```bash
 docker logs -f winrift_worker
+```
+
+Follow monitor logs:
+
+```bash
+docker logs -f winrift_monitor
 ```
 
 Stop the worker only:
@@ -133,4 +143,5 @@ This keeps app summaries and the small normalized lookup index, while deleting b
 - Keep `/srv/winrift/.env` server-local and uncommitted.
 - Keep `winrift_worker` on `restart: "no"`.
 - If the Riot key expires, the worker should stop and the API should stay up.
+- Keep `winrift_monitor` on `restart: unless-stopped` so it can email when the worker stops unexpectedly.
 - Do not expose this deployment publicly until auth, rate limiting, observability, and public API policy are finalized.
