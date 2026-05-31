@@ -65,7 +65,7 @@ This avoids awkward "which machine has the real dataset?" problems. The server b
 
 ## Private Server Deployment
 
-The production-like setup mirrors the PokeGoNexus pattern:
+The production-like setup follows the same private-runner pattern used by the other home-server projects:
 
 - CI builds and pushes `ghcr.io/adamwentworth/winrift-core` from `services/core/Dockerfile`.
 - A manual GitHub Actions deploy runs on the self-hosted runner labeled `self-hosted`, `linux`, `x64`, `prod`.
@@ -75,7 +75,7 @@ The production-like setup mirrors the PokeGoNexus pattern:
 - The worker starts only after the API passes health.
 
 This intentionally does not create a public web domain. For now, use the laptop frontend against the server API over the private home network.
-The web container is intentionally not part of the production Compose file yet because the current frontend Dockerfile is optimized for local Vite development. When we want a private or public hosted frontend, add a production static-web image and either bind it privately or put it behind the same reverse-proxy pattern used by PokeGoNexus.
+The web container is intentionally not part of the production Compose file yet because the current frontend Dockerfile is optimized for local Vite development. When we want a private or public hosted frontend, add a production static-web image and either bind it privately or put it behind the same reverse-proxy pattern used by the rest of the home-server stack.
 
 Server layout:
 
