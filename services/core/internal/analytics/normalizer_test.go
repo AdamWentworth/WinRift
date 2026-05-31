@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-const legacyMatchFixture = "../../../../legacy/data/match_data.json"
+const matchFixture = "../../testdata/sanitized_match_fixture.json"
 
-func TestNormalizeLegacyMatchFixture(t *testing.T) {
-	raw, err := os.ReadFile(legacyMatchFixture)
+func TestNormalizeMatchFixture(t *testing.T) {
+	raw, err := os.ReadFile(matchFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestNormalizeLegacyMatchFixture(t *testing.T) {
 }
 
 func TestShouldIngestFixture(t *testing.T) {
-	raw, err := os.ReadFile(legacyMatchFixture)
+	raw, err := os.ReadFile(matchFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestPatchWindow(t *testing.T) {
 }
 
 func TestNormalizeTimelineEvents(t *testing.T) {
-	raw, err := os.ReadFile(legacyMatchFixture)
+	raw, err := os.ReadFile(matchFixture)
 	if err != nil {
 		t.Fatal(err)
 	}

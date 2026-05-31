@@ -16,3 +16,12 @@ __pycache__/
 legacy/data/lol_data.db
 legacy/data/lol_data/
 *.pyc
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.psd
+data/lol_data/
+data/dumps/
+backups/

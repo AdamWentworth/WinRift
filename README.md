@@ -1,8 +1,8 @@
 # WinRift
 
-WinRift is being rebuilt as a League of Legends build-matchup analytics tool. The new MVP focuses on champion, opponent, role, item, rune, and summoner-spell outcomes from ranked match data.
+WinRift is being rebuilt as a League of Legends build-matchup analytics tool. The MVP focuses on champion, opponent, role, item, rune, and summoner-spell outcomes from ranked match data.
 
-The previous implementation is preserved under `legacy/` for reference and fixtures.
+The original Mongo/Express/CRA/Python prototype has been retired from the working tree. The useful legacy product ideas are preserved in the docs, while the current runtime is the Go/ClickHouse/React implementation below.
 
 ## Stack
 
@@ -94,6 +94,7 @@ cd apps/web && npm test && npm run build
 - [Policy-Safe Live UX](docs/policy-safe-live-ux.md)
 - [Live Match Experience Roadmap](docs/live-match-experience-roadmap.md)
 - [Legacy Win Condition Audit](docs/legacy-win-condition-audit.md)
+- [Public Release Readiness](docs/public-release-readiness.md)
 - [Analytics Philosophy](docs/product/analytics-philosophy.md)
 - [Global Background System](docs/product/global-background-system.md)
 - [Summoner Profiles](docs/product/summoner-profiles.md)

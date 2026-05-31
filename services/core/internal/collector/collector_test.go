@@ -48,6 +48,15 @@ type fakeRepo struct {
 	lastNormalized   analytics.NormalizedMatch
 }
 
+func readMatchFixture(t *testing.T) []byte {
+	t.Helper()
+	raw, err := os.ReadFile("../../testdata/sanitized_match_fixture.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
 func (f *fakeRepo) MatchExists(context.Context, string) (bool, error) {
 	return false, nil
 }
@@ -80,10 +89,7 @@ func (f *fakeRepo) InsertRankSnapshot(_ context.Context, snapshot analytics.Rank
 }
 
 func TestCollectAddsDiscoveredParticipantsToFrontier(t *testing.T) {
-	raw, err := os.ReadFile("../../../../legacy/data/match_data.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := readMatchFixture(t)
 	repo := &fakeRepo{}
 	collector := New(&fakeRiot{
 		matchIDs: []string{"NA1_1"},
@@ -129,10 +135,7 @@ func TestCollectStopsAtRequestBudget(t *testing.T) {
 }
 
 func TestCollectEnrichesRankBucketFromLeagueEntries(t *testing.T) {
-	raw, err := os.ReadFile("../../../../legacy/data/match_data.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := readMatchFixture(t)
 	fixture, err := analytics.NormalizeMatch(raw, nil, "NA1", "UNKNOWN")
 	if err != nil {
 		t.Fatal(err)
@@ -177,10 +180,7 @@ func TestCollectEnrichesRankBucketFromLeagueEntries(t *testing.T) {
 }
 
 func TestCollectAppliesCachedRanksWithoutRankRequests(t *testing.T) {
-	raw, err := os.ReadFile("../../../../legacy/data/match_data.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := readMatchFixture(t)
 	fixture, err := analytics.NormalizeMatch(raw, nil, "NA1", "UNKNOWN")
 	if err != nil {
 		t.Fatal(err)

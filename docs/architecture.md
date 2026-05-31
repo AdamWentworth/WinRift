@@ -25,4 +25,4 @@ WinRift now separates collection, analytics storage, public API, and UI.
 
 ## Legacy
 
-The old Mongo/Express/CRA/Python scripts are preserved in `legacy/`. They are no longer part of the runtime path.
+The old Mongo/Express/CRA/Python prototype has been retired from the working tree. The useful product and analytics ideas are captured in [Legacy Win Condition Audit](legacy-win-condition-audit.md), [Win Conditions](discussions/win-conditions.md), and the current Go win-condition/profile implementation.

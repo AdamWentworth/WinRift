@@ -2,7 +2,7 @@
 
 The old win-condition system is worth preserving. It captures a real League idea: champions contribute differently to SplitPush, Pick, Siege, Control, and TeamFight plans, and the shape of the whole composition can influence which timings and macro plans are favorable.
 
-This audit is based on the archived code under `legacy/` and the current Data Dragon roster observed from version `16.10.1`.
+This audit was originally based on the archived prototype code that lived under `legacy/` and the current Data Dragon roster observed from version `16.10.1`. The legacy code and sample data were later removed from the working tree so the repo can be public-ready; this document is the bookmark for the useful ideas.
 
 External roster reference:
 
@@ -17,7 +17,7 @@ Each champion has a hand-authored strategic profile:
 SplitPush + Pick + Siege + Control + TeamFight = 10
 ```
 
-Example source: `legacy/data/champion_win_conditions.json`.
+Example source from the retired prototype: `legacy/data/champion_win_conditions.json`.
 
 Each team profile is calculated by summing the five champion profiles. The team's main win condition is the highest aggregate axis. If multiple axes tie, the legacy Python path tries to break ties by counting how many champions have an `IndividualWinCondition` matching one of the tied axes.
 
@@ -37,7 +37,9 @@ Those matchup aggregates also include game-duration buckets:
 
 Important nuance: these buckets describe the duration of games that ended in that window. They are not true "win probability at minute 25" state snapshots. They are still useful, but we should label them as game-length outcomes unless we later derive true timeline/state metrics.
 
-## Legacy Files
+## Retired Legacy Files
+
+These files are no longer present in the working tree. The list is retained so the old design can be understood without keeping the old code, data dumps, generated JSON, or possible secrets in the public-facing source tree.
 
 Champion profiles:
 
@@ -86,7 +88,7 @@ Current rebuilt artifact:
 - `services/core/internal/winconditions/profiles.go`
 - `services/core/internal/winconditions/profiles_test.go`
 
-This current artifact keeps `legacy/` untouched, removes the duplicate Blitzcrank row, and adds provisional `16.10.1` profiles for Ambessa, Aurora, Mel, Smolder, Yunara, and Zaahen.
+The current artifact removes the duplicate Blitzcrank row and adds provisional `16.10.1` profiles for Ambessa, Aurora, Mel, Smolder, Yunara, and Zaahen.
 
 The legacy champion profile file has 167 rows but 166 unique champion names.
 
