@@ -156,6 +156,7 @@ Build guide extraction candidates:
 
 Summoner profile extraction candidates:
 
+- summoner search hub, leaderboard, and shared profile message: first pass complete in `components/summoner-profile/`
 - profile header
 - overview metrics
 - champion table
