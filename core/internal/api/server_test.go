@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"winrift/core/internal/riot"
@@ -52,5 +53,38 @@ func TestLoggingResponseWriterCapturesFirstStatusAndBytes(t *testing.T) {
 	}
 	if writer.bytes != 2 {
 		t.Fatalf("bytes = %d, want 2", writer.bytes)
+	}
+}
+
+func TestChampionPageBundleCacheKeyCanonicalizesEffectiveRequest(t *testing.T) {
+	first, badRequest := parseChampionPageBundleRequest(url.Values{
+		"championId":       {"86"},
+		"role":             {" top "},
+		"patch":            {"16.10"},
+		"rankBucket":       {"diamond"},
+		"minGames":         {"5"},
+		"championMinGames": {"10"},
+		"limit":            {"4"},
+	})
+	if badRequest != "" {
+		t.Fatal(badRequest)
+	}
+	second, badRequest := parseChampionPageBundleRequest(url.Values{
+		"limit":            {"4"},
+		"championMinGames": {"10"},
+		"minGames":         {"5"},
+		"rankBucket":       {"DIAMOND"},
+		"patch":            {"16.10"},
+		"itemContext":      {"DEFAULT"},
+		"role":             {"TOP"},
+		"championId":       {"86"},
+	})
+	if badRequest != "" {
+		t.Fatal(badRequest)
+	}
+	firstKey := championPageBundleCacheKey(first)
+	secondKey := championPageBundleCacheKey(second)
+	if firstKey != secondKey {
+		t.Fatalf("cache keys differ:\nfirst:  %s\nsecond: %s", firstKey, secondKey)
 	}
 }

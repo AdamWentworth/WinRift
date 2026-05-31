@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"winrift/core/internal/analytics"
+	"winrift/core/internal/api"
 	"winrift/core/internal/clickhouse"
 	"winrift/core/internal/collector"
 	"winrift/core/internal/config"
@@ -43,11 +44,12 @@ func main() {
 
 	matchCollector := collector.New(riotClient, repo)
 	staticService := staticdata.NewService(riotClient)
+	apiServer := api.NewServer(cfg, riotClient, repo, staticService)
 	platforms := collectorPlatforms(cfg)
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	writeWorkerHeartbeat(cfg, "starting", len(platforms), 0, 0, "worker startup")
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s win_condition_refresh_enabled=%t win_condition_refresh_interval=%s summoner_profile_refresh_enabled=%t summoner_profile_refresh_interval=%s",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s champion_page_prewarm_enabled=%t champion_page_prewarm_per_role=%d champion_page_prewarm_min_games=%d win_condition_refresh_enabled=%t win_condition_refresh_interval=%s summoner_profile_refresh_enabled=%t summoner_profile_refresh_interval=%s",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -64,6 +66,9 @@ func main() {
 		cfg.ItemSlotRefreshInterval,
 		cfg.ChampionGuideRefreshEnabled,
 		cfg.ChampionGuideRefreshInterval,
+		cfg.ChampionPagePrewarmEnabled,
+		cfg.ChampionPagePrewarmPerRole,
+		cfg.ChampionPagePrewarmMinGames,
 		cfg.WinConditionRefreshEnabled,
 		cfg.WinConditionRefreshInterval,
 		cfg.SummonerProfileRefreshEnabled,
@@ -85,7 +90,7 @@ func main() {
 	var lastSummonerProfileRefresh time.Time
 	refreshStatus := newRefreshStatusRecorder(cfg.WorkerRefreshStatusPath)
 	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, refreshStatus, &lastItemSlotRefresh)
-	maybeRefreshChampionGuideAnalytics(context.Background(), cfg, repo, refreshStatus, &lastChampionGuideRefresh)
+	maybeRefreshChampionGuideAnalytics(context.Background(), cfg, apiServer, repo, refreshStatus, &lastChampionGuideRefresh)
 	maybeRefreshWinConditionAnalytics(context.Background(), cfg, repo, refreshStatus, platforms, &lastWinConditionRefresh)
 	maybeRefreshSummonerProfileAnalytics(context.Background(), cfg, repo, refreshStatus, &lastSummonerProfileRefresh)
 	for {
@@ -184,7 +189,7 @@ func main() {
 		}
 
 		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, refreshStatus, &lastItemSlotRefresh)
-		maybeRefreshChampionGuideAnalytics(ctx, cfg, repo, refreshStatus, &lastChampionGuideRefresh)
+		maybeRefreshChampionGuideAnalytics(ctx, cfg, apiServer, repo, refreshStatus, &lastChampionGuideRefresh)
 		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, refreshStatus, platforms, &lastWinConditionRefresh)
 		maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, refreshStatus, &lastSummonerProfileRefresh)
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
@@ -466,7 +471,7 @@ func startingLoadoutRefreshContexts(ctx context.Context, staticService *staticda
 	}, nil
 }
 
-func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, lastRefresh *time.Time) {
+func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, apiServer api.Server, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, lastRefresh *time.Time) {
 	if !cfg.ChampionGuideRefreshEnabled {
 		return
 	}
@@ -491,8 +496,54 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 		refreshStatus.fail("champion-guide-analytics", startedAt, err)
 		return
 	}
+	statusDetails := map[string]int{}
+	if cfg.ChampionPagePrewarmEnabled {
+		prewarmStartedAt := time.Now()
+		log.Printf(
+			"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d rank_bucket=%s",
+			patch,
+			analytics.RankedSoloQueueID,
+			strings.Join(cfg.ChampionPagePrewarmRoles, ","),
+			cfg.ChampionPagePrewarmPerRole,
+			cfg.ChampionPagePrewarmMinGames,
+			cfg.ChampionPagePrewarmRankBucket,
+		)
+		result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
+			Patch:      patch,
+			Roles:      cfg.ChampionPagePrewarmRoles,
+			PerRole:    cfg.ChampionPagePrewarmPerRole,
+			MinGames:   cfg.ChampionPagePrewarmMinGames,
+			RankBucket: cfg.ChampionPagePrewarmRankBucket,
+			QueueID:    analytics.RankedSoloQueueID,
+		})
+		statusDetails["prewarmCandidates"] = result.Candidates
+		statusDetails["prewarmStored"] = result.Stored
+		statusDetails["prewarmErrors"] = result.Errors
+		if err != nil {
+			log.Printf(
+				"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d errors=%d duration=%s err=%v",
+				patch,
+				analytics.RankedSoloQueueID,
+				result.Candidates,
+				result.Stored,
+				result.Errors,
+				time.Since(prewarmStartedAt).Round(time.Millisecond),
+				err,
+			)
+		} else {
+			log.Printf(
+				"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d errors=%d duration=%s",
+				patch,
+				analytics.RankedSoloQueueID,
+				result.Candidates,
+				result.Stored,
+				result.Errors,
+				time.Since(prewarmStartedAt).Round(time.Millisecond),
+			)
+		}
+	}
 	log.Printf("champion guide analytics scheduled refresh complete patch=%s queue=%d duration=%s", patch, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond))
-	refreshStatus.succeed("champion-guide-analytics", startedAt, nil)
+	refreshStatus.succeed("champion-guide-analytics", startedAt, statusDetails)
 }
 
 func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, platforms []string, lastRefresh *time.Time) {

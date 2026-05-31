@@ -17,7 +17,7 @@ import (
 
 const defaultItemSlotMinGames = 5
 const analyticsResponseCacheTTL = 10 * time.Minute
-const championPageBundleCacheKeyPrefix = "champion-page:v3:"
+const championPageBundleCacheKeyPrefix = "champion-page:v4:"
 
 func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -58,18 +58,12 @@ func (s Server) analyticsBuildAdvice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
-	buildRequest, badRequest := parseBuildAdviceRequest(r.URL.Query())
+	request, badRequest := parseChampionPageBundleRequest(r.URL.Query())
 	if badRequest != "" {
 		writeError(w, http.StatusBadRequest, badRequest)
 		return
 	}
-	query := r.URL.Query()
-	guideMinGames := queryInt(query.Get("guideMinGames"), 5)
-	guideLimit := queryInt(query.Get("guideLimit"), 12)
-	indexMinGames := queryInt(query.Get("indexMinGames"), 1)
-	indexLimit := queryInt(query.Get("indexLimit"), 250)
-	queueID := uint16(queryInt(query.Get("queueId"), analytics.RankedSoloQueueID))
-	cacheKey := championPageBundleCacheKeyPrefix + r.URL.RequestURI()
+	cacheKey := championPageBundleCacheKey(request)
 	if body, ok := s.responseCache.get(cacheKey); ok {
 		writeJSONBytes(w, http.StatusOK, body, true)
 		return
@@ -81,12 +75,85 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		writeJSONBytes(w, http.StatusOK, body, true)
 		return
 	}
+	response, err := s.buildChampionPageBundle(r.Context(), request)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.writeCachedChampionPageJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+}
+
+type championPageBundleRequest struct {
+	Build         buildAdviceRequest
+	GuideMinGames int
+	GuideLimit    int
+	IndexMinGames int
+	IndexLimit    int
+	QueueID       uint16
+}
+
+func parseChampionPageBundleRequest(query url.Values) (championPageBundleRequest, string) {
+	buildRequest, badRequest := parseBuildAdviceRequest(query)
+	if badRequest != "" {
+		return championPageBundleRequest{}, badRequest
+	}
+	guideMinGames := queryInt(query.Get("guideMinGames"), 5)
+	if guideMinGames <= 0 {
+		guideMinGames = 5
+	}
+	guideLimit := queryInt(query.Get("guideLimit"), 12)
+	if guideLimit <= 0 {
+		guideLimit = 12
+	}
+	indexMinGames := queryInt(query.Get("indexMinGames"), 1)
+	if indexMinGames <= 0 {
+		indexMinGames = 1
+	}
+	indexLimit := queryInt(query.Get("indexLimit"), 250)
+	if indexLimit <= 0 {
+		indexLimit = 250
+	}
+	queueID := uint16(queryInt(query.Get("queueId"), analytics.RankedSoloQueueID))
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	return championPageBundleRequest{
+		Build:         buildRequest,
+		GuideMinGames: guideMinGames,
+		GuideLimit:    guideLimit,
+		IndexMinGames: indexMinGames,
+		IndexLimit:    indexLimit,
+		QueueID:       queueID,
+	}, ""
+}
+
+func championPageBundleCacheKey(request championPageBundleRequest) string {
+	query := url.Values{}
+	query.Set("championId", strconv.Itoa(int(request.Build.ChampionID)))
+	query.Set("role", request.Build.Role)
+	query.Set("itemContext", request.Build.ItemContext)
+	query.Set("opponentChampionId", strconv.Itoa(int(request.Build.OpponentChampionID)))
+	query.Set("patch", request.Build.Patch)
+	query.Set("rankBucket", request.Build.RankBucket)
+	query.Set("minGames", strconv.Itoa(request.Build.MinGames))
+	query.Set("championMinGames", strconv.Itoa(request.Build.ChampionMinGames))
+	query.Set("limit", strconv.Itoa(request.Build.OptionLimit))
+	query.Set("guideMinGames", strconv.Itoa(request.GuideMinGames))
+	query.Set("guideLimit", strconv.Itoa(request.GuideLimit))
+	query.Set("indexMinGames", strconv.Itoa(request.IndexMinGames))
+	query.Set("indexLimit", strconv.Itoa(request.IndexLimit))
+	query.Set("queueId", strconv.Itoa(int(request.QueueID)))
+	return championPageBundleCacheKeyPrefix + query.Encode()
+}
+
+func (s Server) buildChampionPageBundle(ctx context.Context, request championPageBundleRequest) (map[string]any, error) {
+	buildRequest := request.Build
 	indexFilters := map[string]string{
 		"role":        buildRequest.Role,
 		"patch":       buildRequest.Patch,
 		"rank_bucket": buildRequest.RankBucket,
 	}
-	queryCtx, cancel := context.WithCancel(r.Context())
+	queryCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var (
 		buildAdvice map[string]any
@@ -113,23 +180,22 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 	}
 	run(func(ctx context.Context) error {
 		var err error
-		buildAdvice, guide, err = s.buildAdviceResponseWithGuide(ctx, buildRequest, guideMinGames, guideLimit)
+		buildAdvice, guide, err = s.buildAdviceResponseWithGuide(ctx, buildRequest, request.GuideMinGames, request.GuideLimit)
 		return err
 	})
 	run(func(ctx context.Context) error {
 		var err error
-		index, err = s.repo.QueryChampionGuideIndex(ctx, indexFilters, indexMinGames, indexLimit)
+		index, err = s.repo.QueryChampionGuideIndex(ctx, indexFilters, request.IndexMinGames, request.IndexLimit)
 		return err
 	})
 	run(func(ctx context.Context) error {
 		var err error
-		roleRates, err = s.repo.ChampionRoleRates(ctx, []uint16{buildRequest.ChampionID}, queueID)
+		roleRates, err = s.repo.ChampionRoleRates(ctx, []uint16{buildRequest.ChampionID}, request.QueueID)
 		return err
 	})
 	wg.Wait()
 	if firstErr != nil {
-		writeError(w, http.StatusInternalServerError, firstErr.Error())
-		return
+		return nil, firstErr
 	}
 	response := map[string]any{
 		"filters": map[string]any{
@@ -138,7 +204,7 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 			"opponentChampionId": buildRequest.OpponentChampionID,
 			"patch":              buildRequest.Patch,
 			"rankBucket":         buildRequest.RankBucket,
-			"queueId":            queueID,
+			"queueId":            request.QueueID,
 		},
 		"guide":       championGuideResponse(guide),
 		"buildAdvice": buildAdvice,
@@ -149,7 +215,7 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		},
 		"roleRates": championRoleRatesResponse(roleRates),
 	}
-	s.writeCachedChampionPageJSON(w, http.StatusOK, cacheKey, analyticsResponseCacheTTL, response)
+	return response, nil
 }
 
 type buildAdviceRequest struct {
@@ -169,7 +235,7 @@ func parseBuildAdviceRequest(query url.Values) (buildAdviceRequest, string) {
 	if championID == 0 {
 		return buildAdviceRequest{}, "championId is required"
 	}
-	role := strings.ToUpper(query.Get("role"))
+	role := strings.ToUpper(strings.TrimSpace(query.Get("role")))
 	minGames := queryInt(query.Get("minGames"), defaultItemSlotMinGames)
 	if minGames <= 0 {
 		minGames = defaultItemSlotMinGames
@@ -187,7 +253,7 @@ func parseBuildAdviceRequest(query url.Values) (buildAdviceRequest, string) {
 		Role:               role,
 		OpponentChampionID: uint16(queryInt(query.Get("opponentChampionId"), 0)),
 		Patch:              strings.TrimSpace(query.Get("patch")),
-		RankBucket:         strings.ToUpper(query.Get("rankBucket")),
+		RankBucket:         strings.ToUpper(strings.TrimSpace(query.Get("rankBucket"))),
 		MinGames:           minGames,
 		ChampionMinGames:   championMinGames,
 		OptionLimit:        optionLimit,

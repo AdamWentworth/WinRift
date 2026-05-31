@@ -59,6 +59,11 @@ type Config struct {
 	ItemSlotRefreshInterval        time.Duration
 	ChampionGuideRefreshEnabled    bool
 	ChampionGuideRefreshInterval   time.Duration
+	ChampionPagePrewarmEnabled     bool
+	ChampionPagePrewarmPerRole     int
+	ChampionPagePrewarmMinGames    int
+	ChampionPagePrewarmRoles       []string
+	ChampionPagePrewarmRankBucket  string
 	WinConditionRefreshEnabled     bool
 	WinConditionRefreshInterval    time.Duration
 	SummonerProfileRefreshEnabled  bool
@@ -136,6 +141,11 @@ func Load() Config {
 		ItemSlotRefreshInterval:        time.Duration(envInt("ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
 		ChampionGuideRefreshEnabled:    envBool("CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED", true),
 		ChampionGuideRefreshInterval:   time.Duration(envInt("CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
+		ChampionPagePrewarmEnabled:     envBool("CHAMPION_PAGE_PREWARM_ENABLED", true),
+		ChampionPagePrewarmPerRole:     envInt("CHAMPION_PAGE_PREWARM_PER_ROLE", 5),
+		ChampionPagePrewarmMinGames:    envInt("CHAMPION_PAGE_PREWARM_MIN_GAMES", 50),
+		ChampionPagePrewarmRoles:       splitList(env("CHAMPION_PAGE_PREWARM_ROLES", "TOP,JUNGLE,MIDDLE,BOTTOM,UTILITY")),
+		ChampionPagePrewarmRankBucket:  strings.ToUpper(env("CHAMPION_PAGE_PREWARM_RANK_BUCKET", "")),
 		WinConditionRefreshEnabled:     envBool("WIN_CONDITION_ANALYTICS_REFRESH_ENABLED", true),
 		WinConditionRefreshInterval:    time.Duration(envInt("WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES", 15)) * time.Minute,
 		SummonerProfileRefreshEnabled:  envBool("SUMMONER_PROFILE_ANALYTICS_REFRESH_ENABLED", true),
