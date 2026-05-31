@@ -22,6 +22,8 @@ The champion guide summary read model uses `team_kill_summary` for true kill par
 
 Build advice and champion item paths use `build_signature_analytics` for current/recent patches and `patch_build_metrics` for archived patches. Keep this table refreshed with the champion-guide lane so first-load champion pages do not scan `participant_matchups` just to assemble common build signatures.
 
+Champion guide refreshes should stage new rows before deleting older compiled rows. The current lane inserts a fresh snapshot into the ReplacingMergeTree read models, then removes rows with an older `compiled_at`. Public reads keep seeing the previous snapshot during the rebuild, and a failed refresh leaves the old snapshot intact instead of briefly exposing empty tables.
+
 After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. The prewarm limit should be broad enough to cover normal champion browsing, not only the five highest-played champions per role. Prewarming covers the retained patch window so the UI's default previous-patch view can stay fast while the current patch is still thin.
 
 ## Profiling Checklist
@@ -67,6 +69,7 @@ If an analytics endpoint suddenly takes seconds, first check for:
 
 - a raw JSON table in the hot query,
 - a missing summary refresh,
+- a delete-before-insert refresh that briefly exposes an empty read model,
 - a browser request waterfall,
 - a cache key that is too specific or not being reused,
 - a `FINAL` query over a large table where a compact summary would work.

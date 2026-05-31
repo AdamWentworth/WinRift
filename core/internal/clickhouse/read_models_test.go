@@ -3,7 +3,9 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
@@ -107,6 +109,47 @@ func TestRefreshTeamKillSummaryUsesParticipants(t *testing.T) {
 
 	if err := repo.refreshTeamKillSummary(context.Background(), "16.11", 420); err != nil {
 		t.Fatalf("refresh team kill summary: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestReplacePatchReadModelRowsInsertsBeforeDeletingOldRows(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+	cutoff := time.Date(2026, 5, 31, 14, 0, 0, 0, time.UTC)
+
+	mock.ExpectExec("INSERT INTO champion_role_analytics").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("ALTER TABLE champion_role_analytics DELETE WHERE patch = \\? AND queue_id = \\? AND compiled_at < \\? SETTINGS mutations_sync = 2").
+		WithArgs("16.10", uint16(420), cutoff).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err := repo.replacePatchReadModelRows(context.Background(), "champion_role_analytics", "16.10", 420, cutoff, func() error {
+		_, err := db.Exec("INSERT INTO champion_role_analytics")
+		return err
+	})
+	if err != nil {
+		t.Fatalf("replace read model rows: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestReplacePatchReadModelRowsKeepsOldRowsWhenRefreshFails(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+	refreshErr := errors.New("refresh failed")
+
+	err := repo.replacePatchReadModelRows(context.Background(), "champion_role_analytics", "16.10", 420, time.Now(), func() error {
+		return refreshErr
+	})
+	if !errors.Is(err, refreshErr) {
+		t.Fatalf("replace read model rows error = %v; want %v", err, refreshErr)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)

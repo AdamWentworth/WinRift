@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"winrift/core/internal/analytics"
 )
@@ -190,64 +191,53 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_skill_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	cutoff := time.Now().UTC().Add(-5 * time.Second)
+	refresh := func(table string, fn func(context.Context, string, uint16) error) error {
+		return r.replacePatchReadModelRows(ctx, table, patch, queueID, cutoff, func() error {
+			return fn(ctx, patch, queueID)
+		})
+	}
+	if err := refresh("champion_skill_analytics", r.refreshChampionSkillAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_ban_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("champion_ban_analytics", r.refreshChampionBanAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE team_kill_summary DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("team_kill_summary", r.refreshTeamKillSummary); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_role_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("champion_role_analytics", r.refreshChampionRoleAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_summary_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("champion_guide_summary_analytics", r.refreshChampionGuideSummaryAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_scope_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("champion_guide_scope_analytics", r.refreshChampionGuideScopeAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_matchup_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("champion_matchup_analytics", r.refreshChampionMatchupAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_signature_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("champion_signature_analytics", r.refreshChampionSignatureAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE build_signature_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	if err := refresh("build_signature_analytics", r.refreshBuildSignatureAnalytics); err != nil {
 		return err
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_build_variant_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	return refresh("champion_build_variant_analytics", r.refreshChampionBuildVariantAnalytics)
+}
+
+func (r *Repository) replacePatchReadModelRows(ctx context.Context, table, patch string, queueID uint16, cutoff time.Time, refresh func() error) error {
+	if err := refresh(); err != nil {
 		return err
 	}
-	if err := r.refreshChampionSkillAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshChampionBanAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshTeamKillSummary(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshChampionRoleAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshChampionGuideSummaryAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshChampionGuideScopeAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshChampionMatchupAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshChampionSignatureAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	if err := r.refreshBuildSignatureAnalytics(ctx, patch, queueID); err != nil {
-		return err
-	}
-	return r.refreshChampionBuildVariantAnalytics(ctx, patch, queueID)
+	return r.deletePatchReadModelRowsBefore(ctx, table, patch, queueID, cutoff)
+}
+
+func (r *Repository) deletePatchReadModelRowsBefore(ctx context.Context, table, patch string, queueID uint16, cutoff time.Time) error {
+	query := fmt.Sprintf("ALTER TABLE %s DELETE WHERE patch = ? AND queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2", table)
+	_, err := r.db.ExecContext(ctx, query, patch, queueID, cutoff)
+	return err
 }
 
 func (r *Repository) refreshChampionRoleAnalytics(ctx context.Context, patch string, queueID uint16) error {

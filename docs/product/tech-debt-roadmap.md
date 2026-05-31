@@ -404,9 +404,11 @@ Completed:
 - Split worker lanes by orchestration concern.
 - Split the largest ClickHouse repository/query files by read-model domain.
 - Add champion role-rate summaries for role discovery and default-role resolution.
+- Change champion guide read-model refreshes to insert fresh rows before deleting older compiled rows, avoiding transient empty guide tables during rebuilds.
 
 Next:
 
 1. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
-2. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+2. Apply staged refreshes to item-slot, summoner-profile, or win-condition lanes if timing logs show similar empty-window behavior.
+3. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+4. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.

@@ -160,6 +160,8 @@ Refresh options:
 
 The same refresh lane also populates `team_kill_summary`, `champion_role_analytics`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, and `build_signature_analytics`.
 
+The champion guide refresh lane stages these read models by inserting newly compiled rows first, then deleting rows with an older `compiled_at`. This keeps the previous snapshot visible during a rebuild and prevents a failed refresh from exposing empty champion guide pages.
+
 ## `patch_power_curve_metrics`
 
 Compact closed-patch participant power-curve metrics at 10, 15, and 20 minutes.

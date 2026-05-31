@@ -36,6 +36,7 @@ This endpoint is correctly bundled and has both in-memory and ClickHouse-backed 
 - Good: bundle caching means repeated clicks on the same champion/role/patch become cheap.
 - Good: item paths now read build signatures from `build_signature_analytics` for current/recent patches and `patch_build_metrics` for archived patches before falling back to retained normalized rows in local/dev safety cases.
 - Good: the worker now prewarms top champion/role bundles after champion-guide refreshes, and the cache key is canonicalized so query-param order does not create duplicate cache rows.
+- Good: champion guide read-model refreshes insert the new snapshot before cleaning older compiled rows, so public reads should not briefly see empty guide tables during refresh.
 
 Recommended read models:
 
@@ -80,4 +81,5 @@ For the MVP, pruning old bulky raw payloads is still acceptable as long as we ac
 ## Recommended Order
 
 1. Expand hot-response prewarming to matchup-specific champion pages if deployed timings show frequent cold misses there.
-2. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.
+2. Consider the same staged-refresh pattern for item-slot, summoner-profile, and win-condition summary lanes if timing logs catch empty-window behavior there too.
+3. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.
