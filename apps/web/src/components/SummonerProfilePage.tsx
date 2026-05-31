@@ -406,66 +406,68 @@ function SummonerHub({
         <strong>Profiles and Stored Ranked Ladder</strong>
         <p>Search a Riot ID to open a profile. If that player is in a live game, WinRift jumps straight into the match room.</p>
       </div>
-      <div className={validationError ? 'search-bar invalid summoner-hub-search' : 'search-bar summoner-hub-search'}>
-        <RadioTower className="search-mark" size={22} />
-        <input
-          value={riotId}
-          placeholder="Riot ID, e.g. Sneaky#NA69"
-          onChange={(event) => {
-            setRiotId(event.target.value);
-            setValidationError('');
-          }}
-          onFocus={() => setSuggestionsOpen(aliasSuggestions.length > 0)}
-          onKeyDown={(event) => event.key === 'Enter' && search()}
-        />
-        <button
-          className="server-button"
-          onClick={() => setShowPlatforms((visible) => !visible)}
-          style={{ backgroundColor: selectedPlatform.color }}
-          type="button"
-        >
-          {selectedPlatform.label}
-        </button>
-        <button className="search-button" onClick={search} title="Search summoners" aria-label="Search summoners" type="button">
-          <Search size={19} />
-          <span>Search</span>
-        </button>
+      <div className="summoner-search-shell">
+        <div className={validationError ? 'search-bar invalid summoner-hub-search' : 'search-bar summoner-hub-search'}>
+          <RadioTower className="search-mark" size={22} />
+          <input
+            value={riotId}
+            placeholder="Riot ID, e.g. Sneaky#NA69"
+            onChange={(event) => {
+              setRiotId(event.target.value);
+              setValidationError('');
+            }}
+            onFocus={() => setSuggestionsOpen(aliasSuggestions.length > 0)}
+            onKeyDown={(event) => event.key === 'Enter' && search()}
+          />
+          <button
+            className="server-button"
+            onClick={() => setShowPlatforms((visible) => !visible)}
+            style={{ backgroundColor: selectedPlatform.color }}
+            type="button"
+          >
+            {selectedPlatform.label}
+          </button>
+          <button className="search-button" onClick={search} title="Search summoners" aria-label="Search summoners" type="button">
+            <Search size={19} />
+            <span>Search</span>
+          </button>
+        </div>
+        {showPlatforms ? (
+          <div className="server-options-row summoner-server-options">
+            {platforms.map((candidate) => (
+              <button
+                key={candidate.value}
+                className={candidate.value === platform ? 'server-option selected' : 'server-option'}
+                onClick={() => {
+                  setPlatform(candidate.value);
+                  setShowPlatforms(false);
+                }}
+                style={{ backgroundColor: candidate.color }}
+                type="button"
+              >
+                {candidate.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {showAliasSuggestions ? (
+          <div className="search-autocomplete summoner-search-autocomplete">
+            {aliasSuggestions.map((alias) => (
+              <button
+                key={`${alias.platform}:${alias.puuid}:${alias.tagLine}`}
+                className="alias-option"
+                onClick={() => selectAlias(alias)}
+                aria-label={`Use ${alias.gameName}#${alias.tagLine}`}
+                type="button"
+              >
+                <span className="alias-name">{alias.gameName}</span>
+                <span className="alias-tag">#{alias.tagLine}</span>
+                <span className="alias-platform">{platformLabel(alias.platform)}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
-      {showPlatforms ? (
-        <div className="server-options-row summoner-server-options">
-          {platforms.map((candidate) => (
-            <button
-              key={candidate.value}
-              className={candidate.value === platform ? 'server-option selected' : 'server-option'}
-              onClick={() => {
-                setPlatform(candidate.value);
-                setShowPlatforms(false);
-              }}
-              style={{ backgroundColor: candidate.color }}
-              type="button"
-            >
-              {candidate.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {showAliasSuggestions ? (
-        <div className="search-autocomplete summoner-search-autocomplete">
-          {aliasSuggestions.map((alias) => (
-            <button
-              key={`${alias.platform}:${alias.puuid}:${alias.tagLine}`}
-              className="alias-option"
-              onClick={() => selectAlias(alias)}
-              aria-label={`Use ${alias.gameName}#${alias.tagLine}`}
-              type="button"
-            >
-              <span className="alias-name">{alias.gameName}</span>
-              <span className="alias-tag">#{alias.tagLine}</span>
-              <span className="alias-platform">{platformLabel(alias.platform)}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
       <div className={aliasLoading || validationError ? 'lookup-status has-message' : 'lookup-status'} aria-live="polite">
         {aliasLoading ? (
           <div className="search-message-card checking">
