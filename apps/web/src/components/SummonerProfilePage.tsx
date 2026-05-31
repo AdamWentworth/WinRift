@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CircleAlert, Gamepad2, LoaderCircle, UserRound } from 'lucide-react';
+import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { getLiveGame, getSummonerProfile, resolveAccountAlias } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ItemData, RuneData, SummonerProfile, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
-import { profileIconUrl } from '../lib/staticData';
 import { LiveMatchups } from './LiveMatchups';
+import { ProfileHeader } from './summoner-profile/ProfileHeader';
 import { ProfileMessage } from './summoner-profile/ProfileMessage';
 import { StoredProfile, type ProfileSection } from './summoner-profile/ProfileSections';
 import { SummonerHub } from './summoner-profile/SummonerHub';
@@ -124,39 +124,21 @@ export function SummonerProfilePage({
   const notInGame = Boolean(liveError);
   const showAliasLoading = aliasQuery.isLoading && Boolean(gameName && !tagLine);
   const showLiveLoading = liveQuery.isLoading && Boolean(resolvedGameName && resolvedTagLine);
-  const summonerIcon = profileIconUrl(champions?.version, profileQuery.data?.summoner?.profileIconId);
-  const summonerLevel = profileQuery.data?.summoner?.summonerLevel;
 
   return (
     <section className="profile-page">
       <div className="profile-card">
-        <div className="profile-card-header">
-          {summonerIcon ? (
-            <img className="profile-card-icon" src={summonerIcon} alt={`${exactRiotId} profile icon`} />
-          ) : (
-            <UserRound size={24} />
-          )}
-          <div>
-            <span>Summoner Profile</span>
-            <strong>{exactRiotId || 'Search for a Riot ID'}</strong>
-          </div>
-          <em>{platformLabel(resolvedPlatform)}{summonerLevel ? ` · Level ${formatNumber(summonerLevel)}` : ''}</em>
-        </div>
-
-        {resolvedGameName && resolvedTagLine ? (
-          <div className="profile-action-row">
-            <button
-              className={`profile-action-button ${liveQuery.data ? 'live' : ''}`}
-              disabled={!liveQuery.data}
-              onClick={() => setLiveViewDismissed(false)}
-              type="button"
-            >
-              <Gamepad2 size={16} />
-              <span>Live Match</span>
-              <em>{liveQuery.data ? 'Live now' : liveQuery.isLoading ? 'Checking...' : 'Not live'}</em>
-            </button>
-          </div>
-        ) : null}
+        <ProfileHeader
+          exactRiotId={exactRiotId}
+          platform={resolvedPlatform}
+          staticVersion={champions?.version}
+          profileIconId={profileQuery.data?.summoner?.profileIconId}
+          summonerLevel={profileQuery.data?.summoner?.summonerLevel}
+          canCheckLive={Boolean(resolvedGameName && resolvedTagLine)}
+          liveAvailable={Boolean(liveQuery.data)}
+          liveLoading={liveQuery.isLoading}
+          onShowLive={() => setLiveViewDismissed(false)}
+        />
 
         {!gameName ? (
           <SummonerHub
@@ -253,10 +235,6 @@ function profileLiveError(riotId: string, message: string) {
     return `Summoner '${riotId.trim()}' is not currently in a live match`;
   }
   return message;
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('en-US').format(value);
 }
 
 function profileBackgroundChampionPool(profile: SummonerProfile) {

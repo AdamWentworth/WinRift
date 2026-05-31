@@ -158,7 +158,7 @@ Summoner profile extraction candidates:
 
 - summoner search hub, leaderboard, and shared profile message: first pass complete in `components/summoner-profile/`
 - stored profile tabs, rows, and freshness helpers: first pass complete in `components/summoner-profile/ProfileSections.tsx`
-- profile header
+- profile header: first pass complete in `components/summoner-profile/ProfileHeader.tsx`
 
 ## Priority 4: Backend Maintainability
 
