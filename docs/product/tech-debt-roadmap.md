@@ -151,10 +151,8 @@ Build guide extraction candidates:
 
 - item panels and item selection helpers: first pass complete in `components/build-guide/GuideItemPanels.tsx`
 - build variant tabs and family grouping: first pass complete in `components/build-guide/BuildVariantTabs.tsx`
+- rune, spell, matchup, and skill cards: first pass complete in `components/build-guide/GuideDataCards.tsx`
 - hero/header
-- rune panel
-- matchup cards
-- skill path
 
 Summoner profile extraction candidates:
 
