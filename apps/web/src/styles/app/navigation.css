@@ -1,0 +1,79 @@
+.topbar-nav {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.topbar-nav button {
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #dce8f0;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 34px;
+  min-width: 104px;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+
+.topbar-nav button:hover,
+.topbar-nav button:focus-visible,
+.topbar-nav button.selected {
+  background: linear-gradient(180deg, rgb(61 113 255 / 36%), rgb(38 67 150 / 34%));
+  border-color: rgb(83 133 255 / 74%);
+  color: #fff;
+  outline: none;
+}
+
+.topbar-patch-selector {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(130 215 255 / 13%), rgb(0 0 0 / 14%)),
+    rgb(8 14 16 / 72%);
+  border: 1px solid rgb(130 215 255 / 24%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 7%);
+  color: #dceff5;
+  display: grid;
+  flex: 0 0 190px;
+  gap: 2px;
+  min-height: 42px;
+  padding: 5px 10px;
+}
+
+.topbar-patch-selector span,
+.topbar-patch-selector em {
+  color: #93aeb7;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 1000;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.topbar-patch-selector select,
+.topbar-patch-selector b {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 1000;
+  line-height: 1.1;
+  min-width: 0;
+  outline: none;
+  width: 100%;
+}
+
+.topbar-patch-selector select option {
+  background: #15191a;
+  color: #fff;
+}
+
+.guide-mode {
+  background:
+    radial-gradient(ellipse at 50% 18%, rgb(116 202 214 / 14%), transparent 42%),
+    linear-gradient(115deg, transparent 0 33.6%, rgb(130 215 255 / 14%) 34% 34.42%, transparent 34.8% 64%, rgb(240 128 128 / 10%) 64.32% 64.75%, transparent 65.1%),
+    linear-gradient(180deg, #202426 0%, #171a1c 72%, #080909 100%);
+}

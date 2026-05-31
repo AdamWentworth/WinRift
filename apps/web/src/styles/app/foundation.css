@@ -1,0 +1,256 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #111;
+  color: #f4f6f8;
+  letter-spacing: 0;
+  scrollbar-gutter: stable;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #111;
+  overflow-y: scroll;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.role-icon {
+  color: currentColor;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 1.18em;
+  vertical-align: -0.16em;
+  width: 1.18em;
+}
+
+.app-shell {
+  --global-art-active-opacity: 0.82;
+  --global-art-aura-opacity: 15%;
+  --global-art-brightness: 0.68;
+  --global-art-contrast: 0.94;
+  --global-art-center-dark: 16%;
+  --global-art-img-opacity: 0.72;
+  --global-art-line-opacity: 0.78;
+  --global-art-saturate: 0.78;
+  --global-art-stage-bottom: 62%;
+  --global-art-stage-top: 34%;
+  --global-art-vignette-bottom: 72%;
+  --global-art-vignette-center: 18%;
+  --global-art-vignette-side: 70%;
+  --global-art-vignette-top: 54%;
+  background:
+    radial-gradient(ellipse at 50% -20%, rgb(121 197 207 / 12%), transparent 46%),
+    linear-gradient(180deg, #303234 0%, #242628 72%, #101112 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.app-shell.background-showcase {
+  --global-art-active-opacity: 0.92;
+  --global-art-aura-opacity: 18%;
+  --global-art-brightness: 0.78;
+  --global-art-center-dark: 8%;
+  --global-art-img-opacity: 0.82;
+  --global-art-line-opacity: 0.88;
+  --global-art-saturate: 0.9;
+  --global-art-stage-bottom: 54%;
+  --global-art-stage-top: 24%;
+  --global-art-vignette-bottom: 66%;
+  --global-art-vignette-center: 12%;
+  --global-art-vignette-side: 64%;
+  --global-art-vignette-top: 42%;
+}
+
+.app-shell.background-directory {
+  --global-art-active-opacity: 0.78;
+  --global-art-brightness: 0.62;
+  --global-art-center-dark: 18%;
+  --global-art-img-opacity: 0.64;
+  --global-art-line-opacity: 0.68;
+  --global-art-saturate: 0.8;
+  --global-art-vignette-bottom: 76%;
+  --global-art-vignette-center: 22%;
+  --global-art-vignette-side: 72%;
+  --global-art-vignette-top: 58%;
+}
+
+.app-shell.background-champion-scope {
+  --global-art-active-opacity: 0.84;
+  --global-art-aura-opacity: 18%;
+  --global-art-brightness: 0.66;
+  --global-art-center-dark: 20%;
+  --global-art-img-opacity: 0.7;
+  --global-art-line-opacity: 0.6;
+  --global-art-saturate: 0.86;
+  --global-art-vignette-bottom: 78%;
+  --global-art-vignette-center: 24%;
+  --global-art-vignette-side: 76%;
+  --global-art-vignette-top: 60%;
+}
+
+.app-shell.background-data,
+.app-shell.background-dense {
+  --global-art-active-opacity: 0.66;
+  --global-art-aura-opacity: 12%;
+  --global-art-brightness: 0.52;
+  --global-art-center-dark: 28%;
+  --global-art-img-opacity: 0.5;
+  --global-art-line-opacity: 0.48;
+  --global-art-saturate: 0.7;
+  --global-art-stage-bottom: 68%;
+  --global-art-stage-top: 42%;
+  --global-art-vignette-bottom: 84%;
+  --global-art-vignette-center: 30%;
+  --global-art-vignette-side: 80%;
+  --global-art-vignette-top: 66%;
+}
+
+.app-shell.background-dense {
+  --global-art-active-opacity: 0.62;
+  --global-art-brightness: 0.5;
+  --global-art-img-opacity: 0.46;
+  --global-art-line-opacity: 0.42;
+}
+
+.topbar {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(35 38 40 / 98%), rgb(26 28 30 / 98%)),
+    #202020;
+  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
+  display: flex;
+  height: 77px;
+  justify-content: space-between;
+  padding: 0 22px;
+  position: relative;
+  z-index: 5;
+}
+
+.topbar h1 {
+  line-height: 1;
+  margin: 0;
+}
+
+.topbar-brand {
+  flex: 0 0 auto;
+  min-width: 138px;
+}
+
+.topbar-logo {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+  text-align: left;
+}
+
+.topbar-logo:hover,
+.topbar-logo:focus-visible {
+  color: #d9f6ff;
+  outline: none;
+  text-shadow: 0 0 12px rgb(130 215 255 / 34%);
+}
+
+.live-topbar {
+  position: relative;
+  z-index: 20;
+}
+
+.live-topbar > div {
+  flex: 0 0 auto;
+  min-width: 148px;
+}
+
+.live-topbar .topbar-nav {
+  display: none;
+}
+
+.live-panel {
+  min-height: calc(100vh - 77px);
+}
+
+.live-panel.has-game {
+  background: transparent;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+
+.live-panel.has-game::before,
+.live-panel.has-game::after {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.live-panel.has-game::before {
+  background:
+    linear-gradient(115deg, transparent 0 33.6%, rgb(130 215 255 / 16%) 34% 34.42%, transparent 34.8% 64%, rgb(240 128 128 / 14%) 64.32% 64.75%, transparent 65.1%),
+    linear-gradient(24deg, transparent 0 40.8%, rgb(255 255 255 / 8%) 41.05% 41.36%, transparent 41.72%),
+    linear-gradient(90deg, transparent 0 21.8%, rgb(255 255 255 / 5%) 22.05% 22.24%, transparent 22.46% 76.8%, rgb(255 255 255 / 5%) 77.05% 77.24%, transparent 77.46%);
+  opacity: 0.7;
+}
+
+.live-panel.has-game::after {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgb(0 0 0 / 8%) 0 24%, rgb(0 0 0 / 28%) 70%),
+    linear-gradient(90deg, rgb(0 0 0 / 52%), rgb(0 0 0 / 20%) 34%, rgb(0 0 0 / 20%) 66%, rgb(0 0 0 / 52%)),
+    linear-gradient(180deg, rgb(0 0 0 / 34%) 0%, rgb(0 0 0 / 16%) 24%, rgb(0 0 0 / 56%) 88%, rgb(0 0 0 / 78%));
+}
+
+.search-only {
+  align-items: center;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+}
+
+.search-only::before {
+  background:
+    linear-gradient(115deg, transparent 0 33.6%, rgb(130 215 255 / 22%) 34% 34.42%, transparent 34.8% 64%, rgb(240 128 128 / 20%) 64.32% 64.75%, transparent 65.1%),
+    linear-gradient(24deg, transparent 0 40.8%, rgb(255 255 255 / 12%) 41.05% 41.36%, transparent 41.72%),
+    linear-gradient(90deg, transparent 0 21.8%, rgb(255 255 255 / 7%) 22.05% 22.24%, transparent 22.46% 76.8%, rgb(255 255 255 / 7%) 77.05% 77.24%, transparent 77.46%);
+  content: "";
+  inset: 0;
+  opacity: 0.98;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.search-only::after {
+  background:
+    radial-gradient(ellipse at 50% 42%, rgb(0 0 0 / 10%) 0 24%, rgb(0 0 0 / 30%) 70%),
+    linear-gradient(90deg, rgb(0 0 0 / 72%), rgb(0 0 0 / 18%) 34%, rgb(0 0 0 / 18%) 66%, rgb(0 0 0 / 72%)),
+    linear-gradient(180deg, rgb(0 0 0 / 36%) 0%, rgb(0 0 0 / 12%) 28%, rgb(0 0 0 / 62%) 86%, rgb(0 0 0 / 88%));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+

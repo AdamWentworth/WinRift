@@ -112,24 +112,26 @@ The `prod` folder is an environment boundary, not empty ceremony. Production Com
 
 ### Split `app.css`
 
-`apps/web/src/styles/app.css` is large enough that it is becoming a maintenance liability.
-
-Suggested split:
+Current pass complete: `apps/web/src/styles/app.css` is now an import manifest, and the former single-file stylesheet is split into `apps/web/src/styles/app/` by page surface and stable primitives:
 
 ```text
-styles/
-├── base.css
-├── background.css
-├── forms.css
-├── navigation.css
-├── live-match.css
-├── champion-guide.css
+styles/app/
+├── foundation.css
 ├── summoner-profile.css
+├── background-stage.css
+├── lookup-search.css
+├── live-layout.css
+├── live-win-conditions.css
+├── live-player-cards.css
+├── live-focused-builds.css
+├── navigation.css
+├── champion-directory.css
 ├── tier-list.css
-└── utilities.css
+├── build-guide.css
+└── responsive.css
 ```
 
-Guardrail: split by product surface and stable primitives, not by tiny components. The goal is easier scanning, not CSS fragmentation.
+Guardrail remains: split by product surface and stable primitives, not by tiny components. The goal is easier scanning, not CSS fragmentation.
 
 ### Extract Large Page Sections
 
@@ -309,11 +311,16 @@ See `docs/product/global-background-system.md`.
 
 ## Recommended Next Cleanup Order
 
-1. Add frontend CI.
-2. Add a manual/local performance smoke script.
-3. Split `app.css` by page surface.
-4. Split `server.go` by handler domain.
-5. Extract `BuildGuidePage.tsx` sections.
-6. Extract `SummonerProfilePage.tsx` sections.
-7. Decide whether to rename `services/core` to `core`.
+Completed:
+
+- Add frontend CI.
+- Add a manual/local performance smoke script.
+- Split `app.css` by page surface.
+
+Next:
+
+1. Split `server.go` by handler domain.
+2. Extract `BuildGuidePage.tsx` sections.
+3. Extract `SummonerProfilePage.tsx` sections.
+4. Decide whether to rename `services/core` to `core`.
 8. Add observability for API timing and worker refresh health.

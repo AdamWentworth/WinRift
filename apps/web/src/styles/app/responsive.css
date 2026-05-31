@@ -1,0 +1,779 @@
+@media (max-width: 1120px) {
+  .guide-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tier-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tier-filter-bar .guide-filter-label,
+  .tier-role-tabs {
+    grid-column: 1 / -1;
+  }
+
+  .tier-list-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-table-card {
+    overflow-x: auto;
+  }
+
+  .tier-table-header,
+  .tier-table-row {
+    min-width: 980px;
+  }
+
+  .guide-filter-label,
+  .guide-role-tabs,
+  .guide-select-control.matchup {
+    grid-column: 1 / -1;
+  }
+
+  .guide-primary-grid,
+  .guide-skill-items-row,
+  .guide-matchups-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-item-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guide-build-path-card {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .guide-build-path-stats {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .live-mode-layout {
+    display: block;
+    max-width: 1500px;
+  }
+
+  .live-mode-rail {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0 auto 8px;
+    max-width: 1500px;
+    position: static;
+  }
+
+  .live-mode-button {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    min-height: 54px;
+    padding: 8px 10px;
+    text-align: left;
+  }
+
+  .live-mode-context {
+    grid-template-columns: 1fr;
+  }
+
+  .live-mode-status {
+    justify-self: start;
+  }
+
+  .champion-row,
+  .build-row,
+  .lane-header-row {
+    grid-template-columns: repeat(5, minmax(160px, 1fr));
+    overflow-x: auto;
+    padding: 6px;
+  }
+
+  .match-header {
+    grid-template-columns: 1fr;
+  }
+
+  .match-header-player,
+  .match-header-context {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .match-header-context {
+    flex-direction: column;
+  }
+
+  .match-header-identity {
+    flex-wrap: wrap;
+  }
+
+  .match-header h2 {
+    font-size: 20px;
+  }
+
+  .match-subline {
+    justify-content: flex-start;
+  }
+
+  .match-header-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .focused-build-panel {
+    max-width: 1500px;
+  }
+
+  .focused-build-command-row {
+    grid-template-columns: 1fr;
+  }
+
+  .win-condition-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .win-team-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .win-team-strip header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .win-team-slots {
+    grid-template-columns: repeat(5, minmax(150px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .match-read-section {
+    grid-column: auto;
+  }
+
+  .player-card,
+  .match-build-card {
+    min-width: 160px;
+  }
+
+  .profile-build-row {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-build-paths,
+  .profile-build-loadout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summoner-leaderboard-row {
+    grid-template-columns: 46px 42px minmax(160px, 1fr) minmax(110px, auto) minmax(130px, auto);
+  }
+
+  .summoner-ladder-stored {
+    grid-column: 3 / -1;
+    justify-self: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    height: 52px;
+    padding: 0 14px;
+  }
+
+  .topbar-logo {
+    font-size: 21px;
+  }
+
+  .topbar-brand {
+    min-width: 86px;
+  }
+
+  .topbar-nav {
+    flex: 1 1 auto;
+    gap: 5px;
+    justify-content: flex-end;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .topbar-nav button {
+    flex: 0 0 auto;
+    font-size: 10px;
+    min-width: 68px;
+    padding: 0 8px;
+  }
+
+  .topbar-patch-selector {
+    flex: 0 0 118px;
+    min-height: 34px;
+    padding: 4px 7px;
+  }
+
+  .topbar-patch-selector em {
+    display: none;
+  }
+
+  .build-guide-page {
+    padding: 10px 8px 28px;
+  }
+
+  .tier-list-page {
+    padding: 10px 8px 28px;
+  }
+
+  .tier-list-hero,
+  .tier-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .tier-list-hero-copy h2 {
+    font-size: 28px;
+  }
+
+  .profile-page {
+    align-items: stretch;
+    padding: 10px 8px 28px;
+  }
+
+  .profile-card {
+    width: 100%;
+  }
+
+  .summoner-leaderboard-header,
+  .summoner-leaderboard-row {
+    grid-template-columns: 1fr;
+  }
+
+  .summoner-leaderboard-header em,
+  .summoner-ladder-rank,
+  .summoner-ladder-stored {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .summoner-ladder-profile-icon,
+  .summoner-ladder-icon-fallback {
+    grid-row: auto;
+  }
+
+  .profile-action-row,
+  .profile-section-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-snapshot-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-read-layout,
+  .profile-tab-header {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-read-layout,
+  .profile-tab-header {
+    display: grid;
+  }
+
+  .profile-read-side,
+  .profile-tab-summary,
+  .profile-builds-tab .profile-tab-summary,
+  .profile-highlight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-tab-actions,
+  .profile-tab-controls {
+    justify-content: flex-start;
+  }
+
+  .profile-tab-search {
+    width: 100%;
+  }
+
+  .profile-champion-row,
+  .profile-match-row,
+  .profile-build-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-match-row > div:not(.profile-row-stats) {
+    grid-column: 1 / -1;
+  }
+
+  .profile-build-identity,
+  .profile-build-paths,
+  .profile-build-loadout {
+    grid-column: 1 / -1;
+  }
+
+  .profile-build-paths,
+  .profile-build-loadout {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-row-stats {
+    grid-column: 1 / -1;
+  }
+
+  .champion-directory-page {
+    padding: 10px 8px 28px;
+  }
+
+  .champion-directory-hero,
+  .champion-directory-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .champion-directory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .champion-directory-card {
+    min-height: 212px;
+  }
+
+  .directory-card-name {
+    font-size: 17px;
+  }
+
+  .guide-hero {
+    display: block;
+    min-height: 0;
+  }
+
+  .guide-hero-main {
+    align-items: flex-start;
+  }
+
+  .guide-champion-card {
+    flex: 0 0 auto;
+    height: 72px;
+    width: 72px;
+  }
+
+  .guide-title-block h2 {
+    font-size: 25px;
+    line-height: 1.05;
+  }
+
+  .guide-title-block h2 span {
+    display: block;
+    font-size: 20px;
+    margin-top: 3px;
+  }
+
+  .guide-hero-aside {
+    margin-top: 14px;
+  }
+
+  .guide-stat-strip,
+  .guide-coverage-strip,
+  .guide-build-advice-strip,
+  .guide-filter-bar,
+  .guide-rune-grid,
+  .guide-item-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-stat-shards {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .guide-build-path-card {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-build-path-rank {
+    height: 24px;
+    width: 24px;
+  }
+
+  .guide-build-path-stats {
+    grid-column: auto;
+  }
+
+  .guide-stat {
+    border-left: 0;
+    border-top: 1px solid rgb(111 119 199 / 26%);
+    padding: 8px 14px;
+  }
+
+  .guide-stat:first-child {
+    border-top: 0;
+  }
+
+  .guide-role-tabs {
+    overflow-x: auto;
+  }
+
+  .guide-role-tabs button {
+    min-width: 78px;
+  }
+
+  .tier-role-tabs button {
+    min-width: 92px;
+  }
+
+  .skill-path-placeholder-grid div {
+    grid-template-columns: 28px repeat(9, minmax(18px, 1fr));
+  }
+
+  .skill-path-placeholder-grid span:nth-of-type(n+10) {
+    display: none;
+  }
+
+  .live-panel {
+    min-height: calc(100vh - 52px);
+  }
+
+  .live-topbar > div {
+    min-width: 86px;
+  }
+
+  .has-game .search-section {
+    height: 52px;
+    padding: 0 8px 0 104px;
+    top: -52px;
+  }
+
+  .search-bar {
+    grid-template-columns: 1fr 92px 94px;
+  }
+
+  .has-game .search-bar {
+    gap: 5px;
+    grid-template-columns: minmax(0, 1fr) 56px 42px;
+    padding: 4px;
+    width: 100%;
+  }
+
+  .has-game .search-bar input {
+    min-height: 32px;
+    padding: 0 8px;
+  }
+
+  .has-game .server-button {
+    min-height: 32px;
+    padding: 0 6px;
+    width: 56px;
+  }
+
+  .has-game .search-button {
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    width: 42px;
+  }
+
+  .has-game .search-button span {
+    display: none;
+  }
+
+  .search-mark {
+    display: none;
+  }
+
+  .game-board {
+    padding: 8px;
+  }
+
+  .live-mode-rail {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .live-mode-button {
+    min-height: 46px;
+    padding: 7px 8px;
+  }
+
+  .live-mode-button strong {
+    font-size: 9px;
+  }
+
+  .live-mode-button em {
+    display: none;
+  }
+
+  .focused-build-command-row {
+    grid-template-columns: 1fr;
+  }
+
+  .focused-build-command-group,
+  .focused-build-command-group.build-target,
+  .focused-build-command-group.opponent-target {
+    grid-template-columns: 1fr;
+  }
+
+  .focused-build-versus {
+    height: 24px;
+    justify-self: center;
+    width: 42px;
+  }
+
+  .focused-build-player.enemy {
+    text-align: left;
+  }
+
+  .build-setup-strip,
+  .focused-build-results,
+  .focused-build-result-body,
+  .focused-build-result > header {
+    grid-template-columns: 1fr;
+  }
+
+  .build-setup-block {
+    grid-template-columns: 1fr;
+  }
+
+  .build-setup-block em,
+  .build-setup-shards {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .focused-build-result > header div {
+    justify-items: start;
+  }
+
+  .focused-build-panel .build-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .win-condition-panel {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .win-team-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .mobile-lane-tabs {
+    display: grid;
+    gap: 5px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mobile-lane-tabs button {
+    align-items: center;
+    background: rgb(0 0 0 / 26%);
+    border: 1px solid rgb(255 255 255 / 10%);
+    color: #b7c4cb;
+    display: inline-flex;
+    font-size: 9px;
+    font-weight: 900;
+    gap: 3px;
+    justify-content: center;
+    line-height: 1;
+    min-height: 32px;
+    padding: 0 3px;
+    text-transform: uppercase;
+  }
+
+  .mobile-lane-tabs button.selected {
+    background:
+      linear-gradient(180deg, rgb(100 239 232 / 18%), rgb(100 239 232 / 8%)),
+      rgb(0 0 0 / 30%);
+    border-color: #64efe8;
+    color: #fff;
+  }
+
+  .lane-header-row {
+    display: none;
+  }
+
+  .mobile-hidden {
+    display: none;
+  }
+
+  .champion-row,
+  .build-row {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+    padding: 0;
+  }
+
+  .cards-container {
+    grid-template-columns: 1fr;
+  }
+
+  .blue-row,
+  .red-row,
+  .build-row {
+    align-content: start;
+    display: grid;
+  }
+
+  .player-card,
+  .match-build-card {
+    min-height: 196px;
+    min-width: 0;
+    padding: 9px;
+  }
+
+  .card-topline {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .profile-picture {
+    height: 36px;
+    left: 9px;
+    top: 9px;
+    width: 36px;
+  }
+
+  .player-title {
+    padding: 0;
+    width: calc(100% - 92px);
+  }
+
+  .player-stat-columns {
+    gap: 6px;
+    grid-template-columns: 1fr;
+    margin-bottom: 8px;
+  }
+
+  .rank-info,
+  .champion-performance {
+    margin-bottom: 8px;
+    min-height: 58px;
+    padding: 6px 4px;
+  }
+
+  .ranked-card-icon {
+    height: 34px;
+    right: 7px;
+    top: 7px;
+    width: 34px;
+  }
+
+  .summoner-name,
+  .champion-name,
+  .build-heading strong {
+    font-size: 10px;
+  }
+
+  .stat-chip strong,
+  .stat-chip em {
+    font-size: 9px;
+  }
+
+  .card-loadout {
+    grid-template-columns: 1fr;
+  }
+
+  .summoner-spells img,
+  .runes img,
+  .spell-pill,
+  .rune-fallback {
+    height: 22px;
+    width: 22px;
+  }
+
+  .build-rate strong {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .search-only .search-section {
+    width: calc(100vw - 20px);
+  }
+
+  .champion-directory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-snapshot-strip,
+  .profile-section-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-card-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-card-header em {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .profile-freshness-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-freshness-banner span {
+    white-space: normal;
+  }
+
+  .profile-row-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .win-team-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .lookup-console {
+    padding: 14px 10px;
+  }
+
+  .search-bar {
+    grid-template-columns: 1fr;
+    padding: 9px;
+    width: 100%;
+  }
+
+  .has-game .search-bar {
+    grid-template-columns: minmax(0, 1fr) 56px 42px;
+    padding: 4px;
+  }
+
+  .server-button,
+  .has-game .server-button,
+  .search-button,
+  .has-game .search-button {
+    width: 100%;
+  }
+
+  .has-game .server-button {
+    width: 56px;
+  }
+
+  .has-game .search-button {
+    width: 42px;
+  }
+
+  .server-options-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    left: 0;
+    right: 0;
+    transform: none;
+    width: 100%;
+  }
+
+  .search-autocomplete {
+    left: 0;
+    transform: none;
+    width: 100%;
+  }
+
+  .search-button {
+    width: 100%;
+  }
+}
