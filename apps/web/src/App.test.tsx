@@ -244,6 +244,36 @@ describe('App', () => {
   });
 
   it('turns the summoners page into a searchable ranked ladder hub', async () => {
+    vi.mocked(getSummonerLeaderboard).mockResolvedValueOnce({
+      platform: 'NA1',
+      queueType: 'RANKED_SOLO_5x5',
+      results: [
+        {
+          rank: 1,
+          puuid: 'leader-puuid',
+          platform: 'NA1',
+          gameName: 'Leaderboard Pro',
+          tagLine: 'NA1',
+          ranked: {
+            queueType: 'RANKED_SOLO_5x5',
+            tier: 'CHALLENGER',
+            division: 'I',
+            leaguePoints: 922,
+            wins: 120,
+            losses: 80,
+            totalGames: 200,
+            winRate: 60,
+            rankBucket: 'CHALLENGER',
+          },
+          profileIconId: 588,
+          summonerLevel: 301,
+          rankedGames: 200,
+          storedGames: 24,
+          storedWins: 15,
+          storedWinRate: 62.5,
+        },
+      ],
+    });
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: { retry: false },
@@ -263,11 +293,43 @@ describe('App', () => {
     expect(screen.getByPlaceholderText('Riot ID, e.g. Sneaky#NA69')).toBeInTheDocument();
     await waitFor(() => expect(getSummonerLeaderboard).toHaveBeenCalledWith('NA1', 50));
     expect(await screen.findByText('Leaderboard Pro')).toBeInTheDocument();
+    const profileIcon = screen.getByAltText('Leaderboard Pro profile icon');
+    expect(profileIcon).toHaveAttribute('src', expect.stringContaining('/16.10.1/img/profileicon/588.png'));
+    expect(screen.getByAltText('CHALLENGER I')).toHaveAttribute('src', '/images/ranked_icons/challenger.png');
     expect(screen.getByText('CHALLENGER I')).toBeInTheDocument();
     expect(screen.getByText('24 stored · 62.5% WR')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Leaderboard Pro/i }));
     await waitFor(() => expect(window.location.pathname).toBe('/summoners/NA1/Leaderboard%20Pro/NA1'));
+    queryClient.clear();
+  });
+
+  it('keeps the summoner region selector anchored inside the search shell', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Summoners' }));
+    const shell = await waitFor(() => {
+      const element = container.querySelector('.summoner-search-shell');
+      expect(element).toBeTruthy();
+      return element as HTMLElement;
+    });
+    fireEvent.click(within(shell).getByRole('button', { name: 'NA' }));
+
+    const options = shell.querySelector('.summoner-server-options');
+    expect(options).toBeTruthy();
+    expect(options?.parentElement).toBe(shell);
+    expect(within(options as HTMLElement).getByRole('button', { name: 'EUW' })).toBeInTheDocument();
     queryClient.clear();
   });
 

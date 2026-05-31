@@ -207,6 +207,8 @@ Good candidates:
 - starting item panel does not show impossible duplicate openers,
 - live-match modes gate heavy queries until selected.
 
+Status: first pass in place. App-level and focused component tests now cover the summoner ladder/profile icon path, the anchored summoner region selector, champion main-role routing, build variant item/rune/skill switching shape, impossible duplicate item display, and live-mode query gating.
+
 ### Backend Query Tests
 
 Good candidates:
@@ -318,9 +320,9 @@ Completed:
 - Extract `SummonerProfilePage.tsx` sections.
 - Add first-pass observability for API timing and worker refresh health.
 - Rename `services/core` to `core`.
+- Add first-pass frontend regression tests for the highest-risk UI surfaces.
 
 Next:
 
-1. Add frontend regression tests for the highest-risk UI surfaces.
-2. Add backend query tests around read-model endpoints and patch retention.
-3. Create the read-model coverage audit.
+1. Add backend query tests around read-model endpoints and patch retention.
+2. Create the read-model coverage audit.
