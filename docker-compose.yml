@@ -10,7 +10,7 @@ services:
       CLICKHOUSE_PASSWORD: winrift
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./services/core/internal/clickhouse/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./core/internal/clickhouse/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
       interval: 10s
@@ -20,7 +20,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: services/core/Dockerfile
+      dockerfile: core/Dockerfile
     env_file:
       - .env
     environment:
@@ -44,7 +44,7 @@ services:
     restart: "no"
     build:
       context: .
-      dockerfile: services/core/Dockerfile
+      dockerfile: core/Dockerfile
     command: ["/winrift-worker"]
     env_file:
       - .env
@@ -65,7 +65,7 @@ services:
       - monitor
     build:
       context: .
-      dockerfile: services/core/Dockerfile
+      dockerfile: core/Dockerfile
     command: ["/winrift-monitor"]
     env_file:
       - .env

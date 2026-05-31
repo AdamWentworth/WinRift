@@ -31,7 +31,7 @@ docker compose run --rm api /winrift-patchctl -action archive -patch 16.9 -platf
 Local Go:
 
 ```bash
-cd services/core
+cd core
 go run ./cmd/patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
 ```
 

@@ -9,7 +9,7 @@ Current public-facing cleanup status:
 - Root `.env` is ignored.
 - `.env.example` and `ops/prod/winrift.env.example` use placeholders.
 - The legacy prototype code and generated legacy data have been removed from the working tree.
-- The test fixture needed by Go tests now lives under `services/core/testdata/` with player identifiers sanitized.
+- The test fixture needed by Go tests now lives under `core/testdata/` with player identifiers sanitized.
 - Runtime data, local database files, dumps, backups, local builds, and generated web output are ignored.
 
 ## History Risk
@@ -56,7 +56,7 @@ This is more delicate than the clean-snapshot approach and not necessary for a r
 - Confirm `git status --short` is clean.
 - Confirm no tracked `.env` files except examples.
 - Confirm no tracked `legacy/`, `node_modules/`, `dist/`, database, dump, backup, or unsanitized raw match data files.
-- Run backend tests: `cd services/core && go test ./...`.
+- Run backend tests: `cd core && go test ./...`.
 - Run frontend tests/build: `cd apps/web && npm test && npm run build`.
 - Run a secret scanner with redaction enabled.
 - Review GitHub Actions before public release. CI is fine, but production deploy workflows should remain manual and bound to private self-hosted runner labels/secrets.

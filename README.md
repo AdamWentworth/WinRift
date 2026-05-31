@@ -28,8 +28,7 @@ These screenshots use a deterministic local mock API for public documentation; p
 WinRift/
 ├── apps/
 │   └── web/                 # Vite + React + TypeScript frontend
-├── services/
-│   └── core/                # Go API, collector worker, monitor, patch archive tool
+├── core/                    # Go API, collector worker, monitor, patch archive tool
 ├── docs/                    # Architecture, product notes, runbooks, data docs
 ├── ops/
 │   └── prod/                # Private server Docker Compose and deploy notes
@@ -150,21 +149,21 @@ make logs-monitor
 ### Core API
 
 ```bash
-cd services/core
+cd core
 go run ./cmd/api
 ```
 
 ### Collector Worker
 
 ```bash
-cd services/core
+cd core
 go run ./cmd/worker
 ```
 
 ### Patch Archive Tool
 
 ```bash
-cd services/core
+cd core
 go run ./cmd/patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
 ```
 
@@ -263,7 +262,7 @@ Development-only endpoints are intended for local or private-LAN use, not public
 | Workspace | README |
 |-----------|--------|
 | Web app | [apps/web/README.md](apps/web/README.md) |
-| Go core service | [services/core/README.md](services/core/README.md) |
+| Go core service | [core/README.md](core/README.md) |
 | Production ops | [ops/prod/README.md](ops/prod/README.md) |
 
 | Area | Docs |
@@ -302,7 +301,7 @@ Discussion notes:
 Core tests:
 
 ```bash
-cd services/core
+cd core
 go test ./...
 ```
 

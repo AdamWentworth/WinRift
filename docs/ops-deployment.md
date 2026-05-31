@@ -4,7 +4,7 @@ This doc is the practical "how do we run this without surprising ourselves later
 
 ## Runtime Shape
 
-WinRift has four Docker services:
+WinRift has five Docker services:
 
 - `clickhouse`: persistent analytics database.
 - `api`: Go HTTP API for the frontend, static metadata, live lookups, and read models.
@@ -76,7 +76,7 @@ This avoids awkward "which machine has the real dataset?" problems. The server b
 
 The production-like setup follows the same private-runner pattern used by the other home-server projects:
 
-- CI builds and pushes `ghcr.io/adamwentworth/winrift-core` from `services/core/Dockerfile`.
+- CI builds and pushes `ghcr.io/adamwentworth/winrift-core` from `core/Dockerfile`.
 - A manual GitHub Actions deploy runs on the self-hosted runner labeled `self-hosted`, `linux`, `x64`, `prod`.
 - Durable server state lives at `/srv/winrift`.
 - ClickHouse data, logs, and backups live on the mounted storage SSD under `/mnt/storage/clickhouse`.
@@ -300,7 +300,7 @@ The worker should be stopped before risky migrations or config changes. API/web 
 
 ## Schema Changes
 
-The current Compose file mounts `services/core/internal/clickhouse/schema.sql` into ClickHouse init. That init file runs automatically for a fresh database volume.
+The current Compose file mounts `core/internal/clickhouse/schema.sql` into ClickHouse init. That init file runs automatically for a fresh database volume.
 
 For an existing production volume, schema changes need an explicit migration step. The Go repository has idempotent table/column creation paths for many runtime tables, but do not rely on that as the only production migration strategy forever.
 

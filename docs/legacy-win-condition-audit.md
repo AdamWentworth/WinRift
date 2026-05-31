@@ -84,9 +84,9 @@ Visual assets:
 
 Current rebuilt artifact:
 
-- `services/core/internal/winconditions/champion_profiles.json`
-- `services/core/internal/winconditions/profiles.go`
-- `services/core/internal/winconditions/profiles_test.go`
+- `core/internal/winconditions/champion_profiles.json`
+- `core/internal/winconditions/profiles.go`
+- `core/internal/winconditions/profiles_test.go`
 
 The current artifact removes the duplicate Blitzcrank row and adds provisional `16.10.1` profiles for Ambessa, Aurora, Mel, Smolder, Yunara, and Zaahen.
 

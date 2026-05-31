@@ -71,16 +71,18 @@ Rationale:
 
 Revisit if we decide there will not be a mobile app.
 
-### `services/core`
+### `core`
 
-Current shape:
+Previous shape:
 
 ```text
 services/
 └── core/
 ```
 
-This is less convincing than `apps/web`. The Go module contains multiple runtime entrypoints, but they are one product core:
+Status: complete. The Go module now lives at top-level `core/`.
+
+This was less convincing than `apps/web`. The Go module contains multiple runtime entrypoints, but they are one product core:
 
 - API
 - worker
@@ -89,18 +91,15 @@ This is less convincing than `apps/web`. The Go module contains multiple runtime
 
 They share config, ClickHouse access, Riot client code, analytics, and read models. That is not really a set of separate services yet.
 
-Options:
+Decision: flatten `services/core` to `core`.
 
-1. Keep `services/core`.
-   - Best if we expect true sibling services later, such as `services/inference`, `services/assets`, or a separate public API gateway.
-   - Least disruptive.
+Rationale:
 
-2. Rename `services/core` to `core`.
-   - Cleaner and more honest for the current repo.
-   - Requires updating Go module/import paths from `winrift/services/core` to `winrift/core`.
-   - Requires updating Dockerfiles, Compose files, CI, deploy workflow, Dependabot, docs, Makefile, and README references.
+- The repo does not currently have multiple backend services.
+- The core module already holds several binaries behind one shared domain model.
+- The flatter path is easier to scan in README, CI, Docker, and docs.
 
-Recommendation: rename to `core` only if we do a deliberate structure cleanup pass. It is not urgent, but it would make the repo feel less over-scaffolded.
+Revisit only if we add truly independent backend services later, such as `services/inference`, `services/assets`, or a separate public API gateway.
 
 ### `ops/prod`
 
@@ -164,7 +163,7 @@ Summoner profile extraction candidates:
 
 ### Split `server.go`
 
-Current pass complete: `services/core/internal/api/server.go` now only owns the `Server` type, constructor, route wiring, and health handler. Endpoint logic has been moved into same-package files by domain:
+Current pass complete: `core/internal/api/server.go` now only owns the `Server` type, constructor, route wiring, and health handler. Endpoint logic has been moved into same-package files by domain:
 
 ```text
 internal/api/
@@ -318,10 +317,10 @@ Completed:
 - Extract `BuildGuidePage.tsx` sections.
 - Extract `SummonerProfilePage.tsx` sections.
 - Add first-pass observability for API timing and worker refresh health.
+- Rename `services/core` to `core`.
 
 Next:
 
-1. Decide whether to rename `services/core` to `core`.
-2. Add frontend regression tests for the highest-risk UI surfaces.
-3. Add backend query tests around read-model endpoints and patch retention.
-4. Create the read-model coverage audit.
+1. Add frontend regression tests for the highest-risk UI surfaces.
+2. Add backend query tests around read-model endpoints and patch retention.
+3. Create the read-model coverage audit.

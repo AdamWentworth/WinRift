@@ -119,7 +119,7 @@ Derived one-row-per-team match strategy profile.
 
 Important columns: match, platform, patch, queue, team id, win/loss, duration, champion ids, team rank bucket, five win-condition scores, five letter ratings, primary condition, primary rating, and profile patch.
 
-This table is generated from raw participant rows plus `services/core/internal/winconditions/champion_profiles.json`; it does not come from Riot directly.
+This table is generated from raw participant rows plus `core/internal/winconditions/champion_profiles.json`; it does not come from Riot directly.
 
 ## `patch_win_condition_metrics`
 

@@ -2,8 +2,8 @@
 .venv
 node_modules
 apps/web/node_modules
-services/core/bin
-services/core/.pytest_cache
+core/bin
+core/.pytest_cache
 apps/web/dist
 *.tsbuildinfo
 legacy/**/__pycache__

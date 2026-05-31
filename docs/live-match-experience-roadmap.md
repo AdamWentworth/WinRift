@@ -117,7 +117,7 @@ Bring back the legacy team strategy idea as a live-match layer:
 Current implementation notes:
 
 - `POST /api/analytics/win-conditions` accepts the two live five-champion compositions and returns team profiles plus matchup stats.
-- Raw match and participant rows are not tainted with hand-authored scores. Team strategy rows are derived into `match_team_win_conditions` from `services/core/internal/winconditions/champion_profiles.json`.
+- Raw match and participant rows are not tainted with hand-authored scores. Team strategy rows are derived into `match_team_win_conditions` from `core/internal/winconditions/champion_profiles.json`.
 - Historical stats are served from precompiled `patch_win_condition_metrics` rows. The worker refreshes the current patch on a short interval so the live page does not recompute winrates while a player is waiting.
 - Duration buckets are labeled as game-length outcomes, not true minute-by-minute win probability.
 

@@ -2,7 +2,7 @@
 
 WinRift now has a deterministic narrative layer for win-condition matchup reads.
 
-The source lives in `services/core/internal/winconditions/narratives.go`.
+The source lives in `core/internal/winconditions/narratives.go`.
 
 It covers:
 

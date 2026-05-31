@@ -49,7 +49,7 @@ jobs:
           DEPLOY_ROOT="${{ inputs.deploy_root }}"
           COMPOSE_FILE="${GITHUB_WORKSPACE}/ops/prod/docker-compose.yml"
           ENV_FILE="${DEPLOY_ROOT}/.env"
-          SCHEMA_SOURCE="${GITHUB_WORKSPACE}/services/core/internal/clickhouse/schema.sql"
+          SCHEMA_SOURCE="${GITHUB_WORKSPACE}/core/internal/clickhouse/schema.sql"
           SCHEMA_TARGET="${DEPLOY_ROOT}/schema.sql"
           REQUIRED_ENV_KEYS="RIOT_API_KEY CLICKHOUSE_PASSWORD CORS_ORIGINS COLLECTOR_PLATFORMS COLLECTOR_CURRENT_PATCH"
 

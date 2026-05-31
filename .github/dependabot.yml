@@ -7,7 +7,7 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: "gomod"
-    directory: "/services/core"
+    directory: "/core"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

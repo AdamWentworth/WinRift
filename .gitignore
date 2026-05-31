@@ -2,7 +2,7 @@ node_modules/
 apps/web/node_modules/
 apps/web/dist/
 .vite-cache/
-services/core/bin/
+core/bin/
 *.tsbuildinfo
 *.d.ts.map
 .venv/
