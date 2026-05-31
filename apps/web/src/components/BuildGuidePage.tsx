@@ -11,9 +11,11 @@ import {
   championList,
   championSplashUrl,
 } from '../lib/staticData';
+import { itemContextForRole, mainChampionRole } from '../lib/championRoles';
+import { patchBucketFromVersion } from '../lib/patches';
 import { queryStaleTime } from '../lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from '../lib/queryVersions';
-import { normalizeRole, ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
+import { ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { championTier } from '../lib/tiers';
 import { MetricTile } from './ui/MetricTile';
 import { PanelCard, PanelTitle } from './ui/Panel';
@@ -78,7 +80,7 @@ export function BuildGuidePage({
   const [rankBucket, setRankBucket] = useState('');
   const [opponentChampionId, setOpponentChampionId] = useState(0);
   const [selectedBuildVariantKey, setSelectedBuildVariantKey] = useState('');
-  const patch = analyticsPatch ?? patchBucket(champions?.version);
+  const patch = analyticsPatch ?? patchBucketFromVersion(champions?.version);
   const champion = championByKey(champions, championId);
   const opponent = opponentChampionId ? championByKey(champions, opponentChampionId) : undefined;
   const seededRoleRates = useMemo(() => (
@@ -483,30 +485,6 @@ function AbilityIcon({ champions, ability, label, folder = 'passive' }: { champi
       <b>{label}</b>
     </span>
   );
-}
-
-function itemContextForRole(role: string): 'JUNGLE' | 'SUPPORT' | undefined {
-  if (role === 'JUNGLE') return 'JUNGLE';
-  if (role === 'UTILITY') return 'SUPPORT';
-  return undefined;
-}
-
-function patchBucket(version?: string) {
-  const parts = (version ?? '').split('.');
-  if (parts.length >= 2) {
-    return `${parts[0]}.${parts[1]}`;
-  }
-  return '';
-}
-
-function mainChampionRole(rows: ChampionRoleRate[], championId: number) {
-  const ranked = rows
-    .filter((row) => row.championId === championId && normalizeRole(row.role))
-    .sort((a, b) => {
-      if (a.games !== b.games) return b.games - a.games;
-      return b.pickRate - a.pickRate;
-    });
-  return normalizeRole(ranked[0]?.role);
 }
 
 function guideTier(guide?: ChampionGuideResponse) {

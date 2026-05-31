@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getChampionGuideIndex } from '../api/client';
 import type { AnalyticsPatchStat, Champion, ChampionData, ChampionGuideSummary } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
+import { patchBucketFromVersion } from '../lib/patches';
 import { queryStaleTime } from '../lib/queryPolicies';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championSplashUrl } from '../lib/staticData';
@@ -91,7 +92,7 @@ export function TierListPage({
   const [sortMode, setSortMode] = useState<SortMode>('confidence');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchText, setSearchText] = useState('');
-  const patch = analyticsPatch ?? patchBucket(champions?.version);
+  const patch = analyticsPatch ?? patchBucketFromVersion(champions?.version);
   const tierQuery = useQuery({
     queryKey: ['tier-list', role, patch, rankBucket, minGames],
     queryFn: ({ signal }) => getChampionGuideIndex({ role, patch, rankBucket, minGames, limit: 300 }, { signal }),
@@ -312,14 +313,6 @@ function TierTableRow({ row, champions, onChampionIntent, onSelectChampion }: { 
       <span>{formatNumber(row.summary.games)}</span>
     </button>
   );
-}
-
-function patchBucket(version?: string) {
-  const parts = (version ?? '').split('.');
-  if (parts.length >= 2) {
-    return `${parts[0]}.${parts[1]}`;
-  }
-  return '';
 }
 
 function winriftScore(summary: ChampionGuideSummary) {

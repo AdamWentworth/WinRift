@@ -1,38 +1,36 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAnalyticsPatches, getChampionPageBundle, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
-import type { AnalyticsPatchStat, Champion, ChampionRoleRate } from './api/types';
+import type { Champion } from './api/types';
 import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
-import { BuildGuidePage } from './components/BuildGuidePage';
-import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
-import { LiveMatchPanel } from './components/LiveMatchPanel';
-import { SummonerProfilePage } from './components/SummonerProfilePage';
-import { TierListPage } from './components/TierListPage';
 import {
   championIdFromRoute,
   championRouteSlug,
-  summonerPath,
 } from './lib/lookup';
+import { recommendedAnalyticsPatch, storedAnalyticsPatch, storeAnalyticsPatch } from './lib/analyticsPatch';
+import { appShellClass, pathForRoute, readRoute, type AppRoute } from './lib/appRouting';
+import { itemContextForRole, mainChampionRole } from './lib/championRoles';
+import { patchBucketFromVersion } from './lib/patches';
 import { queryGcTime, queryStaleTime } from './lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from './lib/queryVersions';
 import { normalizeRole } from './lib/roles';
 import { championImageUrl, championSplashUrl } from './lib/staticData';
 
 const DEFAULT_QUEUE_ID = 420;
-const PATCH_READY_MATCHES = 5000;
-const ANALYTICS_PATCH_STORAGE_KEY = 'winrift.analyticsPatch';
+const BACKGROUND_SPLASH_CATALOG_DELAY_MS = 10_000;
 
-type AppRoute =
-  | { kind: 'home' }
-  | { kind: 'tier-list' }
-  | { kind: 'champion'; championSlug?: string }
-  | { kind: 'summoner'; platform?: string; gameName?: string; tagLine?: string };
+const BuildGuidePage = lazy(() => import('./components/BuildGuidePage').then((module) => ({ default: module.BuildGuidePage })));
+const ChampionDirectoryPage = lazy(() => import('./components/ChampionDirectoryPage').then((module) => ({ default: module.ChampionDirectoryPage })));
+const LiveMatchPanel = lazy(() => import('./components/LiveMatchPanel').then((module) => ({ default: module.LiveMatchPanel })));
+const SummonerProfilePage = lazy(() => import('./components/SummonerProfilePage').then((module) => ({ default: module.SummonerProfilePage })));
+const TierListPage = lazy(() => import('./components/TierListPage').then((module) => ({ default: module.TierListPage })));
 
 export function App() {
   const queryClient = useQueryClient();
   const [route, setRoute] = useState<AppRoute>(() => readRoute());
   const [selectedAnalyticsPatch, setSelectedAnalyticsPatch] = useState(() => storedAnalyticsPatch());
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
+  const [backgroundSplashCatalogEnabled, setBackgroundSplashCatalogEnabled] = useState(false);
   const needsGameMetadata = (route.kind === 'summoner' && Boolean(route.gameName)) || (route.kind === 'champion' && Boolean(route.championSlug));
   const champions = useQuery({ queryKey: ['champions'], queryFn: ({ signal }) => getChampions({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const analyticsPatches = useQuery({
@@ -40,7 +38,13 @@ export function App() {
     queryFn: ({ signal }) => getAnalyticsPatches(DEFAULT_QUEUE_ID, { signal }),
     staleTime: queryStaleTime.patchList,
   });
-  const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: ({ signal }) => getChampionSplashes({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
+  const championSplashes = useQuery({
+    queryKey: ['champion-splashes'],
+    queryFn: ({ signal }) => getChampionSplashes({ signal }),
+    enabled: backgroundSplashCatalogEnabled,
+    staleTime: queryStaleTime.static,
+    gcTime: queryGcTime.static,
+  });
   const items = useQuery({ queryKey: ['items'], queryFn: ({ signal }) => getItems({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: ({ signal }) => getSummonerSpells({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const runes = useQuery({ queryKey: ['runes'], queryFn: ({ signal }) => getRunes({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
@@ -59,6 +63,11 @@ export function App() {
     const onPopState = () => setRoute(readRoute());
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setBackgroundSplashCatalogEnabled(true), BACKGROUND_SPLASH_CATALOG_DELAY_MS);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const navigate = useCallback((nextRoute: AppRoute, options?: { replace?: boolean }) => {
@@ -187,90 +196,68 @@ export function App() {
         </nav>
       </header>
 
-      {route.kind === 'tier-list' ? (
-        <TierListPage
-          champions={champions.data}
-          analyticsPatch={activeAnalyticsPatch}
-          analyticsPatchLoading={analyticsPatches.isLoading}
-          analyticsPatchOptions={patchOptions}
-          currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
-          onAnalyticsPatchChange={updateAnalyticsPatch}
-          onChampionIntent={prefetchChampionGuide}
-          onSelectChampion={openChampionGuide}
-        />
-      ) : route.kind === 'champion' && !route.championSlug ? (
-        <ChampionDirectoryPage
-          champions={champions.data}
-          onChampionIntent={prefetchChampionGuide}
-          onSelectChampion={openChampionGuide}
-        />
-      ) : route.kind === 'champion' ? (
-        <BuildGuidePage
-          champions={champions.data}
-          items={items.data}
-          spells={spells.data}
-          runes={runes.data}
-          initialChampionId={initialChampionId}
-          analyticsPatch={activeAnalyticsPatch}
-          analyticsPatchLoading={analyticsPatches.isLoading}
-          analyticsPatchOptions={patchOptions}
-          currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
-          onAnalyticsPatchChange={updateAnalyticsPatch}
-          onChampionChange={openChampionGuide}
-        />
-      ) : route.kind === 'summoner' ? (
-        <SummonerProfilePage
-          platform={route.platform}
-          gameName={route.gameName}
-          tagLine={route.tagLine}
-          champions={champions.data}
-          items={items.data}
-          spells={spells.data}
-          runes={runes.data}
-          analyticsPatch={activeAnalyticsPatch}
-          onUseAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine })}
-          onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
-          onResolvedAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine }, { replace: true })}
-          onBackgroundChampionScopeChange={setSummonerBackgroundChampionIds}
-        />
-      ) : (
-        <LiveMatchPanel
-          champions={champions.data}
-          items={items.data}
-          spells={spells.data}
-          runes={runes.data}
-          analyticsPatch={activeAnalyticsPatch}
-          loading={false}
-          onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
-          onChampionSearch={openChampionGuide}
-        />
-      )}
+      <Suspense fallback={<RouteFallback />}>
+        {route.kind === 'tier-list' ? (
+          <TierListPage
+            champions={champions.data}
+            analyticsPatch={activeAnalyticsPatch}
+            analyticsPatchLoading={analyticsPatches.isLoading}
+            analyticsPatchOptions={patchOptions}
+            currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
+            onAnalyticsPatchChange={updateAnalyticsPatch}
+            onChampionIntent={prefetchChampionGuide}
+            onSelectChampion={openChampionGuide}
+          />
+        ) : route.kind === 'champion' && !route.championSlug ? (
+          <ChampionDirectoryPage
+            champions={champions.data}
+            onChampionIntent={prefetchChampionGuide}
+            onSelectChampion={openChampionGuide}
+          />
+        ) : route.kind === 'champion' ? (
+          <BuildGuidePage
+            champions={champions.data}
+            items={items.data}
+            spells={spells.data}
+            runes={runes.data}
+            initialChampionId={initialChampionId}
+            analyticsPatch={activeAnalyticsPatch}
+            analyticsPatchLoading={analyticsPatches.isLoading}
+            analyticsPatchOptions={patchOptions}
+            currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
+            onAnalyticsPatchChange={updateAnalyticsPatch}
+            onChampionChange={openChampionGuide}
+          />
+        ) : route.kind === 'summoner' ? (
+          <SummonerProfilePage
+            platform={route.platform}
+            gameName={route.gameName}
+            tagLine={route.tagLine}
+            champions={champions.data}
+            items={items.data}
+            spells={spells.data}
+            runes={runes.data}
+            analyticsPatch={activeAnalyticsPatch}
+            onUseAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine })}
+            onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
+            onResolvedAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine }, { replace: true })}
+            onBackgroundChampionScopeChange={setSummonerBackgroundChampionIds}
+          />
+        ) : (
+          <LiveMatchPanel
+            champions={champions.data}
+            items={items.data}
+            spells={spells.data}
+            runes={runes.data}
+            analyticsPatch={activeAnalyticsPatch}
+            loading={false}
+            onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
+            onChampionSearch={openChampionGuide}
+          />
+        )}
+      </Suspense>
     </main>
   );
-}
-
-function patchBucketFromVersion(version?: string) {
-  const parts = (version ?? '').split('.');
-  if (parts.length >= 2) {
-    return `${parts[0]}.${parts[1]}`;
-  }
-  return '';
-}
-
-function itemContextForRole(role: string): 'JUNGLE' | 'SUPPORT' | undefined {
-  if (role === 'JUNGLE') return 'JUNGLE';
-  if (role === 'UTILITY') return 'SUPPORT';
-  return undefined;
-}
-
-function mainChampionRole(rows: ChampionRoleRate[], championId: number) {
-  const ranked = rows
-    .filter((row) => row.championId === championId && normalizeRole(row.role))
-    .sort((a, b) => {
-      if (a.games !== b.games) return b.games - a.games;
-      return b.pickRate - a.pickRate;
-    });
-  return normalizeRole(ranked[0]?.role);
 }
 
 function warmImage(src: string) {
@@ -280,75 +267,10 @@ function warmImage(src: string) {
   image.src = src;
 }
 
-function recommendedAnalyticsPatch(options: AnalyticsPatchStat[], staticPatch: string) {
-  if (!options.length) return '';
-  const current = options.find((patch) => patch.patch === staticPatch);
-  if (current && current.matches >= PATCH_READY_MATCHES) {
-    return current.patch;
-  }
-  const bestSample = [...options].sort((a, b) => b.matches - a.matches)[0];
-  return bestSample?.patch ?? current?.patch ?? options[0]?.patch ?? '';
-}
-
-function storedAnalyticsPatch() {
-  try {
-    return window.localStorage.getItem(ANALYTICS_PATCH_STORAGE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function storeAnalyticsPatch(patch: string) {
-  try {
-    window.localStorage.setItem(ANALYTICS_PATCH_STORAGE_KEY, patch);
-  } catch {
-    // Browser storage is optional; the selector still works for this session.
-  }
-}
-
-function appShellClass(route: AppRoute) {
-  const classes = ['app-shell'];
-  if (route.kind === 'champion' || route.kind === 'tier-list') {
-    classes.push('guide-mode');
-  }
-  if (route.kind === 'home') {
-    classes.push('page-home', 'background-showcase');
-  } else if (route.kind === 'summoner') {
-    classes.push('page-summoner', 'background-dense');
-  } else if (route.kind === 'tier-list') {
-    classes.push('page-tier-list', 'background-data');
-  } else if (route.championSlug) {
-    classes.push('page-champion-guide', 'background-champion-scope');
-  } else {
-    classes.push('page-champion-index', 'background-directory');
-  }
-  return classes.join(' ');
-}
-
-function readRoute(): AppRoute {
-  const parts = window.location.pathname.split('/').filter(Boolean).map((part) => decodeURIComponent(part));
-  if (parts[0] === 'champions') {
-    return { kind: 'champion', championSlug: parts[1] };
-  }
-  if (parts[0] === 'tier-list') {
-    return { kind: 'tier-list' };
-  }
-  if (parts[0] === 'summoners') {
-    return { kind: 'summoner', platform: parts[1], gameName: parts[2], tagLine: parts[3] };
-  }
-  return { kind: 'home' };
-}
-
-function pathForRoute(route: AppRoute) {
-  if (route.kind === 'champion') {
-    return route.championSlug ? `/champions/${encodeURIComponent(route.championSlug)}` : '/champions';
-  }
-  if (route.kind === 'tier-list') {
-    return '/tier-list';
-  }
-  if (route.kind === 'summoner') {
-    if (!route.gameName) return '/summoners';
-    return summonerPath(route.platform ?? 'NA1', route.gameName, route.tagLine);
-  }
-  return '/';
+function RouteFallback() {
+  return (
+    <section className="route-loading-panel" aria-live="polite">
+      <span>Loading WinRift</span>
+    </section>
+  );
 }

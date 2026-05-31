@@ -103,3 +103,5 @@ Useful env vars:
 - `WINRIFT_ROUTE_PERF_REUSE_SERVER`: set to `1` only when you intentionally want Playwright to reuse an existing frontend server.
 
 There is also a manual `route-perf` GitHub Actions workflow for the private self-hosted runner. Keep this manual for now; Chromium install and private-LAN access are heavier than the normal web CI path.
+
+The current frontend route split keeps page-scale JavaScript out of the initial home/search shell. The largest always-loaded bundle should stay small enough for quick first interaction, while champion guides, live match analysis, profiles, and tier lists load in their own chunks. The global background still renders immediately from lightweight metadata, and the full splash-art catalog is fetched after roughly 10 seconds so route timing does not pay for art discovery before the page is usable.

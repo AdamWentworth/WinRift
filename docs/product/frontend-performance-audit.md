@@ -30,24 +30,34 @@ This matters when users:
 
 Stale requests should be canceled instead of racing the current page state.
 
-### Route-Level Static Metadata
+### Route-Level Static Metadata And Bundles
 
-The root app still loads champion metadata and splash metadata eagerly because those power search, routing, and the global background. It does not eagerly load item, rune, and summoner-spell metadata on surfaces that do not need them.
+The root app loads only the metadata needed for first interaction immediately. Heavy page code is split by route, and the larger splash catalog is delayed so it does not compete with first paint.
 
 Eager:
 
 - champion metadata,
-- champion splash metadata,
 - patch list,
-- champion role rates after champion ids are known.
+- a small background fallback pool from champion metadata.
 
 Lazy/gated:
 
 - item metadata,
 - rune metadata,
 - summoner spell metadata.
+- champion splash metadata after the app is already settled.
 
 Those load only on champion and summoner/live surfaces where the UI actually renders builds, spells, or runes.
+
+Route-level chunks are now in place for:
+
+- champion guide pages,
+- champion directory,
+- live-match page,
+- summoner profile page,
+- tier list.
+
+The main production bundle dropped from about 389 kB to about 259 kB uncompressed, and from about 115 kB to about 81 kB gzip, in the first split pass. Keep new page-scale features in their route chunk unless they must run on the home/search shell.
 
 ### Bundled Analytics Pages
 
@@ -106,5 +116,5 @@ This starts a production preview build, opens the core routes with Playwright, r
 ## Next Improvements
 
 - Consider prefetching champion-page bundles on visible links only, not every hover, if the app starts over-prefetching.
-- Add route-level bundle splitting if the frontend bundle becomes large enough to affect first paint.
+- Continue extracting page-local helpers out of large route files when the split makes ownership clearer.
 - Promote perf smoke thresholds from warning to strict only after we collect stable baseline runs from the server.

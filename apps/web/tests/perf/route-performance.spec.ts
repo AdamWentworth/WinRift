@@ -45,7 +45,7 @@ const routeChecks: RouteCheck[] = [
       await expect(page.getByPlaceholder('Champion or Riot ID')).toBeVisible();
     },
     maxReadyMs: 2_500,
-    maxApiRequests: 4,
+    maxApiRequests: 3,
     minApiRequests: 2,
   },
   {
@@ -57,7 +57,7 @@ const routeChecks: RouteCheck[] = [
       await expect(page.getByText(/\d+ champions shown/)).toBeVisible();
     },
     maxReadyMs: 3_000,
-    maxApiRequests: 4,
+    maxApiRequests: 3,
     minApiRequests: 2,
   },
   {
@@ -69,7 +69,7 @@ const routeChecks: RouteCheck[] = [
       await expect(page.getByText('Loading items...')).toHaveCount(0);
     },
     maxReadyMs: 4_500,
-    maxApiRequests: 8,
+    maxApiRequests: 7,
     minApiRequests: 4,
   },
   {
@@ -80,7 +80,7 @@ const routeChecks: RouteCheck[] = [
       await expect(page.getByText('All Roles Rankings')).toBeVisible();
     },
     maxReadyMs: 3_500,
-    maxApiRequests: 4,
+    maxApiRequests: 3,
     minApiRequests: 2,
   },
   {
@@ -92,7 +92,7 @@ const routeChecks: RouteCheck[] = [
       await expect(page.locator('.summoner-leaderboard-row').first()).toBeVisible();
     },
     maxReadyMs: 3_500,
-    maxApiRequests: 5,
+    maxApiRequests: 3,
     minApiRequests: 3,
   },
 ];

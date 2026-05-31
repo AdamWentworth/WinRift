@@ -161,6 +161,27 @@ Summoner profile extraction candidates:
 - stored profile tabs, rows, and freshness helpers: first pass complete in `components/summoner-profile/ProfileSections.tsx`
 - profile header: first pass complete in `components/summoner-profile/ProfileHeader.tsx`
 
+### Route-Level Bundle Splitting
+
+Status: first pass complete.
+
+The root shell now lazy-loads the heavy route pages:
+
+- champion guides,
+- champion directory,
+- live match analysis,
+- summoner profiles,
+- tier list.
+
+The same pass moved routing, analytics patch storage, champion role helpers, and patch parsing into small `lib/` modules. This keeps `App.tsx` focused on shell orchestration and avoids pulling page code into the first home/search bundle.
+
+Measured production build change from the first split pass:
+
+- main JS bundle: about 389 kB to about 259 kB,
+- main gzip size: about 115 kB to about 81 kB.
+
+Next guardrail: keep future page-only features inside their route files or page-local components. Shared shell code should be limited to navigation, search, routing, background, and metadata that is genuinely needed everywhere.
+
 ## Priority 4: Backend Maintainability
 
 ### Split `server.go`
