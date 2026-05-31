@@ -20,6 +20,11 @@ type Repository struct {
 	db *sql.DB
 }
 
+const (
+	clickHousePingTimeout   = 10 * time.Second
+	clickHouseSchemaTimeout = 90 * time.Second
+)
+
 type BuildRow struct {
 	ChampionID          uint16
 	Role                string
@@ -150,13 +155,15 @@ func NewRepository(cfg config.Config) (*Repository, error) {
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(time.Hour)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), clickHousePingTimeout)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
 	repo := &Repository{db: db}
-	if err := repo.EnsureRuntimeSchema(ctx); err != nil {
+	schemaCtx, schemaCancel := context.WithTimeout(context.Background(), clickHouseSchemaTimeout)
+	defer schemaCancel()
+	if err := repo.EnsureRuntimeSchema(schemaCtx); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
