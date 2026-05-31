@@ -219,6 +219,8 @@ Good candidates:
 - build-advice exact matchup rows do not silently borrow champion-wide data,
 - current/recent patch retention preserves summaries before pruning raw data.
 
+Status: first pass in place. Repository tests now assert champion guide indexes use the precomputed guide/scope/ban summary tables when present, and patch stats include compiled `patch_snapshots` rows after raw rows are pruned.
+
 ## Priority 6: Observability
 
 ### API Timing Logs
@@ -321,8 +323,8 @@ Completed:
 - Add first-pass observability for API timing and worker refresh health.
 - Rename `services/core` to `core`.
 - Add first-pass frontend regression tests for the highest-risk UI surfaces.
+- Add first-pass backend query tests for read-model usage and patch-retained summaries.
 
 Next:
 
-1. Add backend query tests around read-model endpoints and patch retention.
-2. Create the read-model coverage audit.
+1. Create the read-model coverage audit.
