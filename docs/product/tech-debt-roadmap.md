@@ -264,6 +264,8 @@ Goal:
 
 Recent progress: champion guide index and tier-list style reads now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request.
 
+Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
+
 Outstanding: add a small team-kills read model so champion guide summaries can include true kill participation without nesting aggregate functions inside the same ClickHouse refresh query.
 
 ### Patch-Scope UX
@@ -324,7 +326,10 @@ Completed:
 - Rename `services/core` to `core`.
 - Add first-pass frontend regression tests for the highest-risk UI surfaces.
 - Add first-pass backend query tests for read-model usage and patch-retained summaries.
+- Create the read-model coverage audit.
 
 Next:
 
-1. Create the read-model coverage audit.
+1. Add summoner recent-match and summoner build summaries.
+2. Add champion matchup/rune/spell read models for cold champion-page loads.
+3. Add a team-kill summary for true kill participation in the fast guide path.
