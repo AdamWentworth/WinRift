@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChampionPageBundle, getChampionRoleRates } from '../api/client';
-import type { BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, SummonerSpellData } from '../api/types';
+import type { AnalyticsPatchStat, BuildAdviceResponse, Champion, ChampionData, ChampionGuideBuildVariant, ChampionGuideResponse, ChampionGuideSummary, ChampionRoleRate, ItemData, RuneData, SummonerSpellData } from '../api/types';
 import {
   championAbilityImageUrl,
   championByKey,
@@ -16,6 +16,7 @@ import { normalizeRole, ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { championTier } from '../lib/tiers';
 import { MetricTile } from './ui/MetricTile';
 import { PanelCard, PanelTitle } from './ui/Panel';
+import { PatchScopeControl } from './ui/PatchScopeControl';
 import { RoleTabs } from './ui/RoleTabs';
 import { SelectControl } from './ui/SelectControl';
 import { BuildVariantTabs, buildVariantLabel, groupBuildVariantsForDisplay, RECOMMENDED_BUILD_KEY } from './build-guide/BuildVariantTabs';
@@ -43,11 +44,28 @@ type Props = {
   runes?: RuneData;
   initialChampionId?: number;
   analyticsPatch?: string;
+  analyticsPatchLoading?: boolean;
+  analyticsPatchOptions?: AnalyticsPatchStat[];
+  currentAnalyticsPatch?: string;
   roleRates?: ChampionRoleRate[];
+  onAnalyticsPatchChange?: (patch: string) => void;
   onChampionChange?: (champion: Champion) => void;
 };
 
-export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, analyticsPatch, roleRates, onChampionChange }: Props) {
+export function BuildGuidePage({
+  champions,
+  items,
+  spells,
+  runes,
+  initialChampionId,
+  analyticsPatch,
+  analyticsPatchLoading = false,
+  analyticsPatchOptions = [],
+  currentAnalyticsPatch = '',
+  roleRates,
+  onAnalyticsPatchChange,
+  onChampionChange,
+}: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
   const defaultChampionId = useMemo(() => {
     const wukong = championsByName.find((champion) => champion.id === 'MonkeyKing');
@@ -203,9 +221,19 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
           </div>
         </div>
         <div className="guide-hero-aside">
-          <span>Patch {patch || champions?.version || 'current'}</span>
-          <b>{rankLabel}</b>
-          <em>{formatNumber(currentCoverage?.games ?? 0)} role games</em>
+          <PatchScopeControl
+            activePatch={patch}
+            className="guide-patch-scope"
+            currentPatch={currentAnalyticsPatch || patch}
+            loading={analyticsPatchLoading}
+            options={analyticsPatchOptions}
+            onChange={onAnalyticsPatchChange ?? (() => undefined)}
+          />
+          <div className="guide-hero-scope-card">
+            <span>Rank Scope</span>
+            <b>{rankLabel}</b>
+            <em>{formatNumber(currentCoverage?.games ?? 0)} role games</em>
+          </div>
         </div>
       </div>
 

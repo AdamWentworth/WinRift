@@ -7,6 +7,7 @@
 @import "./app/live-player-cards.css";
 @import "./app/live-focused-builds.css";
 @import "./app/navigation.css";
+@import "./app/patch-scope.css";
 @import "./app/champion-directory.css";
 @import "./app/tier-list.css";
 @import "./app/build-guide.css";

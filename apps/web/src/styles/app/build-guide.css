@@ -181,40 +181,51 @@
 
 .guide-hero-aside {
   align-self: flex-start;
-  background: rgb(11 14 15 / 72%);
-  border: 1px solid rgb(130 215 255 / 18%);
   color: #fff;
   display: grid;
-  gap: 4px;
-  min-width: 150px;
-  padding: 12px 14px;
+  gap: 8px;
+  min-width: 210px;
   position: relative;
   z-index: 1;
 }
 
-.guide-hero-aside span,
-.guide-hero-aside b,
-.guide-hero-aside em {
+.guide-hero-scope-card {
+  background: rgb(11 14 15 / 72%);
+  border: 1px solid rgb(130 215 255 / 18%);
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.guide-hero-scope-card span,
+.guide-hero-scope-card b,
+.guide-hero-scope-card em {
   display: block;
   font-style: normal;
   font-weight: 1000;
   line-height: 1.1;
 }
 
-.guide-hero-aside span {
+.guide-hero-scope-card span {
   color: #93dceb;
   font-size: 12px;
   text-transform: uppercase;
 }
 
-.guide-hero-aside b {
+.guide-hero-scope-card b {
   color: #fff;
   font-size: 16px;
 }
 
-.guide-hero-aside em {
+.guide-hero-scope-card em {
   color: #c8d8dd;
   font-size: 11px;
+}
+
+.guide-patch-scope {
+  background:
+    linear-gradient(180deg, rgb(130 215 255 / 18%), rgb(0 0 0 / 20%)),
+    rgb(8 14 16 / 80%);
 }
 
 .guide-filter-bar {
@@ -1147,4 +1158,3 @@
   display: flex;
   justify-content: center;
 }
-

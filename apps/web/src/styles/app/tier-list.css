@@ -52,7 +52,8 @@
   grid-template-columns: 1fr;
 }
 
-.tier-list-hero-stats div {
+.tier-list-hero-stats > div,
+.tier-list-hero-stats > label {
   background: rgb(0 0 0 / 28%);
   border: 1px solid rgb(255 255 255 / 8%);
   display: grid;
@@ -60,20 +61,26 @@
   padding: 10px 12px;
 }
 
-.tier-list-hero-stats span {
+.tier-list-hero-stats > div > span,
+.tier-list-hero-stats > label > span {
   color: #93dceb;
   font-size: 10px;
   font-weight: 1000;
   text-transform: uppercase;
 }
 
-.tier-list-hero-stats strong {
+.tier-list-hero-stats > div > strong {
   color: #fff;
   font-size: 17px;
   font-weight: 1000;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tier-patch-scope select,
+.tier-patch-scope b {
+  font-size: 17px;
 }
 
 .tier-filter-bar {
@@ -411,4 +418,3 @@
 .tier-empty-state {
   grid-column: 1 / -1;
 }
-

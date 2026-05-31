@@ -237,6 +237,7 @@ describe('App', () => {
     expect(screen.getByText('Champion names open build guides. Riot IDs open summoner profiles and jump into live match analysis when that player is currently in game.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111')).toBeInTheDocument();
     expect(screen.queryByLabelText('Search champions or summoners')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Analytics data patch')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText('Build Explorer')).not.toBeInTheDocument());
     expect(screen.queryByText('Contextual Patterns')).not.toBeInTheDocument();
     expect(screen.queryByText(/buy this/i)).not.toBeInTheDocument();
@@ -364,6 +365,7 @@ describe('App', () => {
     expect(getChampionGuideIndex).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /Wukong/i }));
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
+    expect(await screen.findByLabelText('Analytics data patch')).toBeInTheDocument();
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
     await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
     queryClient.clear();
@@ -387,6 +389,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText('WinRift Tier List')).toBeInTheDocument());
     expect(screen.getByText('All Roles Rankings')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Analytics data patch')).toBeInTheDocument();
     expect(screen.getByLabelText('Tier list role')).toBeInTheDocument();
     await waitFor(() => expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: '', patch: '16.10', minGames: 50 })));
     expect((await screen.findAllByText('Wukong')).length).toBeGreaterThan(0);

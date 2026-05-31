@@ -194,7 +194,7 @@ The ClickHouse package has grown into the real heart of the app. It is mostly or
 
 This makes it easier to enforce the performance rule: public page endpoints should read summaries, not raw payloads.
 
-Status update: build advice now has `build_signature_analytics`, a compact current-patch build-signature read model refreshed by the champion-guide lane. `QueryBuilds` and champion-guide item paths prefer it before falling back to archived `patch_build_metrics` or retained normalized rows.
+Status update: build advice now has `build_signature_analytics`, a compact current-patch build-signature read model refreshed by the champion-guide lane. `QueryBuilds` and champion-guide item paths prefer it before falling back to archived `patch_build_metrics` or retained normalized rows. Hot champion-guide pages are also prewarmed into `champion_page_bundle_cache` after guide refreshes, using canonical cache keys so equivalent query params reuse the same bundle.
 
 ## Priority 5: Test Coverage Gaps
 
@@ -264,23 +264,24 @@ Goal:
 - no page should fan out into many avoidable requests,
 - old patch raw pruning should not break visible historical analytics.
 
-Recent progress: champion guide index, tier-list style reads, and selected champion headers now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request. Champion guide matchup rows, rune pages, and spell pairs now use `champion_matchup_analytics` and `champion_signature_analytics` after the worker refresh runs.
+Recent progress: champion guide index, tier-list style reads, and selected champion headers now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request. Champion guide matchup rows, rune pages, spell pairs, and build signatures now use read models after the worker refresh runs. Hot champion-page response bundles are prewarmed for common champion/role pages.
 
 Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
 
-Outstanding: add build-advice and item-path summaries so champion pages can avoid the remaining heavier cold-cache work.
+Outstanding: add a champion role-rate summary if directory/champion navigation starts showing up in timing logs. If deployed timings later show frequent cold misses on exact matchup pages, expand response prewarming to common champion/opponent pairs.
 
 ### Patch-Scope UX
 
-We added patch filters, but this needs a consistency pass:
+Patch controls belong only where the visible analytics are actually patch-scoped. They should not live in the global top header because home, summoner lookup, and several live surfaces are not primarily patch-browser pages.
 
-- champion pages,
-- tier list,
-- summoner profiles,
-- live match build context,
-- win-condition metrics.
+Status: first pass complete for the main patch-browsing surfaces:
 
-The UI should make it obvious when the current patch has thin data and when the user is intentionally viewing the previous patch.
+- champion guide pages,
+- tier list.
+
+The control labels the selected data patch, shows whether the user is on the current patch or intentionally viewing a previous patch, and exposes indexed match counts so thin current-patch samples are not mistaken for empty or broken data.
+
+Future follow-up: decide whether live build mode needs its own small patch context label. If it does, keep it inside the Builds mode panel rather than returning it to the app-wide header.
 
 ### Build Variant Validation
 
@@ -333,9 +334,12 @@ Completed:
 - Add champion matchup/rune/spell read models for cold champion-page loads.
 - Reuse champion guide summary read models for selected champion headers.
 - Add team-kill summaries for true kill participation in the fast champion guide path.
+- Add build-signature analytics for build-advice and champion item paths.
+- Add hot champion-page bundle prewarming.
+- Move patch-scope controls out of the global header and into champion guide/tier-list pages.
 
 Next:
 
-1. Add a build-advice bundle summary for live build mode and champion pages.
-2. Add a compact item-path summary for archived champion pages.
-3. Add champion role-rate summaries if directory/tier navigation needs them.
+1. Add champion role-rate summaries if directory/tier navigation needs them.
+2. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
+3. Continue win-condition validation against the stored corpus.

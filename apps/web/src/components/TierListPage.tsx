@@ -3,13 +3,14 @@ import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getChampionGuideIndex } from '../api/client';
-import type { Champion, ChampionData, ChampionGuideSummary } from '../api/types';
+import type { AnalyticsPatchStat, Champion, ChampionData, ChampionGuideSummary } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championSplashUrl } from '../lib/staticData';
 import { championTier } from '../lib/tiers';
 import { ChampionIdentity } from './ui/ChampionIdentity';
 import { MetricTile } from './ui/MetricTile';
+import { PatchScopeControl } from './ui/PatchScopeControl';
 import { RoleTabs } from './ui/RoleTabs';
 import { SelectControl } from './ui/SelectControl';
 
@@ -58,6 +59,10 @@ const tierTableColumns: { mode: SortMode; label: string }[] = [
 type Props = {
   champions?: ChampionData;
   analyticsPatch?: string;
+  analyticsPatchLoading?: boolean;
+  analyticsPatchOptions?: AnalyticsPatchStat[];
+  currentAnalyticsPatch?: string;
+  onAnalyticsPatchChange?: (patch: string) => void;
   onChampionIntent?: (champion: Champion, preferredRole?: string) => void;
   onSelectChampion: (champion: Champion, preferredRole?: string) => void;
 };
@@ -69,7 +74,16 @@ type TierRow = {
   tier: string;
 };
 
-export function TierListPage({ champions, analyticsPatch, onChampionIntent, onSelectChampion }: Props) {
+export function TierListPage({
+  champions,
+  analyticsPatch,
+  analyticsPatchLoading = false,
+  analyticsPatchOptions = [],
+  currentAnalyticsPatch = '',
+  onAnalyticsPatchChange,
+  onChampionIntent,
+  onSelectChampion,
+}: Props) {
   const [role, setRole] = useState('');
   const [rankBucket, setRankBucket] = useState('');
   const [minGames, setMinGames] = useState(50);
@@ -134,7 +148,14 @@ export function TierListPage({ champions, analyticsPatch, onChampionIntent, onSe
           </p>
         </div>
         <div className="tier-list-hero-stats">
-          <MetricTile label="Data Patch" value={patch || champions?.version || 'Current'} />
+          <PatchScopeControl
+            activePatch={patch}
+            className="tier-patch-scope"
+            currentPatch={currentAnalyticsPatch || patch}
+            loading={analyticsPatchLoading}
+            options={analyticsPatchOptions}
+            onChange={onAnalyticsPatchChange ?? (() => undefined)}
+          />
           <MetricTile label="Rank" value={selectedRank} />
           <MetricTile label="Matches Indexed" value={formatNumber(matchCount)} />
           <MetricTile label="Champion Games" value={formatNumber(participantSamples)} />

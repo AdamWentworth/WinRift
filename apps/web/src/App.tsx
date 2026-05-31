@@ -205,19 +205,16 @@ export function App() {
             Summoners
           </button>
         </nav>
-        <AnalyticsPatchPicker
-          activePatch={activeAnalyticsPatch}
-          currentPatch={analyticsPatches.data?.currentPatch || staticPatch}
-          loading={analyticsPatches.isLoading}
-          options={patchOptions}
-          onChange={updateAnalyticsPatch}
-        />
       </header>
 
       {route.kind === 'tier-list' ? (
         <TierListPage
           champions={champions.data}
           analyticsPatch={activeAnalyticsPatch}
+          analyticsPatchLoading={analyticsPatches.isLoading}
+          analyticsPatchOptions={patchOptions}
+          currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
+          onAnalyticsPatchChange={updateAnalyticsPatch}
           onChampionIntent={prefetchChampionGuide}
           onSelectChampion={openChampionGuide}
         />
@@ -235,7 +232,11 @@ export function App() {
           runes={runes.data}
           initialChampionId={initialChampionId}
           analyticsPatch={activeAnalyticsPatch}
+          analyticsPatchLoading={analyticsPatches.isLoading}
+          analyticsPatchOptions={patchOptions}
+          currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
           roleRates={allChampionRoleRateRows}
+          onAnalyticsPatchChange={updateAnalyticsPatch}
           onChampionChange={openChampionGuide}
         />
       ) : route.kind === 'summoner' ? (
@@ -300,49 +301,6 @@ function warmImage(src: string) {
   image.src = src;
 }
 
-function AnalyticsPatchPicker({
-  activePatch,
-  currentPatch,
-  loading,
-  options,
-  onChange,
-}: {
-  activePatch: string;
-  currentPatch: string;
-  loading: boolean;
-  options: AnalyticsPatchStat[];
-  onChange: (patch: string) => void;
-}) {
-  const visibleOptions = options.length
-    ? options
-    : activePatch
-      ? [{ patch: activePatch, matches: 0, participantSamples: 0, rawMatches: 0, compiledMatches: 0, current: activePatch === currentPatch }]
-      : [];
-  if (!visibleOptions.length) {
-    return (
-      <div className="topbar-patch-selector loading" aria-label="Analytics patch loading">
-        <span>Data Patch</span>
-        <b>{loading ? 'Loading' : 'Current'}</b>
-      </div>
-    );
-  }
-  const activeOption = visibleOptions.find((option) => option.patch === activePatch);
-  const sampleLabel = activeOption?.matches ? `${formatNumber(activeOption.matches)} matches` : loading ? 'Loading sample' : 'Sample pending';
-  return (
-    <label className="topbar-patch-selector">
-      <span>Data Patch</span>
-      <select aria-label="Analytics data patch" value={activePatch} onChange={(event) => onChange(event.target.value)}>
-        {visibleOptions.map((option) => (
-          <option key={option.patch} value={option.patch}>
-            {option.patch}{option.patch === currentPatch ? ' current' : ''} · {formatNumber(option.matches)} matches
-          </option>
-        ))}
-      </select>
-      <em>{sampleLabel}</em>
-    </label>
-  );
-}
-
 function recommendedAnalyticsPatch(options: AnalyticsPatchStat[], staticPatch: string) {
   if (!options.length) return '';
   const current = options.find((patch) => patch.patch === staticPatch);
@@ -367,10 +325,6 @@ function storeAnalyticsPatch(patch: string) {
   } catch {
     // Browser storage is optional; the selector still works for this session.
   }
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('en-US').format(value);
 }
 
 function appShellClass(route: AppRoute) {
