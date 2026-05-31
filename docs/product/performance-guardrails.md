@@ -26,7 +26,7 @@ Champion guide refreshes should stage new rows before deleting older compiled ro
 
 After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. The prewarm limit should be broad enough to cover normal champion browsing, not only the five highest-played champions per role. Prewarming covers the retained patch window so the UI's default previous-patch view can stay fast while the current patch is still thin.
 
-Exact opponent-filtered champion pages are the expensive cold path because they assemble the same guide bundle plus matchup-specific item panels. The worker therefore prewarms a bounded number of common opponent bundles per selected champion/role. Keep `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES` conservative; warm responses should be effectively instant, but the first build of an uncached exact matchup can still take seconds.
+Exact opponent-filtered champion pages are the expensive cold path because they assemble the same guide bundle plus matchup-specific item panels. The worker therefore prewarms a bounded number of common opponent bundles per selected champion/role. Keep `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES` conservative; the default is `100` per patch. Warm responses should be effectively instant, but the first build of an uncached exact matchup can still take seconds.
 
 ## Profiling Checklist
 

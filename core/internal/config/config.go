@@ -149,7 +149,7 @@ func Load() Config {
 		ChampionPagePrewarmMinGames:            envInt("CHAMPION_PAGE_PREWARM_MIN_GAMES", 50),
 		ChampionPagePrewarmMatchupsPerChampion: envInt("CHAMPION_PAGE_PREWARM_MATCHUPS_PER_CHAMPION", 2),
 		ChampionPagePrewarmMatchupMinGames:     envInt("CHAMPION_PAGE_PREWARM_MATCHUP_MIN_GAMES", 15),
-		ChampionPagePrewarmMaxMatchupBundles:   envInt("CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES", 300),
+		ChampionPagePrewarmMaxMatchupBundles:   envInt("CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES", 100),
 		ChampionPagePrewarmRoles:               splitList(env("CHAMPION_PAGE_PREWARM_ROLES", "TOP,JUNGLE,MIDDLE,BOTTOM,UTILITY")),
 		ChampionPagePrewarmRankBucket:          strings.ToUpper(env("CHAMPION_PAGE_PREWARM_RANK_BUCKET", "")),
 		WinConditionRefreshEnabled:             envBool("WIN_CONDITION_ANALYTICS_REFRESH_ENABLED", true),
