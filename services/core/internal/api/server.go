@@ -59,6 +59,7 @@ func (s Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/analytics/item-slots", s.analyticsItemSlots)
 	mux.HandleFunc("POST /api/analytics/item-slots/batch", s.analyticsItemSlotsBatch)
 	mux.HandleFunc("GET /api/analytics/champion-roles", s.analyticsChampionRoles)
+	mux.HandleFunc("GET /api/analytics/patches", s.analyticsPatches)
 	mux.HandleFunc("POST /api/analytics/win-conditions", s.analyticsWinConditions)
 	mux.HandleFunc("GET /api/analytics/win-conditions/diagnostics", s.analyticsWinConditionDiagnostics)
 	mux.HandleFunc("GET /api/static/{kind}", s.staticData)
@@ -669,6 +670,20 @@ func (s Server) analyticsItemSlotsBatch(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
 }
 
+func (s Server) analyticsPatches(w http.ResponseWriter, r *http.Request) {
+	queueID := uint16(queryInt(r.URL.Query().Get("queueId"), analytics.RankedSoloQueueID))
+	stats, err := s.repo.PatchStats(r.Context(), queueID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"currentPatch": s.cfg.CollectorCurrentPatch,
+		"queueId":      queueID,
+		"results":      patchStatsResponse(stats, s.cfg.CollectorCurrentPatch),
+	})
+}
+
 type itemSlotAnalyticsRequest struct {
 	Key                      string `json:"key"`
 	ChampionID               uint16 `json:"championId"`
@@ -1098,6 +1113,21 @@ func championGuideSummariesResponse(rows []clickhouse.ChampionGuideSummary) []ma
 	results := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		results = append(results, championGuideSummaryResponse(row))
+	}
+	return results
+}
+
+func patchStatsResponse(rows []clickhouse.PatchStat, currentPatch string) []map[string]any {
+	results := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, map[string]any{
+			"patch":              row.Patch,
+			"matches":            row.Matches,
+			"participantSamples": row.ParticipantSamples,
+			"rawMatches":         row.RawMatches,
+			"compiledMatches":    row.CompiledMatches,
+			"current":            row.Patch == currentPatch,
+		})
 	}
 	return results
 }

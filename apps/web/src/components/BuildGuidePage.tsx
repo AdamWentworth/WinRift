@@ -45,6 +45,7 @@ type Props = {
   spells?: SummonerSpellData;
   runes?: RuneData;
   initialChampionId?: number;
+  analyticsPatch?: string;
   roleRates?: ChampionRoleRate[];
   onChampionChange?: (champion: Champion) => void;
 };
@@ -52,7 +53,7 @@ type Props = {
 export type GuideItemSlot = Pick<AnalyticsItemSlot, 'itemSlot' | 'itemId' | 'wins' | 'games' | 'winRate' | 'confidence'>;
 export type GuideStartingLoadout = Pick<StartingItemLoadout, 'itemSignature' | 'wins' | 'games' | 'winRate' | 'confidence'>;
 
-export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, roleRates, onChampionChange }: Props) {
+export function BuildGuidePage({ champions, items, spells, runes, initialChampionId, analyticsPatch, roleRates, onChampionChange }: Props) {
   const championsByName = useMemo(() => championList(champions), [champions]);
   const defaultChampionId = useMemo(() => {
     const wukong = championsByName.find((champion) => champion.id === 'MonkeyKing');
@@ -64,7 +65,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
   const [rankBucket, setRankBucket] = useState('');
   const [opponentChampionId, setOpponentChampionId] = useState(0);
   const [selectedBuildVariantKey, setSelectedBuildVariantKey] = useState('');
-  const patch = patchBucket(champions?.version);
+  const patch = analyticsPatch || patchBucket(champions?.version);
   const champion = championByKey(champions, championId);
   const opponent = opponentChampionId ? championByKey(champions, opponentChampionId) : undefined;
   const seededRoleRates = useMemo(() => (
@@ -130,7 +131,7 @@ export function BuildGuidePage({ champions, items, spells, runes, initialChampio
 
   useEffect(() => {
     setSelectedBuildVariantKey('');
-  }, [championId, role, rankBucket]);
+  }, [championId, role, rankBucket, patch]);
 
   const updateChampion = (value: number) => {
     setRoleTouched(false);

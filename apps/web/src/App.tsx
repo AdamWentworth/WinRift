@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getChampionPageBundle, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
-import type { Champion, ChampionRoleRate } from './api/types';
+import { getAnalyticsPatches, getChampionPageBundle, getChampionRoleRates, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
+import type { AnalyticsPatchStat, Champion, ChampionRoleRate } from './api/types';
 import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
 import { BuildGuidePage } from './components/BuildGuidePage';
 import { ChampionDirectoryPage } from './components/ChampionDirectoryPage';
@@ -20,6 +20,9 @@ const DEFAULT_QUEUE_ID = 420;
 const STATIC_STALE_TIME = Infinity;
 const GUIDE_STALE_TIME = 10 * 60 * 1000;
 const ROLE_STALE_TIME = 30 * 60 * 1000;
+const PATCH_STALE_TIME = 2 * 60 * 1000;
+const PATCH_READY_MATCHES = 5000;
+const ANALYTICS_PATCH_STORAGE_KEY = 'winrift.analyticsPatch';
 
 type AppRoute =
   | { kind: 'home' }
@@ -30,8 +33,14 @@ type AppRoute =
 export function App() {
   const queryClient = useQueryClient();
   const [route, setRoute] = useState<AppRoute>(() => readRoute());
+  const [selectedAnalyticsPatch, setSelectedAnalyticsPatch] = useState(() => storedAnalyticsPatch());
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
   const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions, staleTime: STATIC_STALE_TIME });
+  const analyticsPatches = useQuery({
+    queryKey: ['analytics-patches', DEFAULT_QUEUE_ID],
+    queryFn: () => getAnalyticsPatches(DEFAULT_QUEUE_ID),
+    staleTime: PATCH_STALE_TIME,
+  });
   const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: STATIC_STALE_TIME });
   const items = useQuery({ queryKey: ['items'], queryFn: getItems, staleTime: STATIC_STALE_TIME });
   const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells, staleTime: STATIC_STALE_TIME });
@@ -42,6 +51,13 @@ export function App() {
       .map((champion) => Number(champion.key))
       .filter((championId) => Number.isFinite(championId) && championId > 0);
   }, [champions.data]);
+  const staticPatch = useMemo(() => patchBucketFromVersion(champions.data?.version), [champions.data?.version]);
+  const patchOptions = analyticsPatches.data?.results ?? [];
+  const activeAnalyticsPatch = useMemo(() => {
+    const selected = patchOptions.find((patch) => patch.patch === selectedAnalyticsPatch);
+    if (selected) return selected.patch;
+    return recommendedAnalyticsPatch(patchOptions, staticPatch) || staticPatch;
+  }, [patchOptions, selectedAnalyticsPatch, staticPatch]);
   const allChampionRoleRates = useQuery({
     queryKey: ['champion-main-roles', DEFAULT_QUEUE_ID, championIds.join(',')],
     queryFn: () => getChampionRoleRates(championIds, DEFAULT_QUEUE_ID),
@@ -69,9 +85,13 @@ export function App() {
   }, []);
 
   const goHome = useCallback(() => navigate({ kind: 'home' }), [navigate]);
+  const updateAnalyticsPatch = useCallback((patch: string) => {
+    setSelectedAnalyticsPatch(patch);
+    storeAnalyticsPatch(patch);
+  }, []);
   const prefetchChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
     const championId = Number(champion.key);
-    const patch = patchBucketFromVersion(champions.data?.version);
+    const patch = activeAnalyticsPatch;
     if (!championId || !patch) return;
 
     warmImage(championImageUrl(champions.data, championId));
@@ -125,7 +145,7 @@ export function App() {
         prefetchForRole('MIDDLE');
       }
     });
-  }, [allChampionRoleRateRows, champions.data, queryClient]);
+  }, [activeAnalyticsPatch, allChampionRoleRateRows, champions.data, queryClient]);
   const openChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
     prefetchChampionGuide(champion, preferredRole);
     navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
@@ -184,11 +204,19 @@ export function App() {
             Summoners
           </button>
         </nav>
+        <AnalyticsPatchPicker
+          activePatch={activeAnalyticsPatch}
+          currentPatch={analyticsPatches.data?.currentPatch || staticPatch}
+          loading={analyticsPatches.isLoading}
+          options={patchOptions}
+          onChange={updateAnalyticsPatch}
+        />
       </header>
 
       {route.kind === 'tier-list' ? (
         <TierListPage
           champions={champions.data}
+          analyticsPatch={activeAnalyticsPatch}
           onChampionIntent={prefetchChampionGuide}
           onSelectChampion={openChampionGuide}
         />
@@ -205,6 +233,7 @@ export function App() {
           spells={spells.data}
           runes={runes.data}
           initialChampionId={initialChampionId}
+          analyticsPatch={activeAnalyticsPatch}
           roleRates={allChampionRoleRateRows}
           onChampionChange={openChampionGuide}
         />
@@ -217,6 +246,7 @@ export function App() {
           items={items.data}
           spells={spells.data}
           runes={runes.data}
+          analyticsPatch={activeAnalyticsPatch}
           onUseAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine })}
           onResolvedAlias={(alias) => navigate({ kind: 'summoner', platform: alias.platform, gameName: alias.gameName, tagLine: alias.tagLine }, { replace: true })}
           onBackgroundChampionScopeChange={setSummonerBackgroundChampionIds}
@@ -227,6 +257,7 @@ export function App() {
           items={items.data}
           spells={spells.data}
           runes={runes.data}
+          analyticsPatch={activeAnalyticsPatch}
           loading={false}
           onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
           onChampionSearch={openChampionGuide}
@@ -265,6 +296,79 @@ function warmImage(src: string) {
   const image = new Image();
   image.decoding = 'async';
   image.src = src;
+}
+
+function AnalyticsPatchPicker({
+  activePatch,
+  currentPatch,
+  loading,
+  options,
+  onChange,
+}: {
+  activePatch: string;
+  currentPatch: string;
+  loading: boolean;
+  options: AnalyticsPatchStat[];
+  onChange: (patch: string) => void;
+}) {
+  const visibleOptions = options.length
+    ? options
+    : activePatch
+      ? [{ patch: activePatch, matches: 0, participantSamples: 0, rawMatches: 0, compiledMatches: 0, current: activePatch === currentPatch }]
+      : [];
+  if (!visibleOptions.length) {
+    return (
+      <div className="topbar-patch-selector loading" aria-label="Analytics patch loading">
+        <span>Data Patch</span>
+        <b>{loading ? 'Loading' : 'Current'}</b>
+      </div>
+    );
+  }
+  const activeOption = visibleOptions.find((option) => option.patch === activePatch);
+  const sampleLabel = activeOption?.matches ? `${formatNumber(activeOption.matches)} matches` : loading ? 'Loading sample' : 'Sample pending';
+  return (
+    <label className="topbar-patch-selector">
+      <span>Data Patch</span>
+      <select aria-label="Analytics data patch" value={activePatch} onChange={(event) => onChange(event.target.value)}>
+        {visibleOptions.map((option) => (
+          <option key={option.patch} value={option.patch}>
+            {option.patch}{option.patch === currentPatch ? ' current' : ''} · {formatNumber(option.matches)} matches
+          </option>
+        ))}
+      </select>
+      <em>{sampleLabel}</em>
+    </label>
+  );
+}
+
+function recommendedAnalyticsPatch(options: AnalyticsPatchStat[], staticPatch: string) {
+  if (!options.length) return '';
+  const current = options.find((patch) => patch.patch === staticPatch);
+  if (current && current.matches >= PATCH_READY_MATCHES) {
+    return current.patch;
+  }
+  const bestSample = [...options].sort((a, b) => b.matches - a.matches)[0];
+  return bestSample?.patch ?? current?.patch ?? options[0]?.patch ?? '';
+}
+
+function storedAnalyticsPatch() {
+  try {
+    return window.localStorage.getItem(ANALYTICS_PATCH_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function storeAnalyticsPatch(patch: string) {
+  try {
+    window.localStorage.setItem(ANALYTICS_PATCH_STORAGE_KEY, patch);
+  } catch {
+    // Browser storage is optional; the selector still works for this session.
+  }
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('en-US').format(value);
 }
 
 function appShellClass(route: AppRoute) {

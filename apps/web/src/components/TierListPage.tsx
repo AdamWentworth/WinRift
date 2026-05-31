@@ -57,6 +57,7 @@ const tierTableColumns: { mode: SortMode; label: string }[] = [
 
 type Props = {
   champions?: ChampionData;
+  analyticsPatch?: string;
   onChampionIntent?: (champion: Champion, preferredRole?: string) => void;
   onSelectChampion: (champion: Champion, preferredRole?: string) => void;
 };
@@ -68,14 +69,14 @@ type TierRow = {
   tier: string;
 };
 
-export function TierListPage({ champions, onChampionIntent, onSelectChampion }: Props) {
+export function TierListPage({ champions, analyticsPatch, onChampionIntent, onSelectChampion }: Props) {
   const [role, setRole] = useState('');
   const [rankBucket, setRankBucket] = useState('');
   const [minGames, setMinGames] = useState(50);
   const [sortMode, setSortMode] = useState<SortMode>('confidence');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchText, setSearchText] = useState('');
-  const patch = patchBucket(champions?.version);
+  const patch = analyticsPatch || patchBucket(champions?.version);
   const tierQuery = useQuery({
     queryKey: ['tier-list', role, patch, rankBucket, minGames],
     queryFn: () => getChampionGuideIndex({ role, patch, rankBucket, minGames, limit: 300 }),
@@ -133,7 +134,7 @@ export function TierListPage({ champions, onChampionIntent, onSelectChampion }: 
           </p>
         </div>
         <div className="tier-list-hero-stats">
-          <MetricTile label="Patch" value={patch || champions?.version || 'Current'} />
+          <MetricTile label="Data Patch" value={patch || champions?.version || 'Current'} />
           <MetricTile label="Rank" value={selectedRank} />
           <MetricTile label="Matches Indexed" value={formatNumber(matchCount)} />
           <MetricTile label="Champion Games" value={formatNumber(participantSamples)} />

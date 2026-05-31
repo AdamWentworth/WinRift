@@ -113,6 +113,21 @@ export type AnalyticsBuildResponse = {
   results: AnalyticsBuild[];
 };
 
+export type AnalyticsPatchStat = {
+  patch: string;
+  matches: number;
+  participantSamples: number;
+  rawMatches: number;
+  compiledMatches: number;
+  current: boolean;
+};
+
+export type AnalyticsPatchesResponse = {
+  currentPatch: string;
+  queueId: number;
+  results: AnalyticsPatchStat[];
+};
+
 export type AnalyticsItemSlot = {
   championId: number;
   role: string;

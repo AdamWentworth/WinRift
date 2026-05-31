@@ -8,6 +8,7 @@ import { LiveMatchups } from './LiveMatchups';
 type Props = {
   champions?: ChampionData;
   items?: ItemData;
+  analyticsPatch?: string;
   spells?: SummonerSpellData;
   runes?: RuneData;
   liveGame?: LiveGame;
@@ -17,7 +18,7 @@ type Props = {
   onChampionSearch?: (champion: Champion) => void;
 };
 
-export function LiveMatchPanel({ champions, items, spells, runes, liveGame, loading, error, onSearch, onChampionSearch }: Props) {
+export function LiveMatchPanel({ champions, items, analyticsPatch, spells, runes, liveGame, loading, error, onSearch, onChampionSearch }: Props) {
   const [riotId, setRiotId] = useState('');
   const [platform, setPlatform] = useState('NA1');
   const [showPlatforms, setShowPlatforms] = useState(false);
@@ -205,6 +206,7 @@ export function LiveMatchPanel({ champions, items, spells, runes, liveGame, load
           liveGame={liveGame}
           champions={champions}
           items={items}
+          analyticsPatch={analyticsPatch}
           spells={spells}
           runes={runes}
         />

@@ -67,6 +67,7 @@ type Props = {
   tagLine?: string;
   champions?: ChampionData;
   items?: ItemData;
+  analyticsPatch?: string;
   spells?: SummonerSpellData;
   runes?: RuneData;
   onUseAlias: (alias: AccountAliasMatch) => void;
@@ -80,6 +81,7 @@ export function SummonerProfilePage({
   tagLine,
   champions,
   items,
+  analyticsPatch,
   spells,
   runes,
   onUseAlias,
@@ -154,6 +156,7 @@ export function SummonerProfilePage({
           liveGame={liveQuery.data}
           champions={champions}
           items={items}
+          analyticsPatch={analyticsPatch}
           profileAction={{
             label: 'View Profile',
             onClick: () => setLiveViewDismissed(true),

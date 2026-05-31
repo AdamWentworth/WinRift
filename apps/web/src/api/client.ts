@@ -1,4 +1,4 @@
-import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, BuildAdviceResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionPageBundleResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerProfile, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
+import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, AnalyticsPatchesResponse, BuildAdviceResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionPageBundleResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerProfile, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -134,6 +134,11 @@ export function getChampionRoleRates(championIds: number[], queueId: number) {
     queueId: String(queueId),
   });
   return request<ChampionRoleRatesResponse>(`/api/analytics/champion-roles?${params.toString()}`);
+}
+
+export function getAnalyticsPatches(queueId = 420) {
+  const params = new URLSearchParams({ queueId: String(queueId) });
+  return request<AnalyticsPatchesResponse>(`/api/analytics/patches?${params.toString()}`);
 }
 
 export function getWinConditionAnalysis(body: WinConditionAnalysisRequest) {

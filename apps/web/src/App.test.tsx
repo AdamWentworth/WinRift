@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { getBuildAdvice, getChampionGuideIndex, getChampionPageBundle, getChampionRoleRates, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
+import { getAnalyticsPatches, getBuildAdvice, getChampionGuideIndex, getChampionPageBundle, getChampionRoleRates, getLiveGame, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
 const buildAdviceFixture = vi.hoisted(() => () => ({
@@ -76,6 +76,11 @@ vi.mock('./api/client', () => ({
   getChampionGuide: vi.fn(async () => championGuideFixture()),
   getChampionGuideIndex: vi.fn(async () => championGuideIndexFixture()),
   getChampionPageBundle: vi.fn(async () => championPageBundleFixture()),
+  getAnalyticsPatches: vi.fn(async () => ({
+    currentPatch: '16.10',
+    queueId: 420,
+    results: [{ patch: '16.10', matches: 1000, participantSamples: 10000, rawMatches: 1000, compiledMatches: 0, current: true }],
+  })),
   getItemSlots: vi.fn(async () => ({ results: [] })),
   getChampionRoleRates: vi.fn(async () => ({ results: [] })),
   getWinConditionAnalysis: vi.fn(async () => winConditionFixture),
@@ -125,6 +130,7 @@ describe('App', () => {
     vi.mocked(getChampionRoleRates).mockReset();
     vi.mocked(getChampionGuideIndex).mockReset();
     vi.mocked(getChampionPageBundle).mockReset();
+    vi.mocked(getAnalyticsPatches).mockReset();
     vi.mocked(getBuildAdvice).mockReset();
     vi.mocked(getWinConditionAnalysis).mockReset();
     vi.mocked(resolveAccountAlias).mockReset();
@@ -133,6 +139,11 @@ describe('App', () => {
     vi.mocked(getChampionRoleRates).mockResolvedValue({ results: [] });
     vi.mocked(getChampionGuideIndex).mockResolvedValue(championGuideIndexFixture());
     vi.mocked(getChampionPageBundle).mockResolvedValue(championPageBundleFixture());
+    vi.mocked(getAnalyticsPatches).mockResolvedValue({
+      currentPatch: '16.10',
+      queueId: 420,
+      results: [{ patch: '16.10', matches: 1000, participantSamples: 10000, rawMatches: 1000, compiledMatches: 0, current: true }],
+    });
     vi.mocked(getBuildAdvice).mockResolvedValue(buildAdviceFixture());
     vi.mocked(getWinConditionAnalysis).mockResolvedValue(winConditionFixture);
     vi.mocked(getSummonerProfile).mockResolvedValue({

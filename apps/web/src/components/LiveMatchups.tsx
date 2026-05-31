@@ -28,6 +28,7 @@ type Props = {
   liveGame: LiveGame;
   champions?: ChampionData;
   items?: ItemData;
+  analyticsPatch?: string;
   profileAction?: {
     label: string;
     onClick: () => void;
@@ -36,11 +37,12 @@ type Props = {
   runes?: RuneData;
 };
 
-export function LiveMatchups({ liveGame, champions, items, profileAction, spells, runes }: Props) {
+export function LiveMatchups({ liveGame, champions, items, analyticsPatch, profileAction, spells, runes }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [liveMode, setLiveMode] = useState<LiveMode>('match');
   const liveChampionIds = useMemo(() => uniqueChampionIds(liveGame.participants), [liveGame.participants]);
-  const patchBucket = useMemo(() => patchBucketFromVersion(champions?.version), [champions?.version]);
+  const staticPatchBucket = useMemo(() => patchBucketFromVersion(champions?.version), [champions?.version]);
+  const analyticsPatchBucket = analyticsPatch || staticPatchBucket;
   const showBuildMode = liveMode === 'builds';
   const showWinConditionMode = liveMode === 'winConditions';
   const roleRatesQuery = useQuery({
@@ -68,15 +70,15 @@ export function LiveMatchups({ liveGame, champions, items, profileAction, spells
     return focusedBuildSelection(searchedParticipant, blueTeam, redTeam, selectedBuildParticipantKey, selectedBuildOpponentKey);
   }, [blueTeam, redTeam, searchedParticipant, selectedBuildOpponentKey, selectedBuildParticipantKey]);
   const focusedBuildFilters = useMemo(() => (
-    focusedBuild ? buildAdviceFilters(focusedBuild.participant, focusedBuild.opponent, focusedBuild.role, patchBucket) : undefined
-  ), [focusedBuild, patchBucket]);
+    focusedBuild ? buildAdviceFilters(focusedBuild.participant, focusedBuild.opponent, focusedBuild.role, analyticsPatchBucket) : undefined
+  ), [analyticsPatchBucket, focusedBuild]);
   const winConditionQuery = useQuery({
-    queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, patchBucket, blueChampionIds, redChampionIds],
+    queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, analyticsPatchBucket, blueChampionIds, redChampionIds],
     queryFn: () => getWinConditionAnalysis({
       blueChampionIds,
       redChampionIds,
       queueId: liveGame.gameQueueConfigId,
-      patch: patchBucket,
+      patch: analyticsPatchBucket,
       minGames: 5,
     }),
     enabled: showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5,
@@ -127,7 +129,7 @@ export function LiveMatchups({ liveGame, champions, items, profileAction, spells
       <MatchHeader
         liveGame={liveGame}
         now={now}
-        patch={patchBucket}
+        patch={staticPatchBucket}
         searchedParticipant={searchedParticipant}
         profileAction={profileAction}
         yourSide={yourSide}
