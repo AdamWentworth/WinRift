@@ -12,7 +12,10 @@ import (
 	"winrift/services/core/internal/analytics"
 )
 
-const buildVariantSkillOrderMinGames = 10
+const (
+	buildVariantSkillOrderMinGames = 10
+	championGuideRankingMinGames   = 50
+)
 
 type ChampionGuideSummary struct {
 	ChampionID                 uint16
@@ -364,6 +367,7 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 	championID := strings.TrimSpace(filters["champion_id"])
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, baseArgs := championGuideBaseSQL(filters, roleScope, false)
+	rankingMinGames := championGuideSummaryRankingMinGames(minGames)
 	var totalRoleGames int
 	if err := r.db.QueryRowContext(ctx, "SELECT count() "+baseSQL, baseArgs...).Scan(&totalRoleGames); err != nil {
 		return ChampionGuideSummary{}, err
@@ -397,7 +401,7 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 		GROUP BY champion_id
 		HAVING games >= ?
 		ORDER BY games DESC, champion_id ASC`
-	rankArgs := append(append([]any{}, baseArgs...), minGames)
+	rankArgs := append(append([]any{}, baseArgs...), rankingMinGames)
 	rows, err := r.db.QueryContext(ctx, rankQuery, rankArgs...)
 	if err != nil {
 		return ChampionGuideSummary{}, err
@@ -447,8 +451,33 @@ func (r *Repository) queryChampionGuideSummary(ctx context.Context, filters map[
 	if err != nil {
 		return ChampionGuideSummary{}, err
 	}
+	if direct.Games <= 0 {
+		direct.RoleRankTotal = len(candidates)
+		return direct, nil
+	}
+	scoredCandidates := append(append([]ChampionGuideSummary{}, candidates...), direct)
+	scoredCandidates, err = r.rankChampionGuideSummaries(ctx, filters, scoredCandidates)
+	if err != nil {
+		return ChampionGuideSummary{}, err
+	}
+	for _, candidate := range scoredCandidates {
+		if candidate.ChampionID == direct.ChampionID {
+			if candidate.Games < rankingMinGames {
+				candidate.RoleRank = 0
+				candidate.RoleRankTotal = len(candidates)
+			}
+			return candidate, nil
+		}
+	}
 	direct.RoleRankTotal = len(candidates)
 	return direct, nil
+}
+
+func championGuideSummaryRankingMinGames(minGames int) int {
+	if minGames > championGuideRankingMinGames {
+		return minGames
+	}
+	return championGuideRankingMinGames
 }
 
 func (r *Repository) queryChampionGuideDirectSummary(ctx context.Context, filters map[string]string, totalRoleGames int) (ChampionGuideSummary, error) {

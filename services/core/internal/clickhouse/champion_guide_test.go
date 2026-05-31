@@ -65,6 +65,15 @@ func TestChampionGuideRankingFiltersUseFullRoleBanUniverse(t *testing.T) {
 	}
 }
 
+func TestChampionGuideSummaryRankingUsesStableMinimum(t *testing.T) {
+	if got := championGuideSummaryRankingMinGames(5); got != 50 {
+		t.Fatalf("ranking min games = %d; wanted stable 50-game floor", got)
+	}
+	if got := championGuideSummaryRankingMinGames(250); got != 250 {
+		t.Fatalf("ranking min games = %d; wanted explicit higher floor preserved", got)
+	}
+}
+
 func TestItemCostExpressionSQLIsDeterministic(t *testing.T) {
 	costs := map[uint32]uint32{
 		2003: 50,
