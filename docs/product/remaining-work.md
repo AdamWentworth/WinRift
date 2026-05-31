@@ -2,6 +2,8 @@
 
 This is the next-session list from the live app rebuild work. The project is moving in the right direction, but a few areas now deserve cleanup before we keep stacking features on top.
 
+For the broader cleanup pass, see `docs/product/tech-debt-roadmap.md`.
+
 ## Frontend Structure
 
 Status: items 1-10 and the first ops/documentation pass have been addressed. The next product pass should be validation, performance polish, or targeted read-model cleanup, not basic page scaffolding.
