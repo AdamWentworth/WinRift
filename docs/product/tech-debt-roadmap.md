@@ -169,24 +169,23 @@ Summoner profile extraction candidates:
 
 ### Split `server.go`
 
-`services/core/internal/api/server.go` is large. It still works, but it is hard to navigate.
-
-Suggested split:
+Current pass complete: `services/core/internal/api/server.go` now only owns the `Server` type, constructor, route wiring, and health handler. Endpoint logic has been moved into same-package files by domain:
 
 ```text
 internal/api/
-├── server.go              # route wiring, middleware, shared response helpers
+├── server.go              # type, constructor, route wiring, health
 ├── account_handlers.go
+├── analytics_handlers.go
+├── dev_handlers.go
+├── http_helpers.go
 ├── live_game_handlers.go
 ├── summoner_handlers.go
-├── champion_handlers.go
-├── build_handlers.go
-├── win_condition_handlers.go
+├── win_conditions.go
 ├── static_handlers.go
-└── dev_handlers.go
+└── *_test.go
 ```
 
-Guardrail: do not invent a new framework or heavy abstraction. Keep the existing `net/http` style and move related handlers into smaller files.
+Guardrail remains: do not invent a new framework or heavy abstraction. Keep the existing `net/http` style and same-package helpers until a real abstraction earns its keep.
 
 ### Split ClickHouse Query Files Further
 
