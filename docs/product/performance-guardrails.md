@@ -105,3 +105,41 @@ Useful env vars:
 There is also a manual `route-perf` GitHub Actions workflow for the private self-hosted runner. Keep this manual for now; Chromium install and private-LAN access are heavier than the normal web CI path.
 
 The current frontend route split keeps page-scale JavaScript out of the initial home/search shell. The largest always-loaded bundle should stay small enough for quick first interaction, while champion guides, live match analysis, profiles, and tier lists load in their own chunks. The global background still renders immediately from lightweight metadata, and the full splash-art catalog is fetched after roughly 10 seconds so route timing does not pay for art discovery before the page is usable.
+
+## Baseline: 2026-05-31
+
+Environment:
+
+- Dev laptop frontend perf runner.
+- Server API at `http://192.168.1.77:8000`.
+- Patch scope `16.10`.
+- API smoke used 2 warmups and 5 measured runs.
+- Browser route timing used the production web build through the Playwright perf server.
+
+API smoke:
+
+| Endpoint | Avg | Max | Notes |
+| --- | ---: | ---: | --- |
+| Health | 3 ms | 4 ms | Clear |
+| Patch list | 60 ms | 71 ms | Clear |
+| Summoner leaderboard | 72 ms | 85 ms | Clear |
+| Champion role rates | 129 ms | 194 ms | Slowest sampled API endpoint, still under budget |
+| Champion guide index | 39 ms | 42 ms | Clear |
+| Aatrox champion page | 13 ms | 13 ms | Warm cached route with explicit role |
+
+Browser route timing, second pass:
+
+| Route | Ready | API Requests | Slowest Request | Notes |
+| --- | ---: | ---: | ---: | --- |
+| Home search | 703 ms | 2 | 87 ms | Clear |
+| Champion directory | 1,939 ms | 2 | 218 ms | Clear on second pass; first pass was 3,866 ms and warned |
+| Aatrox guide | 1,393 ms | 6 | 442 ms | Clear; no loading item panels by ready marker |
+| Tier list | 1,133 ms | 3 | 102 ms | Clear |
+| Summoners hub | 939 ms | 3 | 91 ms | Clear |
+
+Interpretation:
+
+- Stored analytics API reads are no longer the obvious bottleneck.
+- Champion pages are benefiting from response caching/prewarming. A matching no-role Aatrox page request measured around 183 ms immediately after the route run, which is still under the bundled-page target.
+- Browser route timing still shows some cold variability, especially champion directory and patch-list requests through the proxy. Treat one-off cold warnings as investigation leads, not failures.
+- Do not make thresholds strict yet. Collect a few more baseline runs after normal worker refresh/prewarm cycles before turning perf warnings into hard CI gates.
