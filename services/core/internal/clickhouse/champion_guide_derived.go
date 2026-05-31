@@ -348,7 +348,6 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 		(
 			SELECT
 				pm.match_id AS match_id,
-				pm.team_id AS team_id,
 				pm.patch AS patch,
 				pm.queue_id AS queue_id,
 				pm.champion_id AS champion_id,
@@ -381,23 +380,8 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 				multiIf(pp.baron_kills > 0, pp.baron_kills, pm.baron_kills) AS baron_kills,
 				multiIf(pp.objectives_stolen > 0, pp.objectives_stolen, pm.objectives_stolen) AS objectives_stolen,
 				multiIf(pp.total_time_spent_dead > 0, pp.total_time_spent_dead, pm.total_time_spent_dead) AS total_time_spent_dead,
-				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played,
-				tk.team_kills AS team_kills
+				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played
 			FROM participant_matchups AS pm FINAL
-			LEFT JOIN
-			(
-				SELECT
-					match_id,
-					platform,
-					team_id,
-					toUInt64(sum(kills)) AS team_kills
-				FROM participant_matchups FINAL
-				WHERE patch = ? AND queue_id = ?
-				GROUP BY match_id, platform, team_id
-			) AS tk
-				ON tk.match_id = pm.match_id
-				AND tk.platform = pm.platform
-				AND tk.team_id = pm.team_id
 			LEFT JOIN participant_performance AS pp FINAL
 				ON pp.match_id = pm.match_id
 				AND pp.platform = pm.platform
@@ -441,11 +425,9 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 			toUInt64(sum(dragon_kills + baron_kills + objectives_stolen)) AS objective_takedowns_sum,
 			toUInt64(sum(total_time_spent_dead)) AS total_time_spent_dead_sum,
 			toUInt64(sum(time_played)) AS time_played_sum,
-			sum(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation_sum
+			toFloat64(0) AS kill_participation_sum
 		FROM participant_rows
 		GROUP BY patch, queue_id, champion_id, role, rank_bucket`,
-		patch,
-		queueID,
 		patch,
 		queueID,
 	)
