@@ -1,0 +1,54 @@
+name: route-perf
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "API base URL used when building the preview app."
+        required: false
+        default: "http://127.0.0.1:8000"
+        type: string
+      strict_thresholds:
+        description: "Fail when a route exceeds its ready-time or request-count budget."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  browser-route-timing:
+    runs-on: [self-hosted, linux, x64, prod]
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browser
+        run: npx playwright install chromium
+
+      - name: Route Timing Smoke
+        env:
+          WINRIFT_ROUTE_PERF_API_URL: ${{ inputs.api_base_url }}
+          WINRIFT_ROUTE_PERF_STRICT: ${{ inputs.strict_thresholds && '1' || '0' }}
+        run: npm run perf:routes
+
+      - name: Upload Route Timing Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-performance
+          path: apps/web/test-results/route-performance.json
+          if-no-files-found: ignore

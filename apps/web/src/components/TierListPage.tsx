@@ -91,7 +91,7 @@ export function TierListPage({
   const [sortMode, setSortMode] = useState<SortMode>('confidence');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchText, setSearchText] = useState('');
-  const patch = analyticsPatch || patchBucket(champions?.version);
+  const patch = analyticsPatch ?? patchBucket(champions?.version);
   const tierQuery = useQuery({
     queryKey: ['tier-list', role, patch, rankBucket, minGames],
     queryFn: ({ signal }) => getChampionGuideIndex({ role, patch, rankBucket, minGames, limit: 300 }, { signal }),

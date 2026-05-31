@@ -28,6 +28,8 @@ Turn the manual timing habit from `performance-guardrails.md` into a lightweight
 
 Status: first pass implemented as `ops/perf-smoke.sh` plus the manual `perf-smoke` GitHub Actions workflow. It reports threshold warnings by default and can be made strict later. The script now samples each endpoint multiple times, supports a patch selector, and can emit JSONL for trend capture.
 
+Browser route timing is also in place through `apps/web` Playwright checks and the manual `route-perf` workflow. This covers page-level ready time and API request counts, which the API-only smoke cannot see.
+
 Useful first checks:
 
 - deployed `/api/health`
@@ -336,6 +338,7 @@ Completed:
 - Add first-pass frontend regression tests for the highest-risk UI surfaces.
 - Add first-pass backend query tests for read-model usage and patch-retained summaries.
 - Add first-pass frontend request/cache guardrails.
+- Add first-pass Playwright browser route timing.
 - Create the read-model coverage audit.
 - Add summoner recent-match and summoner build summaries.
 - Add champion matchup/rune/spell read models for cold champion-page loads.

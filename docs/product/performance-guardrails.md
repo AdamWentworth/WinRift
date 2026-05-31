@@ -74,3 +74,32 @@ If an analytics endpoint suddenly takes seconds, first check for:
 The fix should usually be a new summary/read-model refresh, not more frontend loading spinners.
 
 Frontend-specific request and cache rules are tracked in [Frontend Performance Audit](./frontend-performance-audit.md).
+
+## Browser Route Timing
+
+API timing alone is not enough. A route can have fast endpoints and still feel slow if the browser creates request waterfalls, waits on unnecessary metadata, or remounts too much UI.
+
+Run the Playwright route timing smoke from `apps/web`:
+
+```bash
+WINRIFT_ROUTE_PERF_API_URL=http://192.168.1.77:8000 \
+npm run perf:routes
+```
+
+The route smoke builds the production frontend, serves it through a tiny local static/proxy server, opens the core routes in Chromium, waits for page-specific ready markers, records API request counts, and writes:
+
+```text
+apps/web/test-results/route-performance.json
+```
+
+Useful env vars:
+
+- `WINRIFT_ROUTE_PERF_API_URL`: backend API URL proxied by the local route-perf server. Use the server API from the dev laptop.
+- `WINRIFT_ROUTE_PERF_CLIENT_API_URL`: optional API URL injected directly into the browser build. Leave unset for the same-origin proxy path.
+- `WINRIFT_ROUTE_PERF_STRICT`: fail if route ready time or request count exceeds its budget.
+- `WINRIFT_ROUTE_PERF_JSON`: output path for the JSON timing report.
+- `WINRIFT_ROUTE_PERF_PORT`: local browser timing server port. Defaults to `4173`.
+- `WINRIFT_ROUTE_PERF_SKIP_SERVER`: set to `1` when testing against an already-running frontend.
+- `WINRIFT_ROUTE_PERF_REUSE_SERVER`: set to `1` only when you intentionally want Playwright to reuse an existing frontend server.
+
+There is also a manual `route-perf` GitHub Actions workflow for the private self-hosted runner. Keep this manual for now; Chromium install and private-LAN access are heavier than the normal web CI path.

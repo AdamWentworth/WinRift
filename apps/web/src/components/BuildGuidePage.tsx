@@ -70,7 +70,7 @@ export function BuildGuidePage({
   const championsByName = useMemo(() => championList(champions), [champions]);
   const defaultChampionId = useMemo(() => {
     const wukong = championsByName.find((champion) => champion.id === 'MonkeyKing');
-    return Number(wukong?.key ?? championsByName[0]?.key ?? 62);
+    return Number(wukong?.key ?? championsByName[0]?.key ?? 0);
   }, [championsByName]);
   const [championId, setChampionId] = useState(initialChampionId ?? defaultChampionId);
   const [role, setRole] = useState('');
@@ -78,7 +78,7 @@ export function BuildGuidePage({
   const [rankBucket, setRankBucket] = useState('');
   const [opponentChampionId, setOpponentChampionId] = useState(0);
   const [selectedBuildVariantKey, setSelectedBuildVariantKey] = useState('');
-  const patch = analyticsPatch || patchBucket(champions?.version);
+  const patch = analyticsPatch ?? patchBucket(champions?.version);
   const champion = championByKey(champions, championId);
   const opponent = opponentChampionId ? championByKey(champions, opponentChampionId) : undefined;
   const seededRoleRates = useMemo(() => (

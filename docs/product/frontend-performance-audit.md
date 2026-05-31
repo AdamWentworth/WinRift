@@ -94,9 +94,17 @@ WINRIFT_PERF_JSONL=/tmp/winrift-perf.jsonl ops/perf-smoke.sh
 
 The smoke script samples each endpoint multiple times and warns on the slowest observed request. It is intentionally a guardrail, not a full benchmark suite.
 
+Run browser route timing from `apps/web`:
+
+```bash
+WINRIFT_ROUTE_PERF_API_URL=http://192.168.1.77:8000 \
+npm run perf:routes
+```
+
+This starts a production preview build, opens the core routes with Playwright, records route ready time and API request count, and writes `test-results/route-performance.json`.
+
 ## Next Improvements
 
-- Add browser-level route timing with Playwright once the local dev/prod API split is fully settled.
 - Consider prefetching champion-page bundles on visible links only, not every hover, if the app starts over-prefetching.
 - Add route-level bundle splitting if the frontend bundle becomes large enough to affect first paint.
 - Promote perf smoke thresholds from warning to strict only after we collect stable baseline runs from the server.

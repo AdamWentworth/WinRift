@@ -33,7 +33,7 @@ export function App() {
   const [route, setRoute] = useState<AppRoute>(() => readRoute());
   const [selectedAnalyticsPatch, setSelectedAnalyticsPatch] = useState(() => storedAnalyticsPatch());
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
-  const needsGameMetadata = route.kind === 'champion' || route.kind === 'summoner';
+  const needsGameMetadata = (route.kind === 'summoner' && Boolean(route.gameName)) || (route.kind === 'champion' && Boolean(route.championSlug));
   const champions = useQuery({ queryKey: ['champions'], queryFn: ({ signal }) => getChampions({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const analyticsPatches = useQuery({
     queryKey: ['analytics-patches', DEFAULT_QUEUE_ID],
@@ -44,26 +44,16 @@ export function App() {
   const items = useQuery({ queryKey: ['items'], queryFn: ({ signal }) => getItems({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: ({ signal }) => getSummonerSpells({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const runes = useQuery({ queryKey: ['runes'], queryFn: ({ signal }) => getRunes({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
-  const championIds = useMemo(() => {
-    if (!champions.data) return [];
-    return Object.values(champions.data.data.data)
-      .map((champion) => Number(champion.key))
-      .filter((championId) => Number.isFinite(championId) && championId > 0);
-  }, [champions.data]);
   const staticPatch = useMemo(() => patchBucketFromVersion(champions.data?.version), [champions.data?.version]);
   const patchOptions = analyticsPatches.data?.results ?? [];
   const activeAnalyticsPatch = useMemo(() => {
     const selected = patchOptions.find((patch) => patch.patch === selectedAnalyticsPatch);
     if (selected) return selected.patch;
+    if (!patchOptions.length && !analyticsPatches.isError) {
+      return selectedAnalyticsPatch || '';
+    }
     return recommendedAnalyticsPatch(patchOptions, staticPatch) || staticPatch;
-  }, [patchOptions, selectedAnalyticsPatch, staticPatch]);
-  const allChampionRoleRates = useQuery({
-    queryKey: ['champion-main-roles', DEFAULT_QUEUE_ID, championIds.join(',')],
-    queryFn: ({ signal }) => getChampionRoleRates(championIds, DEFAULT_QUEUE_ID, { signal }),
-    enabled: championIds.length > 0,
-    staleTime: queryStaleTime.championRoleRates,
-  });
-  const allChampionRoleRateRows = useMemo(() => allChampionRoleRates.data?.results ?? [], [allChampionRoleRates.data?.results]);
+  }, [analyticsPatches.isError, patchOptions, selectedAnalyticsPatch, staticPatch]);
 
   useEffect(() => {
     const onPopState = () => setRoute(readRoute());
@@ -121,14 +111,10 @@ export function App() {
     };
 
     const normalizedPreferredRole = normalizeRole(preferredRole ?? '');
-    const cachedDetectedRole = mainChampionRole(allChampionRoleRateRows, championId);
     if (normalizedPreferredRole) {
       prefetchForRole(normalizedPreferredRole);
-    } else if (cachedDetectedRole) {
-      prefetchForRole(cachedDetectedRole);
+      return;
     }
-
-    if (cachedDetectedRole) return;
 
     void queryClient.ensureQueryData({
       queryKey: ['champion-main-role', championId],
@@ -136,15 +122,11 @@ export function App() {
       staleTime: queryStaleTime.championRoleRates,
     }).then((data) => {
       const detectedRole = mainChampionRole(data.results ?? [], championId);
-      if (!normalizedPreferredRole || detectedRole !== normalizedPreferredRole) {
-        prefetchForRole(detectedRole);
-      }
+      prefetchForRole(detectedRole);
     }).catch(() => {
-      if (!normalizedPreferredRole) {
-        prefetchForRole('MIDDLE');
-      }
+      prefetchForRole('MIDDLE');
     });
-  }, [activeAnalyticsPatch, allChampionRoleRateRows, champions.data, queryClient]);
+  }, [activeAnalyticsPatch, champions.data, queryClient]);
   const openChampionGuide = useCallback((champion: Champion, preferredRole?: string) => {
     prefetchChampionGuide(champion, preferredRole);
     navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
@@ -233,7 +215,6 @@ export function App() {
           analyticsPatchLoading={analyticsPatches.isLoading}
           analyticsPatchOptions={patchOptions}
           currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
-          roleRates={allChampionRoleRateRows}
           onAnalyticsPatchChange={updateAnalyticsPatch}
           onChampionChange={openChampionGuide}
         />

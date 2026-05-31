@@ -1,6 +1,7 @@
 node_modules/
 apps/web/node_modules/
 apps/web/dist/
+apps/web/test-results/
 .vite-cache/
 core/bin/
 *.tsbuildinfo
