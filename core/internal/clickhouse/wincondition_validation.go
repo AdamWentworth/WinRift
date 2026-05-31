@@ -240,7 +240,8 @@ func (r *Repository) queryWinConditionScoreDeltaOutcomes(ctx context.Context, wh
 			o.teamfight_score AS opponent_teamfight_score
 		FROM (` + teamSelect + `) AS t
 		INNER JOIN (` + teamSelect + `) AS o
-			ON t.match_id = o.match_id AND t.team_id != o.team_id`
+			ON t.match_id = o.match_id
+		WHERE t.team_id != o.team_id`
 	query := `
 		SELECT
 			axis,
@@ -321,7 +322,8 @@ func (r *Repository) queryWinConditionPrimaryMatchupOutcomes(ctx context.Context
 			toUInt64(sum(t.win)) AS wins
 		FROM (` + teamSelect + `) AS t
 		INNER JOIN (` + teamSelect + `) AS o
-			ON t.match_id = o.match_id AND t.team_id != o.team_id
+			ON t.match_id = o.match_id
+		WHERE t.team_id != o.team_id
 		GROUP BY t.primary_condition, t.primary_rating, opponent_primary_condition, opponent_primary_rating
 		HAVING games >= ?
 		ORDER BY games DESC, abs((wins / games) - 0.5) DESC
