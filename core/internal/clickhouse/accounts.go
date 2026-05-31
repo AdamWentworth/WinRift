@@ -163,6 +163,60 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ENGINE = ReplacingMergeTree(compiled_at)
 		ORDER BY (platform, queue_id, puuid, champion_id, role)
 	`, `
+		CREATE TABLE IF NOT EXISTS summoner_recent_match_summary
+		(
+			platform LowCardinality(String),
+			queue_id UInt16,
+			puuid String,
+			match_id String,
+			patch LowCardinality(String),
+			champion_id UInt16,
+			role LowCardinality(String),
+			win UInt8,
+			kills UInt16,
+			deaths UInt16,
+			assists UInt16,
+			game_start_timestamp UInt64,
+			duration_seconds UInt32,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY (platform, queue_id, puuid, game_start_timestamp, match_id)
+	`, `
+		CREATE TABLE IF NOT EXISTS summoner_build_summary
+		(
+			platform LowCardinality(String),
+			queue_id UInt16,
+			puuid String,
+			champion_id UInt16,
+			role LowCardinality(String),
+			final_items_signature String,
+			core2_signature String,
+			core3_signature String,
+			rune_signature String,
+			spell_signature String,
+			games UInt64,
+			wins UInt64,
+			kills UInt64,
+			deaths UInt64,
+			assists UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			platform,
+			queue_id,
+			puuid,
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature
+		)
+	`, `
 		CREATE TABLE IF NOT EXISTS champion_page_bundle_cache
 		(
 			cache_key String,

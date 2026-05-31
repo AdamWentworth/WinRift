@@ -82,6 +82,84 @@ func TestPatchStatsIncludesCompiledSnapshotsAfterRawPrune(t *testing.T) {
 	}
 }
 
+func TestSummonerRecentMatchesUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM summoner_recent_match_summary FINAL").
+		WithArgs("NA1", "puuid-1", uint16(420), 20).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"match_id",
+			"platform",
+			"patch",
+			"queue_id",
+			"champion_id",
+			"role",
+			"win",
+			"kills",
+			"deaths",
+			"assists",
+			"game_start_timestamp",
+			"duration_seconds",
+		}).AddRow("NA1_1", "NA1", "16.11", 420, 266, "TOP", 1, 7, 2, 9, 1770000000000, 1830))
+
+	rows, err := repo.SummonerRecentMatches(context.Background(), "NA1", "puuid-1", 420, 20)
+	if err != nil {
+		t.Fatalf("summoner recent matches: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	if rows[0].MatchID != "NA1_1" || rows[0].ChampionID != 266 || !rows[0].Win {
+		t.Fatalf("recent row = %+v", rows[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSummonerBuildsUsesSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM summoner_build_summary FINAL").
+		WithArgs("NA1", "puuid-1", uint16(420), 12).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role",
+			"final_items_signature",
+			"core2_signature",
+			"core3_signature",
+			"rune_signature",
+			"spell_signature",
+			"games",
+			"wins",
+			"kills",
+			"deaths",
+			"assists",
+		}).AddRow(266, "TOP", "3071-3053-6333", "3071-3053", "3071-3053-6333", "rune", "4-14", 11, 7, 60, 33, 80))
+
+	rows, err := repo.SummonerBuilds(context.Background(), "NA1", "puuid-1", 420, 12)
+	if err != nil {
+		t.Fatalf("summoner builds: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	row := rows[0]
+	if row.ChampionID != 266 || row.Games != 11 || row.Wins != 7 || row.Losses != 4 {
+		t.Fatalf("build row = %+v", row)
+	}
+	if row.WinRate <= 0.63 || row.WinRate >= 0.64 {
+		t.Fatalf("win rate = %.4f; want around 0.636", row.WinRate)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func newMockRepository(t *testing.T) (*sql.DB, sqlmock.Sqlmock, func()) {
 	t.Helper()
 	db, mock, err := sqlmock.New()

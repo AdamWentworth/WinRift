@@ -546,12 +546,14 @@ func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config
 		refreshStatus.fail("summoner-profile-analytics", startedAt, err)
 		return
 	}
-	log.Printf("summoner profile analytics scheduled refresh complete queue=%d identity_rows=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", analytics.RankedSoloQueueID, result.IdentityRows, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
+	log.Printf("summoner profile analytics scheduled refresh complete queue=%d identity_rows=%d profile_rows=%d champion_rows=%d champion_role_rows=%d recent_match_rows=%d build_rows=%d duration=%s", analytics.RankedSoloQueueID, result.IdentityRows, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, result.RecentMatchRows, result.BuildRows, time.Since(startedAt).Round(time.Millisecond))
 	refreshStatus.succeed("summoner-profile-analytics", startedAt, map[string]int{
 		"identityRows":     result.IdentityRows,
 		"profileRows":      result.ProfileRows,
 		"championRows":     result.ChampionRows,
 		"championRoleRows": result.ChampionRoleRows,
+		"recentMatchRows":  result.RecentMatchRows,
+		"buildRows":        result.BuildRows,
 	})
 }
 

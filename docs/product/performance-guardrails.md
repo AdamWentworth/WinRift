@@ -14,7 +14,7 @@ WinRift should feel instant for stored analytics pages. Riot-dependent live look
 
 - Champion pages: `champion_page_bundle_cache`, champion guide analytics, item slot analytics, starting loadout analytics, skill analytics, ban analytics, and build variant analytics.
 - Tier lists and champion guide indexes: `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` for role/rank/patch-scoped counts.
-- Summoner profiles: `summoner_profile_summary`, `summoner_champion_summary`, and `summoner_champion_role_summary`.
+- Summoner profiles: `summoner_profile_summary`, `summoner_champion_summary`, `summoner_champion_role_summary`, `summoner_recent_match_summary`, and `summoner_build_summary`.
 - Summoner identity and ladder rows: `summoner_identity_summary`, rank snapshots, and profile summaries.
 - Win conditions: `match_team_win_conditions` and `patch_win_condition_metrics`.
 

@@ -53,6 +53,18 @@ Role-aware read model for summoner champion comfort.
 
 One row per platform, queue, PUUID, champion, and role. It stores the same counters as `summoner_champion_summary`, but keeps top, jungle, mid, bot, and support samples separate. The profile Champion Stats tab uses this when a role filter is selected, so a player's Wukong jungle games do not get blended into Wukong top or mid.
 
+## `summoner_recent_match_summary`
+
+Read model for summoner profile recent-match rows.
+
+One row per platform, queue, PUUID, and match. It stores patch, champion, role, win/loss, KDA fields, game start timestamp, duration, and compile time. The profile Recent tab uses this before falling back to `participants` plus `raw_matches`, so recent-match display does not need to join raw rows on normal requests.
+
+## `summoner_build_summary`
+
+Read model for summoner-owned build usage.
+
+One row per platform, queue, PUUID, champion, role, final/core item signatures, rune signature, and spell signature. It stores games, wins, kills, deaths, assists, and compile time. The profile Builds tab uses this before falling back to direct `participants` aggregation.
+
 ## `champion_page_bundle_cache`
 
 Short-lived persisted JSON cache for exact champion-page API requests. The API also keeps these payloads in memory, but this table lets warmed pages remain fast across API restarts until the cache expiry.

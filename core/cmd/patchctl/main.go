@@ -131,7 +131,7 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 	if err != nil {
 		return fmt.Errorf("summoner profile analytics: %w", err)
 	}
-	log.Printf("patch archive summoner profile summaries queue=%d identities=%d profiles=%d champions=%d champion_roles=%d", queueID, profiles.IdentityRows, profiles.ProfileRows, profiles.ChampionRows, profiles.ChampionRoleRows)
+	log.Printf("patch archive summoner profile summaries queue=%d identities=%d profiles=%d champions=%d champion_roles=%d recent_matches=%d builds=%d", queueID, profiles.IdentityRows, profiles.ProfileRows, profiles.ChampionRows, profiles.ChampionRoleRows, profiles.RecentMatchRows, profiles.BuildRows)
 
 	for _, platform := range platforms {
 		log.Printf("patch archive compile platform patch=%s platform=%s queue=%d", patch, platform, queueID)

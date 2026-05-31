@@ -327,9 +327,10 @@ Completed:
 - Add first-pass frontend regression tests for the highest-risk UI surfaces.
 - Add first-pass backend query tests for read-model usage and patch-retained summaries.
 - Create the read-model coverage audit.
+- Add summoner recent-match and summoner build summaries.
 
 Next:
 
-1. Add summoner recent-match and summoner build summaries.
-2. Add champion matchup/rune/spell read models for cold champion-page loads.
-3. Add a team-kill summary for true kill participation in the fast guide path.
+1. Add champion matchup/rune/spell read models for cold champion-page loads.
+2. Add a team-kill summary for true kill participation in the fast guide path.
+3. Add a build-advice bundle summary for live build mode.

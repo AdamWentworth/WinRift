@@ -71,6 +71,8 @@ type SummonerProfileRefreshResult struct {
 	ProfileRows      int
 	ChampionRows     int
 	ChampionRoleRows int
+	RecentMatchRows  int
+	BuildRows        int
 	IdentityRows     int
 }
 
@@ -245,6 +247,12 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_champion_role_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_recent_match_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_build_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
 	if _, err := r.db.ExecContext(ctx, `
 		INSERT INTO summoner_identity_summary
 			(platform, puuid, game_name, tag_line, profile_icon_id, summoner_level, last_seen_at, compiled_at)
@@ -381,7 +389,72 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			AND p.puuid != ''
 			AND p.champion_id > 0
 			AND p.role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
-		GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role`, queueID); err != nil {
+	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if _, err := r.db.ExecContext(ctx, `
+		INSERT INTO summoner_recent_match_summary
+			(platform, queue_id, puuid, match_id, patch, champion_id, role, win, kills, deaths, assists, game_start_timestamp, duration_seconds, compiled_at)
+		SELECT
+			p.platform,
+			p.queue_id,
+			p.puuid,
+			p.match_id,
+			p.patch,
+			p.champion_id,
+			p.role,
+			p.win,
+			p.kills,
+			p.deaths,
+			p.assists,
+			ifNull(rm.game_start_timestamp, 0) AS game_start_timestamp,
+			ifNull(rm.duration_seconds, 0) AS duration_seconds,
+			now() AS compiled_at
+		FROM participants AS p FINAL
+		LEFT JOIN raw_matches AS rm FINAL
+			ON rm.match_id = p.match_id
+			AND rm.platform = p.platform
+		WHERE p.queue_id = ?
+			AND p.puuid != ''
+			AND p.match_id != ''`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if _, err := r.db.ExecContext(ctx, `
+		INSERT INTO summoner_build_summary
+			(platform, queue_id, puuid, champion_id, role, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature, games, wins, kills, deaths, assists, compiled_at)
+		SELECT
+			platform,
+			queue_id,
+			puuid,
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			toUInt64(count()) AS games,
+			toUInt64(sum(win)) AS wins,
+			toUInt64(sum(kills)) AS kills,
+			toUInt64(sum(deaths)) AS deaths,
+			toUInt64(sum(assists)) AS assists,
+			now() AS compiled_at
+		FROM participants FINAL
+		WHERE queue_id = ?
+			AND puuid != ''
+			AND champion_id > 0
+			AND (final_items_signature != '' OR core3_signature != '')
+		GROUP BY
+			platform,
+			queue_id,
+			puuid,
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature`, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	result := SummonerProfileRefreshResult{}
@@ -392,6 +465,12 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_champion_role_summary FINAL WHERE queue_id = ?`, queueID).Scan(&result.ChampionRoleRows); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_recent_match_summary FINAL WHERE queue_id = ?`, queueID).Scan(&result.RecentMatchRows); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_build_summary FINAL WHERE queue_id = ?`, queueID).Scan(&result.BuildRows); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_identity_summary FINAL`).Scan(&result.IdentityRows); err != nil {
@@ -615,6 +694,79 @@ func (r *Repository) summonerTopChampionRolesFromParticipants(ctx context.Contex
 }
 
 func (r *Repository) SummonerRecentMatches(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerRecentMatch, error) {
+	rows, err := r.summonerRecentMatchesFromSummary(ctx, platform, puuid, queueID, limit)
+	if err == nil && len(rows) > 0 {
+		return rows, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.summonerRecentMatchesFromParticipants(ctx, platform, puuid, queueID, limit)
+}
+
+func (r *Repository) summonerRecentMatchesFromSummary(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerRecentMatch, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			match_id,
+			platform,
+			patch,
+			queue_id,
+			champion_id,
+			role,
+			win,
+			kills,
+			deaths,
+			assists,
+			game_start_timestamp,
+			duration_seconds
+		FROM summoner_recent_match_summary FINAL
+		WHERE platform = ? AND puuid = ? AND queue_id = ?
+		ORDER BY game_start_timestamp DESC, match_id DESC
+		LIMIT ?`,
+		platform,
+		puuid,
+		queueID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SummonerRecentMatch{}
+	for rows.Next() {
+		var row SummonerRecentMatch
+		var win uint8
+		var kills, deaths, assists uint16
+		if err := rows.Scan(
+			&row.MatchID,
+			&row.Platform,
+			&row.Patch,
+			&row.QueueID,
+			&row.ChampionID,
+			&row.Role,
+			&win,
+			&kills,
+			&deaths,
+			&assists,
+			&row.GameStartTimestamp,
+			&row.DurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		row.Win = win > 0
+		row.Kills = int(kills)
+		row.Deaths = int(deaths)
+		row.Assists = int(assists)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) summonerRecentMatchesFromParticipants(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerRecentMatch, error) {
 	if limit <= 0 {
 		limit = 10
 	}
@@ -680,6 +832,94 @@ func (r *Repository) SummonerRecentMatches(ctx context.Context, platform, puuid 
 }
 
 func (r *Repository) SummonerBuilds(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerBuildRecord, error) {
+	rows, err := r.summonerBuildsFromSummary(ctx, platform, puuid, queueID, limit)
+	if err == nil && len(rows) > 0 {
+		return rows, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return r.summonerBuildsFromParticipants(ctx, platform, puuid, queueID, limit)
+}
+
+func (r *Repository) summonerBuildsFromSummary(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerBuildRecord, error) {
+	if limit <= 0 {
+		limit = 24
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			sum(games) AS games,
+			sum(wins) AS wins,
+			sum(kills) AS kills,
+			sum(deaths) AS deaths,
+			sum(assists) AS assists
+		FROM summoner_build_summary FINAL
+		WHERE platform = ? AND puuid = ? AND queue_id = ?
+			AND champion_id > 0
+			AND (final_items_signature != '' OR core3_signature != '')
+		GROUP BY
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature
+		ORDER BY games DESC, wins / games DESC, champion_id ASC
+		LIMIT ?`,
+		platform,
+		puuid,
+		queueID,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SummonerBuildRecord{}
+	for rows.Next() {
+		var row SummonerBuildRecord
+		var games, wins, kills, deaths, assists uint64
+		if err := rows.Scan(
+			&row.ChampionID,
+			&row.Role,
+			&row.FinalItemsSignature,
+			&row.Core2Signature,
+			&row.Core3Signature,
+			&row.RuneSignature,
+			&row.SpellSignature,
+			&games,
+			&wins,
+			&kills,
+			&deaths,
+			&assists,
+		); err != nil {
+			return nil, err
+		}
+		row.PUUID = puuid
+		row.Platform = platform
+		row.QueueID = queueID
+		row.Games = int(games)
+		row.Wins = int(wins)
+		row.Losses = int(games - wins)
+		row.Kills = int(kills)
+		row.Deaths = int(deaths)
+		row.Assists = int(assists)
+		applySummonerBuildAverages(&row)
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) summonerBuildsFromParticipants(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]SummonerBuildRecord, error) {
 	if limit <= 0 {
 		limit = 24
 	}
