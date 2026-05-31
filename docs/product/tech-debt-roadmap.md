@@ -157,12 +157,8 @@ Build guide extraction candidates:
 Summoner profile extraction candidates:
 
 - summoner search hub, leaderboard, and shared profile message: first pass complete in `components/summoner-profile/`
+- stored profile tabs, rows, and freshness helpers: first pass complete in `components/summoner-profile/ProfileSections.tsx`
 - profile header
-- overview metrics
-- champion table
-- recent matches
-- build usage
-- ladder/search hub
 
 ## Priority 4: Backend Maintainability
 
