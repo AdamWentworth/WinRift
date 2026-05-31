@@ -1809,9 +1809,10 @@ func (s Server) refreshSummonerProfileAnalytics(w http.ResponseWriter, r *http.R
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	log.Printf("summoner profile analytics refresh complete queue=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", queueID, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
+	log.Printf("summoner profile analytics refresh complete queue=%d identity_rows=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", queueID, result.IdentityRows, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
 	writeJSON(w, http.StatusOK, map[string]any{
 		"queueId":          queueID,
+		"identityRows":     result.IdentityRows,
 		"profileRows":      result.ProfileRows,
 		"championRows":     result.ChampionRows,
 		"championRoleRows": result.ChampionRoleRows,

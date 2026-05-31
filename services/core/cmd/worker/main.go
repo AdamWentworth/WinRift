@@ -472,7 +472,7 @@ func maybeRefreshSummonerProfileAnalytics(ctx context.Context, cfg config.Config
 		log.Printf("summoner profile analytics scheduled refresh failed queue=%d duration=%s err=%v", analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), err)
 		return
 	}
-	log.Printf("summoner profile analytics scheduled refresh complete queue=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", analytics.RankedSoloQueueID, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
+	log.Printf("summoner profile analytics scheduled refresh complete queue=%d identity_rows=%d profile_rows=%d champion_rows=%d champion_role_rows=%d duration=%s", analytics.RankedSoloQueueID, result.IdentityRows, result.ProfileRows, result.ChampionRows, result.ChampionRoleRows, time.Since(startedAt).Round(time.Millisecond))
 }
 
 func runRankPass(ctx context.Context, cfg config.Config, matchCollector collector.Collector, repo *clickhouse.Repository, platform string, rankRequests int) collector.Result {

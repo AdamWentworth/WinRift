@@ -95,6 +95,20 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ENGINE = ReplacingMergeTree(updated_at)
 		ORDER BY (platform, puuid)
 	`, `
+		CREATE TABLE IF NOT EXISTS summoner_identity_summary
+		(
+			platform LowCardinality(String),
+			puuid String,
+			game_name String,
+			tag_line String,
+			profile_icon_id UInt32,
+			summoner_level UInt64,
+			last_seen_at DateTime,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY (platform, puuid)
+	`, `
 		CREATE TABLE IF NOT EXISTS summoner_profile_summary
 		(
 			platform LowCardinality(String),

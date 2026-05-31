@@ -29,6 +29,12 @@ Cached ranked metadata keyed by `platform`, `puuid`, and `queue_type`.
 
 Important columns: tier, division, league points, wins, losses, rank bucket, fetched time, and expiry time. Current ingestion uses `RANKED_SOLO_5x5` snapshots for participant `rank_bucket` when rank enrichment is enabled. Unranked players are cached as `UNRANKED` so they are not repeatedly queried.
 
+## `summoner_identity_summary`
+
+Read model for summoner-facing identity fields.
+
+One row per platform and PUUID. It stores the latest Riot ID name/tag, profile icon id, summoner level when available, last seen time, and compile time. The worker refreshes it from alias/account snapshots and retained raw match profile icon fields, so the summoner ladder does not need to scan raw match JSON during page load.
+
 ## `summoner_profile_summary`
 
 Read model for summoner profile pages.

@@ -71,6 +71,7 @@ type SummonerProfileRefreshResult struct {
 	ProfileRows      int
 	ChampionRows     int
 	ChampionRoleRows int
+	IdentityRows     int
 }
 
 func (r *Repository) FindAccountAlias(ctx context.Context, platform, gameName, tagLine string) (AccountAlias, error) {
@@ -232,6 +233,9 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_identity_summary DELETE WHERE 1 SETTINGS mutations_sync = 2`); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_profile_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
@@ -239,6 +243,67 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_champion_role_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if _, err := r.db.ExecContext(ctx, `
+		INSERT INTO summoner_identity_summary
+			(platform, puuid, game_name, tag_line, profile_icon_id, summoner_level, last_seen_at, compiled_at)
+		WITH latest_alias AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(game_name, last_seen_at) AS game_name,
+				argMax(tag_line, last_seen_at) AS tag_line,
+				max(last_seen_at) AS last_seen_at
+			FROM riot_account_aliases FINAL
+			GROUP BY platform, puuid
+		),
+		latest_account AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(profile_icon_id, fetched_at) AS profile_icon_id,
+				argMax(summoner_level, fetched_at) AS summoner_level
+			FROM summoner_account_snapshots FINAL
+			GROUP BY platform, puuid
+		),
+		latest_raw_profile AS
+		(
+			SELECT
+				platform,
+				puuid,
+				argMax(raw_profile_icon_id, game_start_timestamp) AS profile_icon_id
+			FROM
+			(
+				SELECT
+					platform,
+					game_start_timestamp,
+					JSONExtractString(participant_json, 'puuid') AS puuid,
+					toUInt32(JSONExtractUInt(participant_json, 'profileIcon')) AS raw_profile_icon_id
+				FROM raw_matches FINAL
+				ARRAY JOIN JSONExtractArrayRaw(raw_json, 'info', 'participants') AS participant_json
+				WHERE queue_id = ?
+			)
+			WHERE puuid != '' AND raw_profile_icon_id > 0
+			GROUP BY platform, puuid
+		)
+		SELECT
+			a.platform,
+			a.puuid,
+			a.game_name,
+			a.tag_line,
+			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
+			ifNull(s.summoner_level, 0) AS summoner_level,
+			a.last_seen_at,
+			now() AS compiled_at
+		FROM latest_alias AS a
+		LEFT JOIN latest_account AS s
+			ON s.platform = a.platform AND s.puuid = a.puuid
+		LEFT JOIN latest_raw_profile AS rp
+			ON rp.platform = a.platform AND rp.puuid = a.puuid
+		WHERE a.game_name != '' AND a.tag_line != ''`, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
@@ -327,6 +392,9 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_champion_role_summary FINAL WHERE queue_id = ?`, queueID).Scan(&result.ChampionRoleRows); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if err := r.db.QueryRowContext(ctx, `SELECT count() FROM summoner_identity_summary FINAL`).Scan(&result.IdentityRows); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	return result, nil

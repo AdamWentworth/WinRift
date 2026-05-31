@@ -226,24 +226,18 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			WHERE platform = ?
 			GROUP BY platform, puuid
 		),
-		latest_raw_profile AS
+		latest_identity AS
 		(
 			SELECT
-				platform,
 				puuid,
-				argMax(raw_profile_icon_id, game_start_timestamp) AS profile_icon_id
-			FROM
-			(
-				SELECT
-					platform,
-					game_start_timestamp,
-					JSONExtractString(participant_json, 'puuid') AS puuid,
-					toUInt32(JSONExtractUInt(participant_json, 'profileIcon')) AS raw_profile_icon_id
-				FROM raw_matches FINAL
-				ARRAY JOIN JSONExtractArrayRaw(raw_json, 'info', 'participants') AS participant_json
-				WHERE platform = ? AND queue_id = ?
-			)
-			WHERE puuid != '' AND raw_profile_icon_id > 0
+				platform,
+				argMax(game_name, compiled_at) AS game_name,
+				argMax(tag_line, compiled_at) AS tag_line,
+				argMax(profile_icon_id, compiled_at) AS profile_icon_id,
+				argMax(summoner_level, compiled_at) AS summoner_level,
+				argMax(last_seen_at, compiled_at) AS last_seen_at
+			FROM summoner_identity_summary FINAL
+			WHERE platform = ?
 			GROUP BY platform, puuid
 		),
 		latest_profile AS
@@ -260,8 +254,8 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 		SELECT
 			r.puuid,
 			r.platform,
-			a.game_name,
-			a.tag_line,
+			if(ifNull(i.game_name, '') != '', ifNull(i.game_name, ''), a.game_name) AS game_name,
+			if(ifNull(i.tag_line, '') != '', ifNull(i.tag_line, ''), a.tag_line) AS tag_line,
 			r.tier,
 			r.division,
 			r.league_points,
@@ -270,9 +264,9 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			r.rank_bucket,
 			r.latest_fetched_at,
 			r.expires_at,
-			a.latest_seen_at,
-			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
-			ifNull(s.summoner_level, 0) AS summoner_level,
+			if(ifNull(i.last_seen_at, toDateTime(0)) > a.latest_seen_at, ifNull(i.last_seen_at, toDateTime(0)), a.latest_seen_at) AS latest_seen_at,
+			if(ifNull(i.profile_icon_id, 0) > 0, ifNull(i.profile_icon_id, 0), ifNull(s.profile_icon_id, 0)) AS profile_icon_id,
+			if(ifNull(i.summoner_level, 0) > 0, ifNull(i.summoner_level, 0), ifNull(s.summoner_level, 0)) AS summoner_level,
 			ifNull(p.stored_games, 0) AS stored_games,
 			ifNull(p.stored_wins, 0) AS stored_wins
 		FROM latest_rank AS r
@@ -280,8 +274,8 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			ON a.platform = r.platform AND a.puuid = r.puuid
 		LEFT JOIN latest_account AS s
 			ON s.platform = r.platform AND s.puuid = r.puuid
-		LEFT JOIN latest_raw_profile AS rp
-			ON rp.platform = r.platform AND rp.puuid = r.puuid
+		LEFT JOIN latest_identity AS i
+			ON i.platform = r.platform AND i.puuid = r.puuid
 		LEFT JOIN latest_profile AS p
 			ON p.platform = r.platform AND p.puuid = r.puuid
 		WHERE a.game_name != '' AND a.tag_line != '' AND r.tier != '' AND r.tier != 'UNRANKED'
@@ -316,7 +310,6 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 		platform,
 		platform,
 		platform,
-		analytics.RankedSoloQueueID,
 		platform,
 		analytics.RankedSoloQueueID,
 		limit,
