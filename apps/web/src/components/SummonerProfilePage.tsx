@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, CircleAlert, History, LoaderCircle, Package, RadioTower, Search, Shield, Trophy } from 'lucide-react';
+import { CalendarDays, CircleAlert, Gamepad2, History, LoaderCircle, Package, Search, Shield, Trophy, UserRound } from 'lucide-react';
 import { getLiveGame, getSummonerLeaderboard, getSummonerProfile, resolveAccountAlias, searchAccountAliases } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerBuildRecord, SummonerLeaderboardRow, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../api/types';
 import { parseRiotId, platformLabel, platforms } from '../lib/lookup';
@@ -185,7 +185,7 @@ export function SummonerProfilePage({
           {summonerIcon ? (
             <img className="profile-card-icon" src={summonerIcon} alt={`${exactRiotId} profile icon`} />
           ) : (
-            <RadioTower size={24} />
+            <UserRound size={24} />
           )}
           <div>
             <span>Summoner Profile</span>
@@ -202,7 +202,7 @@ export function SummonerProfilePage({
               onClick={() => setLiveViewDismissed(false)}
               type="button"
             >
-              <RadioTower size={16} />
+              <Gamepad2 size={16} />
               <span>Live Match</span>
               <em>{liveQuery.data ? 'Live now' : liveQuery.isLoading ? 'Checking...' : 'Not live'}</em>
             </button>
@@ -408,7 +408,7 @@ function SummonerHub({
       </div>
       <div className="summoner-search-shell">
         <div className={validationError ? 'search-bar invalid summoner-hub-search' : 'search-bar summoner-hub-search'}>
-          <RadioTower className="search-mark" size={22} />
+          <UserRound className="search-mark" size={22} />
           <input
             value={riotId}
             placeholder="Riot ID, e.g. Sneaky#NA69"
@@ -579,7 +579,7 @@ function SummonerLeaderboardRowButton({
       {iconSrc ? (
         <img className="summoner-ladder-profile-icon" src={iconSrc} alt={`${row.gameName} profile icon`} />
       ) : (
-        <span className="summoner-ladder-icon-fallback"><RadioTower size={17} /></span>
+        <span className="summoner-ladder-icon-fallback"><UserRound size={17} /></span>
       )}
       <span className="summoner-ladder-name">
         <strong>{row.gameName}</strong>

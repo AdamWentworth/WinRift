@@ -1,4 +1,4 @@
-import { CircleAlert, LoaderCircle, RadioTower, Search } from 'lucide-react';
+import { CircleAlert, LoaderCircle, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { resolveAccountAlias, searchAccountAliases } from '../api/client';
 import type { AccountAliasMatch, Champion, ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
@@ -127,7 +127,7 @@ export function LiveMatchPanel({ champions, items, analyticsPatch, spells, runes
           </div>
         ) : null}
         <div className={validationError ? 'search-bar invalid' : 'search-bar'}>
-          <RadioTower className="search-mark" size={22} />
+          <Search className="search-mark" size={22} />
           <input
             value={riotId}
             placeholder="Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111"

@@ -226,6 +226,26 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			WHERE platform = ?
 			GROUP BY platform, puuid
 		),
+		latest_raw_profile AS
+		(
+			SELECT
+				platform,
+				puuid,
+				argMax(raw_profile_icon_id, game_start_timestamp) AS profile_icon_id
+			FROM
+			(
+				SELECT
+					platform,
+					game_start_timestamp,
+					JSONExtractString(participant_json, 'puuid') AS puuid,
+					toUInt32(JSONExtractUInt(participant_json, 'profileIcon')) AS raw_profile_icon_id
+				FROM raw_matches FINAL
+				ARRAY JOIN JSONExtractArrayRaw(raw_json, 'info', 'participants') AS participant_json
+				WHERE platform = ? AND queue_id = ?
+			)
+			WHERE puuid != '' AND raw_profile_icon_id > 0
+			GROUP BY platform, puuid
+		),
 		latest_profile AS
 		(
 			SELECT
@@ -251,7 +271,7 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			r.latest_fetched_at,
 			r.expires_at,
 			a.latest_seen_at,
-			ifNull(s.profile_icon_id, 0) AS profile_icon_id,
+			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
 			ifNull(s.summoner_level, 0) AS summoner_level,
 			ifNull(p.stored_games, 0) AS stored_games,
 			ifNull(p.stored_wins, 0) AS stored_wins
@@ -260,6 +280,8 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 			ON a.platform = r.platform AND a.puuid = r.puuid
 		LEFT JOIN latest_account AS s
 			ON s.platform = r.platform AND s.puuid = r.puuid
+		LEFT JOIN latest_raw_profile AS rp
+			ON rp.platform = r.platform AND rp.puuid = r.puuid
 		LEFT JOIN latest_profile AS p
 			ON p.platform = r.platform AND p.puuid = r.puuid
 		WHERE a.game_name != '' AND a.tag_line != '' AND r.tier != '' AND r.tier != 'UNRANKED'
@@ -293,6 +315,8 @@ func (r *Repository) SummonerRankLeaderboard(ctx context.Context, platform strin
 		rankedSoloQueueType,
 		platform,
 		platform,
+		platform,
+		analytics.RankedSoloQueueID,
 		platform,
 		analytics.RankedSoloQueueID,
 		limit,
