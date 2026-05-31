@@ -1467,6 +1467,8 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch FROM starting_loadout_analytics
 			UNION ALL SELECT patch FROM champion_skill_analytics
 			UNION ALL SELECT patch FROM champion_ban_analytics
+			UNION ALL SELECT patch FROM champion_guide_summary_analytics
+			UNION ALL SELECT patch FROM champion_guide_scope_analytics
 			UNION ALL SELECT patch FROM champion_build_variant_analytics
 			UNION ALL SELECT patch FROM patch_power_curve_metrics
 			UNION ALL SELECT patch FROM match_team_win_conditions
@@ -1516,6 +1518,8 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "starting_loadout_analytics", column: "patch"},
 		{table: "champion_skill_analytics", column: "patch"},
 		{table: "champion_ban_analytics", column: "patch"},
+		{table: "champion_guide_summary_analytics", column: "patch"},
+		{table: "champion_guide_scope_analytics", column: "patch"},
 		{table: "champion_build_variant_analytics", column: "patch"},
 		{table: "patch_power_curve_metrics", column: "patch"},
 		{table: "match_team_win_conditions", column: "patch"},

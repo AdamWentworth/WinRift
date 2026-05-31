@@ -196,6 +196,12 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_ban_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_summary_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_scope_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_build_variant_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
@@ -203,6 +209,12 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 		return err
 	}
 	if err := r.refreshChampionBanAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
+	if err := r.refreshChampionGuideSummaryAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
+	if err := r.refreshChampionGuideScopeAnalytics(ctx, patch, queueID); err != nil {
 		return err
 	}
 	return r.refreshChampionBuildVariantAnalytics(ctx, patch, queueID)
@@ -295,6 +307,207 @@ func (r *Repository) refreshChampionBanAnalytics(ctx context.Context, patch stri
 		GROUP BY cb.patch, cb.queue_id, cb.champion_id`,
 		patch,
 		queueID,
+		patch,
+		queueID,
+	)
+	return err
+}
+
+func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, patch string, queueID uint16) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO champion_guide_summary_analytics
+		(
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			wins,
+			games,
+			kills,
+			deaths,
+			assists,
+			gold_earned_sum,
+			cs_sum,
+			damage_dealt_to_champions_sum,
+			damage_taken_sum,
+			damage_self_mitigated_sum,
+			damage_dealt_to_objectives_sum,
+			damage_dealt_to_structures_sum,
+			vision_score_sum,
+			time_ccing_others_sum,
+			team_utility_sum,
+			structure_takedowns_sum,
+			objective_takedowns_sum,
+			total_time_spent_dead_sum,
+			time_played_sum,
+			kill_participation_sum
+		)
+		WITH participant_rows AS
+		(
+			SELECT
+				pm.match_id AS match_id,
+				pm.team_id AS team_id,
+				pm.patch AS patch,
+				pm.queue_id AS queue_id,
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_bucket,
+				pm.win AS win,
+				pm.kills AS kills,
+				pm.deaths AS deaths,
+				pm.assists AS assists,
+				multiIf(pp.gold_earned > 0, pp.gold_earned, pm.gold_earned) AS gold_earned,
+				multiIf(pp.total_minions_killed > 0, pp.total_minions_killed, pm.total_minions_killed) AS total_minions_killed,
+				multiIf(pp.neutral_minions_killed > 0, pp.neutral_minions_killed, pm.neutral_minions_killed) AS neutral_minions_killed,
+				multiIf(pp.total_damage_dealt_to_champions > 0, pp.total_damage_dealt_to_champions, pm.total_damage_dealt_to_champions) AS total_damage_dealt_to_champions,
+				multiIf(pp.total_damage_taken > 0, pp.total_damage_taken, pm.total_damage_taken) AS total_damage_taken,
+				multiIf(pp.damage_self_mitigated > 0, pp.damage_self_mitigated, pm.damage_self_mitigated) AS damage_self_mitigated,
+				multiIf(pp.damage_dealt_to_objectives > 0, pp.damage_dealt_to_objectives, pm.damage_dealt_to_objectives) AS damage_dealt_to_objectives,
+				multiIf(pp.damage_dealt_to_turrets > 0, pp.damage_dealt_to_turrets, pm.damage_dealt_to_turrets) AS damage_dealt_to_turrets,
+				multiIf(pp.damage_dealt_to_buildings > 0, pp.damage_dealt_to_buildings, pm.damage_dealt_to_buildings) AS damage_dealt_to_buildings,
+				multiIf(pp.vision_score > 0, pp.vision_score, pm.vision_score) AS vision_score,
+				multiIf(pp.time_ccing_others > 0, pp.time_ccing_others, pm.time_ccing_others) AS time_ccing_others,
+				multiIf(pp.total_heal > 0, pp.total_heal, pm.total_heal) AS total_heal,
+				multiIf(pp.total_heals_on_teammates > 0, pp.total_heals_on_teammates, pm.total_heals_on_teammates) AS total_heals_on_teammates,
+				multiIf(pp.total_damage_shielded_on_teammates > 0, pp.total_damage_shielded_on_teammates, pm.total_damage_shielded_on_teammates) AS total_damage_shielded_on_teammates,
+				multiIf(pp.turret_takedowns > 0, pp.turret_takedowns, pm.turret_takedowns) AS turret_takedowns,
+				multiIf(pp.inhibitor_takedowns > 0, pp.inhibitor_takedowns, pm.inhibitor_takedowns) AS inhibitor_takedowns,
+				multiIf(pp.dragon_kills > 0, pp.dragon_kills, pm.dragon_kills) AS dragon_kills,
+				multiIf(pp.baron_kills > 0, pp.baron_kills, pm.baron_kills) AS baron_kills,
+				multiIf(pp.objectives_stolen > 0, pp.objectives_stolen, pm.objectives_stolen) AS objectives_stolen,
+				multiIf(pp.total_time_spent_dead > 0, pp.total_time_spent_dead, pm.total_time_spent_dead) AS total_time_spent_dead,
+				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played,
+				sum(pm.kills) OVER (PARTITION BY pm.match_id, pm.team_id) AS team_kills
+			FROM participant_matchups AS pm FINAL
+			LEFT JOIN participant_performance AS pp FINAL
+				ON pp.match_id = pm.match_id
+				AND pp.platform = pm.platform
+				AND pp.participant_id = pm.participant_id
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE pm.patch = ? AND pm.queue_id = ?
+		)
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			toUInt64(sum(win)) AS wins,
+			toUInt64(count()) AS games,
+			toUInt64(sum(kills)) AS kills,
+			toUInt64(sum(deaths)) AS deaths,
+			toUInt64(sum(assists)) AS assists,
+			toUInt64(sum(gold_earned)) AS gold_earned_sum,
+			toUInt64(sum(total_minions_killed + neutral_minions_killed)) AS cs_sum,
+			toUInt64(sum(total_damage_dealt_to_champions)) AS damage_dealt_to_champions_sum,
+			toUInt64(sum(total_damage_taken)) AS damage_taken_sum,
+			toUInt64(sum(damage_self_mitigated)) AS damage_self_mitigated_sum,
+			toUInt64(sum(damage_dealt_to_objectives)) AS damage_dealt_to_objectives_sum,
+			toUInt64(sum(damage_dealt_to_turrets + damage_dealt_to_buildings)) AS damage_dealt_to_structures_sum,
+			toUInt64(sum(vision_score)) AS vision_score_sum,
+			toUInt64(sum(time_ccing_others)) AS time_ccing_others_sum,
+			toUInt64(sum(total_heal + total_heals_on_teammates + total_damage_shielded_on_teammates)) AS team_utility_sum,
+			toUInt64(sum(turret_takedowns + inhibitor_takedowns)) AS structure_takedowns_sum,
+			toUInt64(sum(dragon_kills + baron_kills + objectives_stolen)) AS objective_takedowns_sum,
+			toUInt64(sum(total_time_spent_dead)) AS total_time_spent_dead_sum,
+			toUInt64(sum(time_played)) AS time_played_sum,
+			sum(multiIf(team_kills > 0, toFloat64(kills + assists) / toFloat64(team_kills), 0)) AS kill_participation_sum
+		FROM participant_rows
+		GROUP BY patch, queue_id, champion_id, role, rank_bucket`,
+		patch,
+		queueID,
+	)
+	return err
+}
+
+func (r *Repository) refreshChampionGuideScopeAnalytics(ctx context.Context, patch string, queueID uint16) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO champion_guide_scope_analytics
+		(patch, platform, queue_id, role, rank_bucket, participant_samples, match_count)
+		WITH participant_rows AS
+		(
+			SELECT
+				pm.match_id AS match_id,
+				pm.patch AS patch,
+				pm.queue_id AS queue_id,
+				pm.role AS role,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_bucket
+			FROM participant_matchups AS pm FINAL
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE pm.patch = ? AND pm.queue_id = ?
+		)
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			role,
+			rank_bucket,
+			toUInt64(count()) AS participant_samples,
+			toUInt64(uniqExact(match_id)) AS match_count
+		FROM participant_rows
+		GROUP BY patch, queue_id, role, rank_bucket
+		UNION ALL
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			role,
+			'ALL' AS rank_bucket,
+			toUInt64(count()) AS participant_samples,
+			toUInt64(uniqExact(match_id)) AS match_count
+		FROM participant_rows
+		GROUP BY patch, queue_id, role
+		UNION ALL
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			'ALL' AS role,
+			rank_bucket,
+			toUInt64(count()) AS participant_samples,
+			toUInt64(uniqExact(match_id)) AS match_count
+		FROM participant_rows
+		GROUP BY patch, queue_id, rank_bucket
+		UNION ALL
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			'ALL' AS role,
+			'ALL' AS rank_bucket,
+			toUInt64(count()) AS participant_samples,
+			toUInt64(uniqExact(match_id)) AS match_count
+		FROM participant_rows
+		GROUP BY patch, queue_id`,
 		patch,
 		queueID,
 	)

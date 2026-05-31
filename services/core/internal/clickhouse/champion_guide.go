@@ -186,6 +186,15 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	if limit <= 0 {
 		limit = 250
 	}
+	if index, ok, err := r.queryChampionGuideIndexSummary(ctx, filters, minGames, limit); err != nil {
+		return ChampionGuideIndex{}, err
+	} else if ok {
+		return index, nil
+	}
+	return r.queryChampionGuideIndexRaw(ctx, filters, minGames, limit)
+}
+
+func (r *Repository) queryChampionGuideIndexRaw(ctx context.Context, filters map[string]string, minGames, limit int) (ChampionGuideIndex, error) {
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, baseArgs := championGuideBaseSQL(filters, roleScope, false)
 	index := ChampionGuideIndex{}
@@ -259,6 +268,115 @@ func (r *Repository) QueryChampionGuideIndex(ctx context.Context, filters map[st
 	}
 	index.Results = out
 	return index, nil
+}
+
+func (r *Repository) queryChampionGuideIndexSummary(ctx context.Context, filters map[string]string, minGames, limit int) (ChampionGuideIndex, bool, error) {
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	index := ChampionGuideIndex{}
+	scopeQuery := `
+		SELECT
+			toUInt64(sum(participant_samples)) AS participant_samples,
+			toUInt64(sum(match_count)) AS match_count
+		FROM champion_guide_scope_analytics FINAL
+		WHERE platform = 'ALL'
+			AND queue_id = ?
+			AND role = ?
+			AND rank_bucket = ?`
+	scopeArgs := []any{analytics.RankedSoloQueueID, roleLabel(filters["role"]), rankBucketLabel(filters["rank_bucket"])}
+	if filterValue(filters["patch"]) != "" {
+		scopeQuery += " AND patch = ?"
+		scopeArgs = append(scopeArgs, filterValue(filters["patch"]))
+	}
+	if err := r.db.QueryRowContext(ctx, scopeQuery, scopeArgs...).Scan(&index.ParticipantSamples, &index.MatchCount); err != nil {
+		return ChampionGuideIndex{}, false, err
+	}
+
+	query := `
+		SELECT
+			champion_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate,
+			toUInt64(sum(kills)) AS total_kills,
+			toUInt64(sum(deaths)) AS total_deaths,
+			toUInt64(sum(assists)) AS total_assists,
+			sum(gold_earned_sum) / games AS avg_gold_earned,
+			sum(cs_sum) / games AS avg_cs,
+			sum(damage_dealt_to_champions_sum) / games AS avg_damage_dealt_to_champions,
+			sum(damage_taken_sum) / games AS avg_damage_taken,
+			sum(damage_self_mitigated_sum) / games AS avg_damage_self_mitigated,
+			sum(damage_dealt_to_objectives_sum) / games AS avg_damage_dealt_to_objectives,
+			sum(damage_dealt_to_structures_sum) / games AS avg_damage_dealt_to_structures,
+			sum(vision_score_sum) / games AS avg_vision_score,
+			sum(time_ccing_others_sum) / games AS avg_time_ccing_others,
+			sum(team_utility_sum) / games AS avg_team_utility,
+			sum(structure_takedowns_sum) / games AS avg_structure_takedowns,
+			sum(objective_takedowns_sum) / games AS avg_objective_takedowns,
+			sum(total_time_spent_dead_sum) / games AS avg_total_time_spent_dead,
+			sum(time_played_sum) / games AS avg_time_played,
+			sum(kill_participation_sum) / games AS kill_participation
+		FROM champion_guide_summary_analytics FINAL
+		WHERE platform = 'ALL'
+			AND queue_id = ?`
+	args := []any{analytics.RankedSoloQueueID}
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	query += `
+		GROUP BY champion_id
+		HAVING games >= ?
+		ORDER BY games DESC, champion_id ASC`
+	args = append(args, minGames)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return ChampionGuideIndex{}, false, err
+	}
+	defer rows.Close()
+
+	out := []ChampionGuideSummary{}
+	for rows.Next() {
+		var row ChampionGuideSummary
+		var performance championGuidePerformance
+		scanTargets := append([]any{&row.ChampionID, &row.Wins, &row.Games, &row.WinRate}, performance.scanTargets()...)
+		if err := rows.Scan(scanTargets...); err != nil {
+			return ChampionGuideIndex{}, false, err
+		}
+		applyPerformanceAverages(&row, performance)
+		row.Role = roleLabel(filters["role"])
+		row.PatchBucket = patchBucketLabel(filters["patch"])
+		row.RankBucket = rankBucketLabel(filters["rank_bucket"])
+		if row.Games > 0 {
+			row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		}
+		if index.ParticipantSamples > 0 {
+			row.PickRate = float64(row.Games) / float64(index.ParticipantSamples)
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return ChampionGuideIndex{}, false, err
+	}
+	if index.ParticipantSamples == 0 && len(out) == 0 {
+		return ChampionGuideIndex{}, false, nil
+	}
+	out, err = r.rankChampionGuideSummaries(ctx, filters, out)
+	if err != nil {
+		return ChampionGuideIndex{}, false, err
+	}
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	index.Results = out
+	return index, true, nil
 }
 
 func (r *Repository) QueryChampionGuide(ctx context.Context, filters map[string]string, minGames, limit int) (ChampionGuideData, error) {

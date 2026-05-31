@@ -320,6 +320,68 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 		ENGINE = ReplacingMergeTree(compiled_at)
 		ORDER BY (patch, platform, queue_id, champion_id)
 	`, `
+		CREATE TABLE IF NOT EXISTS champion_guide_summary_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			champion_id UInt16,
+			role LowCardinality(String),
+			rank_bucket LowCardinality(String),
+			wins UInt64,
+			games UInt64,
+			kills UInt64,
+			deaths UInt64,
+			assists UInt64,
+			gold_earned_sum UInt64,
+			cs_sum UInt64,
+			damage_dealt_to_champions_sum UInt64,
+			damage_taken_sum UInt64,
+			damage_self_mitigated_sum UInt64,
+			damage_dealt_to_objectives_sum UInt64,
+			damage_dealt_to_structures_sum UInt64,
+			vision_score_sum UInt64,
+			time_ccing_others_sum UInt64,
+			team_utility_sum UInt64,
+			structure_takedowns_sum UInt64,
+			objective_takedowns_sum UInt64,
+			total_time_spent_dead_sum UInt64,
+			time_played_sum UInt64,
+			kill_participation_sum Float64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket
+		)
+	`, `
+		CREATE TABLE IF NOT EXISTS champion_guide_scope_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			role LowCardinality(String),
+			rank_bucket LowCardinality(String),
+			participant_samples UInt64,
+			match_count UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			role,
+			rank_bucket
+		)
+	`, `
 		CREATE TABLE IF NOT EXISTS champion_build_variant_analytics
 		(
 			patch LowCardinality(String),
