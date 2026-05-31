@@ -199,6 +199,9 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE team_kill_summary DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_role_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_summary_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
@@ -226,6 +229,9 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if err := r.refreshTeamKillSummary(ctx, patch, queueID); err != nil {
 		return err
 	}
+	if err := r.refreshChampionRoleAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
 	if err := r.refreshChampionGuideSummaryAnalytics(ctx, patch, queueID); err != nil {
 		return err
 	}
@@ -242,6 +248,29 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 		return err
 	}
 	return r.refreshChampionBuildVariantAnalytics(ctx, patch, queueID)
+}
+
+func (r *Repository) refreshChampionRoleAnalytics(ctx context.Context, patch string, queueID uint16) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO champion_role_analytics
+		(patch, platform, queue_id, champion_id, role, games)
+		SELECT
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			toUInt64(count()) AS games
+		FROM participants FINAL
+		WHERE patch = ?
+			AND queue_id = ?
+			AND champion_id > 0
+			AND role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
+		GROUP BY patch, platform, queue_id, champion_id, role`,
+		patch,
+		queueID,
+	)
+	return err
 }
 
 func (r *Repository) refreshChampionSkillAnalytics(ctx context.Context, patch string, queueID uint16) error {

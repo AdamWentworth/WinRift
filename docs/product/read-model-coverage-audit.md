@@ -13,7 +13,7 @@ Status meanings:
 | Page or flow | Main endpoints | Current data path | Status | Next action |
 | --- | --- | --- | --- | --- |
 | Home lookup | `/api/static/*`, `/api/account/aliases`, `/api/account/alias`, `/api/live-game` | Static Data Dragon metadata, account alias summaries, and Riot live lookup only when resolving a summoner in game. | Green | Keep static metadata cached aggressively in the browser. |
-| Champion directory | `/api/static/champions`, `/api/analytics/champion-roles` | Static metadata plus role-rate aggregation from stored champion role samples. | Amber | Consider a small `champion_role_summary` read model if role discovery starts showing up in timing logs. |
+| Champion directory | `/api/static/champions`, `/api/analytics/champion-roles` | Static metadata plus `champion_role_analytics`, with a participant fallback only when the summary has not been refreshed in local/dev. | Green | Keep route timing on the directory and champion default-role flow. |
 | Tier list | `/api/analytics/champion-guides` | `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, and `champion_ban_analytics`. | Green | Keep tests around this path because it is the main ranking surface. |
 | Champion guide page | `/api/analytics/champion-page` | Canonical response cache plus worker-prewarmed bundles for hot pages, backed by read models for champion summary, team-kill totals, item slots, starting loadouts, build signatures, skills, bans, build variants, matchup rows, and rune/spell signatures. | Green | Keep perf smoke checks on representative champion pages and expand prewarm coverage if product traffic grows. |
 | Live match overview | `/api/live-game` | Riot Spectator/API path plus cached account/rank/profile data where available. | Green | Keep Riot auth/rate-limit failure modes separate from app-data failures. |
@@ -30,7 +30,7 @@ Status meanings:
 
 This endpoint is correctly bundled and has both in-memory and ClickHouse-backed response caching. That is the right public shape. The remaining issue is what happens during a cold cache:
 
-- Good: `champion_skill_analytics`, `champion_ban_analytics`, `champion_build_variant_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, `build_signature_analytics`, item-slot analytics, and starting-loadout analytics already avoid raw JSON scans.
+- Good: `champion_role_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_build_variant_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, `build_signature_analytics`, item-slot analytics, and starting-loadout analytics already avoid raw JSON scans.
 - Good: selected champion summary now reuses `champion_guide_summary_analytics`, so the single-champion header no longer needs a separate participant aggregation on cold cache.
 - Good: `team_kill_summary` feeds true kill participation into `champion_guide_summary_analytics`.
 - Good: bundle caching means repeated clicks on the same champion/role/patch become cheap.
@@ -79,6 +79,5 @@ For the MVP, pruning old bulky raw payloads is still acceptable as long as we ac
 
 ## Recommended Order
 
-1. Add a champion role-rate summary if role discovery starts showing up in timing logs.
-2. Expand hot-response prewarming to matchup-specific champion pages if deployed timings show frequent cold misses there.
-3. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.
+1. Expand hot-response prewarming to matchup-specific champion pages if deployed timings show frequent cold misses there.
+2. Expand backend tests so each public endpoint has one test proving it uses the intended summary table.

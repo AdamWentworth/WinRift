@@ -403,10 +403,10 @@ Completed:
 - Add first-pass win-condition validation endpoint and documentation.
 - Split worker lanes by orchestration concern.
 - Split the largest ClickHouse repository/query files by read-model domain.
+- Add champion role-rate summaries for role discovery and default-role resolution.
 
 Next:
 
-1. Add champion role-rate summaries if directory/tier navigation needs them.
-2. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
-3. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-4. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+1. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
+2. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.

@@ -196,7 +196,7 @@ func (s Server) buildChampionPageBundle(ctx context.Context, request championPag
 	})
 	run(func(ctx context.Context) error {
 		var err error
-		roleRates, err = s.repo.ChampionRoleRates(ctx, []uint16{buildRequest.ChampionID}, request.QueueID)
+		roleRates, err = s.repo.ChampionRoleRatesForPatch(ctx, []uint16{buildRequest.ChampionID}, request.QueueID, buildRequest.Patch)
 		return err
 	})
 	wg.Wait()
@@ -227,7 +227,7 @@ func (s Server) buildChampionPageBundle(ctx context.Context, request championPag
 func (s Server) resolveChampionPageBundleRequest(ctx context.Context, request championPageBundleRequest) (championPageBundleRequest, error) {
 	request.Build.Role = strings.ToUpper(strings.TrimSpace(request.Build.Role))
 	if request.Build.Role == "" {
-		roleRates, err := s.repo.ChampionRoleRates(ctx, []uint16{request.Build.ChampionID}, request.QueueID)
+		roleRates, err := s.repo.ChampionRoleRatesForPatch(ctx, []uint16{request.Build.ChampionID}, request.QueueID, request.Build.Patch)
 		if err != nil {
 			return request, err
 		}
@@ -1209,7 +1209,7 @@ func (s Server) analyticsChampionRoles(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	championIDs := queryUint16List(query.Get("championIds"))
 	queueID := uint16(queryInt(query.Get("queueId"), 420))
-	rows, err := s.repo.ChampionRoleRates(r.Context(), championIDs, queueID)
+	rows, err := s.repo.ChampionRoleRatesForPatch(r.Context(), championIDs, queueID, query.Get("patch"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 )
@@ -101,6 +102,10 @@ func (r *Repository) ChampionPerformance(ctx context.Context, platform string, k
 }
 
 func (r *Repository) ChampionRoleRates(ctx context.Context, championIDs []uint16, queueID uint16) ([]ChampionRoleRate, error) {
+	return r.ChampionRoleRatesForPatch(ctx, championIDs, queueID, "")
+}
+
+func (r *Repository) ChampionRoleRatesForPatch(ctx context.Context, championIDs []uint16, queueID uint16, patch string) ([]ChampionRoleRate, error) {
 	if len(championIDs) == 0 {
 		return nil, nil
 	}
@@ -119,7 +124,83 @@ func (r *Repository) ChampionRoleRates(ctx context.Context, championIDs []uint16
 	if queueID == 0 {
 		queueID = 420
 	}
+	rows, err := r.championRoleRatesFromSummary(ctx, ids, queueID, patch)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) > 0 {
+		return rows, nil
+	}
+	return r.championRoleRatesFromParticipants(ctx, ids, queueID, patch)
+}
+
+func (r *Repository) championRoleRatesFromSummary(ctx context.Context, ids []uint32, queueID uint16, patch string) ([]ChampionRoleRate, error) {
 	idList := uint32ListSQL(ids)
+	wherePatch := ""
+	args := []any{queueID}
+	patch = strings.TrimSpace(patch)
+	if patch != "" {
+		wherePatch = "AND patch = ?"
+		args = append(args, patch)
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		fmt.Sprintf(`
+			WITH role_rows AS
+			(
+				SELECT
+					champion_id,
+					role,
+					sum(games) AS games
+				FROM champion_role_analytics FINAL
+				WHERE champion_id IN (%s)
+					AND queue_id = ?
+					%s
+					AND role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
+				GROUP BY champion_id, role
+			),
+			totals AS
+			(
+				SELECT
+					champion_id,
+					sum(games) AS total_games
+				FROM role_rows
+				GROUP BY champion_id
+			)
+			SELECT
+				r.champion_id,
+				r.role,
+				r.games,
+				t.total_games,
+				toFloat64(r.games) / toFloat64(t.total_games) AS pick_rate
+			FROM role_rows AS r
+			INNER JOIN totals AS t ON r.champion_id = t.champion_id
+			ORDER BY r.champion_id ASC, r.games DESC`,
+			idList,
+			wherePatch,
+		),
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanChampionRoleRates(rows)
+}
+
+func (r *Repository) championRoleRatesFromParticipants(ctx context.Context, ids []uint32, queueID uint16, patch string) ([]ChampionRoleRate, error) {
+	idList := uint32ListSQL(ids)
+	wherePatch := ""
+	args := []any{queueID}
+	patch = strings.TrimSpace(patch)
+	if patch != "" {
+		wherePatch = "AND patch = ?"
+		args = append(args, patch)
+	}
+	args = append(args, queueID)
+	if patch != "" {
+		args = append(args, patch)
+	}
 	rows, err := r.db.QueryContext(
 		ctx,
 		fmt.Sprintf(`
@@ -131,6 +212,7 @@ func (r *Repository) ChampionRoleRates(ctx context.Context, championIDs []uint16
 				FROM participants FINAL
 				WHERE champion_id IN (%s)
 					AND queue_id = ?
+					%s
 					AND role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
 				GROUP BY champion_id
 			)
@@ -144,19 +226,25 @@ func (r *Repository) ChampionRoleRates(ctx context.Context, championIDs []uint16
 			INNER JOIN totals AS t ON p.champion_id = t.champion_id
 			WHERE p.champion_id IN (%s)
 				AND p.queue_id = ?
+				%s
 				AND p.role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
 			GROUP BY p.champion_id, p.role, t.total_games
 			ORDER BY p.champion_id ASC, games DESC`,
 			idList,
+			wherePatch,
 			idList,
+			wherePatch,
 		),
-		queueID,
-		queueID,
+		args...,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+	return scanChampionRoleRates(rows)
+}
+
+func scanChampionRoleRates(rows *sql.Rows) ([]ChampionRoleRate, error) {
 	var out []ChampionRoleRate
 	for rows.Next() {
 		var row ChampionRoleRate

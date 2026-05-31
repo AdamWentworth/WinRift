@@ -75,6 +75,12 @@ Current read model for team kill totals.
 
 One row per patch, platform, queue, match, and team. It stores total team kills and compile time. Champion guide summary refreshes use this table to calculate true kill participation without nesting team-level aggregates inside the champion-level aggregate query.
 
+## `champion_role_analytics`
+
+Current read model for champion role distribution.
+
+One row per patch, platform, queue, champion, and role. It stores games and compile time. The champion role-rate endpoint, champion default-role resolution, live-card role correction, and champion-page bundle assembly read this table before falling back to retained participant rows in local/dev safety cases.
+
 ## `champion_guide_summary_analytics`
 
 Current read model for champion guide headers, tier-list rows, and champion ranking data.
@@ -152,7 +158,7 @@ Refresh options:
 - Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
 - CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
 
-The same refresh lane also populates `team_kill_summary`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, and `build_signature_analytics`.
+The same refresh lane also populates `team_kill_summary`, `champion_role_analytics`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, and `build_signature_analytics`.
 
 ## `patch_power_curve_metrics`
 

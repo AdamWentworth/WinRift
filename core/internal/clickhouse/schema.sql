@@ -720,6 +720,26 @@ ORDER BY
     team_id
 );
 
+CREATE TABLE IF NOT EXISTS winrift.champion_role_analytics
+(
+    patch LowCardinality(String),
+    platform LowCardinality(String),
+    queue_id UInt16,
+    champion_id UInt16,
+    role LowCardinality(String),
+    games UInt64,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY
+(
+    patch,
+    platform,
+    queue_id,
+    champion_id,
+    role
+);
+
 CREATE TABLE IF NOT EXISTS winrift.champion_guide_summary_analytics
 (
     patch LowCardinality(String),

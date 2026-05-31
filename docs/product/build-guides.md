@@ -32,6 +32,7 @@ Backend contracts:
 Read models:
 
 - `build_signature_analytics`: current/recent patch build signatures used by build advice, top builds, and item-path summaries before falling back to archived patch metrics.
+- `champion_role_analytics`: champion role distribution used for default role resolution and role-rate hints before falling back to retained participant rows.
 - `champion_build_variant_analytics`: precomputed champion-guide alternative build tabs, representative runes/spells/items, and build-specific skill orders where the sample floor is met.
 - `champion_skill_analytics`: champion/role skill order rows.
 - `champion_ban_analytics`: sample-relative ban-rate rows.

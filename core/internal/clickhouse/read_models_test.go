@@ -113,6 +113,74 @@ func TestRefreshTeamKillSummaryUsesParticipants(t *testing.T) {
 	}
 }
 
+func TestRefreshChampionRoleAnalyticsUsesParticipants(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectExec("(?s)INSERT INTO champion_role_analytics.*FROM participants FINAL").
+		WithArgs("16.11", uint16(420)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repo.refreshChampionRoleAnalytics(context.Background(), "16.11", 420); err != nil {
+		t.Fatalf("refresh champion role analytics: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestChampionRoleRatesUseSummaryReadModelWhenPresent(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_role_analytics FINAL").
+		WithArgs(uint16(420), "16.10").
+		WillReturnRows(sqlmock.NewRows([]string{"champion_id", "role", "games", "total_games", "pick_rate"}).
+			AddRow(266, "TOP", 70, 100, 0.7).
+			AddRow(266, "MIDDLE", 30, 100, 0.3))
+
+	rows, err := repo.ChampionRoleRatesForPatch(context.Background(), []uint16{266}, 420, "16.10")
+	if err != nil {
+		t.Fatalf("champion role rates: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d; want 2", len(rows))
+	}
+	if rows[0].ChampionID != 266 || rows[0].Role != "TOP" || rows[0].Games != 70 || rows[0].TotalGames != 100 || rows[0].PickRate != 0.7 {
+		t.Fatalf("first role row = %+v", rows[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestChampionRoleRatesFallbackUsesPatchScopedParticipants(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_role_analytics FINAL").
+		WithArgs(uint16(420), "16.10").
+		WillReturnRows(sqlmock.NewRows([]string{"champion_id", "role", "games", "total_games", "pick_rate"}))
+	mock.ExpectQuery("(?s)FROM participants FINAL.*AND patch = \\?").
+		WithArgs(uint16(420), "16.10", uint16(420), "16.10").
+		WillReturnRows(sqlmock.NewRows([]string{"champion_id", "role", "games", "total_games", "pick_rate"}).
+			AddRow(266, "TOP", 5, 5, 1.0))
+
+	rows, err := repo.ChampionRoleRatesForPatch(context.Background(), []uint16{266}, 420, "16.10")
+	if err != nil {
+		t.Fatalf("champion role rates: %v", err)
+	}
+	if len(rows) != 1 || rows[0].Role != "TOP" || rows[0].Games != 5 {
+		t.Fatalf("fallback role rows = %+v", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestRefreshBuildSignatureAnalyticsUsesParticipantSummaries(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()
