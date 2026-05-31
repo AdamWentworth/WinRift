@@ -28,6 +28,14 @@ curl -o /tmp/winrift.out -s -w \
   'http://192.168.1.77:8000/api/summoners/leaderboard?platform=NA1&limit=50'
 ```
 
+Or run the project smoke script:
+
+```bash
+WINRIFT_PERF_BASE_URL=http://192.168.1.77:8000 ops/perf-smoke.sh
+```
+
+There is also a manual GitHub Actions workflow, `perf-smoke`, that runs the same script from the private self-hosted production runner. It defaults to warning on threshold misses rather than failing, because this is currently a regression detector and tuning aid. Set `strict_thresholds=true` when the measured endpoints are consistently under their targets.
+
 Targets for private-LAN reads:
 
 - Static metadata: under 100 ms after warmup.

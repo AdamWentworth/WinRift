@@ -26,6 +26,8 @@ Suggested workflow triggers:
 
 Turn the manual timing habit from `performance-guardrails.md` into a lightweight script or CI/manual workflow.
 
+Status: first pass implemented as `ops/perf-smoke.sh` plus the manual `perf-smoke` GitHub Actions workflow. It reports threshold warnings by default and can be made strict later.
+
 Useful first checks:
 
 - deployed `/api/health`

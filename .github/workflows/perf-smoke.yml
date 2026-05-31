@@ -1,0 +1,31 @@
+name: perf-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "API base URL reachable from the self-hosted runner."
+        required: false
+        default: "http://127.0.0.1:8000"
+        type: string
+      strict_thresholds:
+        description: "Fail the workflow when a healthy endpoint exceeds its timing threshold."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  private-lan-smoke:
+    runs-on: [self-hosted, linux, x64, prod]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run API Performance Smoke
+        env:
+          WINRIFT_PERF_BASE_URL: ${{ inputs.api_base_url }}
+          WINRIFT_PERF_STRICT: ${{ inputs.strict_thresholds && '1' || '0' }}
+        run: bash ops/perf-smoke.sh
