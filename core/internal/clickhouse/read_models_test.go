@@ -55,6 +55,44 @@ func TestQueryChampionGuideIndexUsesSummaryReadModelsWhenPresent(t *testing.T) {
 	}
 }
 
+func TestQueryChampionGuideSummaryUsesSummaryReadModelWhenPresent(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_guide_scope_analytics FINAL").
+		WithArgs(sqlmock.AnyArg(), "TOP", "ALL", "16.10").
+		WillReturnRows(sqlmock.NewRows([]string{"participant_samples", "match_count"}).AddRow(1000, 100))
+
+	mock.ExpectQuery("(?s)FROM champion_guide_summary_analytics FINAL").
+		WithArgs(sqlmock.AnyArg(), "TOP", "16.10", 50).
+		WillReturnRows(sqlmock.NewRows(championGuideSummaryColumns()).
+			AddRow(266, 55, 100, 0.55, 600, 300, 700, 12000, 190, 24000, 28000, 18000, 6000, 2500, 22, 18, 900, 1.2, 0.3, 230, 1800, 0.62))
+
+	mock.ExpectQuery("(?s)FROM champion_ban_analytics FINAL").
+		WithArgs("16.10").
+		WillReturnRows(sqlmock.NewRows([]string{"champion_id", "bans", "games"}).AddRow(266, 20, 1000))
+
+	summary, err := repo.queryChampionGuideSummary(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.10",
+		"rank_bucket": "ALL",
+	}, 5)
+	if err != nil {
+		t.Fatalf("query champion guide summary: %v", err)
+	}
+	if summary.ChampionID != 266 || summary.Role != "TOP" || summary.Games != 100 || summary.Wins != 55 {
+		t.Fatalf("summary = %+v", summary)
+	}
+	if summary.RoleRank != 1 || summary.RoleRankTotal != 1 {
+		t.Fatalf("summary rank = %d/%d; want 1/1", summary.RoleRank, summary.RoleRankTotal)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestPatchStatsIncludesCompiledSnapshotsAfterRawPrune(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()
