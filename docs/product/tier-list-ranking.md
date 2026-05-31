@@ -45,6 +45,8 @@ The tier label is a presentation bucket. The backend `tierScore` is the actual s
 
 When a backend score is available, the frontend maps tiers directly from `tierScore` before falling back to rank percentile. It also caps losing records: a sub-49% champion cannot display as `S` or `S+` from presence alone. A champion can still rank highly enough to be watched, but the visual tier should not imply elite performance when the stored games say it is losing.
 
+Champion guide pages use a stable 50-game floor for the role-rank comparison field. The guide can still show thinner rune, item, matchup, and skill signals where that is useful, but `Rank X / Y` should not compare a 2,000-game champion against 5-game off-role noise.
+
 ## Impact Normalization
 
 Match-V5 final participant fields are normalized into `participants` for new ingestion and into `participant_performance` for retained raw-match backfills. Champion guide queries use `participant_performance` when it exists and fall back to participant columns otherwise.
