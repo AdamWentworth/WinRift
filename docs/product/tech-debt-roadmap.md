@@ -259,6 +259,10 @@ Goal:
 - no page should fan out into many avoidable requests,
 - old patch raw pruning should not break visible historical analytics.
 
+Recent progress: champion guide index and tier-list style reads now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request.
+
+Outstanding: add a small team-kills read model so champion guide summaries can include true kill participation without nesting aggregate functions inside the same ClickHouse refresh query.
+
 ### Patch-Scope UX
 
 We added patch filters, but this needs a consistency pass:
