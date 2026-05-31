@@ -11,6 +11,7 @@ import {
   championList,
   championSplashUrl,
 } from '../lib/staticData';
+import { queryStaleTime } from '../lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from '../lib/queryVersions';
 import { normalizeRole, ROLE_OPTIONS, RoleIcon, roleLabel } from '../lib/roles';
 import { championTier } from '../lib/tiers';
@@ -85,9 +86,9 @@ export function BuildGuidePage({
   ), [championId, roleRates]);
   const roleRatesQuery = useQuery({
     queryKey: ['champion-main-role', championId],
-    queryFn: () => getChampionRoleRates([championId], DEFAULT_QUEUE_ID),
+    queryFn: ({ signal }) => getChampionRoleRates([championId], DEFAULT_QUEUE_ID, { signal }),
     enabled: Boolean(championId && !seededRoleRates.length),
-    staleTime: 30 * 60 * 1000,
+    staleTime: queryStaleTime.championRoleRates,
   });
   const activeRoleRates = seededRoleRates.length ? seededRoleRates : roleRatesQuery.data?.results ?? [];
   const mainRole = useMemo(() => mainChampionRole(activeRoleRates, championId), [activeRoleRates, championId]);
@@ -96,7 +97,7 @@ export function BuildGuidePage({
   const itemContext = itemContextForRole(role);
   const championPageQuery = useQuery({
     queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role, patch, rankBucket, opponentChampionId],
-    queryFn: () => getChampionPageBundle({
+    queryFn: ({ signal }) => getChampionPageBundle({
       championId,
       role,
       itemContext,
@@ -111,9 +112,9 @@ export function BuildGuidePage({
       indexLimit: 250,
       queueId: DEFAULT_QUEUE_ID,
       limit: 4,
-    }),
+    }, { signal }),
     enabled: Boolean(championId && patch && role),
-    staleTime: 5 * 60 * 1000,
+    staleTime: queryStaleTime.championGuide,
   });
 
   useEffect(() => {

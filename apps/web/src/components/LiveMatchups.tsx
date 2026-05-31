@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { ChampionData, ItemData, LiveGame, RuneData, SummonerSpellData } from '../api/types';
 import { getBuildAdvice, getChampionRoleRates, getWinConditionAnalysis } from '../api/client';
+import { queryStaleTime } from '../lib/queryPolicies';
 import { FocusedBuildPanel, buildAdviceFilters, focusedBuildSelection } from './live-match/FocusedBuildPanel';
 import { LiveMatchCardGrid } from './live-match/LiveMatchCardGrid';
 import { LiveModeContext } from './live-match/LiveModeContext';
@@ -47,9 +48,9 @@ export function LiveMatchups({ liveGame, champions, items, analyticsPatch, profi
   const showWinConditionMode = liveMode === 'winConditions';
   const roleRatesQuery = useQuery({
     queryKey: ['champion-role-rates', liveGame.gameQueueConfigId, liveChampionIds],
-    queryFn: () => getChampionRoleRates(liveChampionIds, liveGame.gameQueueConfigId),
+    queryFn: ({ signal }) => getChampionRoleRates(liveChampionIds, liveGame.gameQueueConfigId, { signal }),
     enabled: liveChampionIds.length > 0,
-    staleTime: 5 * 60_000,
+    staleTime: queryStaleTime.championRoleRates,
   });
   const roleRates = useMemo(() => buildRoleRateMap(roleRatesQuery.data?.results), [roleRatesQuery.data?.results]);
   const initialBlue = useMemo(() => orderTeam(liveGame.participants.filter((participant) => participant.teamId === 100), roleRates), [liveGame.participants, roleRates]);
@@ -74,15 +75,15 @@ export function LiveMatchups({ liveGame, champions, items, analyticsPatch, profi
   ), [analyticsPatchBucket, focusedBuild]);
   const winConditionQuery = useQuery({
     queryKey: ['live-win-conditions', liveGame.gameQueueConfigId, analyticsPatchBucket, blueChampionIds, redChampionIds],
-    queryFn: () => getWinConditionAnalysis({
+    queryFn: ({ signal }) => getWinConditionAnalysis({
       blueChampionIds,
       redChampionIds,
       queueId: liveGame.gameQueueConfigId,
       patch: analyticsPatchBucket,
       minGames: 5,
-    }),
+    }, { signal }),
     enabled: showWinConditionMode && blueChampionIds.length === 5 && redChampionIds.length === 5,
-    staleTime: 60_000,
+    staleTime: queryStaleTime.liveWinConditions,
   });
 
   useEffect(() => {
@@ -119,9 +120,9 @@ export function LiveMatchups({ liveGame, champions, items, analyticsPatch, profi
 
   const focusedBuildAdviceQuery = useQuery({
     queryKey: ['live-focused-build-advice', focusedBuildFilters],
-    queryFn: () => getBuildAdvice(focusedBuildFilters!),
+    queryFn: ({ signal }) => getBuildAdvice(focusedBuildFilters!, { signal }),
     enabled: showBuildMode && Boolean(focusedBuildFilters),
-    staleTime: 30_000,
+    staleTime: queryStaleTime.liveBuildAdvice,
   });
 
   return (

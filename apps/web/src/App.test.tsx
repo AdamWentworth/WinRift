@@ -5,6 +5,8 @@ import { App } from './App';
 import { getAnalyticsPatches, getBuildAdvice, getChampionGuideIndex, getChampionPageBundle, getChampionRoleRates, getLiveGame, getSummonerLeaderboard, getSummonerProfile, getWinConditionAnalysis, resolveAccountAlias, searchAccountAliases } from './api/client';
 import type { LiveGame } from './api/types';
 
+const withAbortSignal = () => expect.objectContaining({ signal: expect.any(AbortSignal) });
+
 const buildAdviceFixture = vi.hoisted(() => () => ({
   filters: {
     championId: 3,
@@ -292,7 +294,7 @@ describe('App', () => {
 
     expect(await screen.findByText('Profiles and Stored Ranked Ladder')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Riot ID, e.g. Sneaky#NA69')).toBeInTheDocument();
-    await waitFor(() => expect(getSummonerLeaderboard).toHaveBeenCalledWith('NA1', 50));
+    await waitFor(() => expect(getSummonerLeaderboard).toHaveBeenCalledWith('NA1', 50, withAbortSignal()));
     expect(await screen.findByText('Leaderboard Pro')).toBeInTheDocument();
     const profileIcon = screen.getByAltText('Leaderboard Pro profile icon');
     expect(profileIcon).toHaveAttribute('src', expect.stringContaining('/16.10.1/img/profileicon/588.png'));
@@ -367,7 +369,7 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(await screen.findByLabelText('Analytics data patch')).toBeInTheDocument();
     expect(screen.getByText('Current Sample')).toBeInTheDocument();
-    await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' })));
+    await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(expect.objectContaining({ championId: 62, role: 'JUNGLE', patch: '16.10' }), withAbortSignal()));
     queryClient.clear();
   });
 
@@ -391,7 +393,7 @@ describe('App', () => {
     expect(screen.getByText('All Roles Rankings')).toBeInTheDocument();
     expect(await screen.findByLabelText('Analytics data patch')).toBeInTheDocument();
     expect(screen.getByLabelText('Tier list role')).toBeInTheDocument();
-    await waitFor(() => expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: '', patch: '16.10', minGames: 50 })));
+    await waitFor(() => expect(getChampionGuideIndex).toHaveBeenCalledWith(expect.objectContaining({ role: '', patch: '16.10', minGames: 50 }), withAbortSignal()));
     expect((await screen.findAllByText('Wukong')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('60.00%').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Sort by Games, not sorted' }));
@@ -507,7 +509,7 @@ describe('App', () => {
     });
     fireEvent.click(screen.getByLabelText('Search WinRift'));
 
-    await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1'));
+    await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1', withAbortSignal()));
     await waitFor(() => expect(screen.getByText('Sneaky#NA69')).toBeInTheDocument());
     queryClient.clear();
   });
@@ -541,10 +543,10 @@ describe('App', () => {
       target: { value: 'Sne' },
     });
 
-    await waitFor(() => expect(searchAccountAliases).toHaveBeenCalledWith('Sne', 'NA1', 6));
+    await waitFor(() => expect(searchAccountAliases).toHaveBeenCalledWith('Sne', 'NA1', 6, withAbortSignal()));
     fireEvent.click(await screen.findByLabelText('Use Sneaky#NA69'));
 
-    await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1'));
+    await waitFor(() => expect(getLiveGame).toHaveBeenCalledWith('Sneaky', 'NA69', 'NA1', withAbortSignal()));
     expect(screen.getByText('Sneaky#NA69')).toBeInTheDocument();
     queryClient.clear();
   });
@@ -834,7 +836,7 @@ describe('App', () => {
     });
     fireEvent.click(screen.getByLabelText('Search WinRift'));
 
-    await waitFor(() => expect(getChampionRoleRates).toHaveBeenCalledWith([1, 2, 3, 4, 5, 11, 12, 13, 14, 15], 420));
+    await waitFor(() => expect(getChampionRoleRates).toHaveBeenCalledWith([1, 2, 3, 4, 5, 11, 12, 13, 14, 15], 420, withAbortSignal()));
     await waitFor(() => {
       expect([...container.querySelectorAll('.blue-row .summoner-name')].map((node) => node.textContent)).toEqual([
         'Blue Top',
@@ -929,7 +931,7 @@ describe('App', () => {
         championMinGames: 10,
         limit: 12,
         patch: '16.10',
-      }));
+      }), withAbortSignal());
       const calls = vi.mocked(getBuildAdvice).mock.calls;
       expect(calls[calls.length - 1]?.[0]).not.toHaveProperty('fallback');
     });
@@ -942,7 +944,7 @@ describe('App', () => {
         role: 'JUNGLE',
         opponentChampionId: 2,
         itemContext: 'JUNGLE',
-      }));
+      }), withAbortSignal());
     });
     queryClient.clear();
   });

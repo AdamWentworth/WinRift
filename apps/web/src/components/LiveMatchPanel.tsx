@@ -38,24 +38,24 @@ export function LiveMatchPanel({ champions, items, analyticsPatch, spells, runes
       setSuggestionsOpen(false);
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const response = await searchAccountAliases(parsed.gameName, platform, 6);
-        if (cancelled) {
+        const response = await searchAccountAliases(parsed.gameName, platform, 6, { signal: controller.signal });
+        if (controller.signal.aborted) {
           return;
         }
         setAliasSuggestions(response.matches);
         setSuggestionsOpen(response.matches.length > 0);
       } catch {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setAliasSuggestions([]);
           setSuggestionsOpen(false);
         }
       }
     }, 180);
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
   }, [riotId, platform]);

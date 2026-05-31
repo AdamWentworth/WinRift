@@ -37,10 +37,22 @@ curl -o /tmp/winrift.out -s -w \
 Or run the project smoke script:
 
 ```bash
-WINRIFT_PERF_BASE_URL=http://192.168.1.77:8000 ops/perf-smoke.sh
+WINRIFT_PERF_BASE_URL=http://192.168.1.77:8000 \
+WINRIFT_PERF_PATCH=16.10 \
+WINRIFT_PERF_RUNS=3 \
+ops/perf-smoke.sh
 ```
 
 There is also a manual GitHub Actions workflow, `perf-smoke`, that runs the same script from the private self-hosted production runner. It defaults to warning on threshold misses rather than failing, because this is currently a regression detector and tuning aid. Set `strict_thresholds=true` when the measured endpoints are consistently under their targets.
+
+Useful local env vars:
+
+- `WINRIFT_PERF_BASE_URL`: API base URL.
+- `WINRIFT_PERF_PATCH`: patch used by champion/tier analytics checks. Defaults to `16.10` while the current patch is still filling.
+- `WINRIFT_PERF_RUNS`: measured runs per endpoint. Defaults to `3`.
+- `WINRIFT_PERF_WARMUPS`: warmup requests before measured runs. Defaults to `1`.
+- `WINRIFT_PERF_JSONL`: optional file path for machine-readable JSONL output.
+- `WINRIFT_PERF_STRICT`: fail on threshold warnings when set to `1` or `true`.
 
 Targets for private-LAN reads:
 
@@ -60,3 +72,5 @@ If an analytics endpoint suddenly takes seconds, first check for:
 - a `FINAL` query over a large table where a compact summary would work.
 
 The fix should usually be a new summary/read-model refresh, not more frontend loading spinners.
+
+Frontend-specific request and cache rules are tracked in [Frontend Performance Audit](./frontend-performance-audit.md).

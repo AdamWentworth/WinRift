@@ -13,15 +13,12 @@ import {
   championRouteSlug,
   summonerPath,
 } from './lib/lookup';
+import { queryGcTime, queryStaleTime } from './lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from './lib/queryVersions';
 import { normalizeRole } from './lib/roles';
 import { championImageUrl, championSplashUrl } from './lib/staticData';
 
 const DEFAULT_QUEUE_ID = 420;
-const STATIC_STALE_TIME = Infinity;
-const GUIDE_STALE_TIME = 10 * 60 * 1000;
-const ROLE_STALE_TIME = 30 * 60 * 1000;
-const PATCH_STALE_TIME = 2 * 60 * 1000;
 const PATCH_READY_MATCHES = 5000;
 const ANALYTICS_PATCH_STORAGE_KEY = 'winrift.analyticsPatch';
 
@@ -36,16 +33,17 @@ export function App() {
   const [route, setRoute] = useState<AppRoute>(() => readRoute());
   const [selectedAnalyticsPatch, setSelectedAnalyticsPatch] = useState(() => storedAnalyticsPatch());
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
-  const champions = useQuery({ queryKey: ['champions'], queryFn: getChampions, staleTime: STATIC_STALE_TIME });
+  const needsGameMetadata = route.kind === 'champion' || route.kind === 'summoner';
+  const champions = useQuery({ queryKey: ['champions'], queryFn: ({ signal }) => getChampions({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const analyticsPatches = useQuery({
     queryKey: ['analytics-patches', DEFAULT_QUEUE_ID],
-    queryFn: () => getAnalyticsPatches(DEFAULT_QUEUE_ID),
-    staleTime: PATCH_STALE_TIME,
+    queryFn: ({ signal }) => getAnalyticsPatches(DEFAULT_QUEUE_ID, { signal }),
+    staleTime: queryStaleTime.patchList,
   });
-  const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: getChampionSplashes, staleTime: STATIC_STALE_TIME });
-  const items = useQuery({ queryKey: ['items'], queryFn: getItems, staleTime: STATIC_STALE_TIME });
-  const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: getSummonerSpells, staleTime: STATIC_STALE_TIME });
-  const runes = useQuery({ queryKey: ['runes'], queryFn: getRunes, staleTime: STATIC_STALE_TIME });
+  const championSplashes = useQuery({ queryKey: ['champion-splashes'], queryFn: ({ signal }) => getChampionSplashes({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
+  const items = useQuery({ queryKey: ['items'], queryFn: ({ signal }) => getItems({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
+  const spells = useQuery({ queryKey: ['summoner-spells'], queryFn: ({ signal }) => getSummonerSpells({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
+  const runes = useQuery({ queryKey: ['runes'], queryFn: ({ signal }) => getRunes({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const championIds = useMemo(() => {
     if (!champions.data) return [];
     return Object.values(champions.data.data.data)
@@ -61,9 +59,9 @@ export function App() {
   }, [patchOptions, selectedAnalyticsPatch, staticPatch]);
   const allChampionRoleRates = useQuery({
     queryKey: ['champion-main-roles', DEFAULT_QUEUE_ID, championIds.join(',')],
-    queryFn: () => getChampionRoleRates(championIds, DEFAULT_QUEUE_ID),
+    queryFn: ({ signal }) => getChampionRoleRates(championIds, DEFAULT_QUEUE_ID, { signal }),
     enabled: championIds.length > 0,
-    staleTime: ROLE_STALE_TIME,
+    staleTime: queryStaleTime.championRoleRates,
   });
   const allChampionRoleRateRows = useMemo(() => allChampionRoleRates.data?.results ?? [], [allChampionRoleRates.data?.results]);
 
@@ -103,7 +101,7 @@ export function App() {
       const itemContext = itemContextForRole(role);
       void queryClient.prefetchQuery({
         queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, role, patch, '', 0],
-        queryFn: () => getChampionPageBundle({
+        queryFn: ({ signal }) => getChampionPageBundle({
           championId,
           role,
           itemContext,
@@ -117,8 +115,8 @@ export function App() {
           indexLimit: 250,
           queueId: DEFAULT_QUEUE_ID,
           limit: 4,
-        }),
-        staleTime: GUIDE_STALE_TIME,
+        }, { signal }),
+        staleTime: queryStaleTime.championGuide,
       });
     };
 
@@ -134,8 +132,8 @@ export function App() {
 
     void queryClient.ensureQueryData({
       queryKey: ['champion-main-role', championId],
-      queryFn: () => getChampionRoleRates([championId], DEFAULT_QUEUE_ID),
-      staleTime: ROLE_STALE_TIME,
+      queryFn: ({ signal }) => getChampionRoleRates([championId], DEFAULT_QUEUE_ID, { signal }),
+      staleTime: queryStaleTime.championRoleRates,
     }).then((data) => {
       const detectedRole = mainChampionRole(data.results ?? [], championId);
       if (!normalizedPreferredRole || detectedRole !== normalizedPreferredRole) {

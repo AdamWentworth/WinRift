@@ -26,7 +26,7 @@ Suggested workflow triggers:
 
 Turn the manual timing habit from `performance-guardrails.md` into a lightweight script or CI/manual workflow.
 
-Status: first pass implemented as `ops/perf-smoke.sh` plus the manual `perf-smoke` GitHub Actions workflow. It reports threshold warnings by default and can be made strict later.
+Status: first pass implemented as `ops/perf-smoke.sh` plus the manual `perf-smoke` GitHub Actions workflow. It reports threshold warnings by default and can be made strict later. The script now samples each endpoint multiple times, supports a patch selector, and can emit JSONL for trend capture.
 
 Useful first checks:
 
@@ -211,6 +211,12 @@ Good candidates:
 
 Status: first pass in place. App-level and focused component tests now cover the summoner ladder/profile icon path, the anchored summoner region selector, champion main-role routing, build variant item/rune/skill switching shape, impossible duplicate item display, and live-mode query gating.
 
+### Frontend Request And Cache Guardrails
+
+Status: first pass complete. See `docs/product/frontend-performance-audit.md`.
+
+The frontend now has shared React Query defaults, abort-aware API calls, route-gated item/rune/spell metadata, and documented smells for avoiding request waterfalls.
+
 ### Backend Query Tests
 
 Good candidates:
@@ -329,6 +335,7 @@ Completed:
 - Rename `services/core` to `core`.
 - Add first-pass frontend regression tests for the highest-risk UI surfaces.
 - Add first-pass backend query tests for read-model usage and patch-retained summaries.
+- Add first-pass frontend request/cache guardrails.
 - Create the read-model coverage audit.
 - Add summoner recent-match and summoner build summaries.
 - Add champion matchup/rune/spell read models for cold champion-page loads.

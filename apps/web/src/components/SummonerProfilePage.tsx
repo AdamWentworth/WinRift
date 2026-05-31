@@ -4,6 +4,7 @@ import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { getLiveGame, getSummonerProfile, resolveAccountAlias } from '../api/client';
 import type { AccountAliasMatch, ChampionData, ItemData, RuneData, SummonerProfile, SummonerSpellData } from '../api/types';
 import { platformLabel } from '../lib/lookup';
+import { queryStaleTime } from '../lib/queryPolicies';
 import { LiveMatchups } from './LiveMatchups';
 import { ProfileHeader } from './summoner-profile/ProfileHeader';
 import { ProfileMessage } from './summoner-profile/ProfileMessage';
@@ -43,10 +44,10 @@ export function SummonerProfilePage({
   const [liveViewDismissed, setLiveViewDismissed] = useState(false);
   const aliasQuery = useQuery({
     queryKey: ['summoner-profile-alias', platform, gameName],
-    queryFn: () => resolveAccountAlias(gameName!, platform),
+    queryFn: ({ signal }) => resolveAccountAlias(gameName!, platform, { signal }),
     enabled: Boolean(gameName && !tagLine),
     retry: false,
-    staleTime: 30_000,
+    staleTime: queryStaleTime.summonerAlias,
   });
   const foundAlias = !tagLine && aliasQuery.data?.status === 'found' && aliasQuery.data.gameName && aliasQuery.data.tagLine
     ? {
@@ -62,17 +63,17 @@ export function SummonerProfilePage({
   const exactRiotId = resolvedGameName && resolvedTagLine ? `${resolvedGameName}#${resolvedTagLine}` : gameName ?? '';
   const liveQuery = useQuery({
     queryKey: ['summoner-profile-live', resolvedPlatform, resolvedGameName, resolvedTagLine],
-    queryFn: () => getLiveGame(resolvedGameName!, resolvedTagLine!, resolvedPlatform),
+    queryFn: ({ signal }) => getLiveGame(resolvedGameName!, resolvedTagLine!, resolvedPlatform, { signal }),
     enabled: Boolean(resolvedGameName && resolvedTagLine),
     retry: false,
-    staleTime: 15_000,
+    staleTime: queryStaleTime.summonerLive,
   });
   const profileQuery = useQuery({
     queryKey: ['summoner-profile-stored', resolvedPlatform, resolvedGameName, resolvedTagLine],
-    queryFn: () => getSummonerProfile(resolvedGameName!, resolvedTagLine!, resolvedPlatform),
+    queryFn: ({ signal }) => getSummonerProfile(resolvedGameName!, resolvedTagLine!, resolvedPlatform, { signal }),
     enabled: Boolean(resolvedGameName && resolvedTagLine && !liveQuery.isFetching),
     retry: false,
-    staleTime: 60_000,
+    staleTime: queryStaleTime.summonerProfile,
   });
 
   useEffect(() => {

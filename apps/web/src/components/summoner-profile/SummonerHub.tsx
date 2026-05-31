@@ -4,6 +4,7 @@ import { CircleAlert, LoaderCircle, Search, UserRound } from 'lucide-react';
 import { getSummonerLeaderboard, resolveAccountAlias, searchAccountAliases } from '../../api/client';
 import type { AccountAliasMatch, ChampionData, SummonerLeaderboardRow } from '../../api/types';
 import { parseRiotId, platformLabel, platforms } from '../../lib/lookup';
+import { queryStaleTime } from '../../lib/queryPolicies';
 import { profileIconUrl, rankIconUrl, rankLabel } from '../../lib/staticData';
 import { EmptyState } from '../ui/Panel';
 import { ProfileMessage } from './ProfileMessage';
@@ -29,8 +30,8 @@ export function SummonerHub({
   const showAliasSuggestions = !showPlatforms && suggestionsOpen && !parsedInput.tagLine && aliasSuggestions.length > 0;
   const leaderboard = useQuery({
     queryKey: ['summoner-leaderboard', platform],
-    queryFn: () => getSummonerLeaderboard(platform, 50),
-    staleTime: 60_000,
+    queryFn: ({ signal }) => getSummonerLeaderboard(platform, 50, { signal }),
+    staleTime: queryStaleTime.leaderboard,
   });
 
   useEffect(() => {
@@ -44,24 +45,24 @@ export function SummonerHub({
       setSuggestionsOpen(false);
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const response = await searchAccountAliases(parsed.gameName, platform, 7);
-        if (cancelled) {
+        const response = await searchAccountAliases(parsed.gameName, platform, 7, { signal: controller.signal });
+        if (controller.signal.aborted) {
           return;
         }
         setAliasSuggestions(response.matches);
         setSuggestionsOpen(response.matches.length > 0);
       } catch {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setAliasSuggestions([]);
           setSuggestionsOpen(false);
         }
       }
     }, 180);
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
   }, [riotId, platform]);

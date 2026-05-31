@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getChampionGuideIndex } from '../api/client';
 import type { AnalyticsPatchStat, Champion, ChampionData, ChampionGuideSummary } from '../api/types';
 import { normalizeLookup } from '../lib/lookup';
+import { queryStaleTime } from '../lib/queryPolicies';
 import { ROLE_OPTIONS_WITH_ALL, RoleIcon, roleLabel } from '../lib/roles';
 import { championByKey, championSplashUrl } from '../lib/staticData';
 import { championTier } from '../lib/tiers';
@@ -93,9 +94,9 @@ export function TierListPage({
   const patch = analyticsPatch || patchBucket(champions?.version);
   const tierQuery = useQuery({
     queryKey: ['tier-list', role, patch, rankBucket, minGames],
-    queryFn: () => getChampionGuideIndex({ role, patch, rankBucket, minGames, limit: 300 }),
+    queryFn: ({ signal }) => getChampionGuideIndex({ role, patch, rankBucket, minGames, limit: 300 }, { signal }),
     enabled: Boolean(patch),
-    staleTime: 5 * 60 * 1000,
+    staleTime: queryStaleTime.championIndex,
   });
   const selectedRole = roleLabel(role);
   const selectedRank = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
