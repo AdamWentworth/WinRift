@@ -9,11 +9,11 @@ WinRift has four Docker services:
 - `clickhouse`: persistent analytics database.
 - `api`: Go HTTP API for the frontend, static metadata, live lookups, and read models.
 - `worker`: Go collector loop. This is the only service that continuously spends Riot API budget.
-- `monitor`: Go health monitor that watches API health, the Riot auth-failure marker, and the worker heartbeat.
+- `monitor`: Go health monitor that watches API health, the Riot auth-failure marker, the worker container state, and the worker heartbeat.
 - `web`: Vite/React frontend.
 
 The `worker` is behind the Compose `worker` profile and has `restart: "no"`. That is intentional. A bad or expired Riot key should stop collection instead of creating an infinite retry loop.
-The `monitor` does not call Riot. It reads local runtime state and sends SMTP alerts when the API is unhealthy, the Riot key has failed, or the worker heartbeat is stale.
+The `monitor` does not call Riot. It reads local runtime state and sends SMTP alerts when the API is unhealthy, the Riot key has failed, or the worker container is down. Stale heartbeat observations are logged, not emailed.
 
 ## Local Development
 
@@ -205,6 +205,8 @@ RIOT_AUTH_FAILURE_EXIT=true
 RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
 MONITOR_WORKER_REQUIRED=true
 MONITOR_WORKER_STALE_AFTER_MINUTES=15
+MONITOR_WORKER_CONTAINER_NAME=winrift_worker
+MONITOR_DOCKER_SOCKET_PATH=/var/run/docker.sock
 ALERT_EMAIL_ENABLED=true
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
@@ -228,7 +230,7 @@ If Riot returns 401 or 403:
 - The API stays up.
 - Riot-backed endpoints return a service-unavailable response instead of repeatedly hitting Riot.
 - Cached analytics, static pages, and database-backed reads can keep working.
-- The monitor sees the marker or stale heartbeat and sends an email, then suppresses repeats until `MONITOR_ALERT_COOLDOWN_MINUTES` elapses.
+- The monitor sees the marker or stopped worker container and sends an email, then suppresses repeats until `MONITOR_ALERT_COOLDOWN_MINUTES` elapses. Stale heartbeat observations are log-only.
 
 After refreshing the key:
 
@@ -239,7 +241,7 @@ make up-worker
 
 Both API and worker clear the marker on startup. If the API is already running and you only restart the worker, the shared marker is still cleared from the runtime volume, but a full `make up` is the cleanest reset after a key refresh.
 
-If you intentionally pause collection for more than `MONITOR_WORKER_STALE_AFTER_MINUTES`, set `MONITOR_WORKER_REQUIRED=false` or stop the monitor too. Otherwise it is correct for the monitor to complain: production is configured under the assumption that the worker should be running.
+If you intentionally pause collection, set `MONITOR_WORKER_REQUIRED=false` or stop the monitor too. Otherwise production treats a stopped worker container as an alert condition.
 
 Riot 404s are not auth failures. A missing Riot ID or a summoner not being in a live game should return a normal not-found/live-game-absent response.
 
@@ -251,9 +253,10 @@ The monitor is a tiny Go process built into the core image as `/winrift-monitor`
 
 - `GET /api/health`
 - `RIOT_AUTH_FAILURE_MARKER_PATH`
+- `MONITOR_WORKER_CONTAINER_NAME` through the Docker socket when configured
 - `MONITOR_WORKER_HEARTBEAT_PATH`
 
-It sends an alert when one of those checks fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`. Recovery emails are controlled by `MONITOR_RECOVERY_ALERTS`.
+It sends an alert when an email-worthy check fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`. Recoveries are logged and clear monitor state, but they do not send email.
 
 For Gmail or another SMTP provider, use an app password rather than your normal account password:
 

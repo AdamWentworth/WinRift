@@ -48,7 +48,7 @@ WinRift/
 | Frontend | Vite, React, TypeScript, TanStack Query | Live match, champion guides, tier list, summoner profiles |
 | Core API | Go `net/http` | Typed handlers, Riot proxying, static-data cache, analytics read APIs |
 | Collector | Go worker | Riot rate-limit aware match, timeline, rank, and alias ingestion |
-| Monitor | Go worker-side monitor | API health, auth marker, stale-worker heartbeat, and SMTP alerting |
+| Monitor | Go worker-side monitor | API health, auth marker, worker container state, heartbeat logging, and SMTP alerting |
 | Analytics Store | ClickHouse | Raw payload retention plus normalized tables and precomputed read models |
 | Deployment | Docker Compose, GHCR, GitHub Actions | Private LAN API/worker deployment to a lightweight home server |
 | Static Assets | Riot Data Dragon CDN | Champion, item, rune, spell, splash, and profile icon images |
@@ -202,7 +202,8 @@ cp apps/web/.env.example apps/web/.env.local
 | `COLLECTOR_RATE_LIMIT_REQUESTS` | Per-window request budget per Riot route region. |
 | `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS` | Rate-limit window, commonly `120`. |
 | `RIOT_AUTH_FAILURE_EXIT` | Makes the worker stop on 401/403 auth failures. |
-| `MONITOR_WORKER_STALE_AFTER_MINUTES` | Heartbeat age before stale-worker alerts. |
+| `MONITOR_WORKER_STALE_AFTER_MINUTES` | Heartbeat age before stale-worker log observations. |
+| `MONITOR_WORKER_CONTAINER_NAME` | Optional Docker container name for actual worker-down alerts. |
 | `ALERT_EMAIL_ENABLED` | Enables SMTP alerts from the monitor. |
 | `CLICKHOUSE_*` | ClickHouse host, port, database, user, and password. |
 | `CORS_ORIGINS` | Browser origins allowed to call the API. |
@@ -322,7 +323,7 @@ curl http://localhost:8000/api/health
 
 - Real Riot keys live only in local/server `.env` files.
 - The worker exits on Riot auth failure when `RIOT_AUTH_FAILURE_EXIT=true`.
-- The monitor can email on Riot auth failure, API failure, or stale worker heartbeat.
+- The monitor can email on Riot auth failure, API failure, or a worker container that is actually down. Stale heartbeat observations stay in logs.
 - Riot 429 responses honor `Retry-After` and back off before continuing.
 - The collector has per-platform request budgeting and reserve capacity.
 - The public app should present contextual statistics, not automated real-time commands.

@@ -147,7 +147,7 @@ Keep match counts low on a development key. The client honors Riot 429 `Retry-Af
 
 If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MARKER_PATH`. The worker exits immediately. The API stays online, but Riot-dependent endpoints return `503 RIOT_API_KEY_UNAVAILABLE` and the Riot client short-circuits additional Riot calls while the marker exists. Cached analytics, static metadata, and health checks remain available. This prevents an expired or unauthorized development key from being retried every collector interval without making the whole app look dead. The frontier row is marked `blocked` when the failure happens during a collection pass.
 
-The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health` and the auth-failure marker. In production, keep `MONITOR_WORKER_REQUIRED=true` so a stopped or stale worker sends an email instead of quietly falling behind.
+The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health`, the auth-failure marker, and, in production, the worker Docker container state. In production, keep `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` so a stopped worker sends an email instead of quietly falling behind. Stale heartbeat observations are logged but do not send email.
 
 Riot 404s are different: they mean the requested resource is absent, such as an unknown Riot ID or a player not currently being in a live game. They do not write the auth-failure marker.
 
@@ -164,7 +164,9 @@ Safety knobs:
 - `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate auth-failure behavior.
 - `MONITOR_WORKER_HEARTBEAT_PATH`: worker heartbeat JSON file used by the monitor.
 - `MONITOR_WORKER_REQUIRED`: when true, missing heartbeat is an alert condition.
-- `MONITOR_WORKER_STALE_AFTER_MINUTES`: max heartbeat age before the monitor alerts.
+- `MONITOR_WORKER_STALE_AFTER_MINUTES`: max heartbeat age before the monitor logs a stale-heartbeat observation.
+- `MONITOR_WORKER_CONTAINER_NAME`: optional Docker container name used by the monitor to detect that the collector worker is actually down.
+- `MONITOR_DOCKER_SOCKET_PATH`: Docker socket path used when `MONITOR_WORKER_CONTAINER_NAME` is set.
 - `ALERT_EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TO`: SMTP email alert settings used by the monitor.
 - `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
 - `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.10`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch.

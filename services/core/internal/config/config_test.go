@@ -81,9 +81,10 @@ func TestLoadMonitorConfig(t *testing.T) {
 	t.Setenv("MONITOR_WORKER_HEARTBEAT_PATH", "/run/winrift/worker.json")
 	t.Setenv("MONITOR_WORKER_REQUIRED", "true")
 	t.Setenv("MONITOR_WORKER_STALE_AFTER_MINUTES", "20")
+	t.Setenv("MONITOR_WORKER_CONTAINER_NAME", "winrift_worker")
+	t.Setenv("MONITOR_DOCKER_SOCKET_PATH", "/var/run/docker.sock")
 	t.Setenv("MONITOR_ALERT_STATE_PATH", "/run/winrift/alerts.json")
 	t.Setenv("MONITOR_ALERT_COOLDOWN_MINUTES", "90")
-	t.Setenv("MONITOR_RECOVERY_ALERTS", "false")
 	t.Setenv("ALERT_EMAIL_ENABLED", "true")
 	t.Setenv("SMTP_HOST", "smtp.example.test")
 	t.Setenv("SMTP_PORT", "2525")
@@ -99,6 +100,12 @@ func TestLoadMonitorConfig(t *testing.T) {
 	if cfg.MonitorWorkerHeartbeatPath != "/run/winrift/worker.json" {
 		t.Fatalf("heartbeat path = %q", cfg.MonitorWorkerHeartbeatPath)
 	}
+	if cfg.MonitorWorkerContainerName != "winrift_worker" {
+		t.Fatalf("worker container = %q", cfg.MonitorWorkerContainerName)
+	}
+	if cfg.MonitorDockerSocketPath != "/var/run/docker.sock" {
+		t.Fatalf("docker socket = %q", cfg.MonitorDockerSocketPath)
+	}
 	if !cfg.MonitorWorkerRequired {
 		t.Fatal("expected worker required")
 	}
@@ -107,9 +114,6 @@ func TestLoadMonitorConfig(t *testing.T) {
 	}
 	if cfg.MonitorAlertCooldown != 90*time.Minute {
 		t.Fatalf("alert cooldown = %s, want 90m", cfg.MonitorAlertCooldown)
-	}
-	if cfg.MonitorRecoveryAlerts {
-		t.Fatal("did not expect recovery alerts")
 	}
 	if !cfg.AlertEmailEnabled || cfg.SMTPHost != "smtp.example.test" || cfg.SMTPPort != 2525 || cfg.SMTPUsername != "winrift" || cfg.SMTPPassword != "secret" || cfg.SMTPFrom != "winrift@example.test" {
 		t.Fatalf("smtp config not loaded: %+v", cfg)

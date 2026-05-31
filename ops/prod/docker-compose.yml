@@ -76,8 +76,11 @@ services:
       MONITOR_API_HEALTH_URL: http://api:8000/api/health
       RIOT_AUTH_FAILURE_MARKER_PATH: /run/winrift/riot-auth-failed
       MONITOR_WORKER_HEARTBEAT_PATH: /run/winrift/worker-heartbeat.json
+      MONITOR_WORKER_CONTAINER_NAME: ${MONITOR_WORKER_CONTAINER_NAME:-winrift_worker}
+      MONITOR_DOCKER_SOCKET_PATH: /var/run/docker.sock
       MONITOR_ALERT_STATE_PATH: /run/winrift/monitor-alert-state.json
     volumes:
       - ${WINRIFT_RUNTIME_STATE_DIR:-/srv/winrift/runtime}:/run/winrift
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - api

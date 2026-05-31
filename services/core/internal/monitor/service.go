@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -87,9 +89,6 @@ func (s Service) runOnce(ctx context.Context) {
 	if issue.Key == "" {
 		if state.ActiveKey != "" {
 			log.Printf("monitor recovered previous_issue=%s", state.ActiveKey)
-			if s.cfg.MonitorRecoveryAlerts {
-				s.send("WinRift recovered", fmt.Sprintf("WinRift monitor recovered from issue %q at %s.", state.ActiveKey, s.now().Format(time.RFC3339)))
-			}
 			s.writeState(alertState{})
 		}
 		return
@@ -110,6 +109,9 @@ func (s Service) Check(ctx context.Context) Issue {
 		return issue
 	}
 	if issue := s.checkAPI(ctx); issue.Key != "" {
+		return issue
+	}
+	if issue := s.checkWorkerContainer(ctx); issue.Key != "" {
 		return issue
 	}
 	if issue := s.checkWorkerHeartbeat(); issue.Key != "" {
@@ -202,6 +204,86 @@ func (s Service) checkAPI(ctx context.Context) Issue {
 	return Issue{}
 }
 
+type dockerContainerInspect struct {
+	Name  string `json:"Name"`
+	State struct {
+		Running    bool   `json:"Running"`
+		Status     string `json:"Status"`
+		ExitCode   int    `json:"ExitCode"`
+		Error      string `json:"Error"`
+		FinishedAt string `json:"FinishedAt"`
+	} `json:"State"`
+}
+
+func (s Service) checkWorkerContainer(ctx context.Context) Issue {
+	if !s.cfg.MonitorWorkerRequired {
+		return Issue{}
+	}
+	containerName := strings.TrimSpace(s.cfg.MonitorWorkerContainerName)
+	if containerName == "" {
+		return Issue{}
+	}
+	socketPath := strings.TrimSpace(s.cfg.MonitorDockerSocketPath)
+	if socketPath == "" {
+		socketPath = "/var/run/docker.sock"
+	}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
+		},
+	}
+	client := &http.Client{Transport: transport, Timeout: 5 * time.Second}
+	defer transport.CloseIdleConnections()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://docker/containers/"+url.PathEscape(strings.TrimPrefix(containerName, "/"))+"/json", nil)
+	if err != nil {
+		log.Printf("monitor worker container check skipped container=%q err=%v", containerName, err)
+		return Issue{}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("monitor worker container check skipped container=%q socket=%q err=%v", containerName, socketPath, err)
+		return Issue{}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return Issue{
+			Key:     "worker-container-down",
+			Subject: "WinRift collector worker is down",
+			Body:    fmt.Sprintf("Expected Docker container %q, but Docker did not find it. Start the worker after confirming the Riot API key is current.", containerName),
+		}
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("monitor worker container check skipped container=%q status=%d", containerName, resp.StatusCode)
+		return Issue{}
+	}
+	var inspect dockerContainerInspect
+	if err := json.NewDecoder(resp.Body).Decode(&inspect); err != nil {
+		log.Printf("monitor worker container check skipped container=%q err=%v", containerName, err)
+		return Issue{}
+	}
+	if inspect.State.Running {
+		return Issue{}
+	}
+	detail := []string{
+		fmt.Sprintf("Docker reports collector worker container %q is not running.", containerName),
+		"",
+		fmt.Sprintf("State: %s", inspect.State.Status),
+		fmt.Sprintf("Exit code: %d", inspect.State.ExitCode),
+	}
+	if inspect.State.FinishedAt != "" {
+		detail = append(detail, fmt.Sprintf("Finished at: %s", inspect.State.FinishedAt))
+	}
+	if inspect.State.Error != "" {
+		detail = append(detail, fmt.Sprintf("Docker error: %s", inspect.State.Error))
+	}
+	detail = append(detail, "", "Check `docker logs winrift_worker`, refresh RIOT_API_KEY if needed, then start the worker again.")
+	return Issue{
+		Key:     "worker-container-down",
+		Subject: "WinRift collector worker is down",
+		Body:    strings.Join(detail, "\n"),
+	}
+}
+
 func (s Service) checkWorkerHeartbeat() Issue {
 	staleAfter := s.cfg.MonitorWorkerStaleAfter
 	if staleAfter <= 0 {
@@ -231,20 +313,16 @@ func (s Service) checkWorkerHeartbeat() Issue {
 	}
 	age := s.now().Sub(heartbeat.Timestamp)
 	if age > staleAfter {
-		return Issue{
-			Key:     "worker-heartbeat-stale",
-			Subject: "WinRift collector worker looks stale",
-			Body: fmt.Sprintf(
-				"Worker heartbeat at %s is stale.\n\nLast heartbeat: %s\nAge: %s\nStatus: %s\nPlatforms: %d active of %d\nRequests in last sweep: %d",
-				path,
-				heartbeat.Timestamp.Format(time.RFC3339),
-				age.Round(time.Second),
-				heartbeat.Status,
-				heartbeat.ActivePlatforms,
-				heartbeat.Platforms,
-				heartbeat.Requests,
-			),
-		}
+		log.Printf(
+			"monitor worker heartbeat stale path=%s last=%s age=%s status=%s active_platforms=%d platforms=%d requests=%d",
+			path,
+			heartbeat.Timestamp.Format(time.RFC3339),
+			age.Round(time.Second),
+			heartbeat.Status,
+			heartbeat.ActivePlatforms,
+			heartbeat.Platforms,
+			heartbeat.Requests,
+		)
 	}
 	return Issue{}
 }

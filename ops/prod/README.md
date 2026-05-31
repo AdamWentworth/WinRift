@@ -63,7 +63,8 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `WINRIFT_CLICKHOUSE_DATA_DIR` | ClickHouse data directory on storage SSD. |
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
 | `MONITOR_WORKER_REQUIRED` | Set `true` when the collector is expected to be running. |
-| `ALERT_EMAIL_ENABLED` | Enables SMTP email alerts for auth failure or stale worker state. |
+| `MONITOR_WORKER_CONTAINER_NAME` | Set to `winrift_worker` so the monitor emails only when the worker container is actually down. |
+| `ALERT_EMAIL_ENABLED` | Enables SMTP email alerts for auth failure or down worker state. |
 | `SMTP_TO` | Comma-separated alert recipient list. |
 
 ## 🖥️ Laptop Development Against Server API
@@ -143,5 +144,5 @@ This keeps app summaries and the small normalized lookup index, while deleting b
 - Keep `/srv/winrift/.env` server-local and uncommitted.
 - Keep `winrift_worker` on `restart: "no"`.
 - If the Riot key expires, the worker should stop and the API should stay up.
-- Keep `winrift_monitor` on `restart: unless-stopped` so it can email when the worker stops unexpectedly.
+- Keep `winrift_monitor` on `restart: unless-stopped` so it can email when the worker stops unexpectedly. The monitor mounts the Docker socket read-only to inspect `winrift_worker`; this is intentionally private-server-only plumbing.
 - Do not expose this deployment publicly until auth, rate limiting, observability, and public API policy are finalized.

@@ -66,9 +66,10 @@ type Config struct {
 	MonitorWorkerHeartbeatPath     string
 	MonitorWorkerRequired          bool
 	MonitorWorkerStaleAfter        time.Duration
+	MonitorWorkerContainerName     string
+	MonitorDockerSocketPath        string
 	MonitorAlertStatePath          string
 	MonitorAlertCooldown           time.Duration
-	MonitorRecoveryAlerts          bool
 	AlertEmailEnabled              bool
 	SMTPHost                       string
 	SMTPPort                       int
@@ -138,9 +139,10 @@ func Load() Config {
 		MonitorWorkerHeartbeatPath:     env("MONITOR_WORKER_HEARTBEAT_PATH", "/run/winrift/worker-heartbeat.json"),
 		MonitorWorkerRequired:          envBool("MONITOR_WORKER_REQUIRED", false),
 		MonitorWorkerStaleAfter:        time.Duration(envInt("MONITOR_WORKER_STALE_AFTER_MINUTES", 15)) * time.Minute,
+		MonitorWorkerContainerName:     env("MONITOR_WORKER_CONTAINER_NAME", ""),
+		MonitorDockerSocketPath:        env("MONITOR_DOCKER_SOCKET_PATH", "/var/run/docker.sock"),
 		MonitorAlertStatePath:          env("MONITOR_ALERT_STATE_PATH", "/run/winrift/monitor-alert-state.json"),
 		MonitorAlertCooldown:           time.Duration(envInt("MONITOR_ALERT_COOLDOWN_MINUTES", 360)) * time.Minute,
-		MonitorRecoveryAlerts:          envBool("MONITOR_RECOVERY_ALERTS", true),
 		AlertEmailEnabled:              envBool("ALERT_EMAIL_ENABLED", false),
 		SMTPHost:                       env("SMTP_HOST", ""),
 		SMTPPort:                       envInt("SMTP_PORT", 587),
