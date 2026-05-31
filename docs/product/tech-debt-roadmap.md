@@ -217,7 +217,39 @@ The ClickHouse package has grown into the real heart of the app. It is mostly or
 
 This makes it easier to enforce the performance rule: public page endpoints should read summaries, not raw payloads.
 
-Status update: build advice now has `build_signature_analytics`, a compact current-patch build-signature read model refreshed by the champion-guide lane. `QueryBuilds` and champion-guide item paths prefer it before falling back to archived `patch_build_metrics` or retained normalized rows. Hot champion-guide pages are also prewarmed into `champion_page_bundle_cache` after guide refreshes, using canonical cache keys so equivalent query params reuse the same bundle.
+Status update: first maintainability split complete.
+
+- `repository.go` now owns only the connection/repository constructor and basic existence check.
+- `analytics_scopes.go` owns shared role/opponent scope helpers.
+- `ingestion.go` owns normalized match inserts.
+- `build_analytics.go` owns build-signature reads.
+- `item_slot_analytics.go` owns item slot and starting loadout reads/refreshes.
+- `patch_lifecycle.go` owns patch archive/prune/compile helpers.
+- `champion_guide.go` owns guide summaries, index, ranking, and impact scoring.
+- `champion_guide_builds.go` owns guide item paths and build variants.
+- `champion_guide_rows.go` owns matchup, rune/spell/signature, and base SQL helpers.
+
+Build advice now has `build_signature_analytics`, a compact current-patch build-signature read model refreshed by the champion-guide lane. `QueryBuilds` and champion-guide item paths prefer it before falling back to archived `patch_build_metrics` or retained normalized rows. Hot champion-guide pages are also prewarmed into `champion_page_bundle_cache` after guide refreshes, using canonical cache keys so equivalent query params reuse the same bundle.
+
+Remaining smell: `item_slot_analytics.go`, `champion_guide.go`, and `champion_guide_derived.go` are still large because the SQL itself is large. Split further only when there is a real domain boundary, not just to chase a smaller line count.
+
+### Split Worker Lanes
+
+Status: first pass complete.
+
+`core/cmd/worker/main.go` now stays focused on startup and sweep orchestration. Lane-specific code moved into:
+
+```text
+cmd/worker/
+├── enrichment_lanes.go  # rank and Riot ID alias enrichment
+├── frontier_seed.go     # env/challenger frontier seeding
+├── refresh_lanes.go     # summary/read-model refresh scheduling
+├── request_budget.go    # regional request budget ledger
+├── state.go             # auth/rate-limit/heartbeat/frontier helpers
+└── main.go              # startup and sweep orchestration
+```
+
+Guardrail: keep the worker as one binary while these lanes share rate limits, config, and ClickHouse state. Consider separate processes only if one lane needs independent deployment or a different runtime schedule.
 
 ## Priority 5: Test Coverage Gaps
 
@@ -369,9 +401,12 @@ Completed:
 - Add hot champion-page bundle prewarming.
 - Move patch-scope controls out of the global header and into champion guide/tier-list pages.
 - Add first-pass win-condition validation endpoint and documentation.
+- Split worker lanes by orchestration concern.
+- Split the largest ClickHouse repository/query files by read-model domain.
 
 Next:
 
 1. Add champion role-rate summaries if directory/tier navigation needs them.
 2. Expand hot-response prewarming to common matchup pages if deployed timings show frequent cold misses.
-3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+3. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+4. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
