@@ -436,6 +436,58 @@ func (r *Repository) EnsureRuntimeSchema(ctx context.Context) error {
 			rank_bucket
 		)
 	`, `
+		CREATE TABLE IF NOT EXISTS champion_matchup_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			champion_id UInt16,
+			role LowCardinality(String),
+			opponent_champion_id UInt16,
+			rank_bucket LowCardinality(String),
+			wins UInt64,
+			games UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket
+		)
+	`, `
+		CREATE TABLE IF NOT EXISTS champion_signature_analytics
+		(
+			patch LowCardinality(String),
+			platform LowCardinality(String),
+			queue_id UInt16,
+			champion_id UInt16,
+			role LowCardinality(String),
+			rank_bucket LowCardinality(String),
+			signature_type LowCardinality(String),
+			signature String,
+			wins UInt64,
+			games UInt64,
+			compiled_at DateTime DEFAULT now()
+		)
+		ENGINE = ReplacingMergeTree(compiled_at)
+		ORDER BY
+		(
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			signature_type,
+			signature
+		)
+	`, `
 		CREATE TABLE IF NOT EXISTS champion_build_variant_analytics
 		(
 			patch LowCardinality(String),

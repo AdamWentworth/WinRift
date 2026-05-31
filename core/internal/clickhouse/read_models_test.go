@@ -160,6 +160,66 @@ func TestSummonerBuildsUsesSummaryReadModel(t *testing.T) {
 	}
 }
 
+func TestChampionGuideMatchupsUseSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_matchup_analytics FINAL").
+		WithArgs(sqlmock.AnyArg(), "266", "TOP", "16.11", 5, 12).
+		WillReturnRows(sqlmock.NewRows([]string{"opponent_champion_id", "wins", "games", "win_rate"}).
+			AddRow(122, 4, 5, 0.8))
+
+	rows, err := repo.queryChampionGuideMatchups(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.11",
+		"rank_bucket": "ALL",
+	}, 5, 12, false)
+	if err != nil {
+		t.Fatalf("champion guide matchups: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	if rows[0].OpponentChampionID != 122 || rows[0].Wins != 4 || rows[0].Games != 5 {
+		t.Fatalf("matchup row = %+v", rows[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestChampionGuideSignaturesUseSummaryReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_signature_analytics FINAL").
+		WithArgs(sqlmock.AnyArg(), "266", "rune", "TOP", "16.11", 5, 48).
+		WillReturnRows(sqlmock.NewRows([]string{"signature", "wins", "games", "win_rate"}).
+			AddRow("8010|8000|8400|5005|5008|5011", 8, 10, 0.8))
+
+	rows, err := repo.queryChampionGuideSignatures(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.11",
+		"rank_bucket": "ALL",
+	}, "rune_signature", 5, 12)
+	if err != nil {
+		t.Fatalf("champion guide signatures: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	if rows[0].Signature != "8010|8000|8400|5005|5008|5011" || rows[0].Wins != 8 || rows[0].Games != 10 {
+		t.Fatalf("signature row = %+v", rows[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func newMockRepository(t *testing.T) (*sql.DB, sqlmock.Sqlmock, func()) {
 	t.Helper()
 	db, mock, err := sqlmock.New()

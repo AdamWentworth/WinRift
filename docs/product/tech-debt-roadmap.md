@@ -262,7 +262,7 @@ Goal:
 - no page should fan out into many avoidable requests,
 - old patch raw pruning should not break visible historical analytics.
 
-Recent progress: champion guide index and tier-list style reads now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request.
+Recent progress: champion guide index and tier-list style reads now use `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` instead of aggregating `participant_matchups` on every request. Champion guide matchup rows, rune pages, and spell pairs now use `champion_matchup_analytics` and `champion_signature_analytics` after the worker refresh runs.
 
 Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
 
@@ -328,9 +328,10 @@ Completed:
 - Add first-pass backend query tests for read-model usage and patch-retained summaries.
 - Create the read-model coverage audit.
 - Add summoner recent-match and summoner build summaries.
+- Add champion matchup/rune/spell read models for cold champion-page loads.
 
 Next:
 
-1. Add champion matchup/rune/spell read models for cold champion-page loads.
-2. Add a team-kill summary for true kill participation in the fast guide path.
+1. Add a team-kill summary for true kill participation in the fast guide path.
+2. Add a champion performance summary so cold champion pages avoid direct participant scans.
 3. Add a build-advice bundle summary for live build mode.

@@ -69,6 +69,18 @@ One row per platform, queue, PUUID, champion, role, final/core item signatures, 
 
 Short-lived persisted JSON cache for exact champion-page API requests. The API also keeps these payloads in memory, but this table lets warmed pages remain fast across API restarts until the cache expiry.
 
+## `champion_matchup_analytics`
+
+Current read model for champion guide matchup rows.
+
+One row per patch, queue, champion, role, opponent champion, and rank bucket. It stores wins, games, and compile time. The champion guide endpoint reads this table before falling back to `participant_matchups`, so Toughest Matchups and Favorable Matchups do not need to group participant rows during normal page loads.
+
+## `champion_signature_analytics`
+
+Current read model for champion guide rune and spell samples.
+
+One row per patch, queue, champion, role, rank bucket, signature type, and signature. `signature_type` is `rune` or `spell`. The champion guide endpoint reads this table before falling back to `participant_matchups`, so rune pages and summoner-spell pairs are served from compact aggregate rows after the worker refresh runs.
+
 ## `patch_snapshots`
 
 One row per patch/platform/queue lifecycle state. Tracks whether a patch is collecting, compiling, or closed, plus match counts, participant counts, compile timestamp, and raw retention date.
@@ -120,6 +132,8 @@ Refresh options:
 - Worker: `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED=true` with `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES=10`
 - Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
 - CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
+
+The same refresh lane also populates `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, and `champion_signature_analytics`.
 
 ## `patch_power_curve_metrics`
 

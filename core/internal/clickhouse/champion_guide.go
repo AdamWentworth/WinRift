@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -1731,6 +1732,90 @@ func buildVariantSortedTags(scores map[string]int) []string {
 }
 
 func (r *Repository) queryChampionGuideMatchups(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
+	rows, hasSummary, err := r.queryChampionGuideMatchupsSummary(ctx, filters, minGames, limit, toughest)
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryChampionGuideMatchupsLiveScan(ctx, filters, minGames, limit, toughest)
+}
+
+func (r *Repository) queryChampionGuideMatchupsSummary(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, bool, error) {
+	championID := filterValue(filters["champion_id"])
+	if championID == "" {
+		return nil, false, nil
+	}
+	if minGames <= 0 {
+		minGames = 5
+	}
+	if limit <= 0 {
+		limit = 12
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	order := "win_rate DESC, games DESC"
+	if toughest {
+		order = "win_rate ASC, games DESC"
+	}
+	query := fmt.Sprintf(`
+		SELECT
+			opponent_champion_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM champion_matchup_analytics FINAL
+		WHERE platform = 'ALL'
+			AND queue_id = ?
+			AND champion_id = ?
+			AND %s
+			AND opponent_champion_id > 0`,
+		guideRolePredicate(roleScope),
+	)
+	args := []any{analytics.RankedSoloQueueID, championID}
+	args = append(args, roleScope.args...)
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	query += `
+		GROUP BY opponent_champion_id
+		HAVING games >= ?
+		ORDER BY ` + order + `
+		LIMIT ?`
+	args = append(args, minGames, limit)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	out := []ChampionGuideMatchupRow{}
+	for rows.Next() {
+		var row ChampionGuideMatchupRow
+		if err := rows.Scan(&row.OpponentChampionID, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, false, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	if len(out) > 0 {
+		return out, true, nil
+	}
+	hasSummary, err := r.championGuideAnalyticsHasData(ctx, "champion_matchup_analytics", filters)
+	if err != nil {
+		return nil, false, err
+	}
+	return out, hasSummary, nil
+}
+
+func (r *Repository) queryChampionGuideMatchupsLiveScan(ctx context.Context, filters map[string]string, minGames, limit int, toughest bool) ([]ChampionGuideMatchupRow, error) {
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)
 	order := "win_rate DESC, games DESC"
@@ -1771,6 +1856,92 @@ func (r *Repository) queryChampionGuideSignatures(ctx context.Context, filters m
 	if column != "rune_signature" && column != "spell_signature" {
 		return nil, nil
 	}
+	rows, hasSummary, err := r.queryChampionGuideSignaturesSummary(ctx, filters, column, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryChampionGuideSignaturesLiveScan(ctx, filters, column, minGames, limit)
+}
+
+func (r *Repository) queryChampionGuideSignaturesSummary(ctx context.Context, filters map[string]string, column string, minGames, limit int) ([]ChampionGuideSignatureRow, bool, error) {
+	signatureType := championGuideSignatureType(column)
+	if signatureType == "" {
+		return nil, false, nil
+	}
+	championID := filterValue(filters["champion_id"])
+	if championID == "" {
+		return nil, false, nil
+	}
+	if minGames <= 0 {
+		minGames = 5
+	}
+	if limit <= 0 {
+		limit = 12
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	query := fmt.Sprintf(`
+		SELECT
+			signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM champion_signature_analytics FINAL
+		WHERE platform = 'ALL'
+			AND queue_id = ?
+			AND champion_id = ?
+			AND signature_type = ?
+			AND %s
+			AND signature != ''`,
+		guideRolePredicate(roleScope),
+	)
+	args := []any{analytics.RankedSoloQueueID, championID, signatureType}
+	args = append(args, roleScope.args...)
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	query += `
+		GROUP BY signature
+		HAVING games >= ?
+		ORDER BY games DESC, win_rate DESC
+		LIMIT ?`
+	args = append(args, minGames, limit*4)
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	out := []ChampionGuideSignatureRow{}
+	for rows.Next() {
+		var row ChampionGuideSignatureRow
+		if err := rows.Scan(&row.Signature, &row.Wins, &row.Games, &row.WinRate); err != nil {
+			return nil, false, err
+		}
+		row.Confidence = analytics.WilsonLowerBound(row.Wins, row.Games, 1.96)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	out = sortChampionGuideSignatureRows(out, limit)
+	if len(out) > 0 {
+		return out, true, nil
+	}
+	hasSummary, err := r.championGuideAnalyticsHasData(ctx, "champion_signature_analytics", filters)
+	if err != nil {
+		return nil, false, err
+	}
+	return out, hasSummary, nil
+}
+
+func (r *Repository) queryChampionGuideSignaturesLiveScan(ctx context.Context, filters map[string]string, column string, minGames, limit int) ([]ChampionGuideSignatureRow, error) {
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	baseSQL, args := championGuideBaseSQL(filters, roleScope, true)
 	query := `
@@ -1803,22 +1974,60 @@ func (r *Repository) queryChampionGuideSignatures(ctx context.Context, filters m
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Confidence != out[j].Confidence {
-			return out[i].Confidence > out[j].Confidence
+	return sortChampionGuideSignatureRows(out, limit), nil
+}
+
+func sortChampionGuideSignatureRows(rows []ChampionGuideSignatureRow, limit int) []ChampionGuideSignatureRow {
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].Confidence != rows[j].Confidence {
+			return rows[i].Confidence > rows[j].Confidence
 		}
-		if out[i].WinRate != out[j].WinRate {
-			return out[i].WinRate > out[j].WinRate
+		if rows[i].WinRate != rows[j].WinRate {
+			return rows[i].WinRate > rows[j].WinRate
 		}
-		if out[i].Games != out[j].Games {
-			return out[i].Games > out[j].Games
+		if rows[i].Games != rows[j].Games {
+			return rows[i].Games > rows[j].Games
 		}
-		return out[i].Signature < out[j].Signature
+		return rows[i].Signature < rows[j].Signature
 	})
-	if len(out) > limit {
-		out = out[:limit]
+	if len(rows) > limit {
+		rows = rows[:limit]
 	}
-	return out, nil
+	return rows
+}
+
+func championGuideSignatureType(column string) string {
+	switch column {
+	case "rune_signature":
+		return "rune"
+	case "spell_signature":
+		return "spell"
+	default:
+		return ""
+	}
+}
+
+func (r *Repository) championGuideAnalyticsHasData(ctx context.Context, table string, filters map[string]string) (bool, error) {
+	switch table {
+	case "champion_matchup_analytics", "champion_signature_analytics":
+	default:
+		return false, fmt.Errorf("unsupported champion guide analytics table %q", table)
+	}
+	query := fmt.Sprintf(`
+		SELECT count()
+		FROM %s FINAL
+		WHERE platform = 'ALL'
+			AND queue_id = ?`, table)
+	args := []any{analytics.RankedSoloQueueID}
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	var count uint64
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScope, includeChampion bool) (string, []any) {

@@ -202,6 +202,12 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_guide_scope_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_matchup_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
+	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_signature_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+		return err
+	}
 	if _, err := r.db.ExecContext(ctx, `ALTER TABLE champion_build_variant_analytics DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
 		return err
 	}
@@ -215,6 +221,12 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 		return err
 	}
 	if err := r.refreshChampionGuideScopeAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
+	if err := r.refreshChampionMatchupAnalytics(ctx, patch, queueID); err != nil {
+		return err
+	}
+	if err := r.refreshChampionSignatureAnalytics(ctx, patch, queueID); err != nil {
 		return err
 	}
 	return r.refreshChampionBuildVariantAnalytics(ctx, patch, queueID)
@@ -506,6 +518,137 @@ func (r *Repository) refreshChampionGuideScopeAnalytics(ctx context.Context, pat
 			toUInt64(uniqExact(match_id)) AS match_count
 		FROM participant_rows
 		GROUP BY patch, queue_id`,
+		patch,
+		queueID,
+	)
+	return err
+}
+
+func (r *Repository) refreshChampionMatchupAnalytics(ctx context.Context, patch string, queueID uint16) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO champion_matchup_analytics
+		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, wins, games)
+		SELECT
+			pm.patch AS patch,
+			'ALL' AS platform,
+			pm.queue_id AS queue_id,
+			pm.champion_id AS champion_id,
+			pm.role AS role,
+			pm.opponent_champion_id AS opponent_champion_id,
+			multiIf(
+				s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+				pm.rank_bucket
+			) AS rank_bucket,
+			toUInt64(sum(pm.win)) AS wins,
+			toUInt64(count()) AS games
+		FROM participant_matchups AS pm FINAL
+		LEFT JOIN
+		(
+			SELECT
+				platform,
+				puuid,
+				argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+			FROM summoner_rank_snapshots FINAL
+			WHERE queue_type = 'RANKED_SOLO_5x5'
+			GROUP BY platform, puuid
+		) AS s
+			ON s.platform = pm.platform AND s.puuid = pm.puuid
+		WHERE pm.patch = ?
+			AND pm.queue_id = ?
+			AND pm.champion_id > 0
+			AND pm.opponent_champion_id > 0
+		GROUP BY
+			pm.patch,
+			pm.queue_id,
+			pm.champion_id,
+			pm.role,
+			pm.opponent_champion_id,
+			rank_bucket`,
+		patch,
+		queueID,
+	)
+	return err
+}
+
+func (r *Repository) refreshChampionSignatureAnalytics(ctx context.Context, patch string, queueID uint16) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO champion_signature_analytics
+		(patch, platform, queue_id, champion_id, role, rank_bucket, signature_type, signature, wins, games)
+		WITH participant_rows AS
+		(
+			SELECT
+				pm.patch AS patch,
+				pm.queue_id AS queue_id,
+				pm.champion_id AS champion_id,
+				pm.role AS role,
+				multiIf(
+					s.snapshot_rank_bucket NOT IN ('', 'UNKNOWN'), s.snapshot_rank_bucket,
+					pm.rank_bucket
+				) AS rank_bucket,
+				pm.rune_signature AS rune_signature,
+				pm.spell_signature AS spell_signature,
+				pm.win AS win
+			FROM participant_matchups AS pm FINAL
+			LEFT JOIN
+			(
+				SELECT
+					platform,
+					puuid,
+					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
+				FROM summoner_rank_snapshots FINAL
+				WHERE queue_type = 'RANKED_SOLO_5x5'
+				GROUP BY platform, puuid
+			) AS s
+				ON s.platform = pm.platform AND s.puuid = pm.puuid
+			WHERE pm.patch = ?
+				AND pm.queue_id = ?
+				AND pm.champion_id > 0
+		)
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			signature_type,
+			signature,
+			toUInt64(sum(win)) AS wins,
+			toUInt64(count()) AS games
+		FROM
+		(
+			SELECT
+				patch,
+				queue_id,
+				champion_id,
+				role,
+				rank_bucket,
+				'rune' AS signature_type,
+				rune_signature AS signature,
+				win
+			FROM participant_rows
+			WHERE rune_signature != ''
+			UNION ALL
+			SELECT
+				patch,
+				queue_id,
+				champion_id,
+				role,
+				rank_bucket,
+				'spell' AS signature_type,
+				spell_signature AS signature,
+				win
+			FROM participant_rows
+			WHERE spell_signature != ''
+		)
+		GROUP BY
+			patch,
+			queue_id,
+			champion_id,
+			role,
+			rank_bucket,
+			signature_type,
+			signature`,
 		patch,
 		queueID,
 	)
