@@ -65,6 +65,29 @@ func TestCheckLogsStaleWorkerHeartbeatWithoutAlert(t *testing.T) {
 	}
 }
 
+func TestCheckTreatsAuthFailedWorkerHeartbeatAsRiotAuthIssue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "heartbeat.json")
+	if err := runstate.WriteWorkerHeartbeat(path, runstate.WorkerHeartbeat{
+		Timestamp: time.Date(2026, 5, 30, 10, 0, 0, 0, time.UTC),
+		Status:    "auth_failed",
+		Message:   "Riot API key is missing, expired, or not authorized",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(config.Config{
+		RiotAuthFailureMarkerPath:  filepath.Join(dir, "missing-marker"),
+		MonitorWorkerHeartbeatPath: path,
+		MonitorWorkerRequired:      true,
+		MonitorWorkerContainerName: "winrift_worker",
+	}, nil)
+
+	issue := service.Check(context.Background())
+	if issue.Key != "riot-auth-failed" {
+		t.Fatalf("issue key = %q, want riot-auth-failed", issue.Key)
+	}
+}
+
 func TestCheckReportsDownWorkerContainer(t *testing.T) {
 	service, cleanup := newDockerContainerMonitor(t, false)
 	defer cleanup()
@@ -129,7 +152,34 @@ func newDockerContainerMonitor(t *testing.T, running bool) (Service, func()) {
 	}
 }
 
-func TestRunOnceSuppressesDuplicateAlertsUntilCooldown(t *testing.T) {
+func TestRunOnceSuppressesDuplicateNonAuthAlertsUntilCooldown(t *testing.T) {
+	dir := t.TempDir()
+	notifier := &recordingNotifier{}
+	service := NewService(config.Config{
+		RiotAuthFailureMarkerPath:  filepath.Join(dir, "missing-marker"),
+		MonitorWorkerRequired:      true,
+		MonitorWorkerHeartbeatPath: filepath.Join(dir, "missing-heartbeat.json"),
+		MonitorWorkerStaleAfter:    15 * time.Minute,
+		MonitorAlertStatePath:      filepath.Join(dir, "state.json"),
+		MonitorAlertCooldown:       time.Hour,
+	}, notifier)
+	now := time.Date(2026, 5, 30, 10, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return now }
+
+	service.runOnce(context.Background())
+	service.runOnce(context.Background())
+	if got := len(notifier.subjects); got != 1 {
+		t.Fatalf("notifications = %d, want 1", got)
+	}
+
+	now = now.Add(2 * time.Hour)
+	service.runOnce(context.Background())
+	if got := len(notifier.subjects); got != 2 {
+		t.Fatalf("notifications after cooldown = %d, want 2", got)
+	}
+}
+
+func TestRunOnceSendsRiotAuthFailureOnceUntilRecovery(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "riot-auth-failed")
 	if err := os.WriteFile(marker, []byte("status=403\n"), 0o600); err != nil {
@@ -152,8 +202,24 @@ func TestRunOnceSuppressesDuplicateAlertsUntilCooldown(t *testing.T) {
 
 	now = now.Add(2 * time.Hour)
 	service.runOnce(context.Background())
+	if got := len(notifier.subjects); got != 1 {
+		t.Fatalf("notifications after cooldown = %d, want still 1", got)
+	}
+
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	service.runOnce(context.Background())
+	if state := service.readState(); state.ActiveKey != "" {
+		t.Fatalf("active key after recovery = %q, want cleared", state.ActiveKey)
+	}
+
+	if err := os.WriteFile(marker, []byte("status=401\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	service.runOnce(context.Background())
 	if got := len(notifier.subjects); got != 2 {
-		t.Fatalf("notifications after cooldown = %d, want 2", got)
+		t.Fatalf("notifications for new auth incident = %d, want 2", got)
 	}
 }
 

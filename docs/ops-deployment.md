@@ -231,7 +231,7 @@ If Riot returns 401 or 403:
 - The API stays up.
 - Riot-backed endpoints return a service-unavailable response instead of repeatedly hitting Riot.
 - Cached analytics, static pages, and database-backed reads can keep working.
-- The monitor sees the marker or stopped worker container and sends an email, then suppresses repeats until `MONITOR_ALERT_COOLDOWN_MINUTES` elapses. Stale heartbeat observations are log-only.
+- The monitor sees the marker, API health status, or auth-failed worker heartbeat and sends one Riot-key email for that auth-failure incident. It does not repeat Riot auth-failure emails every cooldown interval. Once the marker/heartbeat clears through a successful restart/deploy, the alert state recovers and a future auth failure can send one new email. Stale heartbeat observations are log-only.
 
 After refreshing the key:
 
@@ -257,7 +257,7 @@ The monitor is a tiny Go process built into the core image as `/winrift-monitor`
 - `MONITOR_WORKER_CONTAINER_NAME` through the Docker socket when configured
 - `MONITOR_WORKER_HEARTBEAT_PATH`
 
-It sends an alert when an email-worthy check fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`. `MONITOR_STARTUP_GRACE_SECONDS` suppresses worker-down alerts briefly after the monitor starts so deploy ordering does not send noise. Recoveries are logged and clear monitor state, but they do not send email.
+It sends an alert when an email-worthy check fails and writes a small state file at `MONITOR_ALERT_STATE_PATH` so it does not email every minute. Non-auth repeat alerts use `MONITOR_ALERT_COOLDOWN_MINUTES`; Riot auth failures are one-shot until the marker clears and a new incident begins. `MONITOR_STARTUP_GRACE_SECONDS` suppresses worker-down alerts briefly after the monitor starts so deploy ordering does not send noise. Recoveries are logged and clear monitor state, but they do not send email.
 
 For Gmail or another SMTP provider, use an app password rather than your normal account password:
 

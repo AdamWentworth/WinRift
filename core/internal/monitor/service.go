@@ -113,6 +113,9 @@ func (s Service) Check(ctx context.Context) Issue {
 	if issue := s.checkAPI(ctx); issue.Key != "" {
 		return issue
 	}
+	if issue := s.checkWorkerAuthHeartbeat(); issue.Key != "" {
+		return issue
+	}
 	if issue := s.checkWorkerContainer(ctx); issue.Key != "" {
 		return issue
 	}
@@ -204,6 +207,29 @@ func (s Service) checkAPI(ctx context.Context) Issue {
 		}
 	}
 	return Issue{}
+}
+
+func (s Service) checkWorkerAuthHeartbeat() Issue {
+	path := strings.TrimSpace(s.cfg.MonitorWorkerHeartbeatPath)
+	if path == "" {
+		return Issue{}
+	}
+	heartbeat, err := runstate.ReadWorkerHeartbeat(path)
+	if err != nil {
+		return Issue{}
+	}
+	if !strings.EqualFold(strings.TrimSpace(heartbeat.Status), "auth_failed") {
+		return Issue{}
+	}
+	body := "The collector heartbeat reports status=auth_failed. Refresh RIOT_API_KEY in /srv/winrift/.env, then redeploy or restart the API and worker."
+	if strings.TrimSpace(heartbeat.Message) != "" {
+		body += "\n\nHeartbeat detail:\n" + strings.TrimSpace(heartbeat.Message)
+	}
+	return Issue{
+		Key:     "riot-auth-failed",
+		Subject: "WinRift Riot API key needs refresh",
+		Body:    body,
+	}
 }
 
 type dockerContainerInspect struct {
@@ -350,11 +376,18 @@ func (s Service) shouldSend(state alertState, issue Issue) bool {
 	if state.ActiveKey != issue.Key {
 		return true
 	}
+	if isOneShotIssue(issue.Key) {
+		return false
+	}
 	cooldown := s.cfg.MonitorAlertCooldown
 	if cooldown <= 0 {
 		cooldown = 6 * time.Hour
 	}
 	return state.LastSentAt.IsZero() || s.now().Sub(state.LastSentAt) >= cooldown
+}
+
+func isOneShotIssue(key string) bool {
+	return key == "riot-auth-failed"
 }
 
 func (s Service) send(subject, body string) {
