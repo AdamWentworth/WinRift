@@ -294,6 +294,41 @@ ORDER BY
     spell_signature
 );
 
+CREATE TABLE IF NOT EXISTS winrift.build_signature_analytics
+(
+    patch LowCardinality(String),
+    platform LowCardinality(String),
+    queue_id UInt16,
+    champion_id UInt16,
+    role LowCardinality(String),
+    opponent_champion_id UInt16,
+    rank_bucket LowCardinality(String),
+    final_items_signature String,
+    core2_signature String,
+    core3_signature String,
+    rune_signature String,
+    spell_signature String,
+    wins UInt64,
+    games UInt64,
+    compiled_at DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(compiled_at)
+ORDER BY
+(
+    patch,
+    platform,
+    queue_id,
+    champion_id,
+    role,
+    opponent_champion_id,
+    rank_bucket,
+    final_items_signature,
+    core2_signature,
+    core3_signature,
+    rune_signature,
+    spell_signature
+);
+
 CREATE TABLE IF NOT EXISTS winrift.champion_build_variant_analytics
 (
     patch LowCardinality(String),

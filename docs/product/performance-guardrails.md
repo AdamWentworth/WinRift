@@ -12,13 +12,15 @@ WinRift should feel instant for stored analytics pages. Riot-dependent live look
 
 ## Current Read Models
 
-- Champion pages: `champion_page_bundle_cache`, champion guide summary/scope analytics, team-kill summaries, matchup analytics, rune/spell signature analytics, item slot analytics, starting loadout analytics, skill analytics, ban analytics, and build variant analytics.
+- Champion pages: `champion_page_bundle_cache`, champion guide summary/scope analytics, team-kill summaries, matchup analytics, rune/spell signature analytics, build-signature analytics, item slot analytics, starting loadout analytics, skill analytics, ban analytics, and build variant analytics.
 - Tier lists and champion guide indexes: `champion_guide_summary_analytics` plus `champion_guide_scope_analytics` for role/rank/patch-scoped counts.
 - Summoner profiles: `summoner_profile_summary`, `summoner_champion_summary`, `summoner_champion_role_summary`, `summoner_recent_match_summary`, and `summoner_build_summary`.
 - Summoner identity and ladder rows: `summoner_identity_summary`, rank snapshots, and profile summaries.
 - Win conditions: `match_team_win_conditions` and `patch_win_condition_metrics`.
 
 The champion guide summary read model uses `team_kill_summary` for true kill participation. Keep that helper table refreshed before `champion_guide_summary_analytics`; otherwise the API will still work, but impact scoring loses one of its better context signals.
+
+Build advice and champion item paths use `build_signature_analytics` for current/recent patches and `patch_build_metrics` for archived patches. Keep this table refreshed with the champion-guide lane so first-load champion pages do not scan `participant_matchups` just to assemble common build signatures.
 
 ## Profiling Checklist
 

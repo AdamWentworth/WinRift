@@ -24,6 +24,7 @@ Current read models:
 
 - `item_slot_analytics`
 - `starting_loadout_analytics`
+- `build_signature_analytics`
 - `champion_skill_analytics`
 - `champion_ban_analytics`
 - `champion_build_variant_analytics`

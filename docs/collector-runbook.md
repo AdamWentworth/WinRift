@@ -190,7 +190,7 @@ Safety knobs:
 - `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS`: max account-alias requests per platform. These are subtracted from the same regional Riot request budget as match collection.
 - `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `item_slot_analytics` and `starting_loadout_analytics` summaries at startup and then after collector sweeps when the interval has elapsed.
 - `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch item-slot and starting-loadout summary refreshes. This is ClickHouse work plus cached Data Dragon item metadata lookup, not Riot match/league API budget.
-- `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes champion-guide read models, including champion skill paths, ban rates, and alternative build variants.
+- `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes champion-guide read models, including champion skill paths, ban rates, build signatures, and alternative build variants.
 - `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled champion-guide read-model refreshes. This is ClickHouse/local aggregation work, not Riot API budget.
 - `WIN_CONDITION_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `match_team_win_conditions` and `patch_win_condition_metrics` summaries at startup and then after collector sweeps when the interval has elapsed.
 - `WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch win-condition summary refreshes. This is ClickHouse/local profile work, not Riot API budget. The default is longer than item slots because it rebuilds per-platform strategy metrics and then the combined `ALL` aggregate.

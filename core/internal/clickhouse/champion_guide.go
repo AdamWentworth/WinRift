@@ -1071,6 +1071,66 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 	if limit <= 0 {
 		limit = 12
 	}
+	rows, hasSummary, err := r.queryChampionGuideItemPathsSummary(ctx, filters, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryChampionGuideItemPathsLiveScan(ctx, filters, minGames, limit)
+}
+
+func (r *Repository) queryChampionGuideItemPathsSummary(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideItemPathRow, bool, error) {
+	championID := filterValue(filters["champion_id"])
+	if championID == "" {
+		return nil, false, nil
+	}
+	hasSummary, err := r.BuildSignatureAnalyticsHasData(ctx, filterValue(filters["patch"]))
+	if err != nil {
+		return nil, false, err
+	}
+	if !hasSummary {
+		return nil, false, nil
+	}
+	roleScope := strictAnalyticsRoleScope(filters["role"])
+	query := `
+		SELECT
+			core3_signature,
+			final_items_signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM (` + buildSignatureSummarySourceSQL() + `)
+		WHERE champion_id = ?
+			AND core3_signature != ''
+			AND final_items_signature != ''
+			AND length(splitByChar('-', core3_signature)) >= 3
+			AND length(splitByChar('-', final_items_signature)) >= 3`
+	args := []any{championID}
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filterValue(filters["patch"]) != "" {
+		query += " AND patch = ?"
+		args = append(args, filterValue(filters["patch"]))
+	}
+	if filterValue(filters["rank_bucket"]) != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filterValue(filters["rank_bucket"]))
+	}
+	query += `
+		GROUP BY core3_signature, final_items_signature
+		HAVING games >= ?
+		ORDER BY games DESC, win_rate DESC
+		LIMIT ?`
+	args = append(args, minGames, limit*5)
+	rows, err := r.scanChampionGuideItemPathRows(ctx, query, args, limit)
+	return rows, true, err
+}
+
+func (r *Repository) queryChampionGuideItemPathsLiveScan(ctx context.Context, filters map[string]string, minGames, limit int) ([]ChampionGuideItemPathRow, error) {
 	roleScope := strictAnalyticsRoleScope(filters["role"])
 	rawSQL, rawArgs := championGuideBaseSQLExcludingCompiledBuilds(filters, roleScope, true)
 	compiledWhere := `
@@ -1129,6 +1189,10 @@ func (r *Repository) queryChampionGuideItemPaths(ctx context.Context, filters ma
 	args := append([]any{}, rawArgs...)
 	args = append(args, compiledArgs...)
 	args = append(args, minGames, limit*5)
+	return r.scanChampionGuideItemPathRows(ctx, query, args, limit)
+}
+
+func (r *Repository) scanChampionGuideItemPathRows(ctx context.Context, query string, args []any, limit int) ([]ChampionGuideItemPathRow, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err

@@ -31,6 +31,7 @@ Backend contracts:
 
 Read models:
 
+- `build_signature_analytics`: current/recent patch build signatures used by build advice, top builds, and item-path summaries before falling back to archived patch metrics.
 - `champion_build_variant_analytics`: precomputed champion-guide alternative build tabs, representative runes/spells/items, and build-specific skill orders where the sample floor is met.
 - `champion_skill_analytics`: champion/role skill order rows.
 - `champion_ban_analytics`: sample-relative ban-rate rows.
@@ -54,7 +55,7 @@ Known gaps:
 - Ban rate is sample-relative: `champion bans / stored ranked matches` for the selected patch. Riot does not expose a separate global champion-ban-rate endpoint, so this should be labeled as our stored sample.
 - Pick rate is a sample-relative estimate from stored participant rows, not global Riot-wide popularity.
 - Tier-list impact is still a correlation-heavy score. It now uses final participant performance fields, but those signals should be validated as the corpus grows. See `docs/product/tier-list-ranking.md`.
-- Item paths use timeline-derived first-three completed item signatures where available, then final inventory signatures for the completed build. Final inventory order is still Riot inventory order, not guaranteed purchase order.
+- Item paths use build-signature summaries for normal production reads. The first-three completed item signatures still come from timeline purchase order where available, while final inventory signatures are Riot inventory order and not guaranteed purchase order.
 - Slot panels remain useful for matchup-specific item choice, especially when a complete path sample is too thin. Slot `0` is reserved for starting items; slots `1-6` remain completed-item purchase order.
 - Starting-item display prefers opening loadout signatures from the first purchase burst only. The full bundle must fit under the normal starting-gold cap, which preserves legal potion/control-ward openers while filtering out early recall buys such as impossible Doran plus Long Sword bundles. If no loadout sample exists, the UI falls back to the older slot `0` single-item rows.
 - Live matchup slot panels should not mix champion-wide fallback rows into the matchup card. Exact-matchup scope can widen across stored patches, while champion-wide baseline stays in the separate overall card.

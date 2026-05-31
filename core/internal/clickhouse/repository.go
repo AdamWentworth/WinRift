@@ -223,6 +223,152 @@ func (r *Repository) InsertNormalized(ctx context.Context, normalized analytics.
 }
 
 func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, error) {
+	if minGames <= 0 {
+		minGames = 1
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	rows, hasSummary, err := r.queryBuildsSummary(ctx, filters, minGames, limit)
+	if err != nil {
+		return nil, err
+	}
+	if hasSummary {
+		return rows, nil
+	}
+	return r.queryBuildsLiveScan(ctx, filters, minGames, limit)
+}
+
+func (r *Repository) queryBuildsSummary(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, bool, error) {
+	hasSummary, err := r.BuildSignatureAnalyticsHasData(ctx, filters["patch"])
+	if err != nil {
+		return nil, false, err
+	}
+	if !hasSummary {
+		return nil, false, nil
+	}
+	roleScope := analyticsRoleScope(filters["role"])
+	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
+	query := fmt.Sprintf(`
+		SELECT
+			champion_id,
+			%s AS role_bucket,
+			%s AS opponent_champion_id,
+			patch AS patch_bucket,
+			rank_bucket,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			wins / games AS win_rate
+		FROM (`+buildSignatureSummarySourceSQL()+`)
+		WHERE 1 = 1`, roleScope.selectExpr, opponentBucketExpr)
+	args := []any{}
+	if filters["champion_id"] != "" {
+		query += " AND champion_id = ?"
+		args = append(args, filters["champion_id"])
+	}
+	if roleScope.whereSQL != "" {
+		query += " AND " + roleScope.whereSQL
+		args = append(args, roleScope.args...)
+	}
+	if filters["opponent_champion_id"] != "" {
+		query += " AND opponent_champion_id = ?"
+		args = append(args, filters["opponent_champion_id"])
+	}
+	if filters["patch"] != "" {
+		query += " AND patch = ?"
+		args = append(args, filters["patch"])
+	}
+	if filters["rank_bucket"] != "" {
+		query += " AND rank_bucket = ?"
+		args = append(args, filters["rank_bucket"])
+	}
+	query += `
+		GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature
+		HAVING games >= ?
+		ORDER BY games DESC, win_rate DESC
+		LIMIT ?`
+	args = append(args, minGames, limit*5)
+	rows, err := r.scanBuildRows(ctx, query, args, limit)
+	return rows, true, err
+}
+
+func (r *Repository) BuildSignatureAnalyticsHasData(ctx context.Context, patch string) (bool, error) {
+	patch = strings.TrimSpace(patch)
+	query := "SELECT count() FROM build_signature_analytics WHERE 1 = 1"
+	args := []any{}
+	if patch != "" {
+		query += " AND patch = ?"
+		args = append(args, patch)
+	}
+	query += " LIMIT 1"
+	var count uint64
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	query = "SELECT count() FROM patch_build_metrics WHERE 1 = 1"
+	args = []any{}
+	if patch != "" {
+		query += " AND patch = ?"
+		args = append(args, patch)
+	}
+	query += " LIMIT 1"
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count > 0, err
+}
+
+func buildSignatureSummarySourceSQL() string {
+	return `
+		SELECT
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			wins,
+			games
+		FROM build_signature_analytics FINAL
+		UNION ALL
+		SELECT
+			pbm.patch,
+			pbm.platform,
+			pbm.queue_id,
+			pbm.champion_id,
+			pbm.role,
+			pbm.opponent_champion_id,
+			pbm.rank_bucket,
+			pbm.final_items_signature,
+			pbm.core2_signature,
+			pbm.core3_signature,
+			pbm.rune_signature,
+			pbm.spell_signature,
+			pbm.wins,
+			pbm.games
+		FROM patch_build_metrics AS pbm FINAL
+		LEFT JOIN
+		(
+			SELECT DISTINCT patch, queue_id
+			FROM build_signature_analytics FINAL
+		) AS bsa
+			ON bsa.patch = pbm.patch AND bsa.queue_id = pbm.queue_id
+		WHERE bsa.patch = ''`
+}
+
+func (r *Repository) queryBuildsLiveScan(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, error) {
 	roleScope := analyticsRoleScope(filters["role"])
 	opponentBucketExpr := analyticsOpponentBucketExpr(filters)
 	query := fmt.Sprintf(`
@@ -346,6 +492,10 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 	query += ` GROUP BY champion_id, role_bucket, opponent_champion_id, patch_bucket, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature HAVING games >= ? ORDER BY games DESC, win_rate DESC LIMIT ?`
 	args = append(args, minGames, limit*5)
 
+	return r.scanBuildRows(ctx, query, args, limit)
+}
+
+func (r *Repository) scanBuildRows(ctx context.Context, query string, args []any, limit int) ([]BuildRow, error) {
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -1472,6 +1622,7 @@ func (r *Repository) StoredPatches(ctx context.Context) ([]string, error) {
 			UNION ALL SELECT patch FROM champion_guide_scope_analytics
 			UNION ALL SELECT patch FROM champion_matchup_analytics
 			UNION ALL SELECT patch FROM champion_signature_analytics
+			UNION ALL SELECT patch FROM build_signature_analytics
 			UNION ALL SELECT patch FROM champion_build_variant_analytics
 			UNION ALL SELECT patch FROM patch_power_curve_metrics
 			UNION ALL SELECT patch FROM match_team_win_conditions
@@ -1526,6 +1677,7 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		{table: "champion_guide_scope_analytics", column: "patch"},
 		{table: "champion_matchup_analytics", column: "patch"},
 		{table: "champion_signature_analytics", column: "patch"},
+		{table: "build_signature_analytics", column: "patch"},
 		{table: "champion_build_variant_analytics", column: "patch"},
 		{table: "patch_power_curve_metrics", column: "patch"},
 		{table: "match_team_win_conditions", column: "patch"},

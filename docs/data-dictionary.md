@@ -131,6 +131,12 @@ Refresh options:
 - Local/dev API: `POST /api/dev/analytics/item-slots/refresh`
 - CLI: `patchctl -action item-slots -patch 16.10 -queue 420`
 
+## `build_signature_analytics`
+
+Current read model for champion build signatures. One row per patch, queue, champion, role, opponent champion, rank bucket, final-item signature, core signatures, rune signature, and spell signature.
+
+The champion guide analytics lane refreshes this table from `participant_matchups` and applies the latest rank snapshot when available. Build-advice and champion-guide item-path reads now prefer this compact table before falling back to archived `patch_build_metrics` or retained normalized rows.
+
 ## `champion_build_variant_analytics`
 
 Current read model for champion-guide alternative build tabs.
@@ -145,7 +151,7 @@ Refresh options:
 - Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
 - CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
 
-The same refresh lane also populates `team_kill_summary`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, and `champion_signature_analytics`.
+The same refresh lane also populates `team_kill_summary`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, and `build_signature_analytics`.
 
 ## `patch_power_curve_metrics`
 

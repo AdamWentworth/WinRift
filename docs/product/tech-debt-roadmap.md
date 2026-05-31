@@ -194,6 +194,8 @@ The ClickHouse package has grown into the real heart of the app. It is mostly or
 
 This makes it easier to enforce the performance rule: public page endpoints should read summaries, not raw payloads.
 
+Status update: build advice now has `build_signature_analytics`, a compact current-patch build-signature read model refreshed by the champion-guide lane. `QueryBuilds` and champion-guide item paths prefer it before falling back to archived `patch_build_metrics` or retained normalized rows.
+
 ## Priority 5: Test Coverage Gaps
 
 ### Frontend Regression Tests

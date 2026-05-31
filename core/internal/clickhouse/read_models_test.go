@@ -113,6 +113,100 @@ func TestRefreshTeamKillSummaryUsesParticipants(t *testing.T) {
 	}
 }
 
+func TestRefreshBuildSignatureAnalyticsUsesParticipantSummaries(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectExec("(?s)INSERT INTO build_signature_analytics.*FROM participant_matchups AS pm FINAL").
+		WithArgs("16.11", uint16(420)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repo.refreshBuildSignatureAnalytics(context.Background(), "16.11", 420); err != nil {
+		t.Fatalf("refresh build signature analytics: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestQueryBuildsUsesBuildSignatureReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM build_signature_analytics WHERE").
+		WithArgs("16.11").
+		WillReturnRows(sqlmock.NewRows([]string{"count()"}).AddRow(1))
+	mock.ExpectQuery("(?s)FROM \\(.*build_signature_analytics FINAL.*patch_build_metrics AS pbm FINAL").
+		WithArgs("266", "16.11", 10, 40).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role_bucket",
+			"opponent_champion_id",
+			"patch_bucket",
+			"rank_bucket",
+			"final_items_signature",
+			"core2_signature",
+			"core3_signature",
+			"rune_signature",
+			"spell_signature",
+			"wins",
+			"games",
+			"win_rate",
+		}).AddRow(266, "TOP", 0, "16.11", "DIAMOND", "3071-3053-6333", "3071-3053", "3071-3053-6333", "rune", "4-14", 7, 10, 0.7))
+
+	rows, err := repo.QueryBuilds(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.11",
+	}, 10, 8)
+	if err != nil {
+		t.Fatalf("query builds: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	if rows[0].ChampionID != 266 || rows[0].FinalItemsSignature != "3071-3053-6333" || rows[0].Games != 10 {
+		t.Fatalf("build row = %+v", rows[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestChampionGuideItemPathsUseBuildSignatureReadModel(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM build_signature_analytics WHERE").
+		WithArgs("16.11").
+		WillReturnRows(sqlmock.NewRows([]string{"count()"}).AddRow(1))
+	mock.ExpectQuery("(?s)FROM \\(.*build_signature_analytics FINAL.*patch_build_metrics AS pbm FINAL").
+		WithArgs("266", "TOP", "16.11", 5, 60).
+		WillReturnRows(sqlmock.NewRows([]string{"core3_signature", "final_items_signature", "wins", "games", "win_rate"}).
+			AddRow("3071-3053-6333", "3071-3053-6333-3065", 8, 12, 0.6667))
+
+	rows, err := repo.queryChampionGuideItemPaths(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.11",
+	}, 5, 12)
+	if err != nil {
+		t.Fatalf("query champion guide item paths: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %d; want 1", len(rows))
+	}
+	if rows[0].Core3Signature != "3071-3053-6333" || rows[0].Games != 12 {
+		t.Fatalf("item path row = %+v", rows[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestPatchStatsIncludesCompiledSnapshotsAfterRawPrune(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()
