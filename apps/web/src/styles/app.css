@@ -615,7 +615,7 @@ button {
   outline: none;
 }
 
-.summoner-leaderboard-row img,
+.summoner-ladder-profile-icon,
 .summoner-ladder-icon-fallback {
   background: rgb(0 0 0 / 40%);
   border: 1px solid rgb(140 236 255 / 24%);
@@ -644,6 +644,26 @@ button {
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+
+.summoner-ladder-tier {
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+.summoner-ladder-tier > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.summoner-ladder-rank-icon {
+  display: block;
+  filter: drop-shadow(0 0 8px rgb(0 0 0 / 70%));
+  height: 38px;
+  object-fit: contain;
+  width: 38px;
 }
 
 .summoner-ladder-name strong,
@@ -6985,7 +7005,7 @@ button {
     text-align: left;
   }
 
-  .summoner-leaderboard-row img,
+  .summoner-ladder-profile-icon,
   .summoner-ladder-icon-fallback {
     grid-row: auto;
   }

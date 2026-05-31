@@ -577,7 +577,7 @@ function SummonerLeaderboardRowButton({
     >
       <span className="summoner-ladder-rank">#{row.rank}</span>
       {iconSrc ? (
-        <img src={iconSrc} alt={`${row.gameName} profile icon`} />
+        <img className="summoner-ladder-profile-icon" src={iconSrc} alt={`${row.gameName} profile icon`} />
       ) : (
         <span className="summoner-ladder-icon-fallback"><RadioTower size={17} /></span>
       )}
@@ -586,8 +586,11 @@ function SummonerLeaderboardRowButton({
         <em>#{row.tagLine} · {platformLabel(row.platform)}</em>
       </span>
       <span className="summoner-ladder-tier">
-        <strong>{rankLabel(row.ranked)}</strong>
-        <em>{row.ranked.leaguePoints} LP</em>
+        <img className="summoner-ladder-rank-icon" src={rankIconUrl(row.ranked)} alt={rankLabel(row.ranked)} />
+        <span>
+          <strong>{rankLabel(row.ranked)}</strong>
+          <em>{row.ranked.leaguePoints} LP</em>
+        </span>
       </span>
       <span className="summoner-ladder-record">
         <strong>{row.ranked.winRate.toFixed(1)}%</strong>
