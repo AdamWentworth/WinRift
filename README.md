@@ -183,6 +183,12 @@ cd apps/web
 VITE_API_URL=http://SERVER_LAN_IP:8000 npm run dev
 ```
 
+For day-to-day laptop work, put that value in ignored local Vite env:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+```
+
 ---
 
 ## ⚙️ Environment Overview

@@ -51,6 +51,19 @@ Point local frontend work at a server-hosted API:
 VITE_API_URL=http://SERVER_LAN_IP:8000 npm run dev
 ```
 
+Or create an ignored local env file:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+editor apps/web/.env.local
+```
+
+For the current private server setup:
+
+```env
+VITE_API_URL=http://192.168.1.77:8000
+```
+
 ## ⚙️ Environment
 
 | Key | Purpose |
