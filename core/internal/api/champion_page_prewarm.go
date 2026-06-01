@@ -25,10 +25,12 @@ type ChampionPagePrewarmResult struct {
 	Candidates        int
 	Stored            int
 	Skipped           int
+	Cached            int
 	Errors            int
 	MatchupCandidates int
 	MatchupStored     int
 	MatchupSkipped    int
+	MatchupCached     int
 }
 
 func (s Server) PrewarmChampionPageBundles(ctx context.Context, options ChampionPagePrewarmOptions) (ChampionPagePrewarmResult, error) {
@@ -167,8 +169,10 @@ func (s Server) prewarmChampionPageBundle(ctx context.Context, request championP
 	if body, ok, err := s.repo.CachedChampionPageBundle(ctx, cacheKey); err == nil && ok {
 		s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
 		result.Skipped++
+		result.Cached++
 		if matchup {
 			result.MatchupSkipped++
+			result.MatchupCached++
 		}
 		return nil
 	} else if err != nil {

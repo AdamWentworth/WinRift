@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"winrift/core/internal/analytics"
 	"winrift/core/internal/winconditions"
@@ -221,12 +222,10 @@ func (r *Repository) refreshWinConditionMetricsForPlatforms(ctx context.Context,
 		return err
 	}
 	analyzer := winconditions.NewAnalyzer(catalog)
+	compiledAt := time.Now().UTC().Truncate(time.Second)
 	for _, platform := range platforms {
 		rows, err := r.QueryTeamCompositions(ctx, TeamCompositionFilters{Patch: patch, Platform: platform, QueueID: queueID})
 		if err != nil {
-			return err
-		}
-		if err := r.deleteWinConditionMetrics(ctx, patch, platform, queueID); err != nil {
 			return err
 		}
 		records := make([]winConditionTeamRecord, 0, len(rows))
@@ -237,16 +236,19 @@ func (r *Repository) refreshWinConditionMetricsForPlatforms(ctx context.Context,
 			}
 			records = append(records, record)
 		}
-		if err := r.insertWinConditionTeamRecords(ctx, records, analyzer.CatalogPatch()); err != nil {
+		if err := r.insertWinConditionTeamRecords(ctx, records, analyzer.CatalogPatch(), compiledAt); err != nil {
 			return err
 		}
 		metrics := aggregateWinConditionRecords(records)
-		if err := r.insertWinConditionMetrics(ctx, metrics); err != nil {
+		if err := r.insertWinConditionMetrics(ctx, metrics, compiledAt); err != nil {
+			return err
+		}
+		if err := r.deleteOldWinConditionMetrics(ctx, patch, platform, queueID, compiledAt); err != nil {
 			return err
 		}
 	}
 	if refreshAll {
-		return r.refreshAllPlatformWinConditionMetrics(ctx, patch, queueID)
+		return r.refreshAllPlatformWinConditionMetrics(ctx, patch, queueID, compiledAt)
 	}
 	return nil
 }
@@ -549,23 +551,23 @@ func repeatArgs(args []any, count int) []any {
 	return out
 }
 
-func (r *Repository) deleteWinConditionMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+func (r *Repository) deleteOldWinConditionMetrics(ctx context.Context, patch, platform string, queueID uint16, compiledAt time.Time) error {
 	statements := []string{
-		`ALTER TABLE match_team_win_conditions DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
-		`ALTER TABLE patch_win_condition_metrics DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
+		`ALTER TABLE match_team_win_conditions DELETE WHERE patch = ? AND platform = ? AND queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+		`ALTER TABLE patch_win_condition_metrics DELETE WHERE patch = ? AND platform = ? AND queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
 	}
 	for _, statement := range statements {
-		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID); err != nil {
+		if _, err := r.db.ExecContext(ctx, statement, patch, platform, queueID, compiledAt); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *Repository) insertWinConditionTeamRecords(ctx context.Context, records []winConditionTeamRecord, profilePatch string) error {
+func (r *Repository) insertWinConditionTeamRecords(ctx context.Context, records []winConditionTeamRecord, profilePatch string, compiledAt time.Time) error {
 	const insertPrefix = `
 		INSERT INTO match_team_win_conditions
-		(patch, platform, queue_id, match_id, team_id, win, duration_seconds, champion_ids, rank_bucket, splitpush_score, pick_score, siege_score, control_score, teamfight_score, splitpush_rating, pick_rating, siege_rating, control_rating, teamfight_rating, primary_condition, primary_rating, profile_patch)
+		(patch, platform, queue_id, match_id, team_id, win, duration_seconds, champion_ids, rank_bucket, splitpush_score, pick_score, siege_score, control_score, teamfight_score, splitpush_rating, pick_rating, siege_rating, control_rating, teamfight_rating, primary_condition, primary_rating, profile_patch, compiled_at)
 		VALUES `
 	values := make([]string, 0, len(records))
 	for _, record := range records {
@@ -577,7 +579,7 @@ func (r *Repository) insertWinConditionTeamRecords(ctx context.Context, records 
 			win = 1
 		}
 		values = append(values, fmt.Sprintf(
-			"(%s, %s, %d, %s, %d, %d, %d, %s, %s, %d, %d, %d, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s)",
+			"(%s, %s, %d, %s, %d, %d, %d, %s, %s, %d, %d, %d, %d, %d, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
 			clickhouseQuote(row.Patch),
 			clickhouseQuote(row.Platform),
 			row.QueueID,
@@ -600,6 +602,7 @@ func (r *Repository) insertWinConditionTeamRecords(ctx context.Context, records 
 			clickhouseQuote(profile.PrimaryCondition),
 			clickhouseQuote(profile.PrimaryRating),
 			clickhouseQuote(profilePatch),
+			clickhouseDateTimeSQL(compiledAt),
 		))
 	}
 	return r.execValueInsertChunks(ctx, insertPrefix, values, 1000)
@@ -666,10 +669,10 @@ func addWinConditionRecordMetrics(metrics map[winConditionMetricKey]winCondition
 	}
 }
 
-func (r *Repository) insertWinConditionMetrics(ctx context.Context, metrics map[winConditionMetricKey]winConditionMetricCounts) error {
+func (r *Repository) insertWinConditionMetrics(ctx context.Context, metrics map[winConditionMetricKey]winConditionMetricCounts, compiledAt time.Time) error {
 	const insertPrefix = `
 		INSERT INTO patch_win_condition_metrics
-		(patch, platform, queue_id, rank_bucket, team_condition, team_rating, opponent_condition, opponent_rating, team_primary, game_length_bucket, wins, games, win_rate_percent, confidence_percent)
+		(patch, platform, queue_id, rank_bucket, team_condition, team_rating, opponent_condition, opponent_rating, team_primary, game_length_bucket, wins, games, win_rate_percent, confidence_percent, compiled_at)
 		VALUES `
 	keys := make([]winConditionMetricKey, 0, len(metrics))
 	for key := range metrics {
@@ -707,7 +710,7 @@ func (r *Repository) insertWinConditionMetrics(ctx context.Context, metrics map[
 	for _, key := range keys {
 		counts := metrics[key]
 		values = append(values, fmt.Sprintf(
-			"(%s, %s, %d, %s, %s, %s, %s, %s, %d, %s, %d, %d, %s, %s)",
+			"(%s, %s, %d, %s, %s, %s, %s, %s, %d, %s, %d, %d, %s, %s, %s)",
 			clickhouseQuote(key.patch),
 			clickhouseQuote(key.platform),
 			key.queueID,
@@ -722,15 +725,13 @@ func (r *Repository) insertWinConditionMetrics(ctx context.Context, metrics map[
 			counts.games,
 			winConditionFloatSQL(winConditionWinRatePercent(counts.wins, counts.games)),
 			winConditionFloatSQL(winConditionConfidencePercent(counts.wins, counts.games)),
+			clickhouseDateTimeSQL(compiledAt),
 		))
 	}
 	return r.execValueInsertChunks(ctx, insertPrefix, values, 1000)
 }
 
-func (r *Repository) refreshAllPlatformWinConditionMetrics(ctx context.Context, patch string, queueID uint16) error {
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE patch_win_condition_metrics DELETE WHERE patch = ? AND platform = 'ALL' AND queue_id = ?`, patch, queueID); err != nil {
-		return err
-	}
+func (r *Repository) refreshAllPlatformWinConditionMetrics(ctx context.Context, patch string, queueID uint16, compiledAt time.Time) error {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT
 			rank_bucket,
@@ -769,7 +770,7 @@ func (r *Repository) refreshAllPlatformWinConditionMetrics(ctx context.Context, 
 		key.platform = "ALL"
 		key.queueID = queueID
 		values = append(values, fmt.Sprintf(
-			"(%s, %s, %d, %s, %s, %s, %s, %s, %d, %s, %d, %d, %s, %s)",
+			"(%s, %s, %d, %s, %s, %s, %s, %s, %d, %s, %d, %d, %s, %s, %s)",
 			clickhouseQuote(key.patch),
 			clickhouseQuote(key.platform),
 			key.queueID,
@@ -784,15 +785,20 @@ func (r *Repository) refreshAllPlatformWinConditionMetrics(ctx context.Context, 
 			counts.games,
 			winConditionFloatSQL(winConditionWinRatePercent(counts.wins, counts.games)),
 			winConditionFloatSQL(winConditionConfidencePercent(counts.wins, counts.games)),
+			clickhouseDateTimeSQL(compiledAt),
 		))
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return r.execValueInsertChunks(ctx, `
+	if err := r.execValueInsertChunks(ctx, `
 		INSERT INTO patch_win_condition_metrics
-		(patch, platform, queue_id, rank_bucket, team_condition, team_rating, opponent_condition, opponent_rating, team_primary, game_length_bucket, wins, games, win_rate_percent, confidence_percent)
-		VALUES `, values, 1000)
+		(patch, platform, queue_id, rank_bucket, team_condition, team_rating, opponent_condition, opponent_rating, team_primary, game_length_bucket, wins, games, win_rate_percent, confidence_percent, compiled_at)
+		VALUES `, values, 1000); err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `ALTER TABLE patch_win_condition_metrics DELETE WHERE patch = ? AND platform = 'ALL' AND queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`, patch, queueID, compiledAt)
+	return err
 }
 
 func (r *Repository) execValueInsertChunks(ctx context.Context, insertPrefix string, values []string, chunkSize int) error {
@@ -817,6 +823,13 @@ func (r *Repository) execValueInsertChunks(ctx context.Context, insertPrefix str
 func clickhouseQuote(value string) string {
 	escaped := strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(value)
 	return "'" + escaped + "'"
+}
+
+func clickhouseDateTimeSQL(value time.Time) string {
+	if value.IsZero() {
+		value = time.Now().UTC()
+	}
+	return "toDateTime(" + clickhouseQuote(value.UTC().Format("2006-01-02 15:04:05")) + ")"
 }
 
 func uint16ArraySQL(values []uint16) string {

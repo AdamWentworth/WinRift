@@ -247,20 +247,24 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 			statusDetails["prewarmCandidates"] += result.Candidates
 			statusDetails["prewarmStored"] += result.Stored
 			statusDetails["prewarmSkipped"] += result.Skipped
+			statusDetails["prewarmCached"] += result.Cached
 			statusDetails["prewarmErrors"] += result.Errors
 			statusDetails["prewarmMatchupCandidates"] += result.MatchupCandidates
 			statusDetails["prewarmMatchupStored"] += result.MatchupStored
 			statusDetails["prewarmMatchupSkipped"] += result.MatchupSkipped
+			statusDetails["prewarmMatchupCached"] += result.MatchupCached
 			if err != nil {
 				log.Printf(
-					"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_skipped=%d errors=%d duration=%s err=%v",
+					"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_cached=%d matchup_skipped=%d errors=%d duration=%s err=%v",
 					refreshPatch,
 					analytics.RankedSoloQueueID,
 					result.Candidates,
 					result.Stored,
+					result.Cached,
 					result.Skipped,
 					result.MatchupCandidates,
 					result.MatchupStored,
+					result.MatchupCached,
 					result.MatchupSkipped,
 					result.Errors,
 					time.Since(prewarmStartedAt).Round(time.Millisecond),
@@ -271,14 +275,16 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 				}
 			} else {
 				log.Printf(
-					"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_skipped=%d errors=%d duration=%s",
+					"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_cached=%d matchup_skipped=%d errors=%d duration=%s",
 					refreshPatch,
 					analytics.RankedSoloQueueID,
 					result.Candidates,
 					result.Stored,
+					result.Cached,
 					result.Skipped,
 					result.MatchupCandidates,
 					result.MatchupStored,
+					result.MatchupCached,
 					result.MatchupSkipped,
 					result.Errors,
 					time.Since(prewarmStartedAt).Round(time.Millisecond),

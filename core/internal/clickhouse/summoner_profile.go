@@ -235,24 +235,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_identity_summary DELETE WHERE 1 SETTINGS mutations_sync = 2`); err != nil {
-		return SummonerProfileRefreshResult{}, err
-	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_profile_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
-		return SummonerProfileRefreshResult{}, err
-	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_champion_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
-		return SummonerProfileRefreshResult{}, err
-	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_champion_role_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
-		return SummonerProfileRefreshResult{}, err
-	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_recent_match_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
-		return SummonerProfileRefreshResult{}, err
-	}
-	if _, err := r.db.ExecContext(ctx, `ALTER TABLE summoner_build_summary DELETE WHERE queue_id = ? SETTINGS mutations_sync = 2`, queueID); err != nil {
-		return SummonerProfileRefreshResult{}, err
-	}
+	compiledAt := time.Now().UTC().Truncate(time.Second)
 	if _, err := r.db.ExecContext(ctx, `
 		INSERT INTO summoner_identity_summary
 			(platform, puuid, game_name, tag_line, profile_icon_id, summoner_level, last_seen_at, compiled_at)
@@ -305,13 +288,13 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
 			ifNull(s.summoner_level, 0) AS summoner_level,
 			a.alias_last_seen_at,
-			now() AS compiled_at
+			? AS compiled_at
 		FROM latest_alias AS a
 		LEFT JOIN latest_account AS s
 			ON s.platform = a.platform AND s.puuid = a.puuid
 		LEFT JOIN latest_raw_profile AS rp
 			ON rp.platform = a.platform AND rp.puuid = a.puuid
-		WHERE a.game_name != '' AND a.tag_line != ''`, queueID); err != nil {
+		WHERE a.game_name != '' AND a.tag_line != ''`, queueID, compiledAt); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
@@ -328,14 +311,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			toUInt64(sum(p.assists)) AS assists,
 			min(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS first_seen_at,
 			max(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS last_seen_at,
-			now() AS compiled_at
+			? AS compiled_at
 		FROM participants AS p FINAL
 		LEFT JOIN raw_matches AS rm FINAL
 			ON rm.match_id = p.match_id
 			AND rm.platform = p.platform
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
-		GROUP BY p.platform, p.queue_id, p.puuid`, queueID); err != nil {
+		GROUP BY p.platform, p.queue_id, p.puuid`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
@@ -353,7 +336,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			toUInt64(sum(p.assists)) AS assists,
 			min(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS first_seen_at,
 			max(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS last_seen_at,
-			now() AS compiled_at
+			? AS compiled_at
 		FROM participants AS p FINAL
 		LEFT JOIN raw_matches AS rm FINAL
 			ON rm.match_id = p.match_id
@@ -361,7 +344,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
 			AND p.champion_id > 0
-	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id`, queueID); err != nil {
+	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
@@ -380,7 +363,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			toUInt64(sum(p.assists)) AS assists,
 			min(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS first_seen_at,
 			max(multiIf(rm.game_start_timestamp > 0, toDateTime(intDiv(rm.game_start_timestamp, 1000)), p.ingested_at)) AS last_seen_at,
-			now() AS compiled_at
+			? AS compiled_at
 		FROM participants AS p FINAL
 		LEFT JOIN raw_matches AS rm FINAL
 			ON rm.match_id = p.match_id
@@ -389,7 +372,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			AND p.puuid != ''
 			AND p.champion_id > 0
 			AND p.role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
-	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role`, queueID); err != nil {
+	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
@@ -409,14 +392,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			p.assists,
 			ifNull(rm.game_start_timestamp, 0) AS game_start_timestamp,
 			ifNull(rm.duration_seconds, 0) AS duration_seconds,
-			now() AS compiled_at
+			? AS compiled_at
 		FROM participants AS p FINAL
 		LEFT JOIN raw_matches AS rm FINAL
 			ON rm.match_id = p.match_id
 			AND rm.platform = p.platform
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
-			AND p.match_id != ''`, queueID); err != nil {
+			AND p.match_id != ''`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if _, err := r.db.ExecContext(ctx, `
@@ -438,7 +421,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			toUInt64(sum(kills)) AS kills,
 			toUInt64(sum(deaths)) AS deaths,
 			toUInt64(sum(assists)) AS assists,
-			now() AS compiled_at
+			? AS compiled_at
 		FROM participants FINAL
 		WHERE queue_id = ?
 			AND puuid != ''
@@ -454,7 +437,10 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			core2_signature,
 			core3_signature,
 			rune_signature,
-			spell_signature`, queueID); err != nil {
+			spell_signature`, compiledAt, queueID); err != nil {
+		return SummonerProfileRefreshResult{}, err
+	}
+	if err := r.cleanupOldSummonerProfileSummaries(ctx, queueID, compiledAt); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	result := SummonerProfileRefreshResult{}
@@ -477,6 +463,44 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	return result, nil
+}
+
+func (r *Repository) cleanupOldSummonerProfileSummaries(ctx context.Context, queueID uint16, compiledAt time.Time) error {
+	statements := []struct {
+		query string
+		args  []any
+	}{
+		{
+			query: `ALTER TABLE summoner_identity_summary DELETE WHERE compiled_at < ? SETTINGS mutations_sync = 2`,
+			args:  []any{compiledAt},
+		},
+		{
+			query: `ALTER TABLE summoner_profile_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+			args:  []any{queueID, compiledAt},
+		},
+		{
+			query: `ALTER TABLE summoner_champion_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+			args:  []any{queueID, compiledAt},
+		},
+		{
+			query: `ALTER TABLE summoner_champion_role_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+			args:  []any{queueID, compiledAt},
+		},
+		{
+			query: `ALTER TABLE summoner_recent_match_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+			args:  []any{queueID, compiledAt},
+		},
+		{
+			query: `ALTER TABLE summoner_build_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+			args:  []any{queueID, compiledAt},
+		},
+	}
+	for _, statement := range statements {
+		if _, err := r.db.ExecContext(ctx, statement.query, statement.args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) SummonerTopChampions(ctx context.Context, platform, puuid string, queueID uint16, limit int) ([]ChampionPerformance, error) {

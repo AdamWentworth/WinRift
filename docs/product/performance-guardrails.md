@@ -22,7 +22,7 @@ The champion guide summary read model uses `team_kill_summary` for true kill par
 
 Build advice and champion item paths use `build_signature_analytics` for current/recent patches and `patch_build_metrics` for archived patches. Keep this table refreshed with the champion-guide lane so first-load champion pages do not scan `participant_matchups` just to assemble common build signatures.
 
-Champion guide refreshes should stage new rows before deleting older compiled rows. The current lane inserts a fresh snapshot into the ReplacingMergeTree read models, then removes rows with an older `compiled_at`. Public reads keep seeing the previous snapshot during the rebuild, and a failed refresh leaves the old snapshot intact instead of briefly exposing empty tables.
+Summary refreshes should stage new rows before deleting older compiled rows. Champion-guide, summoner-profile, item-slot/loadout, and win-condition lanes now insert a fresh snapshot into ReplacingMergeTree read models, then remove rows with an older `compiled_at`. Public reads keep seeing the previous snapshot during the rebuild, and a failed refresh leaves the old snapshot intact instead of briefly exposing empty tables.
 
 After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. The prewarm limit should be broad enough to cover normal champion browsing, not only the five highest-played champions per role. Prewarming covers the retained patch window so the UI's default previous-patch view can stay fast while the current patch is still thin.
 
@@ -161,6 +161,6 @@ Important takeaways:
 - Warm champion-page requests were in the low tens of milliseconds.
 - Cold champion-page and matchup bundle requests still reached 1.5-5 seconds.
 - Summoner profile cold reads reached 2.8-13.1 seconds.
-- Summoner profile, item-slot/loadout, and win-condition refreshes still need staged insert-then-cleanup semantics so public reads do not briefly see empty summary tables.
+- Follow-up work added summoner profile/leaderboard response caching and staged insert-then-cleanup refreshes for summoner-profile, item-slot/loadout, and win-condition summaries.
 
-Until staged refreshes and profile response caching are done, keep performance investigations focused on cold misses and refresh windows rather than adding more frontend loading states.
+Keep performance investigations focused on cold misses, cache-key coverage, and refresh windows rather than adding more frontend loading states.

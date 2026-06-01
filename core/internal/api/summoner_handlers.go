@@ -1,12 +1,17 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"winrift/core/internal/analytics"
 	"winrift/core/internal/clickhouse"
 )
+
+const summonerProfileResponseCacheTTL = 5 * time.Minute
+const summonerLeaderboardResponseCacheTTL = 2 * time.Minute
 
 func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -24,6 +29,11 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	cacheKey := "summoner-profile:" + alias.Platform + ":" + strings.ToLower(alias.GameName) + ":" + strings.ToLower(alias.TagLine) + ":" + alias.PUUID
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
 		return
 	}
 	queueID := uint16(analytics.RankedSoloQueueID)
@@ -71,7 +81,7 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, response)
+	s.writeCachedJSON(w, http.StatusOK, cacheKey, summonerProfileResponseCacheTTL, response)
 }
 
 func (s Server) summonerLeaderboard(w http.ResponseWriter, r *http.Request) {
@@ -84,12 +94,17 @@ func (s Server) summonerLeaderboard(w http.ResponseWriter, r *http.Request) {
 	if limit > 100 {
 		limit = 100
 	}
+	cacheKey := fmt.Sprintf("summoner-leaderboard:%s:%d", platform, limit)
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
 	rows, err := s.repo.SummonerRankLeaderboard(r.Context(), platform, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	s.writeCachedJSON(w, http.StatusOK, cacheKey, summonerLeaderboardResponseCacheTTL, map[string]any{
 		"platform":  platform,
 		"queueType": "RANKED_SOLO_5x5",
 		"results":   summonerLeaderboardRowsResponse(rows),

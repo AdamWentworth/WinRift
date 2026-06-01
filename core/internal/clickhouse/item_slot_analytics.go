@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"winrift/core/internal/analytics"
 )
@@ -652,22 +653,14 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 		if len(completionItemIDs) == 0 && len(itemContext.StartingItemIDs) == 0 {
 			continue
 		}
-		if _, err := r.db.ExecContext(
-			ctx,
-			`ALTER TABLE item_slot_analytics DELETE WHERE patch = ? AND queue_id = ? AND item_context = ? SETTINGS mutations_sync = 2`,
-			patch,
-			queueID,
-			key,
-		); err != nil {
-			return err
-		}
+		compiledAt := time.Now().UTC().Truncate(time.Second)
 		itemList := uint32ListSQL(completionItemIDs)
 		startingItemList := uint32ListSQL(itemContext.StartingItemIDs)
 		_, err := r.db.ExecContext(
 			ctx,
 			fmt.Sprintf(`
 				INSERT INTO item_slot_analytics
-				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games)
+				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games, compiled_at)
 				WITH raw_starting_items AS
 				(
 					SELECT
@@ -791,7 +784,8 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					item_slot,
 					item_id,
 					toUInt64(sum(win)) AS wins,
-					toUInt64(count()) AS games
+					toUInt64(count()) AS games,
+					? AS compiled_at
 				FROM raw_item_slots
 				WHERE item_slot <= 6
 				GROUP BY
@@ -818,7 +812,8 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					item_slot,
 					item_id,
 					toUInt64(sum(win)) AS wins,
-					toUInt64(count()) AS games
+					toUInt64(count()) AS games,
+					? AS compiled_at
 				FROM raw_starting_items
 				GROUP BY
 					patch,
@@ -838,8 +833,13 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 			patch,
 			queueID,
 			key,
+			compiledAt,
+			compiledAt,
 		)
 		if err != nil {
+			return err
+		}
+		if err := r.cleanupOldItemSlotAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
 			return err
 		}
 	}
@@ -859,15 +859,7 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 		if len(context.OpeningItemCosts) == 0 {
 			continue
 		}
-		if _, err := r.db.ExecContext(
-			ctx,
-			`ALTER TABLE starting_loadout_analytics DELETE WHERE patch = ? AND queue_id = ? AND item_context = ? SETTINGS mutations_sync = 2`,
-			patch,
-			queueID,
-			key,
-		); err != nil {
-			return err
-		}
+		compiledAt := time.Now().UTC().Truncate(time.Second)
 		openingItemIDs := uint32MapKeysSorted(context.OpeningItemCosts)
 		itemList := uint32ListSQL(openingItemIDs)
 		itemCostExpr := itemCostExpressionSQL("tie.item_id", context.OpeningItemCosts)
@@ -875,7 +867,7 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 			ctx,
 			fmt.Sprintf(`
 				INSERT INTO starting_loadout_analytics
-				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games)
+				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games, compiled_at)
 				WITH raw_opening_item_events AS
 				(
 					SELECT
@@ -966,7 +958,8 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 					rank_bucket,
 					arrayStringConcat(arrayMap(item -> toString(item), item_ids), '-') AS item_signature,
 					toUInt64(sum(win)) AS wins,
-					toUInt64(count()) AS games
+					toUInt64(count()) AS games,
+					? AS compiled_at
 				FROM opening_purchases
 				GROUP BY
 					patch,
@@ -982,12 +975,40 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 			openingPurchaseBurstWindowMS,
 			openingPurchaseGoldCap,
 			key,
+			compiledAt,
 		)
 		if err != nil {
 			return err
 		}
+		if err := r.cleanupOldStartingLoadoutAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func (r *Repository) cleanupOldItemSlotAnalytics(ctx context.Context, patch string, queueID uint16, itemContext string, compiledAt time.Time) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`ALTER TABLE item_slot_analytics DELETE WHERE patch = ? AND queue_id = ? AND item_context = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+		patch,
+		queueID,
+		normalizedItemContext(itemContext),
+		compiledAt,
+	)
+	return err
+}
+
+func (r *Repository) cleanupOldStartingLoadoutAnalytics(ctx context.Context, patch string, queueID uint16, itemContext string, compiledAt time.Time) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`ALTER TABLE starting_loadout_analytics DELETE WHERE patch = ? AND queue_id = ? AND item_context = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
+		patch,
+		queueID,
+		normalizedItemContext(itemContext),
+		compiledAt,
+	)
+	return err
 }
 
 func uint32ListSQL(values []uint32) string {

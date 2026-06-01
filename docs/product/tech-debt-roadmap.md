@@ -313,7 +313,7 @@ This can start as a ClickHouse table or a small runtime-state JSON file. It woul
 
 Status: first pass complete. The worker now writes `WORKER_REFRESH_STATUS_PATH` with latest start/success/failure timestamps, duration, row/context counts where available, and last error per refresh lane.
 
-Follow-up audit: `docs/product/production-performance-audit-2026-05-31.md` records the first private-server refresh/timing pass. The deployed worker is healthy and warm analytics reads are fast, but the audit confirms three remaining reliability smells: summoner-profile, item-slot/loadout, and win-condition refreshes should adopt the same staged insert-then-cleanup pattern as champion-guide refreshes.
+Follow-up audit: `docs/product/production-performance-audit-2026-05-31.md` records the first private-server refresh/timing pass. The deployed worker is healthy and warm analytics reads are fast. The first follow-up pass added short in-memory response caching for summoner profile/leaderboard reads and moved summoner-profile, item-slot/loadout, and win-condition refreshes to staged insert-then-cleanup semantics.
 
 ## Priority 7: Product/Data Debt
 
@@ -333,7 +333,7 @@ Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
 
 Outstanding: keep watching exact matchup cold timings as traffic grows. If the bounded prewarm cap is too small, raise it before adding another read model.
 
-Production timing note: warm champion-page bundles are now fast, but the 2026-05-31 audit still saw several cold or cache-miss champion pages take 1.5-5 seconds. Before adding another bundle table, inspect why the prewarm lane skips most candidates and make sure frontend query params match the canonical prewarm cache keys.
+Production timing note: warm champion-page bundles are now fast, but the 2026-05-31 audit still saw several cold or cache-miss champion pages take 1.5-5 seconds. The first follow-up inspection found that most prewarm `skipped` rows were actually unexpired persistent-cache hits, not failed prewarms. Worker logs and refresh status now expose cached counts separately so future audits can distinguish healthy cache reuse from real misses.
 
 ### Patch-Scope UX
 
@@ -409,11 +409,13 @@ Completed:
 - Split the largest ClickHouse repository/query files by read-model domain.
 - Add champion role-rate summaries for role discovery and default-role resolution.
 - Change champion guide read-model refreshes to insert fresh rows before deleting older compiled rows, avoiding transient empty guide tables during rebuilds.
+- Add short response caching for summoner leaderboard/profile reads.
+- Apply staged insert-then-cleanup refreshes to summoner-profile, item-slot/loadout, and win-condition lanes.
+- Clarify champion-page prewarm status by reporting cached persistent bundle hits separately from newly stored bundles.
 
 Next:
 
-1. Add short response caching for summoner leaderboard/profile reads, then rerun the production perf smoke.
-2. Apply staged insert-then-cleanup refreshes to summoner-profile, item-slot/loadout, and win-condition lanes.
-3. Inspect champion-page prewarm coverage and fix skipped common page bundles before creating another bundle table.
-4. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-5. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+1. Deploy the cache/staged-refresh changes, then rerun production perf smoke with warmups and with `WINRIFT_PERF_WARMUPS=0`.
+2. Watch the next worker refresh status for `prewarmCached`/`prewarmMatchupCached` versus true stores/errors.
+3. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+4. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
