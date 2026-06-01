@@ -135,3 +135,19 @@ First post-change production read for patch `16.10`:
 The reverse rows show the matching unfavorable side. That is useful: it means the endpoint is finding directional pairings rather than one-sided accounting artifacts.
 
 Patch `16.11` had only `4,793` matches at this check, and no returned primary matchup cleared a 1-point Wilson signal. That is the right behavior. The model should avoid pretending a new patch is stable before the corpus catches up.
+
+## Follow-Up: Champion-Pair Residuals
+
+The validation endpoint now also checks whether high-signal primary matchup rows are being carried by repeated teammate or opponent champion pairs.
+
+First production read for patch `16.10`:
+
+- At the default `synergyMinGames=25`, no champion-pair residual rows met the threshold inside the returned high-signal primary matchups.
+- That is mildly reassuring, but not conclusive. It means no obvious repeated pair artifact is visible at that sample threshold.
+- At an exploratory `synergyMinGames=5`, tiny noisy rows do appear, including `5/8` and `91/901` in the `TeamFight B+` vs `Siege B+` directional pair. These are useful for proving the diagnostic works, but they should not drive scoring changes.
+
+Practical read:
+
+- Keep the default threshold conservative.
+- Treat low-threshold residuals as leads for later review only.
+- Once the retained patch corpus is larger, rerun this with `synergyMinGames=25`, then `50`, before making role or synergy score changes.
