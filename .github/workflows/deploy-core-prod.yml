@@ -392,14 +392,25 @@ jobs:
           from pathlib import Path
           data = json.loads(Path(sys.argv[1]).read_text())
           print("Refresh status file: readable")
-          for name in sorted(data):
-              lane = data[name]
+          refreshes = data.get("refreshes", [])
+          if not isinstance(refreshes, list):
+              refreshes = [lane for lane in data.values() if isinstance(lane, dict)]
+          def clean_time(value):
+              value = str(value or "")
+              if not value or value.startswith("0001-01-01"):
+                  return ""
+              return value
+          for lane in refreshes:
               if not isinstance(lane, dict):
                   continue
-              success = lane.get("lastSuccessAt") or lane.get("last_success_at") or "never"
-              failure = lane.get("lastFailureAt") or lane.get("last_failure_at") or ""
+              name = lane.get("name") or "unknown"
+              success = clean_time(lane.get("lastSucceededAt") or lane.get("last_success_at")) or "never"
+              failure = clean_time(lane.get("lastFailedAt") or lane.get("last_failure_at"))
+              duration = lane.get("lastDurationMs") or lane.get("last_duration_ms") or ""
               error = lane.get("lastError") or lane.get("last_error") or ""
               detail = f"  {name}: success={success}"
+              if duration:
+                  detail += f" duration_ms={duration}"
               if failure:
                   detail += f" failure={failure}"
               if error:
