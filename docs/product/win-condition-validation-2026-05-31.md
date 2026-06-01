@@ -122,3 +122,16 @@ Practical read:
 - Use score deltas to audit whether the five additive scores have broad predictive value.
 - Use primary matchup signal to discover strategy-pair edges worth explaining in the live UI.
 - Do not change champion scores from one row alone; use high-signal rows as leads for role, synergy, and timeline checks.
+
+First post-change production read for patch `16.10`:
+
+| Primary Strategy | Opponent Primary | Games | Win Rate | Wilson Range | Signal |
+| --- | --- | ---: | ---: | ---: | ---: |
+| TeamFight `A-` | TeamFight `B+` | `138` | `63.04%` | `54.74-70.64%` | `+4.74` |
+| Pick `B` | Pick `B-` | `300` | `60.00%` | `54.36-65.38%` | `+4.36` |
+| TeamFight `B+` | Siege `B+` | `278` | `58.99%` | `53.13-64.61%` | `+3.13` |
+| SplitPush `B-` | Siege `B` | `135` | `61.48%` | `53.06-69.26%` | `+3.06` |
+
+The reverse rows show the matching unfavorable side. That is useful: it means the endpoint is finding directional pairings rather than one-sided accounting artifacts.
+
+Patch `16.11` had only `4,793` matches at this check, and no returned primary matchup cleared a 1-point Wilson signal. That is the right behavior. The model should avoid pretending a new patch is stable before the corpus catches up.
