@@ -156,6 +156,7 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 8. Recreates the monitor.
 9. Starts the worker if `start_worker=true`.
 10. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
+11. Runs post-deploy smoke checks for container state, `/api/health`, leaderboard/profile cache-hit behavior, and worker refresh-status readability when the status file exists.
 
 Use `image_ref` only when you intentionally need a pinned image. It accepts `latest`, `sha-<full-commit>`, or a full image reference.
 

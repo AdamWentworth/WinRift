@@ -30,6 +30,8 @@ Status: first pass implemented as `ops/perf-smoke.sh` plus the manual `perf-smok
 
 Browser route timing is also in place through `apps/web` Playwright checks and the manual `route-perf` workflow. This covers page-level ready time and API request counts, which the API-only smoke cannot see.
 
+Post-deploy smoke is now also part of `deploy-core-prod`: after recreation it checks API/monitor/worker container state, `/api/health`, leaderboard/profile response-cache hits, and worker refresh-status JSON readability when the status file exists.
+
 Useful first checks:
 
 - deployed `/api/health`
@@ -412,10 +414,12 @@ Completed:
 - Add short response caching for summoner leaderboard/profile reads.
 - Apply staged insert-then-cleanup refreshes to summoner-profile, item-slot/loadout, and win-condition lanes.
 - Clarify champion-page prewarm status by reporting cached persistent bundle hits separately from newly stored bundles.
+- Add post-deploy smoke checks to `deploy-core-prod`.
 
 Next:
 
-1. Deploy the cache/staged-refresh changes, then rerun production perf smoke with warmups and with `WINRIFT_PERF_WARMUPS=0`.
-2. Watch the next worker refresh status for `prewarmCached`/`prewarmMatchupCached` versus true stores/errors.
-3. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-4. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+1. Deploy the post-deploy smoke workflow once and confirm the smoke summary is useful in GitHub Actions output.
+2. Rerun production perf smoke with warmups and with `WINRIFT_PERF_WARMUPS=0`.
+3. Watch the next worker refresh status for `prewarmCached`/`prewarmMatchupCached` versus true stores/errors.
+4. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+5. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.

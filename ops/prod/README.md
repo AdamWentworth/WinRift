@@ -83,6 +83,8 @@ This lets the server keep collecting and serving data while the laptop only runs
 
 Core production deploys use the latest published core image by default. Normal flow is: push to GitHub, wait for Core CI to publish `ghcr.io/adamwentworth/winrift-core:latest`, then run `deploy-core-prod` with `image_ref` left blank. Pinned `sha-<commit>` images still exist for audit/rollback work, but day-to-day deploys should follow `latest`.
 
+After the API, monitor, and optional worker are recreated, the deploy workflow runs a post-deploy smoke pass. It verifies container state, `/api/health`, leaderboard/profile cache-hit behavior, and the worker refresh-status JSON when present. A deploy should fail loudly before those issues reach the browser.
+
 ```mermaid
 flowchart LR
   Push[Push to GitHub] --> CI[Core CI]

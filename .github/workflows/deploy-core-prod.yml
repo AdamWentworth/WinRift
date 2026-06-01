@@ -231,3 +231,184 @@ jobs:
 
           rm -f "${HEALTH_BODY_FILE}"
           echo "Deployment succeeded."
+
+      - name: Post-Deploy Smoke Checks
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DEPLOY_ROOT="${{ inputs.deploy_root }}"
+          ENV_FILE="${DEPLOY_ROOT}/.env"
+          HEALTH_URL="${{ inputs.api_health_url }}"
+          START_WORKER="${{ inputs.start_worker }}"
+          API_BASE="${HEALTH_URL%/api/health}"
+          if [[ "${API_BASE}" == "${HEALTH_URL}" ]]; then
+            API_BASE="http://127.0.0.1:8000"
+          fi
+
+          env_value() {
+            grep -E "^$1=" "${ENV_FILE}" | tail -1 | cut -d= -f2- || true
+          }
+
+          assert_container_running() {
+            local container_name="$1"
+            local label="$2"
+            local status=""
+            status="$(docker inspect --format '{{.State.Status}}' "${container_name}" 2>/dev/null || true)"
+            if [[ "${status}" != "running" ]]; then
+              echo "${label} is not running. Status: ${status}" >&2
+              docker logs --tail 120 "${container_name}" || true
+              exit 1
+            fi
+            echo "${label}: running"
+          }
+
+          smoke_json_endpoint() {
+            local label="$1"
+            local url="$2"
+            local body_file="/tmp/winrift_${label}_body.json"
+            local header_file="/tmp/winrift_${label}_headers.txt"
+            local status=""
+
+            status="$(curl -sS -o "${body_file}" -D "${header_file}" -w '%{http_code}' "${url}" || true)"
+            if [[ "${status}" != "200" ]]; then
+              echo "${label} smoke failed with HTTP ${status}: ${url}" >&2
+              cat "${body_file}" >&2 || true
+              exit 1
+            fi
+
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -m json.tool "${body_file}" >/dev/null
+            fi
+
+            echo "${label}: HTTP 200"
+          }
+
+          smoke_cached_endpoint() {
+            local label="$1"
+            local url="$2"
+            local first_body="/tmp/winrift_${label}_first_body.json"
+            local first_headers="/tmp/winrift_${label}_first_headers.txt"
+            local second_body="/tmp/winrift_${label}_second_body.json"
+            local second_headers="/tmp/winrift_${label}_second_headers.txt"
+            local status=""
+
+            status="$(curl -sS -o "${first_body}" -D "${first_headers}" -w '%{http_code}' "${url}" || true)"
+            if [[ "${status}" != "200" ]]; then
+              echo "${label} warmup failed with HTTP ${status}: ${url}" >&2
+              cat "${first_body}" >&2 || true
+              exit 1
+            fi
+
+            status="$(curl -sS -o "${second_body}" -D "${second_headers}" -w '%{http_code}' "${url}" || true)"
+            if [[ "${status}" != "200" ]]; then
+              echo "${label} cache check failed with HTTP ${status}: ${url}" >&2
+              cat "${second_body}" >&2 || true
+              exit 1
+            fi
+
+            if ! grep -qi '^x-winrift-cache:[[:space:]]*hit' "${second_headers}"; then
+              echo "${label} cache check did not return X-WinRift-Cache: hit on the second request." >&2
+              echo "Second response headers:" >&2
+              cat "${second_headers}" >&2 || true
+              exit 1
+            fi
+
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -m json.tool "${second_body}" >/dev/null
+            fi
+
+            echo "${label}: cache hit verified"
+          }
+
+          assert_container_running winrift_api API
+          assert_container_running winrift_monitor Monitor
+          if [[ "${START_WORKER}" == "true" ]]; then
+            assert_container_running winrift_worker Worker
+          else
+            echo "Worker check skipped because start_worker=false."
+          fi
+
+          smoke_json_endpoint health "${HEALTH_URL}"
+          smoke_cached_endpoint leaderboard "${API_BASE}/api/summoners/leaderboard?platform=NA1&limit=10"
+
+          if command -v python3 >/dev/null 2>&1; then
+            PROFILE_QUERY="$(
+              python3 - <<'PY'
+          import json
+          from pathlib import Path
+          body = Path("/tmp/winrift_leaderboard_second_body.json").read_text()
+          data = json.loads(body)
+          for row in data.get("results", []):
+              game_name = str(row.get("gameName", "")).strip()
+              tag_line = str(row.get("tagLine", "")).strip()
+              platform = str(row.get("platform", "")).strip()
+              if game_name and tag_line and platform:
+                  from urllib.parse import urlencode
+                  print(urlencode({"gameName": game_name, "tagLine": tag_line, "platform": platform}))
+                  break
+          PY
+            )"
+            if [[ -n "${PROFILE_QUERY}" ]]; then
+              smoke_cached_endpoint profile "${API_BASE}/api/summoner/profile?${PROFILE_QUERY}"
+            else
+              echo "Profile cache smoke skipped: leaderboard returned no usable summoner identity."
+            fi
+          else
+            echo "Profile cache smoke skipped: python3 is unavailable for safe JSON parsing."
+          fi
+
+          runtime_dir="$(env_value WINRIFT_RUNTIME_STATE_DIR)"
+          runtime_dir="${runtime_dir:-${DEPLOY_ROOT}/runtime}"
+          worker_refresh_status_path="$(env_value WORKER_REFRESH_STATUS_PATH)"
+          worker_refresh_status_path="${worker_refresh_status_path:-/run/winrift/worker-refresh-status.json}"
+          if [[ "${worker_refresh_status_path}" == /run/winrift/* ]]; then
+            refresh_status_file="${runtime_dir}/${worker_refresh_status_path#/run/winrift/}"
+          else
+            refresh_status_file="${worker_refresh_status_path}"
+          fi
+
+          readable_refresh_status_file=""
+          if [[ -r "${refresh_status_file}" ]]; then
+            readable_refresh_status_file="${refresh_status_file}"
+          elif [[ -f "${refresh_status_file}" ]]; then
+            echo "Refresh status file exists but is not host-readable: ${refresh_status_file}"
+            if docker exec winrift_worker sh -c 'test -r "$1" && cat "$1"' sh "${worker_refresh_status_path}" \
+              > /tmp/winrift_worker_refresh_status.json 2>/dev/null; then
+              readable_refresh_status_file="/tmp/winrift_worker_refresh_status.json"
+            else
+              echo "Refresh status file could not be read through the worker container either."
+            fi
+          else
+            echo "Refresh status file not found yet: ${refresh_status_file}"
+          fi
+
+          if [[ -n "${readable_refresh_status_file}" ]]; then
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -m json.tool "${readable_refresh_status_file}" >/dev/null
+              python3 - "${readable_refresh_status_file}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          data = json.loads(Path(sys.argv[1]).read_text())
+          print("Refresh status file: readable")
+          for name in sorted(data):
+              lane = data[name]
+              if not isinstance(lane, dict):
+                  continue
+              success = lane.get("lastSuccessAt") or lane.get("last_success_at") or "never"
+              failure = lane.get("lastFailureAt") or lane.get("last_failure_at") or ""
+              error = lane.get("lastError") or lane.get("last_error") or ""
+              detail = f"  {name}: success={success}"
+              if failure:
+                  detail += f" failure={failure}"
+              if error:
+                  detail += f" error={error}"
+              print(detail)
+          PY
+            else
+              echo "Refresh status file exists and was read from: ${readable_refresh_status_file}"
+            fi
+          fi
+
+          echo "Deployment smoke checks passed."
