@@ -24,7 +24,7 @@ Status: items 1-10 and the first ops/documentation pass have been addressed. The
 ## Analytics
 
 10. Keep moving high-traffic frontend reads onto summary/read-model tables instead of computing repeated aggregates on page load. Current pass complete: summoner profile summary tables now provide one compact row per summoner, compact champion-comfort rows, role-aware champion-comfort rows, and a compact summoner identity summary for leaderboard names/icons. See `docs/product/performance-guardrails.md`.
-11. Continue validating win-condition confidence, rating thresholds, timing buckets, and synergy effects against the stored match corpus.
+11. Continue validating win-condition confidence, rating thresholds, timing buckets, and synergy effects against the stored match corpus. Current pass complete: validation now ranks primary strategy matchups by Wilson-backed directional signal, exposes interval/edge fields, and documents that same-axis score deltas are a broad sanity check rather than the main proof of the model.
 12. Revisit build-matchup filtering as the dataset grows: champion-vs-champion first, then optional role, rank, region, and patch filters once sample size can support them. Current pass complete for MVP semantics: matchup cards no longer borrow champion-wide rows, champion-wide baseline lives in its own card, and displayed slot reads suppress impossible duplicate-boot builds.
 
 ## New Follow-Ups

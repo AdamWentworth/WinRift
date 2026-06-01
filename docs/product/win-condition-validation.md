@@ -31,6 +31,15 @@ It returns:
 - `weakSignalWarnings`: low-rated strategy rows that still show high winrate.
 - `findings`: generated plain-English notes from the report.
 
+`primaryMatchups` are sorted by directional Wilson signal, then raw edge and sample size. Each row includes:
+
+- `edge`: raw winrate minus 50.
+- `wilsonLow` / `wilsonHigh`: 95% Wilson interval.
+- `direction`: `favorable`, `unfavorable`, or `mixed`.
+- `signal`: how far the Wilson interval clears 50%. A `2.4` signal means the confidence interval is at least 2.4 percentage points away from even.
+
+This keeps the report from overvaluing one noisy 60% row or one giant 50% row. If a primary matchup has no signal, it may still be worth watching, but it should not drive scoring changes yet.
+
 ## How To Read It
 
 ### Rating Outcomes
@@ -70,6 +79,17 @@ It is useful for asking questions like:
 - Does `Pick B+` reliably beat `Siege B`?
 - Does `Control A` struggle into `SplitPush B+`?
 - Are some pairings mostly sample noise?
+
+This is currently the most promising validation layer because it tests the actual legacy premise: a composition identity into an opposing composition identity. Same-axis score advantage is a rough additive-model test; primary matchups are the real strategy-pair test.
+
+Rows should be interpreted by `signal`, not only raw winrate:
+
+```text
+58% WR, 40 games, signal 0     = interesting but noisy
+53% WR, 700 games, signal 1.5  = modest but more trustworthy
+47% WR, 700 games, signal 1.5  = modest unfavorable signal
+50% WR, 2,000 games, signal 0  = stable even matchup
+```
 
 ### Primary Margin
 

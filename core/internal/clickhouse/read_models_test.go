@@ -628,7 +628,8 @@ func TestQueryWinConditionValidationBuildsCorpusReport(t *testing.T) {
 			AddRow("Pick", "-3..-1", 65, 28, -2.0))
 	mock.ExpectQuery("(?s)primary_condition.*opponent_primary_condition").
 		WillReturnRows(sqlmock.NewRows([]string{"primary_condition", "primary_rating", "opponent_primary_condition", "opponent_primary_rating", "games", "wins"}).
-			AddRow("Pick", "B", "TeamFight", "C", 55, 31))
+			AddRow("Pick", "B", "TeamFight", "C", 300, 150).
+			AddRow("TeamFight", "A", "Pick", "B", 100, 70))
 	mock.ExpectQuery("(?s)primary_margin.*margin_bucket").
 		WillReturnRows(sqlmock.NewRows([]string{"margin_bucket", "games", "wins", "avg_margin"}).
 			AddRow("2-3", 90, 48, 2.4))
@@ -667,6 +668,9 @@ func TestQueryWinConditionValidationBuildsCorpusReport(t *testing.T) {
 	}
 	if len(report.ScoreDeltaOutcomes) != 2 {
 		t.Fatalf("score delta outcomes = %d; want 2", len(report.ScoreDeltaOutcomes))
+	}
+	if len(report.PrimaryMatchups) != 2 || report.PrimaryMatchups[0].Condition != "TeamFight" || report.PrimaryMatchups[0].Direction != "favorable" || report.PrimaryMatchups[0].Signal <= 0 {
+		t.Fatalf("primary matchups = %+v; want strongest Wilson signal first", report.PrimaryMatchups)
 	}
 	if len(report.WeakSignalWarnings) != 1 || report.WeakSignalWarnings[0].Condition != "SplitPush" {
 		t.Fatalf("weak warnings = %+v; want SplitPush warning", report.WeakSignalWarnings)

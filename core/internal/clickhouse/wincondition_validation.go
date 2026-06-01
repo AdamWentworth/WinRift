@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 )
@@ -65,6 +66,11 @@ type WinConditionPrimaryMatchupOutcome struct {
 	Wins              int     `json:"wins"`
 	WinRate           float64 `json:"winRate"`
 	Confidence        float64 `json:"confidence"`
+	Edge              float64 `json:"edge"`
+	WilsonLow         float64 `json:"wilsonLow"`
+	WilsonHigh        float64 `json:"wilsonHigh"`
+	Signal            float64 `json:"signal"`
+	Direction         string  `json:"direction"`
 }
 
 type WinConditionPrimaryMarginOutcome struct {
@@ -326,9 +332,8 @@ func (r *Repository) queryWinConditionPrimaryMatchupOutcomes(ctx context.Context
 		WHERE t.team_id != o.team_id
 		GROUP BY t.primary_condition, t.primary_rating, opponent_primary_condition, opponent_primary_rating
 		HAVING games >= ?
-		ORDER BY games DESC, abs((wins / games) - 0.5) DESC
-		LIMIT ?`
-	queryArgs := append(repeatArgs(args, 2), minGames, limit)
+		ORDER BY games DESC`
+	queryArgs := append(repeatArgs(args, 2), minGames)
 	rows, err := r.db.QueryContext(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("query win condition primary matchups: %w", err)
@@ -345,9 +350,38 @@ func (r *Repository) queryWinConditionPrimaryMatchupOutcomes(ctx context.Context
 		row.Wins = int(wins)
 		row.WinRate = winConditionWinRatePercent(wins, games)
 		row.Confidence = winConditionConfidencePercent(wins, games)
+		row.Edge = winConditionRoundPercent(row.WinRate - 50)
+		row.WilsonLow, row.WilsonHigh = winConditionWilsonIntervalPercent(wins, games)
+		row.Direction, row.Signal = winConditionDirectionalSignal(row.WilsonLow, row.WilsonHigh)
 		out = append(out, row)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Signal != out[j].Signal {
+			return out[i].Signal > out[j].Signal
+		}
+		leftEdge := math.Abs(out[i].Edge)
+		rightEdge := math.Abs(out[j].Edge)
+		if leftEdge != rightEdge {
+			return leftEdge > rightEdge
+		}
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		if out[i].Condition != out[j].Condition {
+			return winConditionAxisOrder(out[i].Condition) < winConditionAxisOrder(out[j].Condition)
+		}
+		if out[i].OpponentCondition != out[j].OpponentCondition {
+			return winConditionAxisOrder(out[i].OpponentCondition) < winConditionAxisOrder(out[j].OpponentCondition)
+		}
+		return winConditionRatingOrder(out[i].Rating) > winConditionRatingOrder(out[j].Rating)
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
 }
 
 func (r *Repository) queryWinConditionPrimaryMarginOutcomes(ctx context.Context, where string, args []any) ([]WinConditionPrimaryMarginOutcome, error) {
@@ -522,6 +556,41 @@ func winConditionValidationFindings(validation WinConditionValidation) []WinCond
 			Summary:  summary,
 		})
 	}
+	signaledPrimaryRows := 0
+	var strongestPrimary WinConditionPrimaryMatchupOutcome
+	for _, row := range validation.PrimaryMatchups {
+		if row.Signal < 1 {
+			continue
+		}
+		signaledPrimaryRows++
+		if strongestPrimary.Signal == 0 || row.Signal > strongestPrimary.Signal {
+			strongestPrimary = row
+		}
+	}
+	if signaledPrimaryRows > 0 {
+		findings = append(findings, WinConditionValidationFinding{
+			Severity: "supportive",
+			Topic:    "Primary strategy matchups",
+			Summary: fmt.Sprintf(
+				"%d returned primary-vs-primary rows have a Wilson interval at least 1 point away from 50%%; strongest signal is %s %s into %s %s at %.2f%% over %d games (%s, %.2f pt signal).",
+				signaledPrimaryRows,
+				strongestPrimary.Condition,
+				strongestPrimary.Rating,
+				strongestPrimary.OpponentCondition,
+				strongestPrimary.OpponentRating,
+				strongestPrimary.WinRate,
+				strongestPrimary.Games,
+				strongestPrimary.Direction,
+				strongestPrimary.Signal,
+			),
+		})
+	} else if len(validation.PrimaryMatchups) > 0 {
+		findings = append(findings, WinConditionValidationFinding{
+			Severity: "watch",
+			Topic:    "Primary strategy matchups",
+			Summary:  "No returned primary-vs-primary row has a Wilson interval at least 1 point away from 50%; keep these reads exploratory until more data or stronger segmentation produces stable edges.",
+		})
+	}
 	if len(validation.WeakSignalWarnings) > 0 {
 		findings = append(findings, WinConditionValidationFinding{
 			Severity: "watch",
@@ -633,4 +702,31 @@ func winConditionMarginBucketOrder(bucket string) int {
 
 func winConditionLowRating(rating string) bool {
 	return winConditionRatingOrder(rating) > 0 && winConditionRatingOrder(rating) <= winConditionRatingOrder("C")
+}
+
+func winConditionWilsonIntervalPercent(wins, games uint64) (float64, float64) {
+	if games == 0 {
+		return 0, 0
+	}
+	const z = 1.96
+	n := float64(games)
+	p := float64(wins) / n
+	z2 := z * z
+	denominator := 1 + z2/n
+	center := (p + z2/(2*n)) / denominator
+	margin := (z / denominator) * math.Sqrt((p*(1-p)+z2/(4*n))/n)
+	low := math.Max(0, center-margin) * 100
+	high := math.Min(1, center+margin) * 100
+	return winConditionRoundPercent(low), winConditionRoundPercent(high)
+}
+
+func winConditionDirectionalSignal(wilsonLow, wilsonHigh float64) (string, float64) {
+	switch {
+	case wilsonLow > 50:
+		return "favorable", winConditionRoundPercent(wilsonLow - 50)
+	case wilsonHigh < 50:
+		return "unfavorable", winConditionRoundPercent(50 - wilsonHigh)
+	default:
+		return "mixed", 0
+	}
 }

@@ -202,6 +202,8 @@ That report compares ratings, score deltas, primary strategy matchups, primary-m
 
 Diagnostics should be the first place to look before changing the grading scale. Validation should be the first place to look before claiming the model has predictive signal.
 
+The validation report now treats primary strategy matchups as the more actionable layer. Those rows include a Wilson interval, raw edge from 50%, direction, and directional signal. This avoids mistaking a large but even row for an insight, while also avoiding overconfidence in a tiny high-winrate row.
+
 ## Building Block 6: Primary And Alternative Conditions
 
 The primary condition is the highest-rated axis. Alternative conditions are the other axes.

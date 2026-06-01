@@ -104,3 +104,21 @@ Near-term refinement should focus on:
 - using timeline evidence to confirm whether teams actually played through a strategy.
 
 The important positive result is that we now have a way to falsify and tune the model. That is more valuable than pretending the first pass is already right.
+
+## Follow-Up: Primary Matchup Signal
+
+After this snapshot, the validation endpoint was tightened so `primaryMatchups` are ranked by Wilson-backed directional signal instead of mostly by sample size.
+
+That matters because the broad additive checks above are intentionally blunt. They ask whether a higher score on one axis beats a lower enemy score on the same axis. The more important legacy question is narrower:
+
+```text
+Does this team's primary strategy reliably perform into that team's primary strategy?
+```
+
+For that reason, the next win-condition tuning pass should start with high-signal primary matchup rows, not global score-delta rows. A primary matchup with a Wilson interval clearing 50% is better evidence than a same-axis score bucket hovering around even.
+
+Practical read:
+
+- Use score deltas to audit whether the five additive scores have broad predictive value.
+- Use primary matchup signal to discover strategy-pair edges worth explaining in the live UI.
+- Do not change champion scores from one row alone; use high-signal rows as leads for role, synergy, and timeline checks.
