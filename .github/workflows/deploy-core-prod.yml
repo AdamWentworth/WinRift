@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       image_ref:
-        description: "Image to deploy: full ref, or just tag (latest / sha-<commit>). Empty defaults to latest."
+        description: "Optional override. Leave blank for normal deploys; production pulls ghcr.io/adamwentworth/winrift-core:latest."
         required: false
-        default: "latest"
+        default: ""
         type: string
       deploy_root:
         description: "Absolute path to the prod deploy state root"

@@ -144,12 +144,12 @@ Core CI is [ci-core.yml](../.github/workflows/ci-core.yml):
 4. Run Trivy scans and upload an SBOM.
 5. On `main`/`master`, push `ghcr.io/adamwentworth/winrift-core:sha-<commit>` and `ghcr.io/adamwentworth/winrift-core:latest` through GitHub Container Registry.
 
-Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml):
+Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml). The normal path is intentionally simple: leave `image_ref` blank and the server pulls `ghcr.io/adamwentworth/winrift-core:latest`, matching the home-server service pattern used in PokeGoNexus. CI still publishes `sha-<commit>` tags for auditability and emergency pinned deploys, but they are not the day-to-day deployment path.
 
 1. Runs manually through `workflow_dispatch`.
 2. Checks `/srv/winrift/.env`.
 3. Copies the current ClickHouse schema to `/srv/winrift/schema.sql`.
-4. Pulls the requested image.
+4. Pulls the latest core image, unless `image_ref` is explicitly overridden.
 5. Stops the worker.
 6. Starts ClickHouse.
 7. Recreates the API and waits for `/api/health`.
@@ -157,7 +157,7 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 9. Starts the worker if `start_worker=true`.
 10. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
 
-The deploy input `image_ref` accepts `latest`, `sha-<commit>`, or a full image reference.
+Use `image_ref` only when you intentionally need a pinned image. It accepts `latest`, `sha-<full-commit>`, or a full image reference.
 
 For the one-time laptop database bootstrap, use [ops/prod/data-migration.md](../ops/prod/data-migration.md). The important rule is to deploy with `start_worker=false`, verify restored match counts, and only then start the worker.
 
