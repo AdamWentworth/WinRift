@@ -373,8 +373,8 @@ jobs:
             readable_refresh_status_file="${refresh_status_file}"
           elif [[ -f "${refresh_status_file}" ]]; then
             echo "Refresh status file exists but is not host-readable: ${refresh_status_file}"
-            if docker exec winrift_worker sh -c 'test -r "$1" && cat "$1"' sh "${worker_refresh_status_path}" \
-              > /tmp/winrift_worker_refresh_status.json 2>/dev/null; then
+            if docker cp "winrift_worker:${worker_refresh_status_path}" - 2>/dev/null \
+              | tar -xO > /tmp/winrift_worker_refresh_status.json; then
               readable_refresh_status_file="/tmp/winrift_worker_refresh_status.json"
             else
               echo "Refresh status file could not be read through the worker container either."
