@@ -17,6 +17,10 @@ Query parameters:
 - `minGames`: minimum sample threshold for primary matchup rows and generated findings. Defaults to `50`.
 - `weakSignalWinRate`: winrate threshold for warning about low-rated high-winrate rows. Defaults to `55`.
 - `limit`: maximum primary matchup rows and weak-signal warnings. Defaults to `25`.
+- `synergyMinGames`: minimum games for champion-pair residual rows. Defaults to `25`.
+- `synergyLimit`: maximum champion-pair residual rows. Defaults to `25`.
+- `synergyParentLimit`: number of high-signal primary matchup rows to inspect for residuals. Defaults to `6`.
+- `synergyMinParentSignal`: minimum primary matchup signal required before checking pair residuals. Defaults to `1`.
 
 ## What It Tests
 
@@ -28,6 +32,7 @@ It returns:
 - `scoreDeltaOutcomes`: winrate when a team has more or fewer points than the enemy on the same axis.
 - `primaryMatchups`: winrate for primary strategy into enemy primary strategy.
 - `primaryMarginOutcomes`: winrate by how sharply a team's top strategy beats its second-best strategy.
+- `synergyResiduals`: champion-pair rows that overperform or underperform the parent primary matchup bucket.
 - `weakSignalWarnings`: low-rated strategy rows that still show high winrate.
 - `findings`: generated plain-English notes from the report.
 
@@ -89,6 +94,46 @@ Rows should be interpreted by `signal`, not only raw winrate:
 53% WR, 700 games, signal 1.5  = modest but more trustworthy
 47% WR, 700 games, signal 1.5  = modest unfavorable signal
 50% WR, 2,000 games, signal 0  = stable even matchup
+```
+
+### Champion-Pair Residuals
+
+This is the first pass at the synergy question.
+
+For the strongest primary-vs-primary matchup rows, the backend inspects:
+
+- teammate champion pairs on the team being evaluated,
+- opponent champion pairs on the enemy team.
+
+Each row compares the pair's winrate against the parent strategy matchup winrate, not against global 50%.
+
+Example:
+
+```text
+Parent: TeamFight A- into TeamFight B+ wins 63%
+Pair: champion 111 + 157 wins 75% in that same parent bucket
+Residual: +12 pts
+```
+
+That does not immediately prove champion synergy. It says this pair is carrying, amplifying, or distorting the parent strategy signal enough to deserve inspection.
+
+Fields:
+
+- `pairType`: `teammate` or `opponent`.
+- `championId1` / `championId2`: sorted champion ids for the pair.
+- `parentWinRate`: winrate of the parent primary matchup row.
+- `residual`: pair winrate minus parent winrate.
+- `direction`: `overperforming`, `underperforming`, or `mixed`.
+- `signal`: how far the pair's Wilson interval clears the parent winrate.
+
+For `opponent` pair rows, winrate and direction are still from the selected team's perspective. An overperforming opponent-pair row means the selected strategy won more often when that enemy pair appeared; it does not mean the enemy pair itself performed well.
+
+Use this report to decide whether a win-condition edge is broad or cluster-driven:
+
+```text
+Many small mixed residuals        = strategy signal is probably broad
+One huge teammate pair residual   = possible synergy or champion-strength artifact
+One huge opponent pair residual   = enemy pair may counter or inflate the read
 ```
 
 ### Primary Margin

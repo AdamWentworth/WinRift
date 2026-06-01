@@ -225,14 +225,22 @@ func (s Server) analyticsWinConditionValidation(w http.ResponseWriter, r *http.R
 	minGames := queryInt(query.Get("minGames"), 50)
 	weakSignalWinRate := queryFloat(query.Get("weakSignalWinRate"), 55)
 	limit := queryInt(query.Get("limit"), 25)
+	synergyMinGames := queryInt(query.Get("synergyMinGames"), 25)
+	synergyLimit := queryInt(query.Get("synergyLimit"), 25)
+	synergyParentLimit := queryInt(query.Get("synergyParentLimit"), 6)
+	synergyMinParentSignal := queryFloat(query.Get("synergyMinParentSignal"), 1)
 	validation, err := s.repo.QueryWinConditionValidation(r.Context(), clickhouse.WinConditionValidationFilters{
-		QueueID:           queueID,
-		Patch:             strings.TrimSpace(query.Get("patch")),
-		Platform:          strings.ToUpper(strings.TrimSpace(query.Get("platform"))),
-		RankBucket:        strings.ToUpper(strings.TrimSpace(query.Get("rankBucket"))),
-		MinGames:          minGames,
-		WeakSignalWinRate: weakSignalWinRate,
-		Limit:             limit,
+		QueueID:                queueID,
+		Patch:                  strings.TrimSpace(query.Get("patch")),
+		Platform:               strings.ToUpper(strings.TrimSpace(query.Get("platform"))),
+		RankBucket:             strings.ToUpper(strings.TrimSpace(query.Get("rankBucket"))),
+		MinGames:               minGames,
+		WeakSignalWinRate:      weakSignalWinRate,
+		Limit:                  limit,
+		SynergyMinGames:        synergyMinGames,
+		SynergyLimit:           synergyLimit,
+		SynergyParentLimit:     synergyParentLimit,
+		SynergyMinParentSignal: synergyMinParentSignal,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

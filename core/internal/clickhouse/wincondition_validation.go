@@ -9,30 +9,37 @@ import (
 )
 
 type WinConditionValidationFilters struct {
-	QueueID           uint16
-	Patch             string
-	Platform          string
-	RankBucket        string
-	MinGames          int
-	WeakSignalWinRate float64
-	Limit             int
+	QueueID                uint16
+	Patch                  string
+	Platform               string
+	RankBucket             string
+	MinGames               int
+	WeakSignalWinRate      float64
+	Limit                  int
+	SynergyMinGames        int
+	SynergyLimit           int
+	SynergyParentLimit     int
+	SynergyMinParentSignal float64
 }
 
 type WinConditionValidation struct {
-	Patch                 string                              `json:"patch"`
-	Platform              string                              `json:"platform"`
-	QueueID               uint16                              `json:"queueId"`
-	RankBucket            string                              `json:"rankBucket"`
-	MinGames              int                                 `json:"minGames"`
-	WeakSignalWinRate     float64                             `json:"weakSignalWinRate"`
-	Teams                 int                                 `json:"teams"`
-	Matches               int                                 `json:"matches"`
-	RatingOutcomes        []WinConditionRatingOutcome         `json:"ratingOutcomes"`
-	ScoreDeltaOutcomes    []WinConditionScoreDeltaOutcome     `json:"scoreDeltaOutcomes"`
-	PrimaryMatchups       []WinConditionPrimaryMatchupOutcome `json:"primaryMatchups"`
-	PrimaryMarginOutcomes []WinConditionPrimaryMarginOutcome  `json:"primaryMarginOutcomes"`
-	WeakSignalWarnings    []WinConditionWeakSignalWarning     `json:"weakSignalWarnings"`
-	Findings              []WinConditionValidationFinding     `json:"findings"`
+	Patch                  string                              `json:"patch"`
+	Platform               string                              `json:"platform"`
+	QueueID                uint16                              `json:"queueId"`
+	RankBucket             string                              `json:"rankBucket"`
+	MinGames               int                                 `json:"minGames"`
+	WeakSignalWinRate      float64                             `json:"weakSignalWinRate"`
+	SynergyMinGames        int                                 `json:"synergyMinGames"`
+	SynergyMinParentSignal float64                             `json:"synergyMinParentSignal"`
+	Teams                  int                                 `json:"teams"`
+	Matches                int                                 `json:"matches"`
+	RatingOutcomes         []WinConditionRatingOutcome         `json:"ratingOutcomes"`
+	ScoreDeltaOutcomes     []WinConditionScoreDeltaOutcome     `json:"scoreDeltaOutcomes"`
+	PrimaryMatchups        []WinConditionPrimaryMatchupOutcome `json:"primaryMatchups"`
+	PrimaryMarginOutcomes  []WinConditionPrimaryMarginOutcome  `json:"primaryMarginOutcomes"`
+	SynergyResiduals       []WinConditionSynergyResidual       `json:"synergyResiduals"`
+	WeakSignalWarnings     []WinConditionWeakSignalWarning     `json:"weakSignalWarnings"`
+	Findings               []WinConditionValidationFinding     `json:"findings"`
 }
 
 type WinConditionRatingOutcome struct {
@@ -95,10 +102,50 @@ type WinConditionWeakSignalWarning struct {
 	Note              string  `json:"note"`
 }
 
+type WinConditionSynergyResidual struct {
+	PairType          string  `json:"pairType"`
+	ChampionID1       uint16  `json:"championId1"`
+	ChampionID2       uint16  `json:"championId2"`
+	Condition         string  `json:"condition"`
+	Rating            string  `json:"rating"`
+	OpponentCondition string  `json:"opponentCondition"`
+	OpponentRating    string  `json:"opponentRating"`
+	ParentGames       int     `json:"parentGames"`
+	ParentWinRate     float64 `json:"parentWinRate"`
+	ParentSignal      float64 `json:"parentSignal"`
+	Games             int     `json:"games"`
+	Wins              int     `json:"wins"`
+	WinRate           float64 `json:"winRate"`
+	WilsonLow         float64 `json:"wilsonLow"`
+	WilsonHigh        float64 `json:"wilsonHigh"`
+	Residual          float64 `json:"residual"`
+	Signal            float64 `json:"signal"`
+	Direction         string  `json:"direction"`
+}
+
 type WinConditionValidationFinding struct {
 	Severity string `json:"severity"`
 	Topic    string `json:"topic"`
 	Summary  string `json:"summary"`
+}
+
+type winConditionPrimaryMatchupKey struct {
+	condition         string
+	rating            string
+	opponentCondition string
+	opponentRating    string
+}
+
+type winConditionSynergyKey struct {
+	parent      winConditionPrimaryMatchupKey
+	pairType    string
+	championID1 uint16
+	championID2 uint16
+}
+
+type winConditionSynergyCounts struct {
+	wins  uint64
+	games uint64
 }
 
 func (r *Repository) QueryWinConditionValidation(ctx context.Context, filters WinConditionValidationFilters) (WinConditionValidation, error) {
@@ -122,14 +169,16 @@ func (r *Repository) QueryWinConditionValidation(ctx context.Context, filters Wi
 	}
 
 	validation := WinConditionValidation{
-		Patch:             diagnostics.Patch,
-		Platform:          diagnostics.Platform,
-		QueueID:           diagnostics.QueueID,
-		RankBucket:        diagnostics.RankBucket,
-		MinGames:          normalized.MinGames,
-		WeakSignalWinRate: normalized.WeakSignalWinRate,
-		Teams:             diagnostics.Teams,
-		Matches:           diagnostics.Matches,
+		Patch:                  diagnostics.Patch,
+		Platform:               diagnostics.Platform,
+		QueueID:                diagnostics.QueueID,
+		RankBucket:             diagnostics.RankBucket,
+		MinGames:               normalized.MinGames,
+		WeakSignalWinRate:      normalized.WeakSignalWinRate,
+		SynergyMinGames:        normalized.SynergyMinGames,
+		SynergyMinParentSignal: normalized.SynergyMinParentSignal,
+		Teams:                  diagnostics.Teams,
+		Matches:                diagnostics.Matches,
 	}
 	var err error
 	if validation.RatingOutcomes, err = r.queryWinConditionRatingOutcomes(ctx, where, args); err != nil {
@@ -142,6 +191,9 @@ func (r *Repository) QueryWinConditionValidation(ctx context.Context, filters Wi
 		return WinConditionValidation{}, err
 	}
 	if validation.PrimaryMarginOutcomes, err = r.queryWinConditionPrimaryMarginOutcomes(ctx, where, args); err != nil {
+		return WinConditionValidation{}, err
+	}
+	if validation.SynergyResiduals, err = r.queryWinConditionSynergyResiduals(ctx, where, args, validation.PrimaryMatchups, normalized); err != nil {
 		return WinConditionValidation{}, err
 	}
 	if validation.WeakSignalWarnings, err = r.queryWinConditionWeakSignalWarnings(ctx, normalized, validation.Patch); err != nil {
@@ -172,6 +224,18 @@ func normalizeWinConditionValidationFilters(filters WinConditionValidationFilter
 	}
 	if filters.Limit <= 0 {
 		filters.Limit = 25
+	}
+	if filters.SynergyMinGames <= 0 {
+		filters.SynergyMinGames = 25
+	}
+	if filters.SynergyLimit <= 0 {
+		filters.SynergyLimit = 25
+	}
+	if filters.SynergyParentLimit <= 0 {
+		filters.SynergyParentLimit = 6
+	}
+	if filters.SynergyMinParentSignal <= 0 {
+		filters.SynergyMinParentSignal = 1
 	}
 	return filters
 }
@@ -442,6 +506,118 @@ func (r *Repository) queryWinConditionPrimaryMarginOutcomes(ctx context.Context,
 	return out, nil
 }
 
+func (r *Repository) queryWinConditionSynergyResiduals(ctx context.Context, where string, args []any, primaryMatchups []WinConditionPrimaryMatchupOutcome, filters WinConditionValidationFilters) ([]WinConditionSynergyResidual, error) {
+	parents := winConditionSynergyParents(primaryMatchups, filters.SynergyMinParentSignal, filters.SynergyParentLimit)
+	if len(parents) == 0 {
+		return []WinConditionSynergyResidual{}, nil
+	}
+	parentByKey := make(map[winConditionPrimaryMatchupKey]WinConditionPrimaryMatchupOutcome, len(parents))
+	clauses := make([]string, 0, len(parents))
+	queryArgs := repeatArgs(args, 2)
+	for _, parent := range parents {
+		key := winConditionPrimaryKey(parent)
+		parentByKey[key] = parent
+		clauses = append(clauses, "(t.primary_condition = ? AND t.primary_rating = ? AND o.primary_condition = ? AND o.primary_rating = ?)")
+		queryArgs = append(queryArgs, parent.Condition, parent.Rating, parent.OpponentCondition, parent.OpponentRating)
+	}
+
+	teamSelect := winConditionScopedTeamSelect(where)
+	query := `
+		SELECT
+			t.primary_condition,
+			t.primary_rating,
+			o.primary_condition AS opponent_primary_condition,
+			o.primary_rating AS opponent_primary_rating,
+			toUInt8(t.win) AS win,
+			t.champion_ids AS team_champion_ids,
+			o.champion_ids AS opponent_champion_ids
+		FROM (` + teamSelect + `) AS t
+		INNER JOIN (` + teamSelect + `) AS o
+			ON t.match_id = o.match_id
+		WHERE t.team_id != o.team_id
+			AND (` + strings.Join(clauses, " OR ") + `)`
+	rows, err := r.db.QueryContext(ctx, query, queryArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("query win condition synergy residuals: %w", err)
+	}
+	defer rows.Close()
+
+	countsByKey := map[winConditionSynergyKey]winConditionSynergyCounts{}
+	for rows.Next() {
+		var condition, rating, opponentCondition, opponentRating string
+		var win uint8
+		var teamChampionIDs, opponentChampionIDs []uint16
+		if err := rows.Scan(&condition, &rating, &opponentCondition, &opponentRating, &win, &teamChampionIDs, &opponentChampionIDs); err != nil {
+			return nil, fmt.Errorf("scan win condition synergy residual: %w", err)
+		}
+		parent := winConditionPrimaryMatchupKey{
+			condition:         condition,
+			rating:            rating,
+			opponentCondition: opponentCondition,
+			opponentRating:    opponentRating,
+		}
+		if _, ok := parentByKey[parent]; !ok {
+			continue
+		}
+		addWinConditionSynergyPairs(countsByKey, parent, "teammate", teamChampionIDs, win)
+		addWinConditionSynergyPairs(countsByKey, parent, "opponent", opponentChampionIDs, win)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]WinConditionSynergyResidual, 0, len(countsByKey))
+	for key, counts := range countsByKey {
+		if int(counts.games) < filters.SynergyMinGames {
+			continue
+		}
+		parent := parentByKey[key.parent]
+		row := WinConditionSynergyResidual{
+			PairType:          key.pairType,
+			ChampionID1:       key.championID1,
+			ChampionID2:       key.championID2,
+			Condition:         parent.Condition,
+			Rating:            parent.Rating,
+			OpponentCondition: parent.OpponentCondition,
+			OpponentRating:    parent.OpponentRating,
+			ParentGames:       parent.Games,
+			ParentWinRate:     parent.WinRate,
+			ParentSignal:      parent.Signal,
+			Games:             int(counts.games),
+			Wins:              int(counts.wins),
+			WinRate:           winConditionWinRatePercent(counts.wins, counts.games),
+		}
+		row.WilsonLow, row.WilsonHigh = winConditionWilsonIntervalPercent(counts.wins, counts.games)
+		row.Residual = winConditionRoundPercent(row.WinRate - parent.WinRate)
+		row.Direction, row.Signal = winConditionResidualSignal(row.WilsonLow, row.WilsonHigh, parent.WinRate)
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Signal != out[j].Signal {
+			return out[i].Signal > out[j].Signal
+		}
+		leftResidual := math.Abs(out[i].Residual)
+		rightResidual := math.Abs(out[j].Residual)
+		if leftResidual != rightResidual {
+			return leftResidual > rightResidual
+		}
+		if out[i].Games != out[j].Games {
+			return out[i].Games > out[j].Games
+		}
+		if out[i].PairType != out[j].PairType {
+			return out[i].PairType < out[j].PairType
+		}
+		if out[i].ChampionID1 != out[j].ChampionID1 {
+			return out[i].ChampionID1 < out[j].ChampionID1
+		}
+		return out[i].ChampionID2 < out[j].ChampionID2
+	})
+	if filters.SynergyLimit > 0 && len(out) > filters.SynergyLimit {
+		out = out[:filters.SynergyLimit]
+	}
+	return out, nil
+}
+
 func (r *Repository) queryWinConditionWeakSignalWarnings(ctx context.Context, filters WinConditionValidationFilters, resolvedPatch string) ([]WinConditionWeakSignalWarning, error) {
 	patch := resolvedPatch
 	if patch == "" {
@@ -501,7 +677,8 @@ func winConditionScopedTeamSelect(where string) string {
 			toInt16(control_score) AS control_score,
 			toInt16(teamfight_score) AS teamfight_score,
 			primary_condition,
-			primary_rating
+			primary_rating,
+			champion_ids
 		FROM match_team_win_conditions FINAL
 		` + where
 }
@@ -590,6 +767,58 @@ func winConditionValidationFindings(validation WinConditionValidation) []WinCond
 			Topic:    "Primary strategy matchups",
 			Summary:  "No returned primary-vs-primary row has a Wilson interval at least 1 point away from 50%; keep these reads exploratory until more data or stronger segmentation produces stable edges.",
 		})
+	}
+	signaledSynergyRows := 0
+	var strongestSynergy WinConditionSynergyResidual
+	for _, row := range validation.SynergyResiduals {
+		if row.Signal < 1 {
+			continue
+		}
+		signaledSynergyRows++
+		if strongestSynergy.Signal == 0 || row.Signal > strongestSynergy.Signal {
+			strongestSynergy = row
+		}
+	}
+	if signaledSynergyRows > 0 {
+		findings = append(findings, WinConditionValidationFinding{
+			Severity: "watch",
+			Topic:    "Champion-pair residuals",
+			Summary: fmt.Sprintf(
+				"%d champion-pair residuals cleared a 1-point Wilson signal against their parent strategy matchup; strongest is %s pair %d/%d in %s %s into %s %s (%+.2f pts over parent, %s, %.2f pt signal).",
+				signaledSynergyRows,
+				strongestSynergy.PairType,
+				strongestSynergy.ChampionID1,
+				strongestSynergy.ChampionID2,
+				strongestSynergy.Condition,
+				strongestSynergy.Rating,
+				strongestSynergy.OpponentCondition,
+				strongestSynergy.OpponentRating,
+				strongestSynergy.Residual,
+				strongestSynergy.Direction,
+				strongestSynergy.Signal,
+			),
+		})
+	} else if len(validation.SynergyResiduals) > 0 {
+		findings = append(findings, WinConditionValidationFinding{
+			Severity: "watch",
+			Topic:    "Champion-pair residuals",
+			Summary:  fmt.Sprintf("%d champion-pair residual rows met the %d-game threshold, but none cleared a 1-point Wilson signal against their parent strategy matchup.", len(validation.SynergyResiduals), validation.SynergyMinGames),
+		})
+	} else if len(validation.PrimaryMatchups) > 0 {
+		hasSynergyParents := false
+		for _, row := range validation.PrimaryMatchups {
+			if row.Signal >= validation.SynergyMinParentSignal {
+				hasSynergyParents = true
+				break
+			}
+		}
+		if hasSynergyParents {
+			findings = append(findings, WinConditionValidationFinding{
+				Severity: "watch",
+				Topic:    "Champion-pair residuals",
+				Summary:  fmt.Sprintf("No champion-pair residual rows met the %d-game threshold inside the returned high-signal primary matchups. That means no obvious repeated pair artifact yet, not proof that synergy is absent.", validation.SynergyMinGames),
+			})
+		}
 	}
 	if len(validation.WeakSignalWarnings) > 0 {
 		findings = append(findings, WinConditionValidationFinding{
@@ -704,6 +933,75 @@ func winConditionLowRating(rating string) bool {
 	return winConditionRatingOrder(rating) > 0 && winConditionRatingOrder(rating) <= winConditionRatingOrder("C")
 }
 
+func winConditionPrimaryKey(row WinConditionPrimaryMatchupOutcome) winConditionPrimaryMatchupKey {
+	return winConditionPrimaryMatchupKey{
+		condition:         row.Condition,
+		rating:            row.Rating,
+		opponentCondition: row.OpponentCondition,
+		opponentRating:    row.OpponentRating,
+	}
+}
+
+func winConditionSynergyParents(rows []WinConditionPrimaryMatchupOutcome, minSignal float64, limit int) []WinConditionPrimaryMatchupOutcome {
+	out := make([]WinConditionPrimaryMatchupOutcome, 0, len(rows))
+	for _, row := range rows {
+		if row.Signal < minSignal {
+			continue
+		}
+		out = append(out, row)
+		if limit > 0 && len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func addWinConditionSynergyPairs(countsByKey map[winConditionSynergyKey]winConditionSynergyCounts, parent winConditionPrimaryMatchupKey, pairType string, championIDs []uint16, win uint8) {
+	for _, pair := range winConditionChampionPairs(championIDs) {
+		key := winConditionSynergyKey{
+			parent:      parent,
+			pairType:    pairType,
+			championID1: pair[0],
+			championID2: pair[1],
+		}
+		counts := countsByKey[key]
+		counts.games++
+		if win > 0 {
+			counts.wins++
+		}
+		countsByKey[key] = counts
+	}
+}
+
+func winConditionChampionPairs(championIDs []uint16) [][2]uint16 {
+	if len(championIDs) < 2 {
+		return nil
+	}
+	ids := append([]uint16(nil), championIDs...)
+	sort.Slice(ids, func(i, j int) bool {
+		return ids[i] < ids[j]
+	})
+	pairs := make([][2]uint16, 0, len(ids)*(len(ids)-1)/2)
+	seen := map[[2]uint16]bool{}
+	for i := 0; i < len(ids); i++ {
+		if ids[i] == 0 {
+			continue
+		}
+		for j := i + 1; j < len(ids); j++ {
+			if ids[j] == 0 || ids[i] == ids[j] {
+				continue
+			}
+			pair := [2]uint16{ids[i], ids[j]}
+			if seen[pair] {
+				continue
+			}
+			seen[pair] = true
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
 func winConditionWilsonIntervalPercent(wins, games uint64) (float64, float64) {
 	if games == 0 {
 		return 0, 0
@@ -726,6 +1024,17 @@ func winConditionDirectionalSignal(wilsonLow, wilsonHigh float64) (string, float
 		return "favorable", winConditionRoundPercent(wilsonLow - 50)
 	case wilsonHigh < 50:
 		return "unfavorable", winConditionRoundPercent(50 - wilsonHigh)
+	default:
+		return "mixed", 0
+	}
+}
+
+func winConditionResidualSignal(wilsonLow, wilsonHigh, parentWinRate float64) (string, float64) {
+	switch {
+	case wilsonLow > parentWinRate:
+		return "overperforming", winConditionRoundPercent(wilsonLow - parentWinRate)
+	case wilsonHigh < parentWinRate:
+		return "underperforming", winConditionRoundPercent(parentWinRate - wilsonHigh)
 	default:
 		return "mixed", 0
 	}

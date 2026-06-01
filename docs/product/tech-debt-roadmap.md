@@ -418,8 +418,9 @@ Completed:
 - Rerun production API perf smoke in warm and no-warmup modes for retained patches after deploy smoke landed.
 - Verify the next worker refresh status after the post-deploy smoke rollout; champion guide, item-slot/loadout, summoner-profile, and win-condition lanes completed successfully, with champion-page prewarm reporting cached versus stored bundle counts and zero errors.
 - Inspect production win-condition validation output and improve the report so primary strategy matchups are ranked by Wilson-backed directional signal instead of mostly by sample size.
+- Add first-pass champion-pair residuals to the win-condition validation report so strategy-pair edges can be checked for teammate/opponent pair artifacts.
 
 Next:
 
 1. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-2. Use high-signal primary strategy matchup rows as leads for role-specific overrides, champion-pair synergy residuals, and timeline validation.
+2. Use high-signal primary strategy and champion-pair residual rows as leads for role-specific overrides and timeline validation.

@@ -633,6 +633,16 @@ func TestQueryWinConditionValidationBuildsCorpusReport(t *testing.T) {
 	mock.ExpectQuery("(?s)primary_margin.*margin_bucket").
 		WillReturnRows(sqlmock.NewRows([]string{"margin_bucket", "games", "wins", "avg_margin"}).
 			AddRow("2-3", 90, 48, 2.4))
+	mock.ExpectQuery("(?s)t\\.champion_ids AS team_champion_ids").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"primary_condition",
+			"primary_rating",
+			"opponent_primary_condition",
+			"opponent_primary_rating",
+			"win",
+			"team_champion_ids",
+			"opponent_champion_ids",
+		}))
 	mock.ExpectQuery("(?s)FROM patch_win_condition_metrics FINAL").
 		WillReturnRows(sqlmock.NewRows([]string{
 			"patch",
@@ -675,11 +685,40 @@ func TestQueryWinConditionValidationBuildsCorpusReport(t *testing.T) {
 	if len(report.WeakSignalWarnings) != 1 || report.WeakSignalWarnings[0].Condition != "SplitPush" {
 		t.Fatalf("weak warnings = %+v; want SplitPush warning", report.WeakSignalWarnings)
 	}
+	if len(report.SynergyResiduals) != 0 {
+		t.Fatalf("synergy residuals = %+v; want none from empty mock rows", report.SynergyResiduals)
+	}
 	if len(report.Findings) == 0 {
 		t.Fatal("expected generated validation findings")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestWinConditionSynergyHelpers(t *testing.T) {
+	pairs := winConditionChampionPairs([]uint16{22, 0, 11, 11, 33})
+	want := [][2]uint16{{11, 22}, {11, 33}, {22, 33}}
+	if len(pairs) != len(want) {
+		t.Fatalf("pairs = %+v; want %+v", pairs, want)
+	}
+	for index := range want {
+		if pairs[index] != want[index] {
+			t.Fatalf("pairs[%d] = %+v; want %+v", index, pairs[index], want[index])
+		}
+	}
+
+	direction, signal := winConditionResidualSignal(64, 80, 60)
+	if direction != "overperforming" || signal != 4 {
+		t.Fatalf("over signal = %s %.2f; want overperforming 4", direction, signal)
+	}
+	direction, signal = winConditionResidualSignal(35, 45, 50)
+	if direction != "underperforming" || signal != 5 {
+		t.Fatalf("under signal = %s %.2f; want underperforming 5", direction, signal)
+	}
+	direction, signal = winConditionResidualSignal(45, 55, 50)
+	if direction != "mixed" || signal != 0 {
+		t.Fatalf("mixed signal = %s %.2f; want mixed 0", direction, signal)
 	}
 }
 
