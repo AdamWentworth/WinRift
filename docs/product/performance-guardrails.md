@@ -150,3 +150,17 @@ Interpretation:
 - Champion pages are benefiting from response caching/prewarming. A matching no-role Aatrox page request measured around 183 ms immediately after the route run, which is still under the bundled-page target.
 - Browser route timing still shows some cold variability, especially champion directory and patch-list requests through the proxy. Treat one-off cold warnings as investigation leads, not failures.
 - Do not make thresholds strict yet. Collect a few more baseline runs after normal worker refresh/prewarm cycles before turning perf warnings into hard CI gates.
+
+## Production Refresh Audit: 2026-05-31
+
+A private-server audit is captured in `docs/product/production-performance-audit-2026-05-31.md`.
+
+Important takeaways:
+
+- Worker collection and all summary refresh lanes were healthy.
+- Warm champion-page requests were in the low tens of milliseconds.
+- Cold champion-page and matchup bundle requests still reached 1.5-5 seconds.
+- Summoner profile cold reads reached 2.8-13.1 seconds.
+- Summoner profile, item-slot/loadout, and win-condition refreshes still need staged insert-then-cleanup semantics so public reads do not briefly see empty summary tables.
+
+Until staged refreshes and profile response caching are done, keep performance investigations focused on cold misses and refresh windows rather than adding more frontend loading states.

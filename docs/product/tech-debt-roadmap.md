@@ -313,6 +313,8 @@ This can start as a ClickHouse table or a small runtime-state JSON file. It woul
 
 Status: first pass complete. The worker now writes `WORKER_REFRESH_STATUS_PATH` with latest start/success/failure timestamps, duration, row/context counts where available, and last error per refresh lane.
 
+Follow-up audit: `docs/product/production-performance-audit-2026-05-31.md` records the first private-server refresh/timing pass. The deployed worker is healthy and warm analytics reads are fast, but the audit confirms three remaining reliability smells: summoner-profile, item-slot/loadout, and win-condition refreshes should adopt the same staged insert-then-cleanup pattern as champion-guide refreshes.
+
 ## Priority 7: Product/Data Debt
 
 ### Read-Model Coverage Audit
@@ -330,6 +332,8 @@ Recent progress: champion guide index, tier-list style reads, and selected champ
 Status: first pass complete in `docs/product/read-model-coverage-audit.md`.
 
 Outstanding: keep watching exact matchup cold timings as traffic grows. If the bounded prewarm cap is too small, raise it before adding another read model.
+
+Production timing note: warm champion-page bundles are now fast, but the 2026-05-31 audit still saw several cold or cache-miss champion pages take 1.5-5 seconds. Before adding another bundle table, inspect why the prewarm lane skips most candidates and make sure frontend query params match the canonical prewarm cache keys.
 
 ### Patch-Scope UX
 
@@ -408,6 +412,8 @@ Completed:
 
 Next:
 
-1. Apply staged refreshes to item-slot, summoner-profile, or win-condition lanes if timing logs show similar empty-window behavior.
-2. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+1. Add short response caching for summoner leaderboard/profile reads, then rerun the production perf smoke.
+2. Apply staged insert-then-cleanup refreshes to summoner-profile, item-slot/loadout, and win-condition lanes.
+3. Inspect champion-page prewarm coverage and fix skipped common page bundles before creating another bundle table.
+4. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+5. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
