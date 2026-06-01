@@ -22,6 +22,11 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "gameName and tagLine are required")
 		return
 	}
+	cacheKey := "summoner-profile:" + platform + ":" + strings.ToLower(gameName) + ":" + strings.ToLower(tagLine)
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
 	alias, err := s.repo.FindAccountAlias(r.Context(), platform, gameName, tagLine)
 	if err != nil {
 		if clickhouse.IsNoRows(err) {
@@ -29,11 +34,6 @@ func (s Server) summonerProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	cacheKey := "summoner-profile:" + alias.Platform + ":" + strings.ToLower(alias.GameName) + ":" + strings.ToLower(alias.TagLine) + ":" + alias.PUUID
-	if body, ok := s.responseCache.get(cacheKey); ok {
-		writeJSONBytes(w, http.StatusOK, body, true)
 		return
 	}
 	queueID := uint16(analytics.RankedSoloQueueID)
