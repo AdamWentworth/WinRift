@@ -164,3 +164,48 @@ Important takeaways:
 - Follow-up work added summoner profile/leaderboard response caching and staged insert-then-cleanup refreshes for summoner-profile, item-slot/loadout, and win-condition summaries.
 
 Keep performance investigations focused on cold misses, cache-key coverage, and refresh windows rather than adding more frontend loading states.
+
+## API Smoke Baseline: 2026-06-01
+
+Environment:
+
+- Server API at `http://192.168.1.77:8000`.
+- Run after `deploy-core-prod` gained post-deploy smoke checks, response-cache checks, and refresh-status readability.
+- Each API smoke used 5 measured runs.
+- Warm mode used 2 warmup requests before measurement.
+- No-warmup mode used `WINRIFT_PERF_WARMUPS=0`; this does not purge persistent champion-page bundle cache, so it represents normal production first-click behavior after worker prewarming rather than a fully empty cache.
+
+Result: all sampled endpoints passed with zero warnings on both retained patches.
+
+### Patch 16.10
+
+| Endpoint | Warm avg/max | No-warmup avg/max | Read |
+| --- | ---: | ---: | --- |
+| Health | 3 / 4 ms | 3 / 5 ms | Good |
+| Patch list | 89 / 112 ms | 167 / 197 ms | Good |
+| Summoner leaderboard | 5 / 6 ms | 6 / 8 ms | Good; response cache is working |
+| Champion role rates | 38 / 49 ms | 23 / 29 ms | Good |
+| Champion guide index | 58 / 78 ms | 59 / 84 ms | Good |
+| Aatrox champion page | 14 / 17 ms | 14 / 16 ms | Good |
+| Kled matchup page | 13 / 14 ms | 17 / 32 ms | Good |
+| Lee Sin matchup page | 14 / 18 ms | 14 / 17 ms | Good |
+
+### Patch 16.11
+
+| Endpoint | Warm avg/max | No-warmup avg/max | Read |
+| --- | ---: | ---: | --- |
+| Health | 6 / 10 ms | 3 / 4 ms | Good |
+| Patch list | 105 / 145 ms | 75 / 99 ms | Good |
+| Summoner leaderboard | 6 / 8 ms | 6 / 10 ms | Good; response cache is working |
+| Champion role rates | 38 / 43 ms | 23 / 26 ms | Good |
+| Champion guide index | 62 / 70 ms | 41 / 45 ms | Good |
+| Aatrox champion page | 13 / 14 ms | 12 / 13 ms | Good |
+| Kled matchup page | 12 / 14 ms | 12 / 14 ms | Good |
+| Lee Sin matchup page | 12 / 13 ms | 10 / 11 ms | Good |
+
+Interpretation:
+
+- The common champion-page and exact-matchup bundle paths are no longer visibly slow in the sampled production path.
+- The summoner leaderboard now behaves like an in-memory cached endpoint after the first request, dropping from the previous occasional hundreds-of-milliseconds behavior to single-digit milliseconds.
+- Patch list remains the slowest sampled no-warmup path, but it is still comfortably under the 500 ms target.
+- Keep strict perf gates off for now. These numbers are strong enough to be a baseline, but a few more days of collection and refresh cycles should pass before turning warnings into deploy blockers.

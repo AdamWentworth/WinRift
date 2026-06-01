@@ -415,11 +415,10 @@ Completed:
 - Apply staged insert-then-cleanup refreshes to summoner-profile, item-slot/loadout, and win-condition lanes.
 - Clarify champion-page prewarm status by reporting cached persistent bundle hits separately from newly stored bundles.
 - Add post-deploy smoke checks to `deploy-core-prod`.
+- Rerun production API perf smoke in warm and no-warmup modes for retained patches after deploy smoke landed.
 
 Next:
 
-1. Deploy the post-deploy smoke workflow once and confirm the smoke summary is useful in GitHub Actions output.
-2. Rerun production perf smoke with warmups and with `WINRIFT_PERF_WARMUPS=0`.
-3. Watch the next worker refresh status for `prewarmCached`/`prewarmMatchupCached` versus true stores/errors.
-4. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
-5. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
+1. Watch the next worker refresh status for `prewarmCached`/`prewarmMatchupCached` versus true stores/errors.
+2. Split `champion_guide_derived.go` if the derived refresh logic starts getting touched often.
+3. Inspect real win-condition validation output from production data and decide whether to tune grading thresholds, add role-specific overrides, or start synergy residual analysis.
