@@ -35,13 +35,13 @@ Before treating a page as polished, test the deployed API with `curl` timing out
 ```bash
 curl -o /tmp/winrift.out -s -w \
   'status=%{http_code} ttfb=%{time_starttransfer} total=%{time_total} size=%{size_download}\n' \
-  'http://192.168.1.77:8000/api/summoners/leaderboard?platform=NA1&limit=50'
+  'http://SERVER_LAN_IP:8000/api/summoners/leaderboard?platform=NA1&limit=50'
 ```
 
 Or run the project smoke script:
 
 ```bash
-WINRIFT_PERF_BASE_URL=http://192.168.1.77:8000 \
+WINRIFT_PERF_BASE_URL=http://SERVER_LAN_IP:8000 \
 WINRIFT_PERF_PATCH=16.10 \
 WINRIFT_PERF_RUNS=3 \
 ops/perf-smoke.sh
@@ -89,7 +89,7 @@ API timing alone is not enough. A route can have fast endpoints and still feel s
 Run the Playwright route timing smoke from `apps/web`:
 
 ```bash
-WINRIFT_ROUTE_PERF_API_URL=http://192.168.1.77:8000 \
+WINRIFT_ROUTE_PERF_API_URL=http://SERVER_LAN_IP:8000 \
 npm run perf:routes
 ```
 
@@ -118,7 +118,7 @@ The current frontend route split keeps page-scale JavaScript out of the initial 
 Environment:
 
 - Dev laptop frontend perf runner.
-- Server API at `http://192.168.1.77:8000`.
+- Server API at `http://SERVER_LAN_IP:8000`.
 - Patch scope `16.10`.
 - API smoke used 2 warmups and 5 measured runs.
 - Browser route timing used the production web build through the Playwright perf server.
@@ -169,7 +169,7 @@ Keep performance investigations focused on cold misses, cache-key coverage, and 
 
 Environment:
 
-- Server API at `http://192.168.1.77:8000`.
+- Server API at `http://SERVER_LAN_IP:8000`.
 - Run after `deploy-core-prod` gained post-deploy smoke checks, response-cache checks, and refresh-status readability.
 - Each API smoke used 5 measured runs.
 - Warm mode used 2 warmup requests before measurement.

@@ -58,10 +58,10 @@ cp apps/web/.env.example apps/web/.env.local
 editor apps/web/.env.local
 ```
 
-For the current private server setup:
+For a private server setup:
 
 ```env
-VITE_API_URL=http://192.168.1.77:8000
+VITE_API_URL=http://SERVER_LAN_IP:8000
 ```
 
 ## ⚙️ Environment

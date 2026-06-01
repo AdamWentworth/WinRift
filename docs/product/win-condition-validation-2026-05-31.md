@@ -12,7 +12,7 @@ Scope:
 Command:
 
 ```bash
-curl 'http://192.168.1.77:8000/api/analytics/win-conditions/validation?patch=16.10&platform=ALL&rankBucket=ALL&minGames=100&limit=5' | jq
+curl 'http://SERVER_LAN_IP:8000/api/analytics/win-conditions/validation?patch=16.10&platform=ALL&rankBucket=ALL&minGames=100&limit=5' | jq
 ```
 
 ## First Read

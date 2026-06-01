@@ -90,7 +90,7 @@ npm test -- --run
 Run the production API smoke from the repo root:
 
 ```bash
-WINRIFT_PERF_BASE_URL=http://192.168.1.77:8000 \
+WINRIFT_PERF_BASE_URL=http://SERVER_LAN_IP:8000 \
 WINRIFT_PERF_PATCH=16.10 \
 WINRIFT_PERF_RUNS=3 \
 ops/perf-smoke.sh
@@ -107,7 +107,7 @@ The smoke script samples each endpoint multiple times and warns on the slowest o
 Run browser route timing from `apps/web`:
 
 ```bash
-WINRIFT_ROUTE_PERF_API_URL=http://192.168.1.77:8000 \
+WINRIFT_ROUTE_PERF_API_URL=http://SERVER_LAN_IP:8000 \
 npm run perf:routes
 ```
 

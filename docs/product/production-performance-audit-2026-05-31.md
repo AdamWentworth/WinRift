@@ -1,6 +1,6 @@
 # Production Performance And Refresh Audit: 2026-05-31
 
-This audit was run against the private server deployment at `http://192.168.1.77:8000` from the dev laptop. It focuses on whether the worker, API, ClickHouse storage, read-model refreshes, and page-facing endpoints are healthy enough to keep building on.
+This audit was run against the private server deployment from the dev laptop. It focuses on whether the worker, API, ClickHouse storage, read-model refreshes, and page-facing endpoints are healthy enough to keep building on.
 
 ## Short Version
 
@@ -135,4 +135,3 @@ These are not causing obvious production failures right now, but they are the hi
 3. Inspect champion-page prewarm coverage because the worker skipped most prewarm candidates even though cold champion-page misses are still expensive.
 4. Keep `ops/perf-smoke.sh` as the quick production guardrail, but add occasional `WINRIFT_PERF_WARMUPS=0` runs to catch cold misses.
 5. Add a small storage/log check to the ops routine so ClickHouse logs and raw timeline growth do not surprise us.
-
