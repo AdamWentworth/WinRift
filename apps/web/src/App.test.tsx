@@ -409,6 +409,30 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it('opens the win condition education page', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Win Conditions' }));
+
+    await waitFor(() => expect(screen.getByText('Understanding Win Conditions')).toBeInTheDocument());
+    expect(window.location.pathname).toBe('/win-conditions');
+    expect(screen.getByText('The Five Axes')).toBeInTheDocument();
+    expect(screen.getByText('Read strategy as a lens, not a script')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search WinRift')).toBeInTheDocument();
+    queryClient.clear();
+  });
+
   it('routes champion names from the homepage search to champion pages', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {

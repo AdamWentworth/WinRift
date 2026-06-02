@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { WinConditionAnalysisResponse, WinConditionMetric, WinConditionTeamProfile } from '../../api/types';
+import { conditionIconUrl } from '../../lib/winConditions';
 import { MetricTile } from '../ui/MetricTile';
 import { StatusChip } from '../ui/StatusChip';
 import type { TeamSide } from './types';
@@ -520,10 +521,6 @@ function planPairRead(metric: WinConditionMetric) {
   const ownPlan = metric.planLabel ?? planLabelFallback(metric);
   const enemyPlan = metric.opponentPlanLabel ?? (metric.opponentPrimary ? 'Primary' : 'Alternative');
   return `Strategy context: your ${metric.condition} is ${ownPlan.toLowerCase()} into the enemy ${metric.opponentCondition} ${enemyPlan.toLowerCase()}.`;
-}
-
-function conditionIconUrl(condition: string) {
-  return `/images/win_condition_icons/${condition}.png`;
 }
 
 function ratingImageUrl(rating: string) {

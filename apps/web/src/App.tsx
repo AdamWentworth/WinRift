@@ -25,6 +25,7 @@ const ChampionDirectoryPage = lazy(() => import('./components/ChampionDirectoryP
 const LiveMatchPanel = lazy(() => import('./components/LiveMatchPanel').then((module) => ({ default: module.LiveMatchPanel })));
 const SummonerProfilePage = lazy(() => import('./components/SummonerProfilePage').then((module) => ({ default: module.SummonerProfilePage })));
 const TierListPage = lazy(() => import('./components/TierListPage').then((module) => ({ default: module.TierListPage })));
+const WinConditionsPage = lazy(() => import('./components/WinConditionsPage').then((module) => ({ default: module.WinConditionsPage })));
 
 export function App() {
   const queryClient = useQueryClient();
@@ -131,14 +132,22 @@ export function App() {
     prefetchChampionGuide(champion, preferredRole);
     navigate({ kind: 'champion', championSlug: championRouteSlug(champion) });
   }, [navigate, prefetchChampionGuide]);
-  const activeSection = route.kind === 'champion' ? 'champions' : route.kind === 'tier-list' ? 'tier-list' : route.kind === 'summoner' ? 'summoners' : 'home';
+  const activeSection = route.kind === 'champion'
+    ? 'champions'
+    : route.kind === 'tier-list'
+      ? 'tier-list'
+      : route.kind === 'win-conditions'
+        ? 'win-conditions'
+        : route.kind === 'summoner'
+          ? 'summoners'
+          : 'home';
   const initialChampionId = useMemo(() => (
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
   const backgroundChampionScopeIds = route.kind === 'summoner' ? summonerBackgroundChampionIds : undefined;
   const appShellClassName = appShellClass(route);
-  const showHeaderSearch = route.kind === 'champion' || route.kind === 'tier-list' || (route.kind === 'summoner' && Boolean(route.gameName));
+  const showHeaderSearch = route.kind === 'champion' || route.kind === 'tier-list' || route.kind === 'win-conditions' || (route.kind === 'summoner' && Boolean(route.gameName));
 
   useEffect(() => {
     if (route.kind !== 'summoner') {
@@ -188,6 +197,13 @@ export function App() {
             Tier List
           </button>
           <button
+            className={activeSection === 'win-conditions' ? 'selected' : ''}
+            onClick={() => navigate({ kind: 'win-conditions' })}
+            type="button"
+          >
+            Win Conditions
+          </button>
+          <button
             className={activeSection === 'summoners' ? 'selected' : ''}
             onClick={() => navigate({ kind: 'summoner' })}
             type="button"
@@ -198,7 +214,12 @@ export function App() {
       </header>
 
       <Suspense fallback={<RouteFallback />}>
-        {route.kind === 'tier-list' ? (
+        {route.kind === 'win-conditions' ? (
+          <WinConditionsPage
+            champions={champions.data}
+            onSelectChampion={openChampionGuide}
+          />
+        ) : route.kind === 'tier-list' ? (
           <TierListPage
             champions={champions.data}
             analyticsPatch={activeAnalyticsPatch}
