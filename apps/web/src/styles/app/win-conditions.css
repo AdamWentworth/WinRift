@@ -269,29 +269,32 @@
 }
 
 .control-pair-art {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: block;
 }
 
 .control-pair-side {
   overflow: hidden;
-  position: relative;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 58%;
 }
 
 .control-pair-side.carry {
-  clip-path: polygon(0 0, 100% 0, 86% 100%, 0 100%);
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+  left: 0;
 }
 
 .control-pair-side.protector {
-  clip-path: polygon(14% 0, 100% 0, 100% 100%, 0 100%);
-  margin-left: -10%;
+  clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%);
+  right: 0;
 }
 
 .control-pair-side .win-condition-art-layer {
   height: 100%;
   inset: 0;
   object-fit: cover;
-  width: 112%;
+  width: 100%;
 }
 
 .control-pair-side.carry .win-condition-art-layer {
