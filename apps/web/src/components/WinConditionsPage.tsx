@@ -1,8 +1,8 @@
-import { ArrowRight, BarChart3, BookOpen, MousePointer2, ShieldAlert } from 'lucide-react';
+import { ArrowRight, BarChart3, BookOpen, ChevronLeft, ChevronRight, MousePointer2, ShieldAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Champion, ChampionData } from '../api/types';
-import { championByKey, championImageUrl, championList, championSplashUrl } from '../lib/staticData';
+import { championImageUrl, championList, championSplashUrl } from '../lib/staticData';
 import { conditionIconUrl, WIN_CONDITION_DEFINITIONS, WIN_CONDITION_PAGE_ORDER, type WinConditionDefinition } from '../lib/winConditions';
 
 type Props = {
@@ -32,6 +32,9 @@ const modelSteps = [
     body: 'Historical winrates and confidence scores explain what has happened in collected games. They are context, not a command to force a strategy your champions cannot actually execute.',
   },
 ];
+
+const carouselPans = ['pan-east', 'pan-west', 'pan-rise', 'pan-fall', 'pan-northeast', 'pan-southwest'];
+const examplePageSize = 5;
 
 export function WinConditionsPage({ champions, onSelectChampion }: Props) {
   const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
@@ -121,33 +124,60 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
 }
 
 function WinConditionGuideCard({ definition, champions, onSelectChampion }: { definition: WinConditionDefinition; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
+  const [exampleOffset, setExampleOffset] = useState(0);
   const exampleChampions = definition.examples
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
-  const activeExampleIndex = useRandomCarouselIndex(exampleChampions.length, definition.key);
-  const heroChampion = exampleChampions[activeExampleIndex] ? championByKey(champions, Number(exampleChampions[activeExampleIndex].key)) : undefined;
   const carryChampions = (definition.carryExamples ?? [])
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
   const protectorChampions = (definition.protectorExamples ?? [])
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
-  const activeCarryIndex = useRandomCarouselIndex(carryChampions.length, `${definition.key}-carry`);
-  const activeProtectorIndex = useRandomCarouselIndex(protectorChampions.length, `${definition.key}-protector`);
-  const carryChampion = carryChampions[activeCarryIndex];
-  const protectorChampion = protectorChampions[activeProtectorIndex];
+  const artCarousel = useChampionSplashCarousel(exampleChampions, definition.key);
+  const carryCarousel = useChampionSplashCarousel(carryChampions, `${definition.key}-carry`);
+  const protectorCarousel = useChampionSplashCarousel(protectorChampions, `${definition.key}-protector`);
   const isControl = definition.key === 'Control';
+  const lastExampleOffset = lastExamplePageOffset(definition.examples.length);
+  const pageOffset = Math.min(exampleOffset, lastExampleOffset);
+  const visibleExampleNames = definition.examples.slice(pageOffset, pageOffset + examplePageSize);
+  const canPageExamples = definition.examples.length > examplePageSize;
+  const exampleRangeStart = visibleExampleNames.length ? pageOffset + 1 : 0;
+  const exampleRangeEnd = pageOffset + visibleExampleNames.length;
+
+  useEffect(() => {
+    setExampleOffset(0);
+  }, [definition.key]);
+
+  function shiftExamplePage(direction: -1 | 1) {
+    setExampleOffset((current) => {
+      const currentPage = Math.min(current, lastExampleOffset);
+      const nextPage = currentPage + direction;
+      if (nextPage > lastExampleOffset) {
+        return 0;
+      }
+      if (nextPage < 0) {
+        return lastExampleOffset;
+      }
+      return nextPage;
+    });
+  }
+
   return (
     <article
       className={`win-condition-guide-card${isControl ? ' spotlight control-pair' : ''}`}
       id={definition.key}
-      style={{
-        '--condition-accent': definition.accent,
-        '--condition-splash': heroChampion ? `url(${championSplashUrl(champions, Number(heroChampion.key))})` : 'none',
-        '--condition-carry-splash': carryChampion ? `url(${championSplashUrl(champions, Number(carryChampion.key))})` : 'none',
-        '--condition-protector-splash': protectorChampion ? `url(${championSplashUrl(champions, Number(protectorChampion.key))})` : 'none',
-      } as CSSProperties}
+      style={{ '--condition-accent': definition.accent } as CSSProperties}
     >
+      {isControl ? (
+        <ControlPairArt
+          carryCarousel={carryCarousel}
+          protectorCarousel={protectorCarousel}
+          champions={champions}
+        />
+      ) : (
+        <WinConditionCardArt carousel={artCarousel} champions={champions} />
+      )}
       <header>
         <img src={conditionIconUrl(definition.key)} alt="" />
         <div>
@@ -173,9 +203,32 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
         </div>
       ) : null}
       <div className="win-condition-example-strip">
-        <span>Example champions</span>
-        <div>
-          {definition.examples.map((name) => {
+        <div className="win-condition-example-strip-header">
+          <span>Example champions</span>
+          <div className="win-condition-example-controls">
+            <button
+              aria-label={`Previous ${definition.label} examples`}
+              className="win-condition-example-arrow"
+              disabled={!canPageExamples}
+              onClick={() => shiftExamplePage(-1)}
+              type="button"
+            >
+              <ChevronLeft size={15} aria-hidden="true" />
+            </button>
+            <em>{exampleRangeStart}-{exampleRangeEnd} / {definition.examples.length}</em>
+            <button
+              aria-label={`Next ${definition.label} examples`}
+              className="win-condition-example-arrow"
+              disabled={!canPageExamples}
+              onClick={() => shiftExamplePage(1)}
+              type="button"
+            >
+              <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div className="win-condition-example-window">
+          {visibleExampleNames.map((name) => {
             const champion = exampleChampions.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
             if (!champion) {
               return <span className="win-condition-example-name" key={name}>{name}</span>;
@@ -191,6 +244,62 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
         </div>
       </div>
     </article>
+  );
+}
+
+function WinConditionCardArt({ carousel, champions }: { carousel: ChampionSplashCarouselState; champions?: ChampionData }) {
+  return (
+    <div className="win-condition-card-art" aria-hidden="true">
+      {carousel.previous ? <WinConditionArtLayer slide={carousel.previous} champions={champions} state="exiting" /> : null}
+      {carousel.active ? <WinConditionArtLayer slide={carousel.active} champions={champions} state="active" /> : null}
+    </div>
+  );
+}
+
+function ControlPairArt({
+  carryCarousel,
+  protectorCarousel,
+  champions,
+}: {
+  carryCarousel: ChampionSplashCarouselState;
+  protectorCarousel: ChampionSplashCarouselState;
+  champions?: ChampionData;
+}) {
+  return (
+    <div className="control-pair-art" aria-hidden="true">
+      <div className="control-pair-side carry">
+        {carryCarousel.previous ? <WinConditionArtLayer slide={carryCarousel.previous} champions={champions} state="exiting" /> : null}
+        {carryCarousel.active ? <WinConditionArtLayer slide={carryCarousel.active} champions={champions} state="active" /> : null}
+      </div>
+      <div className="control-pair-side protector">
+        {protectorCarousel.previous ? <WinConditionArtLayer slide={protectorCarousel.previous} champions={champions} state="exiting" /> : null}
+        {protectorCarousel.active ? <WinConditionArtLayer slide={protectorCarousel.active} champions={champions} state="active" /> : null}
+      </div>
+      <span className="control-pair-blend" />
+    </div>
+  );
+}
+
+function WinConditionArtLayer({
+  slide,
+  champions,
+  state,
+}: {
+  slide: ChampionSplashSlide;
+  champions?: ChampionData;
+  state: 'active' | 'exiting';
+}) {
+  const source = championSplashUrl(champions, Number(slide.champion.key));
+  if (!source) {
+    return null;
+  }
+  return (
+    <img
+      key={`${state}-${slide.cycle}-${slide.champion.id}`}
+      className={`win-condition-art-layer ${state} ${slide.panClass}`}
+      src={source}
+      alt=""
+    />
   );
 }
 
@@ -213,30 +322,78 @@ function orderedWinConditionDefinitions() {
     .filter((definition): definition is WinConditionDefinition => Boolean(definition));
 }
 
-function useRandomCarouselIndex(count: number, key: string) {
-  const [index, setIndex] = useState(0);
+function lastExamplePageOffset(count: number) {
+  if (count <= examplePageSize) {
+    return 0;
+  }
+  return count - examplePageSize;
+}
+
+type ChampionSplashSlide = {
+  champion: Champion;
+  panClass: string;
+  cycle: number;
+};
+
+type ChampionSplashCarouselState = {
+  active?: ChampionSplashSlide;
+  previous?: ChampionSplashSlide;
+};
+
+function useChampionSplashCarousel(champions: Champion[], key: string): ChampionSplashCarouselState {
+  const [state, setState] = useState<ChampionSplashCarouselState>({});
+  const championKey = champions.map((champion) => champion.key).join(':');
 
   useEffect(() => {
-    if (count <= 1) {
-      setIndex(0);
+    if (!champions.length) {
+      setState({});
       return undefined;
     }
 
-    setIndex(randomIndex(count));
-    const intervalMs = 4800 + randomIndex(1100);
+    const firstChampion = champions[randomIndex(champions.length)];
+    setState({ active: splashSlide(firstChampion, 0, key) });
+    if (champions.length <= 1) {
+      return undefined;
+    }
+
+    const intervalMs = 9200 + randomIndex(1600);
+    let cycle = 0;
     const timer = window.setInterval(() => {
-      setIndex((current) => {
-        const next = randomIndex(count);
-        return next === current ? (next + 1) % count : next;
+      setState((current) => {
+        const currentKey = current.active?.champion.key;
+        const candidates = champions.filter((champion) => champion.key !== currentKey);
+        const nextChampion = candidates[randomIndex(candidates.length)] ?? champions[0];
+        cycle += 1;
+        return {
+          active: splashSlide(nextChampion, cycle, key),
+          previous: current.active,
+        };
       });
     }, intervalMs);
 
     return () => window.clearInterval(timer);
-  }, [count, key]);
+  }, [championKey, key]);
 
-  return count > 0 ? Math.min(index, count - 1) : 0;
+  return state;
+}
+
+function splashSlide(champion: Champion, cycle: number, key: string): ChampionSplashSlide {
+  const panIndex = (hashText(`${key}:${champion.id}:${cycle}`) + cycle) % carouselPans.length;
+  return {
+    champion,
+    cycle,
+    panClass: carouselPans[panIndex],
+  };
 }
 
 function randomIndex(count: number) {
   return Math.floor(Math.random() * Math.max(1, count));
+}
+
+function hashText(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
 }

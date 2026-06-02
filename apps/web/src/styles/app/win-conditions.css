@@ -28,7 +28,7 @@
 .win-condition-reading-card > div > span,
 .win-condition-guide-card header span,
 .win-condition-detail-grid span,
-.win-condition-example-strip > span {
+.win-condition-example-strip-header > span {
   color: #93dceb;
   display: block;
   font-size: 11px;
@@ -188,11 +188,8 @@
 
 .win-condition-guide-card {
   background:
-    linear-gradient(180deg, rgb(6 8 9 / 34%), rgb(6 8 9 / 88%)),
-    var(--condition-splash),
+    radial-gradient(ellipse at 18% 0, color-mix(in srgb, var(--condition-accent) 12%, transparent), transparent 48%),
     linear-gradient(180deg, #202426, #080909);
-  background-position: center 22%;
-  background-size: cover;
   border: 1px solid color-mix(in srgb, var(--condition-accent) 44%, rgb(255 255 255 / 12%));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%), 0 18px 34px rgb(0 0 0 / 30%);
   display: grid;
@@ -206,22 +203,6 @@
   grid-column: 1 / -1;
 }
 
-.win-condition-guide-card.control-pair {
-  background-image:
-    var(--condition-carry-splash),
-    var(--condition-protector-splash),
-    linear-gradient(180deg, #202426, #080909);
-  background-position:
-    left center,
-    right center,
-    center;
-  background-repeat: no-repeat;
-  background-size:
-    55% 100%,
-    55% 100%,
-    cover;
-}
-
 .win-condition-guide-card::before {
   background:
     linear-gradient(180deg, rgb(0 0 0 / 16%), rgb(0 0 0 / 58%) 42%, rgb(0 0 0 / 92%)),
@@ -230,27 +211,159 @@
   inset: 0;
   pointer-events: none;
   position: absolute;
+  z-index: 1;
 }
 
-.win-condition-guide-card.control-pair::after {
-  background:
-    linear-gradient(180deg, transparent, color-mix(in srgb, var(--condition-accent) 70%, #fff), transparent),
-    linear-gradient(180deg, transparent 0 18%, rgb(255 255 255 / 42%) 45% 55%, transparent 82%);
-  box-shadow:
-    0 0 22px color-mix(in srgb, var(--condition-accent) 42%, transparent),
-    0 0 1px rgb(255 255 255 / 70%);
-  content: "";
-  inset: -18% auto -18% 50%;
-  opacity: 0.76;
+.win-condition-guide-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.win-condition-card-art,
+.control-pair-art {
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.win-condition-art-layer {
+  filter: saturate(0.92) contrast(0.96) brightness(0.5);
+  height: 108%;
+  inset: -4%;
+  object-fit: cover;
+  opacity: 0;
+  position: absolute;
+  transform: translate3d(0, 0, 0) scale(1.08);
+  width: 108%;
+  will-change: opacity, transform;
+}
+
+.win-condition-art-layer.active.pan-east {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanEast 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-west {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanWest 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-rise {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanRise 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-fall {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanFall 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-northeast {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanNorthEast 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-southwest {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanSouthWest 10500ms linear forwards;
+}
+
+.win-condition-art-layer.exiting {
+  animation: winConditionArtDepart 2600ms ease-in forwards;
+}
+
+.control-pair-art {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.control-pair-side {
+  overflow: hidden;
+  position: relative;
+}
+
+.control-pair-side.carry {
+  clip-path: polygon(0 0, 100% 0, 86% 100%, 0 100%);
+}
+
+.control-pair-side.protector {
+  clip-path: polygon(14% 0, 100% 0, 100% 100%, 0 100%);
+  margin-left: -10%;
+}
+
+.control-pair-side .win-condition-art-layer {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  width: 112%;
+}
+
+.control-pair-side.carry .win-condition-art-layer {
+  object-position: 42% center;
+}
+
+.control-pair-side.protector .win-condition-art-layer {
+  object-position: 58% center;
+}
+
+.control-pair-blend {
+  background:
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--condition-accent) 72%, #fff), transparent),
+    linear-gradient(180deg, transparent 0 18%, rgb(255 255 255 / 34%) 45% 55%, transparent 82%);
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--condition-accent) 46%, transparent),
+    0 0 1px rgb(255 255 255 / 70%);
+  inset: -18% auto -18% 49.8%;
+  opacity: 0.72;
   position: absolute;
   transform: rotate(10deg);
   width: 3px;
 }
 
-.win-condition-guide-card > * {
-  position: relative;
-  z-index: 1;
+@keyframes winConditionArtReveal {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0.76;
+  }
+}
+
+@keyframes winConditionArtDepart {
+  0% {
+    opacity: 0.58;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes winConditionPanEast {
+  from { transform: translate3d(-2%, 0, 0) scale(1.08); }
+  to { transform: translate3d(2%, 0, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanWest {
+  from { transform: translate3d(2%, 0, 0) scale(1.08); }
+  to { transform: translate3d(-2%, 0, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanRise {
+  from { transform: translate3d(0, 2%, 0) scale(1.08); }
+  to { transform: translate3d(0, -2%, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanFall {
+  from { transform: translate3d(0, -2%, 0) scale(1.08); }
+  to { transform: translate3d(0, 2%, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanNorthEast {
+  from { transform: translate3d(-2%, 2%, 0) scale(1.08); }
+  to { transform: translate3d(2%, -2%, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanSouthWest {
+  from { transform: translate3d(2%, -2%, 0) scale(1.08); }
+  to { transform: translate3d(-2%, 2%, 0) scale(1.12); }
 }
 
 .win-condition-guide-card header {
@@ -352,17 +465,58 @@
   padding: 10px;
 }
 
-.win-condition-example-strip > span {
+.win-condition-example-strip-header {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.win-condition-example-strip-header > span {
   color: var(--condition-accent);
 }
 
-.win-condition-example-strip > div {
+.win-condition-example-controls {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.win-condition-example-arrow {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 9%), rgb(255 255 255 / 3%)),
+    rgb(0 0 0 / 34%);
+  border: 1px solid color-mix(in srgb, var(--condition-accent) 44%, rgb(255 255 255 / 12%));
+  color: #fff;
+  display: inline-flex;
+  height: 26px;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+}
+
+.win-condition-example-arrow:hover,
+.win-condition-example-arrow:focus-visible {
+  background: color-mix(in srgb, var(--condition-accent) 18%, rgb(255 255 255 / 6%));
+  border-color: var(--condition-accent);
+  outline: none;
+}
+
+.win-condition-example-arrow:disabled {
+  cursor: default;
+  opacity: 0.36;
+}
+
+.win-condition-example-window {
   display: grid;
   gap: 7px;
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.win-condition-example-strip button {
+.win-condition-example-window button {
   align-items: center;
   background: rgb(255 255 255 / 6%);
   border: 1px solid rgb(255 255 255 / 10%);
@@ -394,21 +548,21 @@
   white-space: nowrap;
 }
 
-.win-condition-example-strip button:hover,
-.win-condition-example-strip button:focus-visible {
+.win-condition-example-window button:hover,
+.win-condition-example-window button:focus-visible {
   background: color-mix(in srgb, var(--condition-accent) 18%, rgb(255 255 255 / 7%));
   border-color: var(--condition-accent);
   outline: none;
 }
 
-.win-condition-example-strip img {
+.win-condition-example-window img {
   border: 1px solid color-mix(in srgb, var(--condition-accent) 70%, rgb(255 255 255 / 20%));
   height: 30px;
   object-fit: cover;
   width: 30px;
 }
 
-.win-condition-example-strip strong {
+.win-condition-example-window strong {
   font-size: 11px;
   font-weight: 1000;
   min-width: 0;
