@@ -241,7 +241,8 @@ if [[ "${#NEW_KEY}" -lt 20 ]]; then
   exit 1
 fi
 if [[ "${NEW_KEY}" != RGAPI-* ]]; then
-  echo "Warning: Riot development keys usually start with RGAPI-." >&2
+  echo "Riot API key must start with RGAPI-. Aborting before updating ${ENV_FILE}." >&2
+  exit 1
 fi
 
 echo "Updating ${ENV_FILE}."
