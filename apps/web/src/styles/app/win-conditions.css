@@ -18,7 +18,7 @@
   box-shadow: 0 20px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 8%);
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1fr) minmax(230px, 0.32fr);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.42fr);
   padding: 20px;
 }
 
@@ -60,10 +60,11 @@
 }
 
 .win-conditions-hero-icons {
+  align-self: start;
   display: grid;
   gap: 7px;
-  grid-template-columns: 1fr;
-  max-width: 300px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 420px;
   width: 100%;
 }
 
@@ -77,11 +78,15 @@
   border-left: 3px solid var(--condition-accent);
   color: #fff;
   display: grid;
-  gap: 10px;
-  grid-template-columns: 48px minmax(0, 1fr);
-  min-height: 58px;
-  padding: 6px 10px 6px 7px;
+  gap: 8px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  min-height: 50px;
+  padding: 5px 9px 5px 6px;
   text-decoration: none;
+}
+
+.win-conditions-hero-icons a:last-child {
+  grid-column: 1 / -1;
 }
 
 .win-conditions-hero-icons a:hover,
@@ -96,9 +101,9 @@
 
 .win-conditions-hero-icons img {
   filter: drop-shadow(0 6px 12px rgb(0 0 0 / 48%));
-  height: 46px;
+  height: 38px;
   object-fit: contain;
-  width: 46px;
+  width: 38px;
 }
 
 .win-conditions-hero-icons span {
