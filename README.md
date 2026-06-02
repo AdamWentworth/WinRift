@@ -205,6 +205,7 @@ cp apps/web/.env.example apps/web/.env.local
 | `API_SLOW_REQUEST_MS` | Marks API request log lines as slow after this duration. |
 | `MONITOR_WORKER_STALE_AFTER_MINUTES` | Heartbeat age before stale-worker log observations. |
 | `WORKER_REFRESH_STATUS_PATH` | Runtime JSON file with latest worker summary-refresh health. |
+| `ANALYTICS_REFRESH_SCHEDULER_INTERVAL_SECONDS` | Background refresh cadence; the worker runs at most one due summary/prewarm family per tick. |
 | `MONITOR_WORKER_CONTAINER_NAME` | Optional Docker container name for actual worker-down alerts. |
 | `MONITOR_STARTUP_GRACE_SECONDS` | Grace window that avoids worker-down email noise during monitor/deploy startup. |
 | `ALERT_EMAIL_ENABLED` | Enables SMTP alerts from the monitor. |

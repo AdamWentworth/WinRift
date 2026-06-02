@@ -44,7 +44,7 @@ func main() {
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	writeWorkerHeartbeat(cfg, "starting", len(platforms), 0, 0, "worker startup")
 	log.Printf(
-		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s champion_page_prewarm_enabled=%t champion_page_prewarm_per_role=%d champion_page_prewarm_min_games=%d champion_page_prewarm_matchups_per_champion=%d champion_page_prewarm_matchup_min_games=%d champion_page_prewarm_max_matchup_bundles=%d win_condition_refresh_enabled=%t win_condition_refresh_interval=%s summoner_profile_refresh_enabled=%t summoner_profile_refresh_interval=%s",
+		"collector platforms=%s current_patch=%s patch_retention=%d idle_sleep=%s region_request_budget=%d rate_limit=%d/%s reserve=%d manual_match_cap=%d rank_lane_cap=%d alias_lane_enabled=%t alias_lane_cap=%d item_slot_refresh_enabled=%t item_slot_refresh_interval=%s champion_guide_refresh_enabled=%t champion_guide_refresh_interval=%s champion_page_prewarm_enabled=%t champion_page_prewarm_per_role=%d champion_page_prewarm_min_games=%d champion_page_prewarm_matchups_per_champion=%d champion_page_prewarm_matchup_min_games=%d champion_page_prewarm_max_matchup_bundles=%d win_condition_refresh_enabled=%t win_condition_refresh_interval=%s summoner_profile_refresh_enabled=%t summoner_profile_refresh_interval=%s analytics_refresh_scheduler_interval=%s",
 		strings.Join(platforms, ","),
 		cfg.CollectorCurrentPatch,
 		cfg.CollectorPatchRetention,
@@ -71,6 +71,7 @@ func main() {
 		cfg.WinConditionRefreshInterval,
 		cfg.SummonerProfileRefreshEnabled,
 		cfg.SummonerProfileRefreshInterval,
+		cfg.AnalyticsRefreshSchedulerInterval,
 	)
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {

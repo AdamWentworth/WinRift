@@ -143,3 +143,12 @@ func TestLoadMonitorConfig(t *testing.T) {
 		t.Fatalf("smtp to = %v", cfg.SMTPTo)
 	}
 }
+
+func TestLoadAnalyticsRefreshSchedulerConfig(t *testing.T) {
+	t.Setenv("ANALYTICS_REFRESH_SCHEDULER_INTERVAL_SECONDS", "90")
+
+	cfg := Load()
+	if cfg.AnalyticsRefreshSchedulerInterval != 90*time.Second {
+		t.Fatalf("analytics refresh scheduler interval = %s, want 90s", cfg.AnalyticsRefreshSchedulerInterval)
+	}
+}

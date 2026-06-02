@@ -71,6 +71,7 @@ type Config struct {
 	WinConditionRefreshInterval            time.Duration
 	SummonerProfileRefreshEnabled          bool
 	SummonerProfileRefreshInterval         time.Duration
+	AnalyticsRefreshSchedulerInterval      time.Duration
 	MonitorAPIHealthURL                    string
 	MonitorInterval                        time.Duration
 	MonitorWorkerHeartbeatPath             string
@@ -156,6 +157,7 @@ func Load() Config {
 		WinConditionRefreshInterval:            time.Duration(envInt("WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES", 15)) * time.Minute,
 		SummonerProfileRefreshEnabled:          envBool("SUMMONER_PROFILE_ANALYTICS_REFRESH_ENABLED", true),
 		SummonerProfileRefreshInterval:         time.Duration(envInt("SUMMONER_PROFILE_ANALYTICS_REFRESH_INTERVAL_MINUTES", 10)) * time.Minute,
+		AnalyticsRefreshSchedulerInterval:      time.Duration(envInt("ANALYTICS_REFRESH_SCHEDULER_INTERVAL_SECONDS", 60)) * time.Second,
 		MonitorAPIHealthURL:                    env("MONITOR_API_HEALTH_URL", "http://api:8000/api/health"),
 		MonitorInterval:                        time.Duration(envInt("MONITOR_INTERVAL_SECONDS", 60)) * time.Second,
 		MonitorWorkerHeartbeatPath:             env("MONITOR_WORKER_HEARTBEAT_PATH", "/run/winrift/worker-heartbeat.json"),

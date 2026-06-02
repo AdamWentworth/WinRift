@@ -64,6 +64,7 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
 | `API_REQUEST_LOGS_ENABLED` | Enables grep-friendly API timing logs. |
 | `WORKER_REFRESH_STATUS_PATH` | Runtime JSON file for worker refresh health. |
+| `ANALYTICS_REFRESH_SCHEDULER_INTERVAL_SECONDS` | Background summary/prewarm cadence; only one due refresh family runs per tick. |
 | `MONITOR_WORKER_REQUIRED` | Set `true` when the collector is expected to be running. |
 | `MONITOR_WORKER_CONTAINER_NAME` | Set to `winrift_worker` so the monitor emails only when the worker container is actually down. |
 | `MONITOR_STARTUP_GRACE_SECONDS` | Short deploy/startup grace window before worker-down emails are eligible. |
