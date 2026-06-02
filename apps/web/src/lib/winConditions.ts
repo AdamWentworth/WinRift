@@ -10,6 +10,8 @@ export type WinConditionDefinition = {
   teamNeeds: string;
   commonFailure: string;
   examples: string[];
+  carryExamples?: string[];
+  protectorExamples?: string[];
 };
 
 export const WIN_CONDITION_DEFINITIONS: WinConditionDefinition[] = [
@@ -56,6 +58,8 @@ export const WIN_CONDITION_DEFINITIONS: WinConditionDefinition[] = [
     teamNeeds: 'A protected damage source plus champions who can deny entry: shields, knockbacks, walls, traps, slows, durable front line, and disciplined objective setup.',
     commonFailure: 'Showing up late, chasing out of controlled space, or drafting protection without a carry who can turn that space into real damage.',
     examples: ['Janna', 'Braum', 'Poppy', 'Vayne', 'Kai\'Sa'],
+    carryExamples: ['Vayne', 'Kai\'Sa', 'Kog\'Maw', 'Jinx'],
+    protectorExamples: ['Janna', 'Braum', 'Poppy', 'Ivern'],
   },
   {
     key: 'TeamFight',
@@ -69,6 +73,8 @@ export const WIN_CONDITION_DEFINITIONS: WinConditionDefinition[] = [
     examples: ['Malphite', 'Orianna', 'Rell', 'Amumu', 'Ornn'],
   },
 ];
+
+export const WIN_CONDITION_PAGE_ORDER: WinConditionKey[] = ['TeamFight', 'SplitPush', 'Pick', 'Siege', 'Control'];
 
 export function conditionIconUrl(condition: string) {
   return `/images/win_condition_icons/${condition}.png`;

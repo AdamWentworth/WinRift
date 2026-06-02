@@ -1,8 +1,9 @@
 import { ArrowRight, BarChart3, BookOpen, MousePointer2, ShieldAlert } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Champion, ChampionData } from '../api/types';
 import { championByKey, championImageUrl, championList, championSplashUrl } from '../lib/staticData';
-import { conditionIconUrl, WIN_CONDITION_DEFINITIONS, type WinConditionDefinition } from '../lib/winConditions';
+import { conditionIconUrl, WIN_CONDITION_DEFINITIONS, WIN_CONDITION_PAGE_ORDER, type WinConditionDefinition } from '../lib/winConditions';
 
 type Props = {
   champions?: ChampionData;
@@ -33,6 +34,7 @@ const modelSteps = [
 ];
 
 export function WinConditionsPage({ champions, onSelectChampion }: Props) {
+  const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
   return (
     <section className="win-conditions-page">
       <div className="win-conditions-hero">
@@ -45,7 +47,7 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
           </p>
         </div>
         <div className="win-conditions-hero-icons" aria-label="Win condition shortcuts">
-          {WIN_CONDITION_DEFINITIONS.map((definition) => (
+          {orderedDefinitions.map((definition) => (
             <a
               href={`#${definition.key}`}
               key={definition.key}
@@ -92,7 +94,7 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
       </div>
 
       <div className="win-condition-guide-grid">
-        {WIN_CONDITION_DEFINITIONS.map((definition) => (
+        {orderedDefinitions.map((definition) => (
           <WinConditionGuideCard
             key={definition.key}
             definition={definition}
@@ -122,14 +124,28 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
   const exampleChampions = definition.examples
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
-  const heroChampion = exampleChampions[0] ? championByKey(champions, Number(exampleChampions[0].key)) : undefined;
+  const activeExampleIndex = useRandomCarouselIndex(exampleChampions.length, definition.key);
+  const heroChampion = exampleChampions[activeExampleIndex] ? championByKey(champions, Number(exampleChampions[activeExampleIndex].key)) : undefined;
+  const carryChampions = (definition.carryExamples ?? [])
+    .map((name) => championByDisplayName(champions, name))
+    .filter((champion): champion is Champion => Boolean(champion));
+  const protectorChampions = (definition.protectorExamples ?? [])
+    .map((name) => championByDisplayName(champions, name))
+    .filter((champion): champion is Champion => Boolean(champion));
+  const activeCarryIndex = useRandomCarouselIndex(carryChampions.length, `${definition.key}-carry`);
+  const activeProtectorIndex = useRandomCarouselIndex(protectorChampions.length, `${definition.key}-protector`);
+  const carryChampion = carryChampions[activeCarryIndex];
+  const protectorChampion = protectorChampions[activeProtectorIndex];
+  const isControl = definition.key === 'Control';
   return (
     <article
-      className={`win-condition-guide-card${definition.key === 'Control' ? ' spotlight' : ''}`}
+      className={`win-condition-guide-card${isControl ? ' spotlight control-pair' : ''}`}
       id={definition.key}
       style={{
         '--condition-accent': definition.accent,
         '--condition-splash': heroChampion ? `url(${championSplashUrl(champions, Number(heroChampion.key))})` : 'none',
+        '--condition-carry-splash': carryChampion ? `url(${championSplashUrl(champions, Number(carryChampion.key))})` : 'none',
+        '--condition-protector-splash': protectorChampion ? `url(${championSplashUrl(champions, Number(protectorChampion.key))})` : 'none',
       } as CSSProperties}
     >
       <header>
@@ -145,7 +161,7 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
         <ReadDetail label="Team Needs" text={definition.teamNeeds} />
         <ReadDetail label="Common Failure" text={definition.commonFailure} />
       </div>
-      {definition.key === 'Control' ? (
+      {isControl ? (
         <div className="win-condition-pairing-callout">
           <span>Why Carry Pairings Matter</span>
           <p>
@@ -189,4 +205,38 @@ function ReadDetail({ label, text }: { label: string; text: string }) {
 
 function championByDisplayName(champions: ChampionData | undefined, name: string) {
   return championList(champions).find((champion) => champion.name.toLowerCase() === name.toLowerCase());
+}
+
+function orderedWinConditionDefinitions() {
+  return WIN_CONDITION_PAGE_ORDER
+    .map((key) => WIN_CONDITION_DEFINITIONS.find((definition) => definition.key === key))
+    .filter((definition): definition is WinConditionDefinition => Boolean(definition));
+}
+
+function useRandomCarouselIndex(count: number, key: string) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    if (count <= 1) {
+      setIndex(0);
+      return undefined;
+    }
+
+    setIndex(randomIndex(count));
+    const intervalMs = 4800 + randomIndex(1100);
+    const timer = window.setInterval(() => {
+      setIndex((current) => {
+        const next = randomIndex(count);
+        return next === current ? (next + 1) % count : next;
+      });
+    }, intervalMs);
+
+    return () => window.clearInterval(timer);
+  }, [count, key]);
+
+  return count > 0 ? Math.min(index, count - 1) : 0;
+}
+
+function randomIndex(count: number) {
+  return Math.floor(Math.random() * Math.max(1, count));
 }

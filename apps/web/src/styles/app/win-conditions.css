@@ -206,6 +206,22 @@
   grid-column: 1 / -1;
 }
 
+.win-condition-guide-card.control-pair {
+  background-image:
+    var(--condition-carry-splash),
+    var(--condition-protector-splash),
+    linear-gradient(180deg, #202426, #080909);
+  background-position:
+    left center,
+    right center,
+    center;
+  background-repeat: no-repeat;
+  background-size:
+    55% 100%,
+    55% 100%,
+    cover;
+}
+
 .win-condition-guide-card::before {
   background:
     linear-gradient(180deg, rgb(0 0 0 / 16%), rgb(0 0 0 / 58%) 42%, rgb(0 0 0 / 92%)),
@@ -214,6 +230,22 @@
   inset: 0;
   pointer-events: none;
   position: absolute;
+}
+
+.win-condition-guide-card.control-pair::after {
+  background:
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--condition-accent) 70%, #fff), transparent),
+    linear-gradient(180deg, transparent 0 18%, rgb(255 255 255 / 42%) 45% 55%, transparent 82%);
+  box-shadow:
+    0 0 22px color-mix(in srgb, var(--condition-accent) 42%, transparent),
+    0 0 1px rgb(255 255 255 / 70%);
+  content: "";
+  inset: -18% auto -18% 50%;
+  opacity: 0.76;
+  pointer-events: none;
+  position: absolute;
+  transform: rotate(10deg);
+  width: 3px;
 }
 
 .win-condition-guide-card > * {
