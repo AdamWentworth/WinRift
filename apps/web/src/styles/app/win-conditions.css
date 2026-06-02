@@ -268,6 +268,30 @@
   animation: winConditionArtDepart 2600ms ease-in forwards;
 }
 
+.win-condition-art-layer.exiting.pan-east {
+  transform: translate3d(2%, 0, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-west {
+  transform: translate3d(-2%, 0, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-rise {
+  transform: translate3d(0, -2%, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-fall {
+  transform: translate3d(0, 2%, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-northeast {
+  transform: translate3d(2%, -2%, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-southwest {
+  transform: translate3d(-2%, 2%, 0) scale(1.12);
+}
+
 .control-pair-art {
   display: block;
 }

@@ -414,7 +414,7 @@ function useChampionSplashCarousel(champions: Champion[], key: string): Champion
       return undefined;
     }
 
-    const intervalMs = 9200 + randomIndex(1600);
+    const intervalMs = 11200 + randomIndex(1600);
     let cycle = 0;
     const timer = window.setInterval(() => {
       setState((current) => {
