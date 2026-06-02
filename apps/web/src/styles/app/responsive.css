@@ -185,11 +185,20 @@
   }
 
   .topbar-logo {
-    font-size: 21px;
+    gap: 0;
   }
 
   .topbar-brand {
-    min-width: 86px;
+    min-width: 46px;
+  }
+
+  .topbar-logo-icon {
+    height: 36px;
+    width: 36px;
+  }
+
+  .topbar-logo-wordmark {
+    display: none;
   }
 
   .topbar-nav {

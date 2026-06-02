@@ -121,6 +121,7 @@ export function LiveMatchPanel({ champions, items, analyticsPatch, spells, runes
       <div className={showLiveGame ? 'search-section compact-search' : 'search-section lookup-console'}>
         {!showLiveGame ? (
           <div className="lookup-console-header">
+            <img className="lookup-brand-wordmark" src="/images/brand/winrift-wordmark.png" alt="" aria-hidden="true" />
             <span>Search WinRift</span>
             <strong>Guides, Profiles, Live Games</strong>
             <p>Champion names open build guides. Riot IDs open summoner profiles and jump into live match analysis when that player is currently in game.</p>

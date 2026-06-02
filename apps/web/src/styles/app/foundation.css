@@ -28,6 +28,18 @@ button {
   cursor: pointer;
 }
 
+.sr-only {
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
 .role-icon {
   color: currentColor;
   display: inline-block;
@@ -149,25 +161,53 @@ button {
 
 .topbar-brand {
   flex: 0 0 auto;
-  min-width: 138px;
+  min-width: 218px;
 }
 
 .topbar-logo {
+  align-items: center;
   background: transparent;
   border: 0;
   color: #fff;
+  display: flex;
   font-size: 26px;
   font-weight: 700;
+  gap: 10px;
   line-height: 1;
   padding: 0;
+  position: relative;
   text-align: left;
+}
+
+.topbar-logo-icon {
+  filter: drop-shadow(0 0 10px rgb(77 227 239 / 18%));
+  height: 42px;
+  object-fit: contain;
+  width: 42px;
+}
+
+.topbar-logo-wordmark {
+  filter:
+    drop-shadow(0 0 10px rgb(77 227 239 / 16%))
+    drop-shadow(0 1px 0 rgb(255 255 255 / 10%));
+  height: 31px;
+  object-fit: contain;
+  width: 182px;
 }
 
 .topbar-logo:hover,
 .topbar-logo:focus-visible {
   color: #d9f6ff;
   outline: none;
-  text-shadow: 0 0 12px rgb(130 215 255 / 34%);
+}
+
+.topbar-logo:hover .topbar-logo-icon,
+.topbar-logo:focus-visible .topbar-logo-icon,
+.topbar-logo:hover .topbar-logo-wordmark,
+.topbar-logo:focus-visible .topbar-logo-wordmark {
+  filter:
+    drop-shadow(0 0 14px rgb(77 227 239 / 34%))
+    drop-shadow(0 1px 0 rgb(255 255 255 / 14%));
 }
 
 .live-topbar {
@@ -192,14 +232,23 @@ button {
   align-items: center;
   color: #bfeaf2;
   display: flex;
+  flex-direction: column;
   font-size: 12px;
   font-weight: 800;
+  gap: 12px;
   justify-content: center;
   letter-spacing: 0.08em;
   min-height: calc(100vh - 77px);
   position: relative;
   text-transform: uppercase;
   z-index: 2;
+}
+
+.route-loading-panel img {
+  filter: drop-shadow(0 0 22px rgb(77 227 239 / 24%));
+  height: 72px;
+  object-fit: contain;
+  width: 72px;
 }
 
 .live-panel.has-game {

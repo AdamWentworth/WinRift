@@ -40,11 +40,23 @@
 }
 
 .lookup-console-header {
+  align-items: center;
   display: grid;
   gap: 8px;
   margin: 0 auto 16px;
   max-width: 690px;
   text-align: center;
+}
+
+.lookup-brand-wordmark {
+  filter:
+    drop-shadow(0 0 18px rgb(77 227 239 / 20%))
+    drop-shadow(0 2px 0 rgb(255 255 255 / 8%));
+  height: auto;
+  justify-self: center;
+  margin: 0 0 2px;
+  max-width: min(312px, 72vw);
+  width: 100%;
 }
 
 .lookup-console-header span {
@@ -337,4 +349,3 @@
     transform: rotate(360deg);
   }
 }
-

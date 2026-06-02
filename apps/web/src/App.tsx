@@ -156,7 +156,9 @@ export function App() {
         <div className="topbar-brand">
           <h1>
             <button className="topbar-logo" onClick={goHome} type="button" aria-label="WinRift home">
-              WinRift
+              <img className="topbar-logo-icon" src="/images/brand/winrift-icon.png" alt="" aria-hidden="true" />
+              <img className="topbar-logo-wordmark" src="/images/brand/winrift-wordmark.png" alt="" aria-hidden="true" />
+              <span className="sr-only">WinRift</span>
             </button>
           </h1>
         </div>
@@ -260,6 +262,7 @@ function warmImage(src: string) {
 function RouteFallback() {
   return (
     <section className="route-loading-panel" aria-live="polite">
+      <img src="/images/brand/winrift-icon.png" alt="" aria-hidden="true" />
       <span>Loading WinRift</span>
     </section>
   );
