@@ -302,6 +302,7 @@
   }
 
   .win-conditions-model-grid,
+  .win-condition-control-examples,
   .win-condition-example-window,
   .win-condition-reading-card ol {
     grid-template-columns: 1fr;

@@ -124,8 +124,6 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
 }
 
 function WinConditionGuideCard({ definition, champions, onSelectChampion }: { definition: WinConditionDefinition; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
-  const [exampleOffset, setExampleOffset] = useState(0);
-  const shuffledExamples = useMemo(() => shuffleExamples(definition.examples), [definition.examples]);
   const exampleChampions = definition.examples
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
@@ -139,30 +137,6 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
   const carryCarousel = useChampionSplashCarousel(carryChampions, `${definition.key}-carry`);
   const protectorCarousel = useChampionSplashCarousel(protectorChampions, `${definition.key}-protector`);
   const isControl = definition.key === 'Control';
-  const lastExampleOffset = lastExamplePageOffset(shuffledExamples.length);
-  const pageOffset = Math.min(exampleOffset, lastExampleOffset);
-  const visibleExampleNames = shuffledExamples.slice(pageOffset, pageOffset + examplePageSize);
-  const canPageExamples = shuffledExamples.length > examplePageSize;
-  const exampleRangeStart = visibleExampleNames.length ? pageOffset + 1 : 0;
-  const exampleRangeEnd = pageOffset + visibleExampleNames.length;
-
-  useEffect(() => {
-    setExampleOffset(0);
-  }, [definition.key]);
-
-  function shiftExamplePage(direction: -1 | 1) {
-    setExampleOffset((current) => {
-      const currentPage = Math.min(current, lastExampleOffset);
-      const nextPage = currentPage + direction;
-      if (nextPage > lastExampleOffset) {
-        return 0;
-      }
-      if (nextPage < 0) {
-        return lastExampleOffset;
-      }
-      return nextPage;
-    });
-  }
 
   return (
     <article
@@ -203,48 +177,122 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
           </p>
         </div>
       ) : null}
-      <div className="win-condition-example-strip">
-        <div className="win-condition-example-strip-header">
-          <span>Example champions</span>
-          <div className="win-condition-example-controls">
-            <button
-              aria-label={`Previous ${definition.label} examples`}
-              className="win-condition-example-arrow"
-              disabled={!canPageExamples}
-              onClick={() => shiftExamplePage(-1)}
-              type="button"
-            >
-              <ChevronLeft size={15} aria-hidden="true" />
-            </button>
-            <em>{exampleRangeStart}-{exampleRangeEnd} / {shuffledExamples.length}</em>
-            <button
-              aria-label={`Next ${definition.label} examples`}
-              className="win-condition-example-arrow"
-              disabled={!canPageExamples}
-              onClick={() => shiftExamplePage(1)}
-              type="button"
-            >
-              <ChevronRight size={15} aria-hidden="true" />
-            </button>
-          </div>
+      {isControl ? (
+        <div className="win-condition-control-examples">
+          <ExampleChampionCarousel
+            championNames={definition.carryExamples ?? []}
+            champions={champions}
+            conditionLabel={definition.label}
+            label="Carry examples"
+            onSelectChampion={onSelectChampion}
+          />
+          <ExampleChampionCarousel
+            championNames={definition.protectorExamples ?? []}
+            champions={champions}
+            conditionLabel={definition.label}
+            label="Protector examples"
+            onSelectChampion={onSelectChampion}
+          />
         </div>
-        <div className="win-condition-example-window">
-          {visibleExampleNames.map((name) => {
-            const champion = exampleChampions.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
-            if (!champion) {
-              return <span className="win-condition-example-name" key={name}>{name}</span>;
-            }
-            return (
-              <button key={champion.key} type="button" onClick={() => onSelectChampion(champion)}>
-                <img src={championImageUrl(champions, Number(champion.key))} alt="" />
-                <strong>{champion.name}</strong>
-                <ArrowRight size={13} aria-hidden="true" />
-              </button>
-            );
-          })}
+      ) : (
+        <ExampleChampionCarousel
+          championNames={definition.examples}
+          champions={champions}
+          conditionLabel={definition.label}
+          label="Example champions"
+          onSelectChampion={onSelectChampion}
+        />
+      )}
+    </article>
+  );
+}
+
+function ExampleChampionCarousel({
+  championNames,
+  champions,
+  conditionLabel,
+  label,
+  onSelectChampion,
+}: {
+  championNames: string[];
+  champions?: ChampionData;
+  conditionLabel: string;
+  label: string;
+  onSelectChampion: (champion: Champion) => void;
+}) {
+  const [exampleOffset, setExampleOffset] = useState(0);
+  const namesKey = championNames.join('|');
+  const shuffledExamples = useMemo(() => shuffleExamples(championNames), [namesKey]);
+  const exampleChampions = championNames
+    .map((name) => championByDisplayName(champions, name))
+    .filter((champion): champion is Champion => Boolean(champion));
+  const lastExampleOffset = lastExamplePageOffset(shuffledExamples.length);
+  const pageOffset = Math.min(exampleOffset, lastExampleOffset);
+  const visibleExampleNames = shuffledExamples.slice(pageOffset, pageOffset + examplePageSize);
+  const canPageExamples = shuffledExamples.length > examplePageSize;
+  const exampleRangeStart = visibleExampleNames.length ? pageOffset + 1 : 0;
+  const exampleRangeEnd = pageOffset + visibleExampleNames.length;
+
+  useEffect(() => {
+    setExampleOffset(0);
+  }, [namesKey]);
+
+  function shiftExamplePage(direction: -1 | 1) {
+    setExampleOffset((current) => {
+      const currentPage = Math.min(current, lastExampleOffset);
+      const nextPage = currentPage + direction;
+      if (nextPage > lastExampleOffset) {
+        return 0;
+      }
+      if (nextPage < 0) {
+        return lastExampleOffset;
+      }
+      return nextPage;
+    });
+  }
+
+  return (
+    <div className="win-condition-example-strip">
+      <div className="win-condition-example-strip-header">
+        <span>{label}</span>
+        <div className="win-condition-example-controls">
+          <button
+            aria-label={`Previous ${conditionLabel} ${label.toLowerCase()}`}
+            className="win-condition-example-arrow"
+            disabled={!canPageExamples}
+            onClick={() => shiftExamplePage(-1)}
+            type="button"
+          >
+            <ChevronLeft size={15} aria-hidden="true" />
+          </button>
+          <em>{exampleRangeStart}-{exampleRangeEnd} / {shuffledExamples.length}</em>
+          <button
+            aria-label={`Next ${conditionLabel} ${label.toLowerCase()}`}
+            className="win-condition-example-arrow"
+            disabled={!canPageExamples}
+            onClick={() => shiftExamplePage(1)}
+            type="button"
+          >
+            <ChevronRight size={15} aria-hidden="true" />
+          </button>
         </div>
       </div>
-    </article>
+      <div className="win-condition-example-window">
+        {visibleExampleNames.map((name) => {
+          const champion = exampleChampions.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
+          if (!champion) {
+            return <span className="win-condition-example-name" key={name}>{name}</span>;
+          }
+          return (
+            <button key={champion.key} type="button" onClick={() => onSelectChampion(champion)}>
+              <img src={championImageUrl(champions, Number(champion.key))} alt="" />
+              <strong>{champion.name}</strong>
+              <ArrowRight size={13} aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
