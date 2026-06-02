@@ -147,6 +147,14 @@ Keep match counts low on a development key. The client honors Riot 429 `Retry-Af
 
 If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MARKER_PATH`. The worker exits immediately. The API stays online, but Riot-dependent endpoints return `503 RIOT_API_KEY_UNAVAILABLE` and the Riot client short-circuits additional Riot calls while the marker exists. Cached analytics, static metadata, and health checks remain available. This prevents an expired or unauthorized development key from being retried every collector interval without making the whole app look dead. The frontier row is marked `blocked` when the failure happens during a collection pass.
 
+On the production server, use the installed refresh helper after getting a new Riot development key:
+
+```bash
+/srv/winrift/refresh-riot-key
+```
+
+The helper prompts for the key without echoing it, updates `/srv/winrift/.env`, clears the auth marker, recreates the API, starts the worker, and leaves the monitor running. If you need to test only the env-file update path, pass `--no-restart` with a temporary `--env-file`.
+
 The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health`, the auth-failure marker, and, in production, the worker Docker container state. In production, keep `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` so a stopped worker sends an email instead of quietly falling behind. Riot auth-failure emails are one-shot per marker or auth-failed heartbeat incident, and stale heartbeat observations are logged but do not send email.
 
 Riot 404s are different: they mean the requested resource is absent, such as an unknown Riot ID or a player not currently being in a live game. They do not write the auth-failure marker.

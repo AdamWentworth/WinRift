@@ -149,14 +149,15 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 1. Runs manually through `workflow_dispatch`.
 2. Checks `/srv/winrift/.env`.
 3. Copies the current ClickHouse schema to `/srv/winrift/schema.sql`.
-4. Pulls the latest core image, unless `image_ref` is explicitly overridden.
-5. Stops the worker.
-6. Starts ClickHouse.
-7. Recreates the API and waits for `/api/health`.
-8. Recreates the monitor.
-9. Starts the worker if `start_worker=true`.
-10. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
-11. Runs post-deploy smoke checks for container state, `/api/health`, leaderboard/profile cache-hit behavior, and worker refresh-status readability when the status file exists.
+4. Copies the production Compose file and Riot-key refresh helper into `/srv/winrift`.
+5. Pulls the latest core image, unless `image_ref` is explicitly overridden.
+6. Stops the worker.
+7. Starts ClickHouse.
+8. Recreates the API and waits for `/api/health`.
+9. Recreates the monitor.
+10. Starts the worker if `start_worker=true`.
+11. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
+12. Runs post-deploy smoke checks for container state, `/api/health`, leaderboard/profile cache-hit behavior, and worker refresh-status readability when the status file exists.
 
 Use `image_ref` only when you intentionally need a pinned image. It accepts `latest`, `sha-<full-commit>`, or a full image reference.
 
@@ -237,11 +238,10 @@ If Riot returns 401 or 403:
 After refreshing the key:
 
 ```bash
-make up
-make up-worker
+/srv/winrift/refresh-riot-key
 ```
 
-Both API and worker clear the marker on startup. If the API is already running and you only restart the worker, the shared marker is still cleared from the runtime volume, but a full `make up` is the cleanest reset after a key refresh.
+The helper prompts for the new Riot key without echoing it, updates `/srv/winrift/.env`, clears the shared marker, recreates the API, ensures the monitor is running, and starts the worker. It is designed for laptop SSH, phone SSH clients, and Tailscale SSH sessions. Both API and worker also clear the marker on startup, but the helper avoids manual env editing and Docker command memorization.
 
 If you intentionally pause collection, set `MONITOR_WORKER_REQUIRED=false` or stop the monitor too. Otherwise production treats a stopped worker container as an alert condition.
 

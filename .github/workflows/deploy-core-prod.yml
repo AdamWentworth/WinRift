@@ -51,6 +51,8 @@ jobs:
           ENV_FILE="${DEPLOY_ROOT}/.env"
           SCHEMA_SOURCE="${GITHUB_WORKSPACE}/core/internal/clickhouse/schema.sql"
           SCHEMA_TARGET="${DEPLOY_ROOT}/schema.sql"
+          REFRESH_KEY_SOURCE="${GITHUB_WORKSPACE}/ops/prod/refresh-riot-key.sh"
+          REFRESH_KEY_TARGET="${DEPLOY_ROOT}/refresh-riot-key"
           REQUIRED_ENV_KEYS="RIOT_API_KEY CLICKHOUSE_PASSWORD CORS_ORIGINS COLLECTOR_PLATFORMS COLLECTOR_CURRENT_PATCH"
 
           mkdir -p "${DEPLOY_ROOT}" "${DEPLOY_ROOT}/deployments"
@@ -99,7 +101,9 @@ jobs:
 
           mkdir -p "${clickhouse_dir}" "${clickhouse_log_dir}" "${clickhouse_backup_dir}" "${runtime_dir}"
 
+          install -m 0644 "${COMPOSE_FILE}" "${DEPLOY_ROOT}/docker-compose.yml"
           cp "${SCHEMA_SOURCE}" "${SCHEMA_TARGET}"
+          install -m 0755 "${REFRESH_KEY_SOURCE}" "${REFRESH_KEY_TARGET}"
 
           docker compose \
             --project-directory "${DEPLOY_ROOT}" \

@@ -101,6 +101,21 @@ See [../../docs/ops-deployment.md](../../docs/ops-deployment.md) for the full ru
 
 ## 🧭 Common Commands
 
+Refresh the daily Riot development key:
+
+```bash
+/srv/winrift/refresh-riot-key
+```
+
+Paste the new key when prompted. The helper updates `/srv/winrift/.env`, clears the auth-failure marker, recreates the API, ensures the monitor is running, and starts the worker. It reads the key silently so the value does not land in shell history.
+
+The deploy workflow installs the helper automatically. To install it manually on the server before the next deploy:
+
+```bash
+install -m 0644 ops/prod/docker-compose.yml /srv/winrift/docker-compose.yml
+install -m 0755 ops/prod/refresh-riot-key.sh /srv/winrift/refresh-riot-key
+```
+
 Start API, monitor, and ClickHouse:
 
 ```bash
