@@ -125,6 +125,7 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
 
 function WinConditionGuideCard({ definition, champions, onSelectChampion }: { definition: WinConditionDefinition; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
   const [exampleOffset, setExampleOffset] = useState(0);
+  const shuffledExamples = useMemo(() => shuffleExamples(definition.examples), [definition.examples]);
   const exampleChampions = definition.examples
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
@@ -138,10 +139,10 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
   const carryCarousel = useChampionSplashCarousel(carryChampions, `${definition.key}-carry`);
   const protectorCarousel = useChampionSplashCarousel(protectorChampions, `${definition.key}-protector`);
   const isControl = definition.key === 'Control';
-  const lastExampleOffset = lastExamplePageOffset(definition.examples.length);
+  const lastExampleOffset = lastExamplePageOffset(shuffledExamples.length);
   const pageOffset = Math.min(exampleOffset, lastExampleOffset);
-  const visibleExampleNames = definition.examples.slice(pageOffset, pageOffset + examplePageSize);
-  const canPageExamples = definition.examples.length > examplePageSize;
+  const visibleExampleNames = shuffledExamples.slice(pageOffset, pageOffset + examplePageSize);
+  const canPageExamples = shuffledExamples.length > examplePageSize;
   const exampleRangeStart = visibleExampleNames.length ? pageOffset + 1 : 0;
   const exampleRangeEnd = pageOffset + visibleExampleNames.length;
 
@@ -215,7 +216,7 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
             >
               <ChevronLeft size={15} aria-hidden="true" />
             </button>
-            <em>{exampleRangeStart}-{exampleRangeEnd} / {definition.examples.length}</em>
+            <em>{exampleRangeStart}-{exampleRangeEnd} / {shuffledExamples.length}</em>
             <button
               aria-label={`Next ${definition.label} examples`}
               className="win-condition-example-arrow"
@@ -327,6 +328,15 @@ function lastExamplePageOffset(count: number) {
     return 0;
   }
   return count - examplePageSize;
+}
+
+function shuffleExamples(examples: string[]) {
+  const shuffled = [...examples];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomIndex(index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
 type ChampionSplashSlide = {
