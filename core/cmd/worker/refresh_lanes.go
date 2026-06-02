@@ -14,6 +14,11 @@ import (
 	"winrift/core/internal/staticdata"
 )
 
+const (
+	refreshSchedulerPollInterval = time.Minute
+	refreshSchedulerLanePause    = 5 * time.Second
+)
+
 type refreshStatusRecorder struct {
 	path     string
 	statuses map[string]runstate.RefreshStatus
@@ -74,6 +79,56 @@ func (r *refreshStatusRecorder) flush() {
 	}
 	if err := runstate.WriteWorkerRefreshStatus(r.path, r.statuses); err != nil {
 		log.Printf("worker refresh status write failed path=%s err=%v", r.path, err)
+	}
+}
+
+func startRefreshScheduler(ctx context.Context, cfg config.Config, staticService *staticdata.Service, apiServer api.Server, repo *clickhouse.Repository, platforms []string, firstSweepComplete <-chan struct{}) {
+	go func() {
+		log.Printf("analytics refresh scheduler waiting for first collector sweep")
+		select {
+		case <-ctx.Done():
+			log.Printf("analytics refresh scheduler stopped before first sweep err=%v", ctx.Err())
+			return
+		case <-firstSweepComplete:
+			log.Printf("analytics refresh scheduler starting after first collector sweep")
+		}
+
+		var lastItemSlotRefresh time.Time
+		var lastChampionGuideRefresh time.Time
+		var lastWinConditionRefresh time.Time
+		var lastSummonerProfileRefresh time.Time
+		refreshStatus := newRefreshStatusRecorder(cfg.WorkerRefreshStatusPath)
+		for {
+			runRefreshSchedulerPass(ctx, cfg, staticService, apiServer, repo, refreshStatus, platforms, &lastItemSlotRefresh, &lastChampionGuideRefresh, &lastWinConditionRefresh, &lastSummonerProfileRefresh)
+			select {
+			case <-ctx.Done():
+				log.Printf("analytics refresh scheduler stopped err=%v", ctx.Err())
+				return
+			case <-time.After(refreshSchedulerPollInterval):
+			}
+		}
+	}()
+}
+
+func runRefreshSchedulerPass(ctx context.Context, cfg config.Config, staticService *staticdata.Service, apiServer api.Server, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, platforms []string, lastItemSlotRefresh, lastChampionGuideRefresh, lastWinConditionRefresh, lastSummonerProfileRefresh *time.Time) {
+	maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, refreshStatus, lastItemSlotRefresh)
+	pauseRefreshLane(ctx)
+	maybeRefreshChampionGuideAnalytics(ctx, cfg, apiServer, repo, refreshStatus, lastChampionGuideRefresh)
+	pauseRefreshLane(ctx)
+	maybeRefreshWinConditionAnalytics(ctx, cfg, repo, refreshStatus, platforms, lastWinConditionRefresh)
+	pauseRefreshLane(ctx)
+	maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, refreshStatus, lastSummonerProfileRefresh)
+}
+
+func pauseRefreshLane(ctx context.Context) {
+	if refreshSchedulerLanePause <= 0 {
+		return
+	}
+	timer := time.NewTimer(refreshSchedulerLanePause)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
 	}
 }
 

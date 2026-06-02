@@ -82,15 +82,9 @@ func main() {
 	ledger := newRegionRequestLedger(cfg)
 	recordSeedRequests(ledger, seedRequestsByRegion)
 	regions := configuredRegions(platforms)
-	var lastItemSlotRefresh time.Time
-	var lastChampionGuideRefresh time.Time
-	var lastWinConditionRefresh time.Time
-	var lastSummonerProfileRefresh time.Time
-	refreshStatus := newRefreshStatusRecorder(cfg.WorkerRefreshStatusPath)
-	maybeRefreshItemSlotAnalytics(context.Background(), cfg, staticService, repo, refreshStatus, &lastItemSlotRefresh)
-	maybeRefreshChampionGuideAnalytics(context.Background(), cfg, apiServer, repo, refreshStatus, &lastChampionGuideRefresh)
-	maybeRefreshWinConditionAnalytics(context.Background(), cfg, repo, refreshStatus, platforms, &lastWinConditionRefresh)
-	maybeRefreshSummonerProfileAnalytics(context.Background(), cfg, repo, refreshStatus, &lastSummonerProfileRefresh)
+	firstSweepComplete := make(chan struct{})
+	startRefreshScheduler(context.Background(), cfg, staticService, apiServer, repo, platforms, firstSweepComplete)
+	firstSweepSignaled := false
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
@@ -186,10 +180,10 @@ func main() {
 			}
 		}
 
-		maybeRefreshItemSlotAnalytics(ctx, cfg, staticService, repo, refreshStatus, &lastItemSlotRefresh)
-		maybeRefreshChampionGuideAnalytics(ctx, cfg, apiServer, repo, refreshStatus, &lastChampionGuideRefresh)
-		maybeRefreshWinConditionAnalytics(ctx, cfg, repo, refreshStatus, platforms, &lastWinConditionRefresh)
-		maybeRefreshSummonerProfileAnalytics(ctx, cfg, repo, refreshStatus, &lastSummonerProfileRefresh)
+		if !firstSweepSignaled {
+			close(firstSweepComplete)
+			firstSweepSignaled = true
+		}
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
 		writeWorkerHeartbeat(cfg, "active", len(platforms), platformsWithWork, requestsThisSweep, "sleep="+sleepFor.Round(time.Second).String())
 		log.Printf(
