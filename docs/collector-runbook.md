@@ -150,10 +150,10 @@ If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MA
 On the production server, use the installed refresh helper after getting a new Riot development key:
 
 ```bash
-/srv/winrift/refresh-riot-key
+riotkey
 ```
 
-The helper prompts for the key without echoing it, updates `/srv/winrift/.env`, clears the auth marker, recreates the API, starts the worker, and leaves the monitor running. If you need to test only the env-file update path, pass `--no-restart` with a temporary `--env-file`.
+The helper prompts for the key without echoing it, updates `/srv/winrift/.env`, clears the auth marker, recreates the API, starts the worker, and leaves the monitor running. If `riotkey` is not on the interactive shell `PATH`, run `/srv/winrift/refresh-riot-key`. If you need to test only the env-file update path, pass `--no-restart` with a temporary `--env-file`.
 
 The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health`, the auth-failure marker, and, in production, the worker Docker container state. In production, keep `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` so a stopped worker sends an email instead of quietly falling behind. Riot auth-failure emails are one-shot per marker or auth-failed heartbeat incident, and stale heartbeat observations are logged but do not send email.
 

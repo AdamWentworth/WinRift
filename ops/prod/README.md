@@ -104,16 +104,17 @@ See [../../docs/ops-deployment.md](../../docs/ops-deployment.md) for the full ru
 Refresh the daily Riot development key:
 
 ```bash
-/srv/winrift/refresh-riot-key
+riotkey
 ```
 
-Paste the new key when prompted. The helper updates `/srv/winrift/.env`, clears the auth-failure marker, recreates the API, ensures the monitor is running, and starts the worker. It reads the key silently so the value does not land in shell history.
+Paste the new key when prompted. The helper updates `/srv/winrift/.env`, clears the auth-failure marker, recreates the API, ensures the monitor is running, and starts the worker. It reads the key silently so the value does not land in shell history. If the shortcut is not on the interactive shell `PATH`, use `/srv/winrift/refresh-riot-key`.
 
-The deploy workflow installs the helper automatically. To install it manually on the server before the next deploy:
+The deploy workflow installs both `/srv/winrift/refresh-riot-key` and the short `riotkey` wrapper automatically. To install them manually on the server before the next deploy:
 
 ```bash
 install -m 0644 ops/prod/docker-compose.yml /srv/winrift/docker-compose.yml
 install -m 0755 ops/prod/refresh-riot-key.sh /srv/winrift/refresh-riot-key
+install -m 0755 ops/prod/riotkey.sh /usr/local/bin/riotkey
 ```
 
 Start API, monitor, and ClickHouse:

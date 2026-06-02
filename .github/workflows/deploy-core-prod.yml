@@ -53,6 +53,8 @@ jobs:
           SCHEMA_TARGET="${DEPLOY_ROOT}/schema.sql"
           REFRESH_KEY_SOURCE="${GITHUB_WORKSPACE}/ops/prod/refresh-riot-key.sh"
           REFRESH_KEY_TARGET="${DEPLOY_ROOT}/refresh-riot-key"
+          RIOTKEY_SOURCE="${GITHUB_WORKSPACE}/ops/prod/riotkey.sh"
+          RIOTKEY_TARGET="${DEPLOY_ROOT}/riotkey"
           REQUIRED_ENV_KEYS="RIOT_API_KEY CLICKHOUSE_PASSWORD CORS_ORIGINS COLLECTOR_PLATFORMS COLLECTOR_CURRENT_PATCH"
 
           mkdir -p "${DEPLOY_ROOT}" "${DEPLOY_ROOT}/deployments"
@@ -104,6 +106,29 @@ jobs:
           install -m 0644 "${COMPOSE_FILE}" "${DEPLOY_ROOT}/docker-compose.yml"
           cp "${SCHEMA_SOURCE}" "${SCHEMA_TARGET}"
           install -m 0755 "${REFRESH_KEY_SOURCE}" "${REFRESH_KEY_TARGET}"
+          install -m 0755 "${RIOTKEY_SOURCE}" "${RIOTKEY_TARGET}"
+
+          install_shortcut() {
+            local target="$1"
+            if install -m 0755 "${RIOTKEY_SOURCE}" "${target}" 2>/dev/null; then
+              echo "Installed Riot key shortcut: ${target}"
+              return 0
+            fi
+            if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+              if sudo install -m 0755 "${RIOTKEY_SOURCE}" "${target}" 2>/dev/null; then
+                echo "Installed Riot key shortcut with sudo: ${target}"
+                return 0
+              fi
+            fi
+            return 1
+          }
+
+          if ! install_shortcut /usr/local/bin/riotkey; then
+            mkdir -p "${HOME}/.local/bin"
+            install -m 0755 "${RIOTKEY_SOURCE}" "${HOME}/.local/bin/riotkey"
+            echo "Installed Riot key shortcut: ${HOME}/.local/bin/riotkey"
+            echo "If 'riotkey' is not found in an interactive SSH shell, add ${HOME}/.local/bin to PATH or run ${HOME}/.local/bin/riotkey."
+          fi
 
           docker compose \
             --project-directory "${DEPLOY_ROOT}" \
