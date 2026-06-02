@@ -18,7 +18,7 @@
   box-shadow: 0 20px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 8%);
   display: grid;
   gap: 18px;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.5fr);
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 0.32fr);
   padding: 20px;
 }
 
@@ -61,30 +61,33 @@
 
 .win-conditions-hero-icons {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+  grid-template-columns: 1fr;
+  max-width: 300px;
+  width: 100%;
 }
 
 .win-conditions-hero-icons a {
   align-items: center;
   background:
-    radial-gradient(circle at 50% 14%, color-mix(in srgb, var(--condition-accent) 28%, transparent), transparent 62%),
-    linear-gradient(180deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%)),
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 22%, transparent), transparent 72%),
+    linear-gradient(180deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 3%)),
     rgb(0 0 0 / 28%);
   border: 1px solid color-mix(in srgb, var(--condition-accent) 58%, rgb(255 255 255 / 12%));
+  border-left: 3px solid var(--condition-accent);
   color: #fff;
   display: grid;
-  gap: 8px;
-  justify-items: center;
-  min-height: 136px;
-  padding: 10px 8px;
+  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-height: 58px;
+  padding: 6px 10px 6px 7px;
   text-decoration: none;
 }
 
 .win-conditions-hero-icons a:hover,
 .win-conditions-hero-icons a:focus-visible {
   background:
-    radial-gradient(circle at 50% 14%, color-mix(in srgb, var(--condition-accent) 38%, transparent), transparent 62%),
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 32%, transparent), transparent 72%),
     linear-gradient(180deg, rgb(255 255 255 / 11%), rgb(255 255 255 / 4%)),
     rgb(0 0 0 / 28%);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--condition-accent) 36%, transparent);
@@ -92,19 +95,23 @@
 }
 
 .win-conditions-hero-icons img {
-  filter: drop-shadow(0 8px 18px rgb(0 0 0 / 44%));
-  height: 78px;
+  filter: drop-shadow(0 6px 12px rgb(0 0 0 / 48%));
+  height: 46px;
   object-fit: contain;
-  width: 78px;
+  width: 46px;
 }
 
 .win-conditions-hero-icons span {
   color: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 1000;
   line-height: 1;
-  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .win-conditions-primer {

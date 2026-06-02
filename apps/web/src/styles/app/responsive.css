@@ -289,16 +289,18 @@
   }
 
   .win-conditions-hero-icons {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+    max-width: none;
   }
 
   .win-conditions-hero-icons a {
-    min-height: 104px;
+    grid-template-columns: 42px minmax(0, 1fr);
+    min-height: 52px;
   }
 
   .win-conditions-hero-icons img {
-    height: 58px;
-    width: 58px;
+    height: 40px;
+    width: 40px;
   }
 
   .win-conditions-model-grid,
