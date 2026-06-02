@@ -59,6 +59,10 @@
     grid-template-columns: 1fr;
   }
 
+  .win-condition-guide-card.spotlight .win-condition-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   .tier-table-card {
     overflow-x: auto;
   }

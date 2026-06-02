@@ -125,7 +125,7 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
   const heroChampion = exampleChampions[0] ? championByKey(champions, Number(exampleChampions[0].key)) : undefined;
   return (
     <article
-      className="win-condition-guide-card"
+      className={`win-condition-guide-card${definition.key === 'Control' ? ' spotlight' : ''}`}
       id={definition.key}
       style={{
         '--condition-accent': definition.accent,
@@ -145,6 +145,17 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
         <ReadDetail label="Team Needs" text={definition.teamNeeds} />
         <ReadDetail label="Common Failure" text={definition.commonFailure} />
       </div>
+      {definition.key === 'Control' ? (
+        <div className="win-condition-pairing-callout">
+          <span>Why Carry Pairings Matter</span>
+          <p>
+            Control is not just a defensive label. Janna, Braum, Poppy, Ivern, traps, walls, and slows are valuable because
+            they buy time and space for a damage dealer. Pair that shell with Vayne, Kai'Sa, Kog'Maw, Jinx, or another
+            protected carry and the strategy becomes much more real: the enemy has to walk through the controlled zone
+            while your carry keeps dealing damage.
+          </p>
+        </div>
+      ) : null}
       <div className="win-condition-example-strip">
         <span>Example champions</span>
         <div>

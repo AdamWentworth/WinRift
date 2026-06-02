@@ -182,6 +182,7 @@
 .win-condition-guide-grid {
   display: grid;
   gap: 12px;
+  grid-auto-flow: dense;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -199,6 +200,10 @@
   overflow: hidden;
   padding: 16px;
   position: relative;
+}
+
+.win-condition-guide-card.spotlight {
+  grid-column: 1 / -1;
 }
 
 .win-condition-guide-card::before {
@@ -271,6 +276,38 @@
   font-size: 11px;
   line-height: 1.42;
   margin-top: 5px;
+}
+
+.win-condition-guide-card.spotlight .win-condition-detail-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.win-condition-pairing-callout {
+  background:
+    radial-gradient(ellipse at 8% 0, color-mix(in srgb, var(--condition-accent) 22%, transparent), transparent 42%),
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 14%, transparent), rgb(255 255 255 / 4%)),
+    rgb(0 0 0 / 32%);
+  border: 1px solid color-mix(in srgb, var(--condition-accent) 42%, rgb(255 255 255 / 10%));
+  border-left: 3px solid var(--condition-accent);
+  display: grid;
+  gap: 6px;
+  padding: 11px 12px;
+}
+
+.win-condition-pairing-callout span {
+  color: var(--condition-accent);
+  display: block;
+  font-size: 10px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.win-condition-pairing-callout p {
+  color: #edf7f9;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.48;
+  margin: 0;
 }
 
 .win-condition-example-strip {
