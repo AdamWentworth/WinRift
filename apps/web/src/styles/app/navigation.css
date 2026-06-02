@@ -2,6 +2,7 @@
   align-items: center;
   display: flex;
   gap: 8px;
+  flex: 0 0 auto;
 }
 
 .topbar-nav button {
@@ -23,6 +24,191 @@
   border-color: rgb(83 133 255 / 74%);
   color: #fff;
   outline: none;
+}
+
+.topbar-search {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 8%), rgb(255 255 255 / 3%)),
+    rgb(9 12 14 / 66%);
+  border: 1px solid rgb(130 215 255 / 18%);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 24%),
+    0 10px 24px rgb(0 0 0 / 16%);
+  display: grid;
+  flex: 1 1 430px;
+  gap: 6px;
+  grid-template-columns: 26px minmax(130px, 1fr) 70px 38px;
+  margin: 0 18px;
+  max-width: 540px;
+  min-width: 260px;
+  padding: 5px;
+  position: relative;
+  z-index: 8;
+}
+
+.topbar-search-icon {
+  color: #a9c5ce;
+  justify-self: center;
+}
+
+.topbar-search input {
+  background: rgb(255 255 255 / 94%);
+  border: 0;
+  color: #16191a;
+  height: 34px;
+  min-width: 0;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.topbar-search input:focus {
+  box-shadow: inset 0 0 0 2px rgb(130 215 255 / 82%);
+  outline: none;
+}
+
+.topbar-search-platform,
+.topbar-search-submit,
+.topbar-search-platforms button {
+  border: 0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  min-height: 34px;
+  text-transform: uppercase;
+}
+
+.topbar-search-platform {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.topbar-search-submit {
+  align-items: center;
+  background:
+    linear-gradient(180deg, rgb(130 215 255 / 28%), rgb(45 88 105 / 34%)),
+    #263b43;
+  border: 1px solid rgb(130 215 255 / 28%);
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.topbar-search-submit:hover,
+.topbar-search-submit:focus-visible {
+  background:
+    linear-gradient(180deg, rgb(130 215 255 / 42%), rgb(45 88 105 / 48%)),
+    #263b43;
+  outline: none;
+}
+
+.topbar-search-platforms,
+.topbar-search-autocomplete,
+.topbar-search-status.visible {
+  position: absolute;
+  top: calc(100% + 8px);
+}
+
+.topbar-search-platforms {
+  background:
+    linear-gradient(180deg, rgb(35 38 40 / 98%), rgb(18 20 22 / 98%)),
+    #202020;
+  border: 1px solid rgb(255 255 255 / 12%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 36%);
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(4, minmax(52px, 1fr));
+  left: 0;
+  padding: 9px;
+  width: min(340px, calc(100vw - 32px));
+  z-index: 12;
+}
+
+.topbar-search-platforms button {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.topbar-search-platforms button.selected {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.topbar-search-autocomplete {
+  background: #202426;
+  border: 1px solid rgb(130 215 255 / 22%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 38%);
+  display: grid;
+  left: 0;
+  width: min(440px, calc(100vw - 32px));
+  z-index: 11;
+}
+
+.topbar-search-autocomplete button {
+  align-items: center;
+  background: rgb(255 255 255 / 94%);
+  border: 0;
+  border-bottom: 1px solid rgb(0 0 0 / 14%);
+  color: #151515;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 38px;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.topbar-search-autocomplete button:last-child {
+  border-bottom: 0;
+}
+
+.topbar-search-autocomplete button:hover,
+.topbar-search-autocomplete button:focus-visible {
+  background: #e9f1ff;
+  outline: none;
+}
+
+.topbar-search-autocomplete span,
+.topbar-search-autocomplete em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-search-autocomplete span {
+  font-weight: 900;
+  min-width: 0;
+}
+
+.topbar-search-autocomplete em {
+  color: #555;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.topbar-search-autocomplete b {
+  background: #2d2d2d;
+  color: #fff;
+  font-size: 10px;
+  padding: 3px 5px;
+}
+
+.topbar-search-status {
+  display: none;
+}
+
+.topbar-search-status.visible {
+  background: rgb(20 28 31 / 96%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 14px 28px rgb(0 0 0 / 36%);
+  color: #dce8f0;
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  left: 0;
+  padding: 9px 11px;
+  width: min(360px, calc(100vw - 32px));
+  z-index: 13;
 }
 
 .guide-mode {

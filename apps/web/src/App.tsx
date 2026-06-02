@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAnalyticsPatches, getChampionPageBundle, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
 import type { Champion } from './api/types';
 import { GlobalBackgroundStage } from './components/GlobalBackgroundStage';
+import { HeaderSearch } from './components/HeaderSearch';
 import {
   championIdFromRoute,
   championRouteSlug,
@@ -137,6 +138,7 @@ export function App() {
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
   const backgroundChampionScopeIds = route.kind === 'summoner' ? summonerBackgroundChampionIds : undefined;
   const appShellClassName = appShellClass(route);
+  const showHeaderSearch = route.kind === 'champion' || route.kind === 'tier-list' || (route.kind === 'summoner' && Boolean(route.gameName));
 
   useEffect(() => {
     if (route.kind !== 'summoner') {
@@ -162,6 +164,13 @@ export function App() {
             </button>
           </h1>
         </div>
+        {showHeaderSearch ? (
+          <HeaderSearch
+            champions={champions.data}
+            onSearch={(gameName, tagLine, platform) => navigate({ kind: 'summoner', platform, gameName, tagLine })}
+            onChampionSearch={openChampionGuide}
+          />
+        ) : null}
         <nav className="topbar-nav" aria-label="Primary">
           <button className={activeSection === 'home' ? 'selected' : ''} onClick={goHome} type="button">Home</button>
           <button

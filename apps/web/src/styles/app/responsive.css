@@ -1,4 +1,29 @@
 @media (max-width: 1120px) {
+  .topbar-brand {
+    min-width: 46px;
+  }
+
+  .topbar-logo {
+    gap: 0;
+  }
+
+  .topbar-logo-wordmark {
+    display: none;
+  }
+
+  .topbar-search {
+    flex-basis: 320px;
+    grid-template-columns: 24px minmax(110px, 1fr) 62px 34px;
+    margin: 0 10px;
+    max-width: 420px;
+    min-width: 220px;
+  }
+
+  .topbar-nav button {
+    min-width: 90px;
+    padding: 0 10px;
+  }
+
   .guide-filter-bar {
     grid-template-columns: 1fr 1fr;
   }
@@ -198,6 +223,10 @@
   }
 
   .topbar-logo-wordmark {
+    display: none;
+  }
+
+  .topbar-search {
     display: none;
   }
 

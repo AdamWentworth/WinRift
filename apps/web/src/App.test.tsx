@@ -435,6 +435,35 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it('routes champion names from the header search on data pages', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tier List' }));
+    await waitFor(() => expect(screen.getByText('WinRift Tier List')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTitle('Wukong')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Search WinRift'), {
+      target: { value: 'wukong' },
+    });
+    fireEvent.click(screen.getByLabelText('Submit header search'));
+
+    await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
+    expect(window.location.pathname).toBe('/champions/MonkeyKing');
+    expect(getLiveGame).not.toHaveBeenCalled();
+    queryClient.clear();
+  });
+
   it('shows the legacy live-match miss message', async () => {
     vi.mocked(getLiveGame).mockRejectedValueOnce(new Error('Player is not currently in a live game'));
     const queryClient = new QueryClient({
