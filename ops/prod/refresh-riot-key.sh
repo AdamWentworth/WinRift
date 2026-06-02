@@ -103,6 +103,27 @@ trim_key() {
   printf '%s' "${value}"
 }
 
+normalize_key_input() {
+  local value="$1"
+  local line=""
+  local fallback=""
+
+  value="${value//$'\r'/$'\n'}"
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    line="$(trim_key "${line}")"
+    line="${line#RIOT_API_KEY=}"
+    if [[ "${line}" == RGAPI-* ]]; then
+      printf '%s' "${line}"
+      return 0
+    fi
+    if [[ -z "${fallback}" && -n "${line}" ]]; then
+      fallback="${line}"
+    fi
+  done <<<"${value}"
+
+  printf '%s' "${fallback}"
+}
+
 read_new_key() {
   local value=""
   if [[ -n "${KEY_FILE}" ]]; then
@@ -121,7 +142,7 @@ read_new_key() {
     read -r -s -p "Paste new Riot API key: " value
     echo
   fi
-  trim_key "${value}"
+  normalize_key_input "${value}"
 }
 
 env_value() {

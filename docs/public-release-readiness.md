@@ -1,6 +1,6 @@
 # Public Release Readiness
 
-WinRift is intended to be a public resume/project repo, while the live deployment stays private-LAN first.
+WinRift is a public resume/project repo, while the live deployment stays private-LAN first.
 
 ## Current Working Tree
 
@@ -12,7 +12,7 @@ Current public-facing cleanup status:
 - The test fixture needed by Go tests now lives under `core/testdata/` with player identifiers sanitized.
 - Runtime data, local database files, dumps, backups, local builds, and generated web output are ignored.
 - The active Git history has been rewritten to the modern rebuild history; old 2023 prototype commits are no longer on `master`.
-- The repository is still private on GitHub until the final visibility flip.
+- The repository has been made public on GitHub; the production deployment remains private.
 
 ## History Risk
 
@@ -27,9 +27,9 @@ Keep rotating development Riot keys normally, because Riot development keys expi
 
 ## Public Strategy
 
-Publish this repository directly once the checklist below is green. Keep the production deployment private and keep server `.env` files, database volumes, ClickHouse backups, and runtime state out of Git.
+Keep the public repository focused on source, architecture, docs, and sanitized screenshots. Keep the production deployment private and keep server `.env` files, database volumes, ClickHouse backups, and runtime state out of Git.
 
-## Pre-Public Checklist
+## Public Maintenance Checklist
 
 - Confirm `git status --short` is clean.
 - Confirm no tracked `.env` files except examples.
