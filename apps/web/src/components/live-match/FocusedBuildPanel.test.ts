@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalyticsItemSlot, ItemData } from '../../api/types';
-import { selectBuildSlotRows } from './FocusedBuildPanel';
+import { selectBuildSlotRows } from './buildSlotSelection';
 
 const items = {
   version: 'test',

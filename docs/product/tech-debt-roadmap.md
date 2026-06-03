@@ -166,6 +166,7 @@ Summoner profile extraction candidates:
 Live match extraction candidates:
 
 - focused build participant picker: first pass complete in `components/live-match/BuildParticipantPicker.tsx`, with shared live participant display labeling in `participantLabels.ts`.
+- focused build result rendering: first pass complete in `components/live-match/FocusedBuildResults.tsx`, with pure item-slot selection in `buildSlotSelection.ts`. `FocusedBuildPanel.tsx` now owns selection orchestration and build-summary shaping rather than every result-card detail.
 
 ### Route-Level Bundle Splitting
 
