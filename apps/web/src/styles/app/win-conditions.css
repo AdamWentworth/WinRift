@@ -61,23 +61,28 @@
 }
 
 .win-condition-kicker-icon {
-  align-items: center;
   background:
     radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--condition-accent, #93dceb) 26%, transparent), transparent 64%),
     rgb(0 0 0 / 34%);
   border: 1px solid color-mix(in srgb, var(--condition-accent, #93dceb) 52%, rgb(255 255 255 / 14%));
   box-shadow: 0 0 16px color-mix(in srgb, var(--condition-accent, #93dceb) 20%, transparent);
-  display: inline-flex;
+  display: block;
   flex: 0 0 auto;
   height: 22px;
-  justify-content: center;
   line-height: 1;
+  position: relative;
   width: 22px;
 }
 
 .win-condition-kicker-icon svg {
   color: currentColor;
   display: block;
+  height: 14px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
 }
 
 .win-condition-kicker strong {
@@ -191,6 +196,11 @@
   gap: 10px;
 }
 
+.win-conditions-section-heading .win-condition-kicker,
+.win-condition-reading-card > div .win-condition-kicker {
+  margin-bottom: 8px;
+}
+
 .win-conditions-primer-copy h3,
 .win-conditions-section-heading h3,
 .win-condition-reading-card h3 {
@@ -198,6 +208,11 @@
   font-size: 26px;
   line-height: 1.02;
   margin: 0;
+}
+
+.win-conditions-section-heading h3,
+.win-condition-reading-card h3 {
+  margin-top: 8px;
 }
 
 .win-conditions-primer-copy strong {
@@ -911,7 +926,7 @@
   font-size: 13px;
   font-weight: 800;
   line-height: 1.52;
-  margin: 7px 0 0;
+  margin: 11px 0 0;
 }
 
 .win-condition-detail-aside {
