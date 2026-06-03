@@ -430,6 +430,12 @@ describe('App', () => {
     expect(screen.getByText('The Five Axes')).toBeInTheDocument();
     expect(screen.getByText('Read strategy as a lens, not a script')).toBeInTheDocument();
     expect(screen.getByLabelText('Search WinRift')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Open Team Fight guide/i }));
+    await waitFor(() => expect(window.location.pathname).toBe('/teamfight'));
+    expect(await screen.findByText('Composition Signals')).toBeInTheDocument();
+    expect(screen.getByText('Usually Good Into')).toBeInTheDocument();
+    expect(screen.getByText('Team Fight champion examples')).toBeInTheDocument();
     queryClient.clear();
   });
 

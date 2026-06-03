@@ -68,7 +68,7 @@
   width: 100%;
 }
 
-.win-conditions-hero-icons a {
+.win-conditions-hero-icons button {
   align-items: center;
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 22%, transparent), transparent 72%),
@@ -85,12 +85,12 @@
   text-decoration: none;
 }
 
-.win-conditions-hero-icons a:last-child {
+.win-conditions-hero-icons button:last-child {
   grid-column: 1 / -1;
 }
 
-.win-conditions-hero-icons a:hover,
-.win-conditions-hero-icons a:focus-visible {
+.win-conditions-hero-icons button:hover,
+.win-conditions-hero-icons button:focus-visible {
   background:
     linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 32%, transparent), transparent 72%),
     linear-gradient(180deg, rgb(255 255 255 / 11%), rgb(255 255 255 / 4%)),
@@ -438,6 +438,33 @@
   padding: 10px 12px;
 }
 
+.win-condition-guide-link {
+  align-items: center;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 24%, transparent), rgb(255 255 255 / 4%)),
+    rgb(0 0 0 / 32%);
+  border: 1px solid color-mix(in srgb, var(--condition-accent) 46%, rgb(255 255 255 / 12%));
+  color: #fff;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 1000;
+  gap: 8px;
+  justify-content: center;
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.win-condition-guide-link:hover,
+.win-condition-guide-link:focus-visible {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 34%, transparent), rgb(255 255 255 / 6%)),
+    rgb(0 0 0 / 32%);
+  border-color: var(--condition-accent);
+  outline: none;
+}
+
 .win-condition-detail-grid {
   display: grid;
   gap: 8px;
@@ -625,6 +652,240 @@
   font-size: 12px;
   font-style: normal;
   font-weight: 900;
+}
+
+.win-condition-detail-page {
+  color: #f4f6ff;
+  display: grid;
+  gap: 14px;
+  margin: 0 auto;
+  max-width: 1280px;
+  min-height: calc(100vh - 77px);
+  padding: 18px 18px 48px;
+  position: relative;
+  z-index: 2;
+}
+
+.win-condition-detail-hero {
+  background:
+    radial-gradient(ellipse at 18% 0, color-mix(in srgb, var(--condition-accent) 18%, transparent), transparent 44%),
+    linear-gradient(180deg, rgb(6 8 9 / 28%), rgb(6 8 9 / 88%)),
+    linear-gradient(180deg, #202426, #080909);
+  border: 1px solid color-mix(in srgb, var(--condition-accent) 46%, rgb(255 255 255 / 14%));
+  box-shadow: 0 20px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
+  min-height: 286px;
+  overflow: hidden;
+  padding: 18px;
+  position: relative;
+}
+
+.win-condition-detail-hero::before {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 18%), rgb(0 0 0 / 60%) 46%, rgb(0 0 0 / 90%)),
+    linear-gradient(115deg, transparent 0 39%, color-mix(in srgb, var(--condition-accent) 18%, transparent) 39.2% 39.55%, transparent 39.8%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.win-condition-detail-hero > :not(.win-condition-card-art, .control-pair-art) {
+  position: relative;
+  z-index: 2;
+}
+
+.win-condition-detail-hero-copy {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+  max-width: 820px;
+}
+
+.win-condition-back-button {
+  align-items: center;
+  background: rgb(0 0 0 / 34%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  color: #d9edf1;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 1000;
+  gap: 8px;
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 10px;
+  text-transform: uppercase;
+}
+
+.win-condition-back-button:hover,
+.win-condition-back-button:focus-visible {
+  border-color: var(--condition-accent);
+  color: #fff;
+  outline: none;
+}
+
+.win-condition-detail-title-row {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.win-condition-detail-title-row img {
+  filter: drop-shadow(0 10px 18px rgb(0 0 0 / 48%));
+  height: 112px;
+  object-fit: contain;
+  width: 112px;
+}
+
+.win-condition-detail-title-row span,
+.win-condition-detail-section span,
+.win-condition-detail-aside span,
+.win-condition-detail-list-grid span,
+.win-condition-detail-matchups span {
+  color: var(--condition-accent);
+  display: block;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.win-condition-detail-title-row h2 {
+  color: #fff;
+  font-size: clamp(42px, 7vw, 78px);
+  line-height: 0.9;
+  margin: 6px 0 0;
+}
+
+.win-condition-detail-hero-copy > p {
+  background: rgb(0 0 0 / 34%);
+  border-left: 3px solid var(--condition-accent);
+  color: #edf7f9;
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.5;
+  margin: 0;
+  padding: 12px 14px;
+}
+
+.win-condition-detail-nav {
+  align-self: start;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 1fr;
+}
+
+.win-condition-detail-nav button {
+  align-items: center;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 18%, transparent), transparent 70%),
+    rgb(0 0 0 / 34%);
+  border: 1px solid color-mix(in srgb, var(--condition-accent) 38%, rgb(255 255 255 / 10%));
+  border-left: 3px solid var(--condition-accent);
+  color: #fff;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 42px minmax(0, 1fr);
+  min-height: 52px;
+  padding: 5px 9px 5px 6px;
+  text-align: left;
+}
+
+.win-condition-detail-nav button[aria-current="page"],
+.win-condition-detail-nav button:hover,
+.win-condition-detail-nav button:focus-visible {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 34%, transparent), transparent 74%),
+    rgb(255 255 255 / 5%);
+  border-color: var(--condition-accent);
+  outline: none;
+}
+
+.win-condition-detail-nav img {
+  height: 40px;
+  object-fit: contain;
+  width: 40px;
+}
+
+.win-condition-detail-nav span {
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.win-condition-detail-layout {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
+}
+
+.win-condition-detail-main {
+  display: grid;
+  gap: 12px;
+}
+
+.win-condition-detail-section,
+.win-condition-detail-aside,
+.win-condition-detail-list-grid article,
+.win-condition-detail-matchups article {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 3%)),
+    rgb(0 0 0 / 30%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  padding: 13px;
+}
+
+.win-condition-detail-section p,
+.win-condition-detail-aside p,
+.win-condition-detail-matchups p {
+  color: #d2e2e8;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.52;
+  margin: 7px 0 0;
+}
+
+.win-condition-detail-aside {
+  align-content: start;
+  display: grid;
+  gap: 10px;
+}
+
+.win-condition-detail-list-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.win-condition-detail-list-grid ul {
+  color: #d2e2e8;
+  display: grid;
+  font-size: 12px;
+  font-weight: 850;
+  gap: 8px;
+  line-height: 1.38;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.win-condition-detail-list-grid li {
+  border-left: 2px solid var(--condition-accent);
+  padding-left: 9px;
+}
+
+.win-condition-detail-matchups {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.win-condition-control-examples.detail {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .win-condition-reading-card {

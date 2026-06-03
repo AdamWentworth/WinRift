@@ -26,6 +26,7 @@ const LiveMatchPanel = lazy(() => import('./components/LiveMatchPanel').then((mo
 const SummonerProfilePage = lazy(() => import('./components/SummonerProfilePage').then((module) => ({ default: module.SummonerProfilePage })));
 const TierListPage = lazy(() => import('./components/TierListPage').then((module) => ({ default: module.TierListPage })));
 const WinConditionsPage = lazy(() => import('./components/WinConditionsPage').then((module) => ({ default: module.WinConditionsPage })));
+const WinConditionDetailPage = lazy(() => import('./components/WinConditionsPage').then((module) => ({ default: module.WinConditionDetailPage })));
 
 export function App() {
   const queryClient = useQueryClient();
@@ -136,7 +137,7 @@ export function App() {
     ? 'champions'
     : route.kind === 'tier-list'
       ? 'tier-list'
-      : route.kind === 'win-conditions'
+      : route.kind === 'win-conditions' || route.kind === 'win-condition-detail'
         ? 'win-conditions'
         : route.kind === 'summoner'
           ? 'summoners'
@@ -147,7 +148,11 @@ export function App() {
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
   const backgroundChampionScopeIds = route.kind === 'summoner' ? summonerBackgroundChampionIds : undefined;
   const appShellClassName = appShellClass(route);
-  const showHeaderSearch = route.kind === 'champion' || route.kind === 'tier-list' || route.kind === 'win-conditions' || (route.kind === 'summoner' && Boolean(route.gameName));
+  const showHeaderSearch = route.kind === 'champion'
+    || route.kind === 'tier-list'
+    || route.kind === 'win-conditions'
+    || route.kind === 'win-condition-detail'
+    || (route.kind === 'summoner' && Boolean(route.gameName));
 
   useEffect(() => {
     if (route.kind !== 'summoner') {
@@ -217,7 +222,16 @@ export function App() {
         {route.kind === 'win-conditions' ? (
           <WinConditionsPage
             champions={champions.data}
+            onSelectCondition={(condition) => navigate({ kind: 'win-condition-detail', condition })}
             onSelectChampion={openChampionGuide}
+          />
+        ) : route.kind === 'win-condition-detail' ? (
+          <WinConditionDetailPage
+            champions={champions.data}
+            condition={route.condition}
+            onBack={() => navigate({ kind: 'win-conditions' })}
+            onSelectChampion={openChampionGuide}
+            onSelectCondition={(condition) => navigate({ kind: 'win-condition-detail', condition })}
           />
         ) : route.kind === 'tier-list' ? (
           <TierListPage

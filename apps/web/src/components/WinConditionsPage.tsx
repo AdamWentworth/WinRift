@@ -1,12 +1,20 @@
-import { ArrowRight, BarChart3, BookOpen, ChevronLeft, ChevronRight, MousePointer2, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, BookOpen, ChevronLeft, ChevronRight, MousePointer2, ShieldAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Champion, ChampionData } from '../api/types';
 import { championImageUrl, championList, championSplashUrl } from '../lib/staticData';
-import { conditionIconUrl, WIN_CONDITION_DEFINITIONS, WIN_CONDITION_PAGE_ORDER, type WinConditionDefinition } from '../lib/winConditions';
+import {
+  conditionIconUrl,
+  WIN_CONDITION_DEFINITIONS,
+  WIN_CONDITION_PAGE_ORDER,
+  winConditionDetail,
+  type WinConditionDefinition,
+  type WinConditionKey,
+} from '../lib/winConditions';
 
 type Props = {
   champions?: ChampionData;
+  onSelectCondition: (condition: WinConditionKey) => void;
   onSelectChampion: (champion: Champion) => void;
 };
 
@@ -36,7 +44,7 @@ const modelSteps = [
 const carouselPans = ['pan-east', 'pan-west', 'pan-rise', 'pan-fall', 'pan-northeast', 'pan-southwest'];
 const examplePageSize = 5;
 
-export function WinConditionsPage({ champions, onSelectChampion }: Props) {
+export function WinConditionsPage({ champions, onSelectChampion, onSelectCondition }: Props) {
   const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
   return (
     <section className="win-conditions-page">
@@ -51,14 +59,15 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
         </div>
         <div className="win-conditions-hero-icons" aria-label="Win condition shortcuts">
           {orderedDefinitions.map((definition) => (
-            <a
-              href={`#${definition.key}`}
+            <button
               key={definition.key}
+              onClick={() => onSelectCondition(definition.key)}
               style={{ '--condition-accent': definition.accent } as CSSProperties}
+              type="button"
             >
               <img src={conditionIconUrl(definition.key)} alt="" />
               <span>{definition.label}</span>
-            </a>
+            </button>
           ))}
         </div>
       </div>
@@ -102,6 +111,7 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
             key={definition.key}
             definition={definition}
             champions={champions}
+            onSelectCondition={onSelectCondition}
             onSelectChampion={onSelectChampion}
           />
         ))}
@@ -123,7 +133,156 @@ export function WinConditionsPage({ champions, onSelectChampion }: Props) {
   );
 }
 
-function WinConditionGuideCard({ definition, champions, onSelectChampion }: { definition: WinConditionDefinition; champions?: ChampionData; onSelectChampion: (champion: Champion) => void }) {
+export function WinConditionDetailPage({
+  champions,
+  condition,
+  onBack,
+  onSelectChampion,
+  onSelectCondition,
+}: {
+  champions?: ChampionData;
+  condition: WinConditionKey;
+  onBack: () => void;
+  onSelectChampion: (champion: Champion) => void;
+  onSelectCondition: (condition: WinConditionKey) => void;
+}) {
+  const definition = winConditionDefinitionByKey(condition);
+  const detail = winConditionDetail(condition);
+  const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
+  const exampleChampions = definition.examples
+    .map((name) => championByDisplayName(champions, name))
+    .filter((champion): champion is Champion => Boolean(champion));
+  const carryChampions = (definition.carryExamples ?? [])
+    .map((name) => championByDisplayName(champions, name))
+    .filter((champion): champion is Champion => Boolean(champion));
+  const protectorChampions = (definition.protectorExamples ?? [])
+    .map((name) => championByDisplayName(champions, name))
+    .filter((champion): champion is Champion => Boolean(champion));
+  const artCarousel = useChampionSplashCarousel(exampleChampions, `${condition}-detail`);
+  const carryCarousel = useChampionSplashCarousel(carryChampions, `${condition}-detail-carry`);
+  const protectorCarousel = useChampionSplashCarousel(protectorChampions, `${condition}-detail-protector`);
+  const isControl = condition === 'Control';
+
+  return (
+    <section className="win-condition-detail-page" style={{ '--condition-accent': definition.accent } as CSSProperties}>
+      <div className={`win-condition-detail-hero${isControl ? ' control-pair' : ''}`}>
+        {isControl ? (
+          <ControlPairArt carryCarousel={carryCarousel} protectorCarousel={protectorCarousel} champions={champions} />
+        ) : (
+          <WinConditionCardArt carousel={artCarousel} champions={champions} />
+        )}
+        <div className="win-condition-detail-hero-copy">
+          <button className="win-condition-back-button" onClick={onBack} type="button">
+            <ArrowLeft size={15} aria-hidden="true" />
+            Win Conditions
+          </button>
+          <div className="win-condition-detail-title-row">
+            <img src={conditionIconUrl(definition.key)} alt="" />
+            <div>
+              <span>{definition.shortLabel}</span>
+              <h2>{definition.label}</h2>
+            </div>
+          </div>
+          <p>{detail.thesis}</p>
+        </div>
+        <div className="win-condition-detail-nav" aria-label="Other win conditions">
+          {orderedDefinitions.map((candidate) => (
+            <button
+              aria-current={candidate.key === condition ? 'page' : undefined}
+              key={candidate.key}
+              onClick={() => onSelectCondition(candidate.key)}
+              style={{ '--condition-accent': candidate.accent } as CSSProperties}
+              type="button"
+            >
+              <img src={conditionIconUrl(candidate.key)} alt="" />
+              <span>{candidate.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="win-condition-detail-layout">
+        <div className="win-condition-detail-main">
+          {detail.sections.map((section) => (
+            <article className="win-condition-detail-section" key={section.title}>
+              <span>{section.title}</span>
+              <p>{section.body}</p>
+            </article>
+          ))}
+        </div>
+        <aside className="win-condition-detail-aside">
+          <ReadDetail label="Map Pattern" text={definition.mapPattern} />
+          <ReadDetail label="Team Needs" text={definition.teamNeeds} />
+          <ReadDetail label="Common Failure" text={definition.commonFailure} />
+        </aside>
+      </div>
+
+      <div className="win-condition-detail-list-grid">
+        <DetailList title="Composition Signals" items={detail.signals} />
+        <DetailList title="Play Pattern" items={detail.playPattern} />
+        <DetailList title="Failure Checks" items={detail.failureChecks} />
+      </div>
+
+      <div className="win-condition-detail-matchups">
+        <article>
+          <span>Usually Good Into</span>
+          <p>{detail.goodInto}</p>
+        </article>
+        <article>
+          <span>Usually Struggles Into</span>
+          <p>{detail.strugglesInto}</p>
+        </article>
+        <article>
+          <span>Timing Read</span>
+          <p>{detail.timing}</p>
+        </article>
+        <article>
+          <span>Live Page Interpretation</span>
+          <p>{detail.liveRead}</p>
+        </article>
+      </div>
+
+      {isControl ? (
+        <div className="win-condition-control-examples detail">
+          <ExampleChampionCarousel
+            championNames={definition.carryExamples ?? []}
+            champions={champions}
+            conditionLabel={definition.label}
+            label="Carry examples"
+            onSelectChampion={onSelectChampion}
+          />
+          <ExampleChampionCarousel
+            championNames={definition.protectorExamples ?? []}
+            champions={champions}
+            conditionLabel={definition.label}
+            label="Protector examples"
+            onSelectChampion={onSelectChampion}
+          />
+        </div>
+      ) : (
+        <ExampleChampionCarousel
+          championNames={definition.examples}
+          champions={champions}
+          conditionLabel={definition.label}
+          label={`${definition.label} champion examples`}
+          onSelectChampion={onSelectChampion}
+        />
+      )}
+    </section>
+  );
+}
+
+function WinConditionGuideCard({
+  definition,
+  champions,
+  onSelectChampion,
+  onSelectCondition,
+}: {
+  definition: WinConditionDefinition;
+  champions?: ChampionData;
+  onSelectChampion: (champion: Champion) => void;
+  onSelectCondition: (condition: WinConditionKey) => void;
+}) {
   const exampleChampions = definition.examples
     .map((name) => championByDisplayName(champions, name))
     .filter((champion): champion is Champion => Boolean(champion));
@@ -161,22 +320,10 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
         </div>
       </header>
       <p className="win-condition-main-copy">{definition.plainEnglish}</p>
-      <div className="win-condition-detail-grid">
-        <ReadDetail label="Map Pattern" text={definition.mapPattern} />
-        <ReadDetail label="Team Needs" text={definition.teamNeeds} />
-        <ReadDetail label="Common Failure" text={definition.commonFailure} />
-      </div>
-      {isControl ? (
-        <div className="win-condition-pairing-callout">
-          <span>Why Carry Pairings Matter</span>
-          <p>
-            Control is not just a defensive label. Janna, Braum, Poppy, Ivern, traps, walls, and slows are valuable because
-            they buy time and space for a damage dealer. Pair that shell with Vayne, Kai'Sa, Kog'Maw, Jinx, or another
-            protected carry and the strategy becomes much more real: the enemy has to walk through the controlled zone
-            while your carry keeps dealing damage.
-          </p>
-        </div>
-      ) : null}
+      <button className="win-condition-guide-link" onClick={() => onSelectCondition(definition.key)} type="button">
+        Open {definition.label} guide
+        <ArrowRight size={14} aria-hidden="true" />
+      </button>
       {isControl ? (
         <div className="win-condition-control-examples">
           <ExampleChampionCarousel
@@ -203,6 +350,19 @@ function WinConditionGuideCard({ definition, champions, onSelectChampion }: { de
           onSelectChampion={onSelectChampion}
         />
       )}
+    </article>
+  );
+}
+
+function DetailList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <article>
+      <span>{title}</span>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
     </article>
   );
 }
@@ -369,6 +529,10 @@ function orderedWinConditionDefinitions() {
   return WIN_CONDITION_PAGE_ORDER
     .map((key) => WIN_CONDITION_DEFINITIONS.find((definition) => definition.key === key))
     .filter((definition): definition is WinConditionDefinition => Boolean(definition));
+}
+
+function winConditionDefinitionByKey(key: WinConditionKey) {
+  return WIN_CONDITION_DEFINITIONS.find((definition) => definition.key === key) ?? WIN_CONDITION_DEFINITIONS[0];
 }
 
 function lastExamplePageOffset(count: number) {

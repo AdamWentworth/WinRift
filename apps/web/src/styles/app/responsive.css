@@ -55,14 +55,6 @@
     grid-template-columns: 1fr;
   }
 
-  .win-condition-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .win-condition-guide-card.spotlight .win-condition-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
   .tier-table-card {
     overflow-x: auto;
   }
@@ -284,6 +276,10 @@
     padding: 14px;
   }
 
+  .win-condition-detail-page {
+    padding: 10px 8px 28px;
+  }
+
   .win-conditions-hero h2 {
     font-size: 30px;
   }
@@ -293,7 +289,7 @@
     max-width: none;
   }
 
-  .win-conditions-hero-icons a {
+  .win-conditions-hero-icons button {
     grid-template-columns: 42px minmax(0, 1fr);
     min-height: 52px;
   }
@@ -304,10 +300,19 @@
   }
 
   .win-conditions-model-grid,
+  .win-condition-detail-hero,
+  .win-condition-detail-layout,
+  .win-condition-detail-list-grid,
+  .win-condition-detail-matchups,
   .win-condition-control-examples,
   .win-condition-example-window,
   .win-condition-reading-card ol {
     grid-template-columns: 1fr;
+  }
+
+  .win-condition-detail-hero {
+    min-height: 0;
+    padding: 14px;
   }
 
   .win-condition-guide-card {
@@ -325,6 +330,19 @@
 
   .win-condition-guide-card h3 {
     font-size: 28px;
+  }
+
+  .win-condition-detail-title-row {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+
+  .win-condition-detail-title-row img {
+    height: 78px;
+    width: 78px;
+  }
+
+  .win-condition-detail-title-row h2 {
+    font-size: 34px;
   }
 
   .tier-list-hero-copy h2 {
