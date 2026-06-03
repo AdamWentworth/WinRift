@@ -62,11 +62,12 @@ type Props = {
   championScopeId?: number;
   championScopeIds?: number[];
   strictChampionScope?: boolean;
+  defaultSplashOnly?: boolean;
 };
 
-export function GlobalBackgroundStage({ champions, championSplashes, championScopeId, championScopeIds, strictChampionScope }: Props) {
+export function GlobalBackgroundStage({ champions, championSplashes, championScopeId, championScopeIds, strictChampionScope, defaultSplashOnly }: Props) {
   const scopeKey = championScopeIds?.join(':') ?? '';
-  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId, championScopeIds, strictChampionScope), [champions, championScopeId, championSplashes, scopeKey, strictChampionScope]);
+  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId, championScopeIds, strictChampionScope, defaultSplashOnly), [champions, championScopeId, championSplashes, scopeKey, strictChampionScope, defaultSplashOnly]);
   const [slideState, setSlideState] = useState(() => initialGlobalBackgroundSlideState(fallbackGlobalBackgroundSlides));
 
   useEffect(() => {
@@ -113,10 +114,10 @@ function GlobalBackgroundArtSlide({ slide, state }: { slide: GlobalBackgroundSli
   );
 }
 
-function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number, championScopeIds?: number[], strictChampionScope?: boolean): GlobalBackgroundSlide[] {
+function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number, championScopeIds?: number[], strictChampionScope?: boolean, defaultSplashOnly?: boolean): GlobalBackgroundSlide[] {
   const scopedChampion = championScopeId ? championByKey(champions, championScopeId) : undefined;
   if (scopedChampion) {
-    const scopedSplashes = championSplashes?.data.filter((splash) => splash.championId === scopedChampion.id) ?? [];
+    const scopedSplashes = filterSplashPool(championSplashes?.data ?? [], new Set([scopedChampion.id]), defaultSplashOnly);
     if (scopedSplashes.length) {
       return mapSplashSlides(scopedSplashes);
     }
@@ -132,7 +133,7 @@ function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplas
     .filter((champion): champion is Champion => Boolean(champion));
   if (scopedChampions.length) {
     const scopedChampionIds = new Set(scopedChampions.map((champion) => champion.id));
-    const scopedSplashes = championSplashes?.data.filter((splash) => scopedChampionIds.has(splash.championId)) ?? [];
+    const scopedSplashes = filterSplashPool(championSplashes?.data ?? [], scopedChampionIds, defaultSplashOnly);
     if (scopedSplashes.length) {
       return mapSplashSlides(scopedSplashes);
     }
@@ -147,7 +148,10 @@ function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplas
     return [];
   }
   if (championSplashes?.data.length) {
-    return mapSplashSlides(championSplashes.data);
+    const splashes = defaultSplashOnly
+      ? championSplashes.data.filter((splash) => splash.skinNumber === 0)
+      : championSplashes.data;
+    return mapSplashSlides(splashes);
   }
   const championsByName = championList(champions);
   if (!championsByName.length) {
@@ -159,6 +163,12 @@ function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplas
     position: globalBackgroundSplashPosition(champion.id),
     panClass: globalBackgroundSplashPan(champion.id, index),
   }));
+}
+
+function filterSplashPool(splashes: ChampionSplashData['data'], championIds: Set<string>, defaultSplashOnly?: boolean) {
+  return splashes.filter((splash) => (
+    championIds.has(splash.championId) && (!defaultSplashOnly || splash.skinNumber === 0)
+  ));
 }
 
 function mapSplashSlides(splashes: ChampionSplashData['data']): GlobalBackgroundSlide[] {

@@ -12,11 +12,11 @@
 
 .win-condition-detail-hero {
   background:
-    linear-gradient(115deg, transparent 0 39%, color-mix(in srgb, var(--condition-accent) 16%, transparent) 39.2% 39.55%, transparent 39.8%),
-    radial-gradient(ellipse at 18% 0, color-mix(in srgb, var(--condition-accent) 26%, transparent), transparent 46%),
-    radial-gradient(ellipse at 78% 18%, rgb(255 255 255 / 8%), transparent 34%),
-    linear-gradient(180deg, rgb(6 8 9 / 22%), rgb(6 8 9 / 54%));
-  backdrop-filter: blur(1.5px) saturate(1.08);
+    linear-gradient(115deg, transparent 0 39%, color-mix(in srgb, var(--condition-accent) 12%, transparent) 39.2% 39.55%, transparent 39.8%),
+    radial-gradient(ellipse at 18% 0, color-mix(in srgb, var(--condition-accent) 18%, transparent), transparent 46%),
+    radial-gradient(ellipse at 78% 18%, rgb(255 255 255 / 5%), transparent 34%),
+    linear-gradient(180deg, rgb(6 8 9 / 8%), rgb(6 8 9 / 30%));
+  backdrop-filter: blur(0.5px) saturate(1.08);
   border: 1px solid color-mix(in srgb, var(--condition-accent) 46%, rgb(255 255 255 / 14%));
   box-shadow: 0 20px 70px rgb(0 0 0 / 32%), inset 0 1px 0 rgb(255 255 255 / 10%);
   display: grid;
@@ -30,8 +30,8 @@
 
 .win-condition-detail-hero::before {
   background:
-    linear-gradient(180deg, rgb(0 0 0 / 6%), rgb(0 0 0 / 30%) 46%, rgb(0 0 0 / 58%)),
-    radial-gradient(ellipse at 28% 40%, color-mix(in srgb, var(--condition-accent) 13%, transparent), transparent 44%);
+    linear-gradient(180deg, rgb(0 0 0 / 0%), rgb(0 0 0 / 12%) 46%, rgb(0 0 0 / 28%)),
+    radial-gradient(ellipse at 28% 40%, color-mix(in srgb, var(--condition-accent) 9%, transparent), transparent 44%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -103,7 +103,7 @@
 }
 
 .win-condition-detail-hero-copy > p {
-  background: rgb(0 0 0 / 34%);
+  background: rgb(0 0 0 / 42%);
   border-left: 3px solid var(--condition-accent);
   color: #edf7f9;
   font-size: 15px;

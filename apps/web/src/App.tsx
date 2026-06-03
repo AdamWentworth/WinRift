@@ -175,6 +175,7 @@ export function App() {
         championScopeId={backgroundChampionScopeId}
         championScopeIds={backgroundChampionScopeIds}
         strictChampionScope={route.kind === 'win-condition-detail'}
+        defaultSplashOnly={route.kind === 'win-condition-detail'}
       />
       <header className="topbar">
         <div className="topbar-brand">
