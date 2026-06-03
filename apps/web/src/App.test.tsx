@@ -153,6 +153,23 @@ vi.mock('./api/client', () => ({
   searchAccountAliases: vi.fn(async () => ({ matches: [] })),
 }));
 
+function renderApp() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>,
+  );
+
+  return { queryClient, ...view };
+}
+
 describe('App', () => {
   afterEach(() => {
     cleanup();
@@ -221,18 +238,7 @@ describe('App', () => {
   });
 
   it('renders the core workspace', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     expect(screen.getByText('WinRift')).toBeInTheDocument();
     expect(await screen.findByText('Guides, Profiles, Live Games')).toBeInTheDocument();
@@ -277,18 +283,7 @@ describe('App', () => {
         },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Summoners' }));
 
@@ -308,18 +303,7 @@ describe('App', () => {
   });
 
   it('keeps the summoner region selector anchored inside the search shell', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const { container } = render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient, container } = renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Summoners' }));
     const shell = await waitFor(() => {
@@ -343,18 +327,7 @@ describe('App', () => {
         { championId: 62, role: 'MIDDLE', games: 20, totalGames: 140, pickRate: 14.29 },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Champions' }));
 
@@ -376,18 +349,7 @@ describe('App', () => {
   });
 
   it('opens the role tier list and links into champion guides', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tier List' }));
 
@@ -410,18 +372,7 @@ describe('App', () => {
   });
 
   it('opens the win condition education page', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Win Conditions' }));
 
@@ -447,18 +398,7 @@ describe('App', () => {
     ['/control', 'Control'],
   ])('renders the %s win condition detail route', async (path, title) => {
     window.history.replaceState({}, '', path);
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: title })).toBeInTheDocument());
     expect(screen.getByText('What It Is')).toBeInTheDocument();
@@ -468,18 +408,7 @@ describe('App', () => {
   });
 
   it('routes champion names from the homepage search to champion pages', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     await waitFor(() => expect(screen.getByTitle('Wukong')).toBeInTheDocument());
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
@@ -494,18 +423,7 @@ describe('App', () => {
   });
 
   it('routes champion names from the header search on data pages', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Tier List' }));
     await waitFor(() => expect(screen.getByText('WinRift Tier List')).toBeInTheDocument());
@@ -524,18 +442,7 @@ describe('App', () => {
 
   it('shows the legacy live-match miss message', async () => {
     vi.mocked(getLiveGame).mockRejectedValueOnce(new Error('Player is not currently in a live game'));
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Test Summoner#NA1' },
@@ -547,18 +454,7 @@ describe('App', () => {
   });
 
   it('requires a unique saved Riot ID before calling the live API without a tag', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Test Summoner' },
@@ -580,18 +476,7 @@ describe('App', () => {
       tagLine: 'NA69',
     });
     vi.mocked(getLiveGame).mockRejectedValueOnce(new Error('Player is not currently in a live game'));
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'sneaky' },
@@ -615,18 +500,7 @@ describe('App', () => {
       ],
     });
     vi.mocked(getLiveGame).mockRejectedValueOnce(new Error('Player is not currently in a live game'));
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Sne' },
@@ -671,18 +545,7 @@ describe('App', () => {
         },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Profile Test#NA1' },
@@ -712,18 +575,7 @@ describe('App', () => {
       recentMatches: [],
       topBuilds: [],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Role Test#NA1' },
@@ -801,18 +653,7 @@ describe('App', () => {
       ],
     };
     vi.mocked(getLiveGame).mockResolvedValueOnce(liveGame);
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Ranked Blue#NA1' },
@@ -843,18 +684,7 @@ describe('App', () => {
         { teamId: 200, championId: 2, spell1Id: 4, spell2Id: 12, puuid: 'red-puuid', summonerName: 'Logo Red', perks: {}, bot: false },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Logo Blue#NA1' },
@@ -907,18 +737,7 @@ describe('App', () => {
         { teamId: 200, championId: 12, spell1Id: 11, spell2Id: 4, puuid: 'red-jungle', summonerName: 'Red Jungle', perks: {}, bot: false },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const { container } = render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient, container } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue Top#NA1' },
@@ -982,18 +801,7 @@ describe('App', () => {
         { teamId: 200, championId: 12, spell1Id: 11, spell2Id: 4, puuid: 'red-jungle', summonerName: 'Red Jungle', perks: {}, bot: false },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    const { container } = render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient, container } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue Mid#NA1' },
@@ -1061,18 +869,7 @@ describe('App', () => {
         { teamId: 200, championId: 15, spell1Id: 4, spell2Id: 14, puuid: 'red-5', summonerName: 'Red 5', perks: {}, bot: false },
       ],
     });
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-        mutations: { retry: false },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>,
-    );
+    const { queryClient } = renderApp();
 
     fireEvent.change(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111'), {
       target: { value: 'Blue 1#NA1' },
