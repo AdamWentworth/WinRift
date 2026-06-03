@@ -439,6 +439,34 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it.each([
+    ['/teamfight', 'Team Fight'],
+    ['/splitpush', 'Split Push'],
+    ['/pick', 'Pick'],
+    ['/siege', 'Siege'],
+    ['/control', 'Control'],
+  ])('renders the %s win condition detail route', async (path, title) => {
+    window.history.replaceState({}, '', path);
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: title })).toBeInTheDocument());
+    expect(screen.getByText('What It Is')).toBeInTheDocument();
+    expect(screen.getByText('Usually Good Into')).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('button', { name: 'Win Conditions' })).toHaveClass('selected');
+    queryClient.clear();
+  });
+
   it('routes champion names from the homepage search to champion pages', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
