@@ -68,25 +68,25 @@ const modelSteps = [
 const carouselPans = ['pan-east', 'pan-west', 'pan-rise', 'pan-fall', 'pan-northeast', 'pan-southwest'];
 const examplePageSize = 5;
 const sectionVisuals: Record<string, HeaderVisual> = {
-  'Carry examples': { emoji: '💥', icon: Target },
-  'Common Failure': { emoji: '⚠️', icon: AlertTriangle },
-  'Composition Signals': { emoji: '🧩', icon: Network },
-  'Example champions': { emoji: '⭐', icon: Sparkles },
-  'Failure Checks': { emoji: '🚧', icon: ShieldAlert },
-  'How It Wins': { emoji: '⚔️', icon: Swords },
-  'How To Read It': { emoji: '👁️', icon: Eye },
-  'How To Use It': { emoji: '🎯', icon: Target },
-  'Live Page Interpretation': { emoji: '📊', icon: BarChart3 },
-  'Map Pattern': { emoji: '🗺️', icon: MapPinned },
-  'Plain English': { emoji: '💬', icon: MessageCircle },
-  'Play Pattern': { emoji: '🧭', icon: Route },
-  'Protector examples': { emoji: '🛡️', icon: Shield },
-  'Team Needs': { emoji: '🤝', icon: Users },
-  'The Five Axes': { emoji: '🧭', icon: Compass },
-  'Timing Read': { emoji: '⏱️', icon: Clock3 },
-  'Usually Good Into': { emoji: '✅', icon: Target },
-  'Usually Struggles Into': { emoji: '🛡️', icon: Shield },
-  'What It Is': { emoji: '📘', icon: BookOpen },
+  'Carry examples': { icon: Target },
+  'Common Failure': { icon: AlertTriangle },
+  'Composition Signals': { icon: Network },
+  'Example champions': { icon: Sparkles },
+  'Failure Checks': { icon: ShieldAlert },
+  'How It Wins': { icon: Swords },
+  'How To Read It': { icon: Eye },
+  'How To Use It': { icon: Target },
+  'Live Page Interpretation': { icon: BarChart3 },
+  'Map Pattern': { icon: MapPinned },
+  'Plain English': { icon: MessageCircle },
+  'Play Pattern': { icon: Route },
+  'Protector examples': { icon: Shield },
+  'Team Needs': { icon: Users },
+  'The Five Axes': { icon: Compass },
+  'Timing Read': { icon: Clock3 },
+  'Usually Good Into': { icon: Target },
+  'Usually Struggles Into': { icon: Shield },
+  'What It Is': { icon: BookOpen },
 };
 
 export function WinConditionsPage({ champions, onSelectChampion, onSelectCondition }: Props) {
@@ -95,7 +95,7 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
     <section className="win-conditions-page">
       <div className="win-conditions-hero">
         <div className="win-conditions-hero-copy">
-          <SectionKicker emoji="✨" icon={Sparkles} label="WinRift Strategy Model" />
+          <SectionKicker icon={Sparkles} label="WinRift Strategy Model" />
           <h2>Understanding Win Conditions</h2>
           <p>
             A win condition is the practical path your team composition can use to turn champion strengths into a won game.
@@ -567,15 +567,15 @@ function ReadDetail({ label, text }: { label: string; text: string }) {
 }
 
 type HeaderVisual = {
-  emoji: string;
   icon: LucideIcon;
 };
 
-function SectionKicker({ emoji, icon: Icon, label }: HeaderVisual & { label: string }) {
+function SectionKicker({ icon: Icon, label }: HeaderVisual & { label: string }) {
   return (
     <span className="win-condition-kicker">
-      <em aria-hidden="true">{emoji}</em>
-      <Icon size={14} strokeWidth={2.4} aria-hidden="true" />
+      <span className="win-condition-kicker-icon" aria-hidden="true">
+        <Icon size={14} strokeWidth={2.4} />
+      </span>
       <strong>{label}</strong>
     </span>
   );
@@ -583,9 +583,9 @@ function SectionKicker({ emoji, icon: Icon, label }: HeaderVisual & { label: str
 
 function visualForHeader(label: string): HeaderVisual {
   if (label.endsWith('champion examples')) {
-    return { emoji: '⭐', icon: Sparkles };
+    return { icon: Sparkles };
   }
-  return sectionVisuals[label] ?? { emoji: '•', icon: ListChecks };
+  return sectionVisuals[label] ?? { icon: ListChecks };
 }
 
 function championByDisplayName(champions: ChampionData | undefined, name: string) {

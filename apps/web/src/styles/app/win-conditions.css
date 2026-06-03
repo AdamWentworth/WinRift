@@ -40,29 +40,27 @@
   align-items: center;
   color: var(--condition-accent, #93dceb);
   display: inline-flex;
-  gap: 6px;
+  gap: 7px;
   letter-spacing: 0;
   min-width: 0;
   width: fit-content;
 }
 
-.win-condition-kicker em {
+.win-condition-kicker-icon {
   align-items: center;
   background: color-mix(in srgb, var(--condition-accent, #93dceb) 18%, rgb(0 0 0 / 28%));
   border: 1px solid color-mix(in srgb, var(--condition-accent, #93dceb) 42%, rgb(255 255 255 / 12%));
   box-shadow: 0 0 18px color-mix(in srgb, var(--condition-accent, #93dceb) 18%, transparent);
   display: inline-flex;
-  font-size: 13px;
-  font-style: normal;
+  flex: 0 0 auto;
   height: 24px;
   justify-content: center;
   line-height: 1;
   width: 24px;
 }
 
-.win-condition-kicker svg {
+.win-condition-kicker-icon svg {
   color: currentColor;
-  flex: 0 0 auto;
 }
 
 .win-condition-kicker strong {
