@@ -74,6 +74,18 @@ Keep sum-to-10. Add metadata around confidence and review status for each champi
 
 Each champion has an `individualWinCondition`, including `Flex` for champions that do not cleanly belong to one axis.
 
+### Current Product Treatment
+
+`Flex` is now documented in the app as a special champion archetype at `/flex`, and the high-level `/win-conditions` page includes it as an adjacent concept.
+
+This is intentionally not a sixth team win condition. The five team axes remain SplitPush, Pick, Siege, Control, and TeamFight. Flex explains champions that can bridge or pivot between those plans, such as Lee Sin, Ezreal, Hwei, Jarvan IV, Kayn, Senna, Taliyah, Yasuo, and Yone.
+
+The practical UX rule is:
+
+- team strategy is still read through the five axes,
+- individual champion identity may be shown as Flex,
+- Flex should help explain adaptability, not replace the team's actual path to winning.
+
 ### What Is Sound
 
 This is useful for tie-breaking and human explanation. It lets the system say not only "this team has 16 Pick points," but also "this composition contains multiple champions whose primary identity is Pick."

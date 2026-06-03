@@ -16,7 +16,7 @@ import { queryGcTime, queryStaleTime } from './lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from './lib/queryVersions';
 import { normalizeRole } from './lib/roles';
 import { championImageUrl, championList, championSplashUrl } from './lib/staticData';
-import { WIN_CONDITION_DEFINITIONS, type WinConditionKey } from './lib/winConditions';
+import { FLEX_ARCHETYPE_DEFINITION, WIN_CONDITION_DEFINITIONS, type WinConditionKey } from './lib/winConditions';
 
 const DEFAULT_QUEUE_ID = 420;
 const BACKGROUND_SPLASH_CATALOG_DELAY_MS = 10_000;
@@ -28,6 +28,7 @@ const SummonerProfilePage = lazy(() => import('./components/SummonerProfilePage'
 const TierListPage = lazy(() => import('./components/TierListPage').then((module) => ({ default: module.TierListPage })));
 const WinConditionsPage = lazy(() => import('./components/win-conditions/WinConditionsPage').then((module) => ({ default: module.WinConditionsPage })));
 const WinConditionDetailPage = lazy(() => import('./components/win-conditions/WinConditionDetailPage').then((module) => ({ default: module.WinConditionDetailPage })));
+const FlexArchetypePage = lazy(() => import('./components/win-conditions/FlexArchetypePage').then((module) => ({ default: module.FlexArchetypePage })));
 
 export function App() {
   const queryClient = useQueryClient();
@@ -36,7 +37,7 @@ export function App() {
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
   const [backgroundSplashCatalogEnabled, setBackgroundSplashCatalogEnabled] = useState(false);
   const needsGameMetadata = (route.kind === 'summoner' && Boolean(route.gameName)) || (route.kind === 'champion' && Boolean(route.championSlug));
-  const needsWinConditionDetailBackground = route.kind === 'win-condition-detail';
+  const needsWinConditionDetailBackground = route.kind === 'win-condition-detail' || route.kind === 'flex-archetype';
   const champions = useQuery({ queryKey: ['champions'], queryFn: ({ signal }) => getChampions({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const analyticsPatches = useQuery({
     queryKey: ['analytics-patches', DEFAULT_QUEUE_ID],
@@ -139,7 +140,7 @@ export function App() {
     ? 'champions'
     : route.kind === 'tier-list'
       ? 'tier-list'
-      : route.kind === 'win-conditions' || route.kind === 'win-condition-detail'
+      : route.kind === 'win-conditions' || route.kind === 'win-condition-detail' || route.kind === 'flex-archetype'
         ? 'win-conditions'
         : route.kind === 'summoner'
           ? 'summoners'
@@ -150,6 +151,8 @@ export function App() {
   const winConditionBackgroundChampionIds = useMemo(() => (
     route.kind === 'win-condition-detail'
       ? championIdsForWinConditionBackground(champions.data, route.condition)
+      : route.kind === 'flex-archetype'
+        ? championIdsForNames(champions.data, FLEX_ARCHETYPE_DEFINITION.examples)
       : undefined
   ), [champions.data, route]);
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
@@ -159,6 +162,7 @@ export function App() {
     || route.kind === 'tier-list'
     || route.kind === 'win-conditions'
     || route.kind === 'win-condition-detail'
+    || route.kind === 'flex-archetype'
     || (route.kind === 'summoner' && Boolean(route.gameName));
 
   useEffect(() => {
@@ -174,8 +178,8 @@ export function App() {
         championSplashes={championSplashes.data}
         championScopeId={backgroundChampionScopeId}
         championScopeIds={backgroundChampionScopeIds}
-        strictChampionScope={route.kind === 'win-condition-detail'}
-        defaultSplashOnly={route.kind === 'win-condition-detail'}
+        strictChampionScope={needsWinConditionDetailBackground}
+        defaultSplashOnly={needsWinConditionDetailBackground}
       />
       <header className="topbar">
         <div className="topbar-brand">
@@ -231,6 +235,7 @@ export function App() {
         {route.kind === 'win-conditions' ? (
           <WinConditionsPage
             champions={champions.data}
+            onSelectFlex={() => navigate({ kind: 'flex-archetype' })}
             onSelectCondition={(condition) => navigate({ kind: 'win-condition-detail', condition })}
             onSelectChampion={openChampionGuide}
           />
@@ -238,6 +243,13 @@ export function App() {
           <WinConditionDetailPage
             champions={champions.data}
             condition={route.condition}
+            onBack={() => navigate({ kind: 'win-conditions' })}
+            onSelectChampion={openChampionGuide}
+            onSelectCondition={(condition) => navigate({ kind: 'win-condition-detail', condition })}
+          />
+        ) : route.kind === 'flex-archetype' ? (
+          <FlexArchetypePage
+            champions={champions.data}
             onBack={() => navigate({ kind: 'win-conditions' })}
             onSelectChampion={openChampionGuide}
             onSelectCondition={(condition) => navigate({ kind: 'win-condition-detail', condition })}
@@ -321,7 +333,11 @@ function championIdsForWinConditionBackground(champions: Parameters<typeof champ
     ...(definition.carryExamples ?? []),
     ...(definition.protectorExamples ?? []),
   ];
-  const normalizedNames = new Set(conditionChampionNames.map((name) => name.toLowerCase()));
+  return championIdsForNames(champions, conditionChampionNames);
+}
+
+function championIdsForNames(champions: Parameters<typeof championList>[0], championNames: string[]) {
+  const normalizedNames = new Set(championNames.map((name) => name.toLowerCase()));
   return championList(champions)
     .filter((champion) => normalizedNames.has(champion.name.toLowerCase()))
     .map((champion) => Number(champion.key))

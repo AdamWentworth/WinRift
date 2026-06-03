@@ -30,6 +30,34 @@ export type WinConditionDetail = {
   liveRead: string;
 };
 
+export type FlexArchetypeDefinition = {
+  key: 'Flex';
+  label: string;
+  shortLabel: string;
+  accent: string;
+  plainEnglish: string;
+  mapPattern: string;
+  teamNeeds: string;
+  commonFailure: string;
+  examples: string[];
+};
+
+export type FlexArchetypeDetail = {
+  key: 'Flex';
+  thesis: string;
+  sections: Array<{
+    title: string;
+    body: string;
+  }>;
+  signals: string[];
+  playPattern: string[];
+  failureChecks: string[];
+  goodInto: string;
+  strugglesInto: string;
+  timing: string;
+  liveRead: string;
+};
+
 export const WIN_CONDITION_CHAMPION_POOLS: Record<WinConditionKey, string[]> = {
   SplitPush: ['Ambessa', 'Camille', 'Dr. Mundo', 'Fiora', 'Garen', 'Gwen', 'Illaoi', 'Irelia', 'Jax', 'Jayce', 'Kassadin', 'Kled', 'Master Yi', 'Mordekaiser', 'Nasus', 'Olaf', 'Quinn', 'Renekton', 'Riven', 'Sett', 'Shen', 'Shyvana', 'Singed', 'Teemo', 'Trundle', 'Tryndamere', 'Udyr', 'Urgot', 'Yorick'],
   Pick: ['Ahri', 'Akali', 'Bard', "Bel'Veth", 'Blitzcrank', 'Diana', 'Elise', 'Evelynn', 'Fizz', "Kha'Zix", 'LeBlanc', 'Morgana', 'Naafiri', 'Nautilus', 'Nidalee', 'Nocturne', 'Pantheon', 'Pyke', 'Qiyana', 'Rammus', "Rek'Sai", 'Rengar', 'Sett', 'Shaco', 'Skarner', 'Sylas', 'Talon', 'Thresh', 'Twisted Fate', 'Vex', 'Vi', 'Viego', 'Warwick', 'Xin Zhao', 'Zed', 'Zoe'],
@@ -37,6 +65,8 @@ export const WIN_CONDITION_CHAMPION_POOLS: Record<WinConditionKey, string[]> = {
   Control: ['Aurelion Sol', 'Braum', "Cho'Gath", 'Fiddlesticks', 'Ivern', 'Janna', 'Jinx', "Kai'Sa", 'Kalista', 'Karma', 'Karthus', 'Kayle', 'Kindred', "Kog'Maw", 'Lissandra', 'Lulu', 'Nami', 'Nilah', 'Nunu & Willump', 'Poppy', 'Renata Glasc', 'Soraka', 'Swain', 'Tahm Kench', 'Taric', 'Tristana', 'Twitch', 'Vayne', 'Yuumi', 'Zeri'],
   TeamFight: ['Aatrox', 'Alistar', 'Amumu', 'Annie', 'Brand', 'Cassiopeia', 'Darius', 'Galio', 'Gnar', 'Gragas', 'Hecarim', 'Karthus', 'Katarina', 'Kennen', 'Leona', 'Lillia', 'Malphite', 'Maokai', 'Miss Fortune', 'Nunu & Willump', 'Orianna', 'Ornn', 'Rakan', 'Rell', 'Rumble', 'Samira', 'Sejuani', 'Sion', 'Smolder', 'Vladimir', 'Wukong', 'Xayah', 'Zac'],
 };
+
+export const FLEX_ARCHETYPE_CHAMPION_POOL = ['Akshan', 'Aphelios', 'Aurora', 'Briar', 'Draven', 'Ekko', 'Ezreal', 'Gangplank', 'Graves', 'Hwei', 'Jarvan IV', 'K\'Sante', 'Kayn', 'Lee Sin', 'Lucian', 'Neeko', 'Ryze', 'Senna', 'Taliyah', 'Yasuo', 'Yone', 'Yunara', 'Zaahen'];
 
 export const WIN_CONDITION_DEFINITIONS: WinConditionDefinition[] = [
   {
@@ -97,6 +127,18 @@ export const WIN_CONDITION_DEFINITIONS: WinConditionDefinition[] = [
     examples: WIN_CONDITION_CHAMPION_POOLS.TeamFight,
   },
 ];
+
+export const FLEX_ARCHETYPE_DEFINITION: FlexArchetypeDefinition = {
+  key: 'Flex',
+  label: 'Flex',
+  shortLabel: 'Adaptive glue',
+  accent: '#d4e3ec',
+  plainEnglish: 'Flex is an individual champion identity, not a sixth team win condition. Flex champions are jack-of-all-trades pieces that can help a draft pivot between plans when the map state changes.',
+  mapPattern: 'The map pattern is chosen by the game state: early tempo, which lane is ahead, objective timing, and which enemy weakness is easiest to attack.',
+  teamNeeds: 'A Flex champion needs teammates who still create a real pressure point. Flex adds options; it does not replace the need for damage, engage, wave control, or objective setup.',
+  commonFailure: 'A team full of adaptable pieces can become vague if nobody commits to the moment. Flex turns bad when every player can do a little, but nobody creates a clear way to win.',
+  examples: FLEX_ARCHETYPE_CHAMPION_POOL,
+};
 
 export const WIN_CONDITION_PAGE_ORDER: WinConditionKey[] = ['TeamFight', 'SplitPush', 'Pick', 'Siege', 'Control'];
 
@@ -183,6 +225,23 @@ export const WIN_CONDITION_DETAILS: Record<WinConditionKey, WinConditionDetail> 
   },
 };
 
+export const FLEX_ARCHETYPE_DETAIL: FlexArchetypeDetail = {
+  key: 'Flex',
+  thesis: 'Flex champions do not say "we only win this one way." They are adaptive pieces that can bridge plans, hide draft intent, and help the team lean toward whichever pressure point the game creates.',
+  sections: [
+    { title: 'What It Is', body: 'A Flex identity means the champion has a flatter strategic profile. Lee Sin, Ezreal, Hwei, Jarvan IV, Kayn, Senna, and similar champions can contribute to more than one plan without hard-locking the team into Split Push, Pick, Siege, Control, or Team Fight by themselves.' },
+    { title: 'How It Wins', body: 'Flex wins by making the team less brittle. If the carry gets ahead, the Flex champion can protect or enable that lane. If the enemy mispositions, it can become a pick tool. If the game slows down, it can help waveclear, contest vision, or bridge into grouped fights.' },
+    { title: 'How To Read It', body: 'Do not read Flex as "no identity." Read it as "watch the first few map decisions." Flex-heavy teams often reveal their real plan through lane priority, first objective setup, who gets resources, and which cooldowns they use proactively.' },
+  ],
+  signals: ['Balanced scores across several win-condition axes', 'Tools that can start, follow, peel, poke, or skirmish depending on the game', 'Champions that fit several lanes, roles, builds, or tempo plans', 'Drafts where one champion helps connect the main plan to a secondary plan'],
+  playPattern: ['Identify which lane or champion is actually ahead', 'Use the Flex piece to reinforce that pressure point', 'Pivot when the enemy overcommits to stopping the first plan', 'Resolve into a concrete plan before late-game fights become mandatory'],
+  failureChecks: ['Nobody creates a reliable pressure point', 'The team keeps changing plans after every small setback', 'The Flex champion spends cooldowns reactively instead of enabling the strongest teammate', 'The draft has many options but no damage, engage, waveclear, or scaling anchor'],
+  goodInto: 'Often useful into rigid comps that reveal their plan early, because Flex can choose whether to answer with pick, peel, side pressure, skirmish, or grouped fighting.',
+  strugglesInto: 'Can struggle into comps with one overwhelming identity and clean execution, especially when the Flex side never commits to its own best lane, timing, or objective setup.',
+  timing: 'Flex value is often highest in early and mid game, when tempo choices decide which plan becomes real. Later, the team usually needs to resolve Flex into a clear fight, pick, siege, control, or side-lane pattern.',
+  liveRead: 'On the live page, Flex should be treated as an individual champion archetype. It can explain why a champion feels useful in several plans, but it should not replace the team-level win-condition read.',
+};
+
 export const WIN_CONDITION_ROUTE_SLUGS: Record<WinConditionKey, string> = {
   TeamFight: 'teamfight',
   SplitPush: 'splitpush',
@@ -209,6 +268,10 @@ export function winConditionSlug(condition: WinConditionKey) {
 
 export function winConditionPath(condition: WinConditionKey) {
   return `/${winConditionSlug(condition)}`;
+}
+
+export function flexArchetypePath() {
+  return '/flex';
 }
 
 export function winConditionFromSlug(slug: string | undefined): WinConditionKey | undefined {

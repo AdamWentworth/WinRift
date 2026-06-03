@@ -1,14 +1,16 @@
-import { BarChart3, BookOpen, MousePointer2, ShieldAlert } from 'lucide-react';
+import { ArrowRight, BarChart3, BookOpen, MousePointer2, ShieldAlert, Shuffle } from 'lucide-react';
 import { useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import type { Champion, ChampionData } from '../../api/types';
-import { conditionIconUrl, type WinConditionKey } from '../../lib/winConditions';
+import { conditionIconUrl, FLEX_ARCHETYPE_DEFINITION, type WinConditionKey } from '../../lib/winConditions';
+import { ExampleChampionCarousel } from './ExampleChampionCarousel';
 import { orderedWinConditionDefinitions } from './helpers';
 import { SectionKicker, visualForHeader } from './SectionKicker';
 import { WinConditionGuideCard } from './WinConditionGuideCard';
 
 type Props = {
   champions?: ChampionData;
+  onSelectFlex: () => void;
   onSelectCondition: (condition: WinConditionKey) => void;
   onSelectChampion: (champion: Champion) => void;
 };
@@ -36,8 +38,9 @@ const modelSteps = [
   },
 ];
 
-export function WinConditionsPage({ champions, onSelectChampion, onSelectCondition }: Props) {
+export function WinConditionsPage({ champions, onSelectChampion, onSelectCondition, onSelectFlex }: Props) {
   const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
+  const flexDefinition = FLEX_ARCHETYPE_DEFINITION;
   return (
     <section className="win-conditions-page">
       <div className="win-conditions-hero">
@@ -61,6 +64,15 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
               <span>{definition.label}</span>
             </button>
           ))}
+          <button
+            className="flex-shortcut"
+            onClick={onSelectFlex}
+            style={{ '--condition-accent': flexDefinition.accent } as CSSProperties}
+            type="button"
+          >
+            <img src={conditionIconUrl(flexDefinition.key)} alt="" />
+            <span>{flexDefinition.label}</span>
+          </button>
         </div>
       </div>
 
@@ -108,6 +120,38 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
           />
         ))}
       </div>
+
+      <article
+        className="win-condition-flex-card"
+        style={{ '--condition-accent': flexDefinition.accent } as CSSProperties}
+      >
+        <div className="win-condition-flex-copy">
+          <SectionKicker icon={Shuffle} label="Special Archetype" />
+          <header>
+            <img src={conditionIconUrl(flexDefinition.key)} alt="" />
+            <div>
+              <span className="win-condition-card-subtitle">{flexDefinition.shortLabel}</span>
+              <h3>{flexDefinition.label}</h3>
+            </div>
+          </header>
+          <p className="win-condition-main-copy">{flexDefinition.plainEnglish}</p>
+          <p>
+            Think of Flex as draft glue. It is useful because it can connect your main plan to a secondary plan, but it
+            still needs the team to commit to a real pressure point once the game state becomes clear.
+          </p>
+          <button className="win-condition-guide-link" onClick={onSelectFlex} type="button">
+            Open Flex guide
+            <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        </div>
+        <ExampleChampionCarousel
+          championNames={flexDefinition.examples}
+          champions={champions}
+          conditionLabel={flexDefinition.label}
+          label="Flex champion examples"
+          onSelectChampion={onSelectChampion}
+        />
+      </article>
 
       <div className="win-condition-reading-card">
         <div>

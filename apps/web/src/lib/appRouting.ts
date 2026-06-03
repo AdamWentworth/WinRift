@@ -1,10 +1,11 @@
 import { summonerPath } from './lookup';
-import { winConditionFromSlug, winConditionPath, type WinConditionKey } from './winConditions';
+import { flexArchetypePath, winConditionFromSlug, winConditionPath, type WinConditionKey } from './winConditions';
 
 export type AppRoute =
   | { kind: 'home' }
   | { kind: 'tier-list' }
   | { kind: 'win-conditions' }
+  | { kind: 'flex-archetype' }
   | { kind: 'win-condition-detail'; condition: WinConditionKey }
   | { kind: 'champion'; championSlug?: string }
   | { kind: 'summoner'; platform?: string; gameName?: string; tagLine?: string };
@@ -19,6 +20,9 @@ export function readRoute(): AppRoute {
   }
   if (parts[0] === 'win-conditions' || parts[0] === 'winconditions') {
     return { kind: 'win-conditions' };
+  }
+  if (parts[0] === 'flex') {
+    return { kind: 'flex-archetype' };
   }
   const winCondition = winConditionFromSlug(parts[0]);
   if (winCondition) {
@@ -40,6 +44,9 @@ export function pathForRoute(route: AppRoute) {
   if (route.kind === 'win-conditions') {
     return '/win-conditions';
   }
+  if (route.kind === 'flex-archetype') {
+    return flexArchetypePath();
+  }
   if (route.kind === 'win-condition-detail') {
     return winConditionPath(route.condition);
   }
@@ -52,7 +59,7 @@ export function pathForRoute(route: AppRoute) {
 
 export function appShellClass(route: AppRoute) {
   const classes = ['app-shell'];
-  if (route.kind === 'champion' || route.kind === 'tier-list' || route.kind === 'win-conditions' || route.kind === 'win-condition-detail') {
+  if (route.kind === 'champion' || route.kind === 'tier-list' || route.kind === 'win-conditions' || route.kind === 'win-condition-detail' || route.kind === 'flex-archetype') {
     classes.push('guide-mode');
   }
   if (route.kind === 'home') {
@@ -61,7 +68,7 @@ export function appShellClass(route: AppRoute) {
     classes.push('page-summoner', 'background-dense');
   } else if (route.kind === 'tier-list') {
     classes.push('page-tier-list', 'background-data');
-  } else if (route.kind === 'win-conditions' || route.kind === 'win-condition-detail') {
+  } else if (route.kind === 'win-conditions' || route.kind === 'win-condition-detail' || route.kind === 'flex-archetype') {
     classes.push('page-win-conditions', 'background-directory');
   } else if (route.championSlug) {
     classes.push('page-champion-guide', 'background-champion-scope');

@@ -47,6 +47,7 @@
 
   .win-conditions-hero,
   .win-conditions-primer,
+  .win-condition-flex-card,
   .win-condition-reading-card {
     grid-template-columns: 1fr;
   }
@@ -304,6 +305,7 @@
   .win-condition-detail-layout,
   .win-condition-detail-list-grid,
   .win-condition-detail-matchups,
+  .flex-archetype-note,
   .win-condition-control-examples,
   .win-condition-example-window,
   .win-condition-reading-card ol {
