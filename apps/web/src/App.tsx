@@ -36,6 +36,7 @@ export function App() {
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
   const [backgroundSplashCatalogEnabled, setBackgroundSplashCatalogEnabled] = useState(false);
   const needsGameMetadata = (route.kind === 'summoner' && Boolean(route.gameName)) || (route.kind === 'champion' && Boolean(route.championSlug));
+  const needsWinConditionDetailBackground = route.kind === 'win-condition-detail';
   const champions = useQuery({ queryKey: ['champions'], queryFn: ({ signal }) => getChampions({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const analyticsPatches = useQuery({
     queryKey: ['analytics-patches', DEFAULT_QUEUE_ID],
@@ -45,7 +46,7 @@ export function App() {
   const championSplashes = useQuery({
     queryKey: ['champion-splashes'],
     queryFn: ({ signal }) => getChampionSplashes({ signal }),
-    enabled: backgroundSplashCatalogEnabled,
+    enabled: backgroundSplashCatalogEnabled || needsWinConditionDetailBackground,
     staleTime: queryStaleTime.static,
     gcTime: queryGcTime.static,
   });

@@ -12,11 +12,13 @@
 
 .win-condition-detail-hero {
   background:
-    radial-gradient(ellipse at 18% 0, color-mix(in srgb, var(--condition-accent) 18%, transparent), transparent 44%),
-    linear-gradient(180deg, rgb(6 8 9 / 28%), rgb(6 8 9 / 88%)),
-    linear-gradient(180deg, #202426, #080909);
+    linear-gradient(115deg, transparent 0 39%, color-mix(in srgb, var(--condition-accent) 16%, transparent) 39.2% 39.55%, transparent 39.8%),
+    radial-gradient(ellipse at 18% 0, color-mix(in srgb, var(--condition-accent) 26%, transparent), transparent 46%),
+    radial-gradient(ellipse at 78% 18%, rgb(255 255 255 / 8%), transparent 34%),
+    linear-gradient(180deg, rgb(6 8 9 / 22%), rgb(6 8 9 / 54%));
+  backdrop-filter: blur(1.5px) saturate(1.08);
   border: 1px solid color-mix(in srgb, var(--condition-accent) 46%, rgb(255 255 255 / 14%));
-  box-shadow: 0 20px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 8%);
+  box-shadow: 0 20px 70px rgb(0 0 0 / 32%), inset 0 1px 0 rgb(255 255 255 / 10%);
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
@@ -28,8 +30,8 @@
 
 .win-condition-detail-hero::before {
   background:
-    linear-gradient(180deg, rgb(0 0 0 / 18%), rgb(0 0 0 / 60%) 46%, rgb(0 0 0 / 90%)),
-    linear-gradient(115deg, transparent 0 39%, color-mix(in srgb, var(--condition-accent) 18%, transparent) 39.2% 39.55%, transparent 39.8%);
+    linear-gradient(180deg, rgb(0 0 0 / 6%), rgb(0 0 0 / 30%) 46%, rgb(0 0 0 / 58%)),
+    radial-gradient(ellipse at 28% 40%, color-mix(in srgb, var(--condition-accent) 13%, transparent), transparent 44%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -37,7 +39,7 @@
   z-index: 1;
 }
 
-.win-condition-detail-hero > :not(.win-condition-card-art, .control-pair-art) {
+.win-condition-detail-hero > * {
   position: relative;
   z-index: 2;
 }

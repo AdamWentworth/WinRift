@@ -4,9 +4,8 @@ import type { CSSProperties } from 'react';
 import type { Champion, ChampionData } from '../../api/types';
 import { conditionIconUrl, winConditionDetail, type WinConditionKey } from '../../lib/winConditions';
 import { ExampleChampionCarousel } from './ExampleChampionCarousel';
-import { matchingChampions, orderedWinConditionDefinitions, winConditionDefinitionByKey } from './helpers';
+import { orderedWinConditionDefinitions, winConditionDefinitionByKey } from './helpers';
 import { SectionKicker, visualForHeader } from './SectionKicker';
-import { ControlPairArt, useChampionSplashCarousel, WinConditionCardArt } from './WinConditionArt';
 
 export function WinConditionDetailPage({
   champions,
@@ -24,22 +23,11 @@ export function WinConditionDetailPage({
   const definition = winConditionDefinitionByKey(condition);
   const detail = winConditionDetail(condition);
   const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
-  const exampleChampions = matchingChampions(champions, definition.examples);
-  const carryChampions = matchingChampions(champions, definition.carryExamples ?? []);
-  const protectorChampions = matchingChampions(champions, definition.protectorExamples ?? []);
-  const artCarousel = useChampionSplashCarousel(exampleChampions, `${condition}-detail`);
-  const carryCarousel = useChampionSplashCarousel(carryChampions, `${condition}-detail-carry`);
-  const protectorCarousel = useChampionSplashCarousel(protectorChampions, `${condition}-detail-protector`);
   const isControl = condition === 'Control';
 
   return (
     <section className="win-condition-detail-page" style={{ '--condition-accent': definition.accent } as CSSProperties}>
-      <div className={`win-condition-detail-hero${isControl ? ' control-pair' : ''}`}>
-        {isControl ? (
-          <ControlPairArt carryCarousel={carryCarousel} protectorCarousel={protectorCarousel} champions={champions} />
-        ) : (
-          <WinConditionCardArt carousel={artCarousel} champions={champions} />
-        )}
+      <div className="win-condition-detail-hero global-window">
         <div className="win-condition-detail-hero-copy">
           <button className="win-condition-back-button" onClick={onBack} type="button">
             <ArrowLeft size={15} aria-hidden="true" />
