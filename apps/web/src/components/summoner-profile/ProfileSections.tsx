@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarDays, History, Package, Shield, Trophy } from 'lucide-react';
 import type { ChampionData, ChampionRecord, ItemData, RankedRecord, RuneData, SummonerBuildRecord, SummonerProfile, SummonerRecentMatch, SummonerSpellData } from '../../api/types';
-import { championByKey, championImageUrl, itemImageUrl, itemName, parseRuneSignature, rankIconUrl, rankLabel, runeImageUrl, runeName, runeStyleImageUrl, runeStyleName, signatureItems, signatureSpells, summonerSpellImageUrl, summonerSpellName } from '../../lib/staticData';
-import { RoleIcon, roleLabel } from '../../lib/roles';
-import { MetricTile, MiniStat } from '../ui/MetricTile';
+import { championByKey, championImageUrl, rankIconUrl, rankLabel } from '../../lib/staticData';
+import { roleLabel } from '../../lib/roles';
+import { MetricTile } from '../ui/MetricTile';
 import { EmptyState } from '../ui/Panel';
 import { RoleTabs } from '../ui/RoleTabs';
 import { SegmentedControl } from '../ui/SegmentedControl';
+import { BuildUsageRow, ChampionComfortRow, RecentMatchRow } from './ProfileRows';
+import { championName, formatGameDate, formatNumber, formatProfileDate, profileFreshness, type ProfileFreshness } from './profileFormatters';
 
 export type ProfileSection = 'overview' | 'champions' | 'builds' | 'matches';
 type ChampionSort = 'games' | 'winrate' | 'kda';
@@ -351,13 +353,6 @@ function ProfileSnapshot({ detail, icon, label, value }: { detail: string; icon:
   );
 }
 
-type ProfileFreshness = {
-  tone: 'fresh' | 'recent' | 'stale' | 'empty';
-  label: string;
-  body: string;
-  snapshotDetail: string;
-};
-
 function ProfileFreshnessBanner({ freshness }: { freshness: ProfileFreshness }) {
   return (
     <div className={`profile-freshness-banner ${freshness.tone}`}>
@@ -430,141 +425,6 @@ function PanelHeading({ icon, title }: { icon: ReactNode; title: string }) {
   );
 }
 
-function ChampionComfortRow({ record, champions }: { record: ChampionRecord; champions?: ChampionData }) {
-  const champion = championByKey(champions, record.championId);
-  return (
-    <div className="profile-champion-row">
-      <img src={championImageUrl(champions, record.championId)} alt={champion?.name ?? String(record.championId)} />
-      <div>
-        <strong>{champion?.name ?? `Champion ${record.championId}`}</strong>
-        <span>{record.role ? <><RoleIcon role={record.role} /> {roleLabel(record.role)} · </> : null}{record.avgKills.toFixed(1)} / {record.avgDeaths.toFixed(1)} / {record.avgAssists.toFixed(1)} average</span>
-      </div>
-      <div className="profile-row-stats">
-        <MiniStat label="WR" value={`${record.winRate.toFixed(1)}%`} />
-        <MiniStat label="KDA" value={record.kda.toFixed(2)} />
-        <MiniStat label="Games" value={formatNumber(record.games)} />
-      </div>
-    </div>
-  );
-}
-
-function RecentMatchRow({ match, champions }: { match: SummonerRecentMatch; champions?: ChampionData }) {
-  const champion = championByKey(champions, match.championId);
-  const championLabel = champion?.name ?? `Champion ${match.championId}`;
-  return (
-    <div className={`profile-match-row ${match.win ? 'win' : 'loss'}`}>
-      <img src={championImageUrl(champions, match.championId)} alt={champion?.name ?? String(match.championId)} />
-      <span className={`profile-match-result-badge ${match.win ? 'win' : 'loss'}`}>{match.win ? 'Win' : 'Loss'}</span>
-      <div>
-        <strong>{championLabel}</strong>
-        <span className="profile-match-meta"><RoleIcon role={match.role} /> {roleLabel(match.role)} · Patch {match.patch} · {formatGameDate(match.gameStartTimestamp)} · {formatDuration(match.durationSeconds)}</span>
-      </div>
-      <div className="profile-row-stats">
-        <MiniStat label="KDA" value={`${match.kills}/${match.deaths}/${match.assists}`} />
-        <MiniStat label="Role" value={roleLabel(match.role)} />
-        <MiniStat label="Duration" value={formatDuration(match.durationSeconds)} />
-      </div>
-    </div>
-  );
-}
-
-function BuildUsageRow({
-  build,
-  champions,
-  items,
-  spells,
-  runes,
-}: {
-  build: SummonerBuildRecord;
-  champions?: ChampionData;
-  items?: ItemData;
-  spells?: SummonerSpellData;
-  runes?: RuneData;
-}) {
-  const champion = championByKey(champions, build.championId);
-  const coreItems = signatureItems(build.core3Signature || build.core2Signature);
-  const finalItems = signatureItems(build.finalItemsSignature);
-  const displayedCore = coreItems.length ? coreItems : finalItems.slice(0, 3);
-  const parsedRunes = parseRuneSignature(build.runeSignature);
-  const primaryRuneStyleSrc = runeStyleImageUrl(runes, parsedRunes.primaryStyleId);
-  const runeIds = parsedRunes.runeIds.slice(0, 4);
-  const spellIds = signatureSpells(build.spellSignature);
-  return (
-    <div className="profile-build-row">
-      <div className="profile-build-identity">
-        <img src={championImageUrl(champions, build.championId)} alt={champion?.name ?? String(build.championId)} />
-        <div>
-          <strong>{champion?.name ?? `Champion ${build.championId}`}</strong>
-          <span><RoleIcon role={build.role} /> {roleLabel(build.role)}</span>
-        </div>
-      </div>
-      <div className="profile-build-paths">
-        <div className="profile-build-path">
-          <em>Core</em>
-          <ItemIconList itemIds={displayedCore} items={items} />
-        </div>
-        <div className="profile-build-path">
-          <em>Final</em>
-          <ItemIconList itemIds={finalItems} items={items} />
-        </div>
-      </div>
-      <div className="profile-build-loadout">
-        <div>
-          <em>Runes</em>
-          <div className="profile-build-icon-row">
-            {primaryRuneStyleSrc ? (
-              <img src={primaryRuneStyleSrc} alt={runeStyleName(runes, parsedRunes.primaryStyleId)} title={runeStyleName(runes, parsedRunes.primaryStyleId)} />
-            ) : null}
-            {runeIds.map((runeId) => {
-              const src = runeImageUrl(runes, runeId);
-              return src ? <img key={runeId} src={src} alt={runeName(runes, runeId)} title={runeName(runes, runeId)} /> : null;
-            })}
-          </div>
-        </div>
-        <div>
-          <em>Spells</em>
-          <div className="profile-build-icon-row">
-            {spellIds.map((spellId) => {
-              const src = summonerSpellImageUrl(spells, spellId);
-              return src ? <img key={spellId} src={src} alt={summonerSpellName(spells, spellId)} title={summonerSpellName(spells, spellId)} /> : null;
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="profile-row-stats">
-        <MiniStat label="Games" value={formatNumber(build.games)} />
-        <MiniStat label="WR" value={`${build.winRate.toFixed(1)}%`} />
-        <MiniStat label="KDA" value={build.kda.toFixed(2)} />
-      </div>
-    </div>
-  );
-}
-
-function ItemIconList({ itemIds, items }: { itemIds: string[]; items?: ItemData }) {
-  if (!itemIds.length) {
-    return <span className="profile-build-empty-path">No item path</span>;
-  }
-  return (
-    <div className="profile-build-icon-row">
-      {itemIds.slice(0, 6).map((itemId, index) => {
-        const src = itemImageUrl(items, itemId);
-        return src ? (
-          <img key={`${itemId}:${index}`} src={src} alt={itemName(items, itemId)} title={itemName(items, itemId)} />
-        ) : (
-          <span key={`${itemId}:${index}`} className="profile-build-item-fallback">{itemId}</span>
-        );
-      })}
-    </div>
-  );
-}
-function formatNumber(value: number) {
-  return new Intl.NumberFormat('en-US').format(value);
-}
-
-function championName(champions: ChampionData | undefined, championId: number) {
-  return championByKey(champions, championId)?.name ?? `Champion ${championId}`;
-}
-
 function filterChampionRecords(records: ChampionRecord[], query: string, champions: ChampionData | undefined) {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) {
@@ -622,84 +482,4 @@ function sortBuildRecords(records: SummonerBuildRecord[], sort: BuildSort, champ
 
 function sortedByWinRate(records: ChampionRecord[]) {
   return [...records].sort((a, b) => b.winRate - a.winRate || b.games - a.games);
-}
-
-function formatProfileDate(value?: string) {
-  if (!value) return '--';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime()) || date.getFullYear() <= 1970) return '--';
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
-}
-
-function profileFreshness(summary: SummonerProfile['summary']): ProfileFreshness {
-  const days = daysSinceDate(summary.lastSeen);
-  const firstSeen = formatProfileDate(summary.firstSeen);
-  const lastSeen = formatProfileDate(summary.lastSeen);
-  if (days === undefined) {
-    return {
-      tone: 'empty',
-      label: 'No stored window yet',
-      body: 'The collector has not attached retained ranked games to this profile yet. Live lookup can still work if the player is in game.',
-      snapshotDetail: 'No retained games yet',
-    };
-  }
-  const relativeLastSeen = relativeDayLabel(days);
-  const sampleText = `${formatNumber(summary.games)} stored ${summary.games === 1 ? 'game' : 'games'}`;
-  const firstSeenDetail = firstSeen !== '--' ? ` · first ${firstSeen}` : '';
-  if (days <= 2) {
-    return {
-      tone: 'fresh',
-      label: 'Fresh stored sample',
-      body: `Last stored game was ${relativeLastSeen}. This profile is using ${sampleText}${firstSeen !== '--' ? ` since ${firstSeen}` : ''}.`,
-      snapshotDetail: `${relativeLastSeen}${firstSeenDetail}`,
-    };
-  }
-  if (days <= 14) {
-    return {
-      tone: 'recent',
-      label: 'Recent stored sample',
-      body: `Last stored game was ${relativeLastSeen}. Treat form and champion comfort as recent stored history, not live-season truth.`,
-      snapshotDetail: `${relativeLastSeen}${firstSeenDetail}`,
-    };
-  }
-  return {
-    tone: 'stale',
-    label: 'Aging stored sample',
-    body: `Last stored game was ${relativeLastSeen} on ${lastSeen}. This profile may lag behind the player's current form until the collector sees newer games.`,
-    snapshotDetail: `${relativeLastSeen}${firstSeenDetail}`,
-  };
-}
-
-function daysSinceDate(value?: string) {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime()) || date.getFullYear() <= 1970) {
-    return undefined;
-  }
-  const now = Date.now();
-  const diff = now - date.getTime();
-  if (diff < 0) {
-    return 0;
-  }
-  return Math.floor(diff / 86_400_000);
-}
-
-function relativeDayLabel(days: number) {
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  return `${formatNumber(days)} days ago`;
-}
-
-function formatGameDate(timestamp: number) {
-  if (!timestamp) return 'unknown date';
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return 'unknown date';
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
-}
-
-function formatDuration(seconds: number) {
-  if (!seconds) return '--';
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return `${minutes}:${String(remaining).padStart(2, '0')}`;
 }

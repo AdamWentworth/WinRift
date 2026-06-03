@@ -160,7 +160,7 @@ Build guide extraction candidates:
 Summoner profile extraction candidates:
 
 - summoner search hub, leaderboard, and shared profile message: first pass complete in `components/summoner-profile/`
-- stored profile tabs, rows, and freshness helpers: first pass complete in `components/summoner-profile/ProfileSections.tsx`
+- stored profile tabs, rows, and freshness helpers: second pass complete. `ProfileSections.tsx` owns tab state and summaries, `ProfileRows.tsx` owns champion/build/match row markup, and `profileFormatters.ts` owns shared date/name/freshness formatting.
 - profile header: first pass complete in `components/summoner-profile/ProfileHeader.tsx`
 
 ### Route-Level Bundle Splitting
