@@ -38,25 +38,38 @@
 
 .win-condition-kicker {
   align-items: center;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent, #93dceb) 18%, transparent), transparent 76%),
+    linear-gradient(180deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 2%)),
+    rgb(0 0 0 / 22%);
+  border: 1px solid color-mix(in srgb, var(--condition-accent, #93dceb) 28%, rgb(255 255 255 / 10%));
+  border-left: 2px solid var(--condition-accent, #93dceb);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 7%),
+    0 0 20px color-mix(in srgb, var(--condition-accent, #93dceb) 10%, transparent);
   color: var(--condition-accent, #93dceb);
   display: inline-flex;
-  gap: 7px;
+  gap: 8px;
   letter-spacing: 0;
+  min-height: 31px;
   min-width: 0;
-  width: fit-content;
+  padding: 4px 10px 4px 5px;
+  width: auto;
 }
 
 .win-condition-kicker-icon {
   align-items: center;
-  background: color-mix(in srgb, var(--condition-accent, #93dceb) 18%, rgb(0 0 0 / 28%));
-  border: 1px solid color-mix(in srgb, var(--condition-accent, #93dceb) 42%, rgb(255 255 255 / 12%));
-  box-shadow: 0 0 18px color-mix(in srgb, var(--condition-accent, #93dceb) 18%, transparent);
+  background:
+    radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--condition-accent, #93dceb) 26%, transparent), transparent 64%),
+    rgb(0 0 0 / 34%);
+  border: 1px solid color-mix(in srgb, var(--condition-accent, #93dceb) 52%, rgb(255 255 255 / 14%));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--condition-accent, #93dceb) 20%, transparent);
   display: inline-flex;
   flex: 0 0 auto;
-  height: 24px;
+  height: 22px;
   justify-content: center;
   line-height: 1;
-  width: 24px;
+  width: 22px;
 }
 
 .win-condition-kicker-icon svg {
@@ -66,6 +79,7 @@
 .win-condition-kicker strong {
   color: currentColor;
   font: inherit;
+  line-height: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -883,11 +897,7 @@
 .win-condition-detail-aside .win-condition-kicker,
 .win-condition-detail-list-grid .win-condition-kicker,
 .win-condition-detail-matchups .win-condition-kicker {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 14%, transparent), transparent 78%),
-    rgb(0 0 0 / 18%);
-  border: 1px solid color-mix(in srgb, var(--condition-accent) 24%, rgb(255 255 255 / 9%));
-  padding: 4px 8px 4px 4px;
+  display: inline-flex;
 }
 
 .win-condition-detail-section p,
