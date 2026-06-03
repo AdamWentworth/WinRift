@@ -1,6 +1,30 @@
-import { ArrowLeft, ArrowRight, BarChart3, BookOpen, ChevronLeft, ChevronRight, MousePointer2, ShieldAlert } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Compass,
+  Eye,
+  ListChecks,
+  MapPinned,
+  MessageCircle,
+  MousePointer2,
+  Network,
+  Route,
+  Shield,
+  ShieldAlert,
+  Sparkles,
+  Swords,
+  Target,
+  Users,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import type { Champion, ChampionData } from '../api/types';
 import { championImageUrl, championList, championSplashUrl } from '../lib/staticData';
 import {
@@ -43,6 +67,27 @@ const modelSteps = [
 
 const carouselPans = ['pan-east', 'pan-west', 'pan-rise', 'pan-fall', 'pan-northeast', 'pan-southwest'];
 const examplePageSize = 5;
+const sectionVisuals: Record<string, HeaderVisual> = {
+  'Carry examples': { emoji: '💥', icon: Target },
+  'Common Failure': { emoji: '⚠️', icon: AlertTriangle },
+  'Composition Signals': { emoji: '🧩', icon: Network },
+  'Example champions': { emoji: '⭐', icon: Sparkles },
+  'Failure Checks': { emoji: '🚧', icon: ShieldAlert },
+  'How It Wins': { emoji: '⚔️', icon: Swords },
+  'How To Read It': { emoji: '👁️', icon: Eye },
+  'How To Use It': { emoji: '🎯', icon: Target },
+  'Live Page Interpretation': { emoji: '📊', icon: BarChart3 },
+  'Map Pattern': { emoji: '🗺️', icon: MapPinned },
+  'Plain English': { emoji: '💬', icon: MessageCircle },
+  'Play Pattern': { emoji: '🧭', icon: Route },
+  'Protector examples': { emoji: '🛡️', icon: Shield },
+  'Team Needs': { emoji: '🤝', icon: Users },
+  'The Five Axes': { emoji: '🧭', icon: Compass },
+  'Timing Read': { emoji: '⏱️', icon: Clock3 },
+  'Usually Good Into': { emoji: '✅', icon: Target },
+  'Usually Struggles Into': { emoji: '🛡️', icon: Shield },
+  'What It Is': { emoji: '📘', icon: BookOpen },
+};
 
 export function WinConditionsPage({ champions, onSelectChampion, onSelectCondition }: Props) {
   const orderedDefinitions = useMemo(() => orderedWinConditionDefinitions(), []);
@@ -50,7 +95,7 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
     <section className="win-conditions-page">
       <div className="win-conditions-hero">
         <div className="win-conditions-hero-copy">
-          <span>WinRift Strategy Model</span>
+          <SectionKicker emoji="✨" icon={Sparkles} label="WinRift Strategy Model" />
           <h2>Understanding Win Conditions</h2>
           <p>
             A win condition is the practical path your team composition can use to turn champion strengths into a won game.
@@ -74,7 +119,7 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
 
       <div className="win-conditions-primer">
         <div className="win-conditions-primer-copy">
-          <span>Plain English</span>
+          <SectionKicker {...visualForHeader('Plain English')} label="Plain English" />
           <h3>What the live page is trying to tell you</h3>
           <p>
             When the live match screen says something like <strong>Team Fight B+ into Pick B</strong>, it is not saying
@@ -101,7 +146,7 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
       </div>
 
       <div className="win-conditions-section-heading">
-        <span>The Five Axes</span>
+        <SectionKicker {...visualForHeader('The Five Axes')} label="The Five Axes" />
         <h3>How to recognize each strategy</h3>
       </div>
 
@@ -119,7 +164,7 @@ export function WinConditionsPage({ champions, onSelectChampion, onSelectConditi
 
       <div className="win-condition-reading-card">
         <div>
-          <span>How To Use It</span>
+          <SectionKicker {...visualForHeader('How To Use It')} label="How To Use It" />
           <h3>Read strategy as a lens, not a script</h3>
         </div>
         <ol>
@@ -205,7 +250,7 @@ export function WinConditionDetailPage({
         <div className="win-condition-detail-main">
           {detail.sections.map((section) => (
             <article className="win-condition-detail-section" key={section.title}>
-              <span>{section.title}</span>
+              <SectionKicker {...visualForHeader(section.title)} label={section.title} />
               <p>{section.body}</p>
             </article>
           ))}
@@ -225,19 +270,19 @@ export function WinConditionDetailPage({
 
       <div className="win-condition-detail-matchups">
         <article>
-          <span>Usually Good Into</span>
+          <SectionKicker {...visualForHeader('Usually Good Into')} label="Usually Good Into" />
           <p>{detail.goodInto}</p>
         </article>
         <article>
-          <span>Usually Struggles Into</span>
+          <SectionKicker {...visualForHeader('Usually Struggles Into')} label="Usually Struggles Into" />
           <p>{detail.strugglesInto}</p>
         </article>
         <article>
-          <span>Timing Read</span>
+          <SectionKicker {...visualForHeader('Timing Read')} label="Timing Read" />
           <p>{detail.timing}</p>
         </article>
         <article>
-          <span>Live Page Interpretation</span>
+          <SectionKicker {...visualForHeader('Live Page Interpretation')} label="Live Page Interpretation" />
           <p>{detail.liveRead}</p>
         </article>
       </div>
@@ -357,7 +402,7 @@ function WinConditionGuideCard({
 function DetailList({ title, items }: { title: string; items: string[] }) {
   return (
     <article>
-      <span>{title}</span>
+      <SectionKicker {...visualForHeader(title)} label={title} />
       <ul>
         {items.map((item) => (
           <li key={item}>{item}</li>
@@ -414,7 +459,7 @@ function ExampleChampionCarousel({
   return (
     <div className="win-condition-example-strip">
       <div className="win-condition-example-strip-header">
-        <span>{label}</span>
+        <SectionKicker {...visualForHeader(label)} label={label} />
         <div className="win-condition-example-controls">
           <button
             aria-label={`Previous ${conditionLabel} ${label.toLowerCase()}`}
@@ -515,10 +560,32 @@ function WinConditionArtLayer({
 function ReadDetail({ label, text }: { label: string; text: string }) {
   return (
     <div>
-      <span>{label}</span>
+      <SectionKicker {...visualForHeader(label)} label={label} />
       <p>{text}</p>
     </div>
   );
+}
+
+type HeaderVisual = {
+  emoji: string;
+  icon: LucideIcon;
+};
+
+function SectionKicker({ emoji, icon: Icon, label }: HeaderVisual & { label: string }) {
+  return (
+    <span className="win-condition-kicker">
+      <em aria-hidden="true">{emoji}</em>
+      <Icon size={14} strokeWidth={2.4} aria-hidden="true" />
+      <strong>{label}</strong>
+    </span>
+  );
+}
+
+function visualForHeader(label: string): HeaderVisual {
+  if (label.endsWith('champion examples')) {
+    return { emoji: '⭐', icon: Sparkles };
+  }
+  return sectionVisuals[label] ?? { emoji: '•', icon: ListChecks };
 }
 
 function championByDisplayName(champions: ChampionData | undefined, name: string) {
