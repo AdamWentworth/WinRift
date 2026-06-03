@@ -163,6 +163,10 @@ Summoner profile extraction candidates:
 - stored profile tabs, rows, and freshness helpers: second pass complete. `ProfileSections.tsx` owns tab state and summaries, `ProfileRows.tsx` owns champion/build/match row markup, and `profileFormatters.ts` owns shared date/name/freshness formatting.
 - profile header: first pass complete in `components/summoner-profile/ProfileHeader.tsx`
 
+Live match extraction candidates:
+
+- focused build participant picker: first pass complete in `components/live-match/BuildParticipantPicker.tsx`, with shared live participant display labeling in `participantLabels.ts`.
+
 ### Route-Level Bundle Splitting
 
 Status: first pass complete.
