@@ -43,17 +43,19 @@
     linear-gradient(180deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 2%)),
     rgb(0 0 0 / 22%);
   border: 1px solid color-mix(in srgb, var(--condition-accent, #93dceb) 28%, rgb(255 255 255 / 10%));
-  border-left: 2px solid var(--condition-accent, #93dceb);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 7%),
     0 0 20px color-mix(in srgb, var(--condition-accent, #93dceb) 10%, transparent);
   color: var(--condition-accent, #93dceb);
   display: inline-flex;
+  font-size: 11px;
+  font-weight: 1000;
   gap: 8px;
   letter-spacing: 0;
   min-height: 31px;
   min-width: 0;
   padding: 4px 10px 4px 5px;
+  text-transform: uppercase;
   width: auto;
 }
 
@@ -74,6 +76,7 @@
 
 .win-condition-kicker-icon svg {
   color: currentColor;
+  display: block;
 }
 
 .win-condition-kicker strong {
@@ -795,11 +798,11 @@
   width: 112px;
 }
 
-.win-condition-detail-title-row span,
-.win-condition-detail-section span,
-.win-condition-detail-aside span,
-.win-condition-detail-list-grid span,
-.win-condition-detail-matchups span {
+.win-condition-detail-title-row span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
+.win-condition-detail-section span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
+.win-condition-detail-aside span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
+.win-condition-detail-list-grid span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
+.win-condition-detail-matchups span:not(.win-condition-kicker):not(.win-condition-kicker-icon) {
   color: var(--condition-accent);
   display: block;
   font-size: 11px;
