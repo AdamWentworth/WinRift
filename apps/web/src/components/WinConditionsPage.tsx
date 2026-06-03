@@ -224,7 +224,7 @@ export function WinConditionDetailPage({
           <div className="win-condition-detail-title-row">
             <img src={conditionIconUrl(definition.key)} alt="" />
             <div>
-              <span>{definition.shortLabel}</span>
+              <span className="win-condition-detail-subtitle">{definition.shortLabel}</span>
               <h2>{definition.label}</h2>
             </div>
           </div>
@@ -360,7 +360,7 @@ function WinConditionGuideCard({
       <header>
         <img src={conditionIconUrl(definition.key)} alt="" />
         <div>
-          <span>{definition.shortLabel}</span>
+          <span className="win-condition-card-subtitle">{definition.shortLabel}</span>
           <h3>{definition.label}</h3>
         </div>
       </header>

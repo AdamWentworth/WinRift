@@ -22,20 +22,6 @@
   padding: 20px;
 }
 
-.win-conditions-hero-copy > span:not(.win-condition-kicker),
-.win-conditions-primer-copy > span:not(.win-condition-kicker),
-.win-conditions-section-heading > span:not(.win-condition-kicker),
-.win-condition-reading-card > div > span:not(.win-condition-kicker),
-.win-condition-guide-card header span,
-.win-condition-detail-grid span,
-.win-condition-example-strip-header > span:not(.win-condition-kicker) {
-  color: #93dceb;
-  display: block;
-  font-size: 11px;
-  font-weight: 1000;
-  text-transform: uppercase;
-}
-
 .win-condition-kicker {
   align-items: center;
   background:
@@ -105,7 +91,6 @@
 .win-conditions-hero p,
 .win-conditions-primer-copy p,
 .win-condition-main-copy,
-.win-condition-detail-grid p,
 .win-condition-reading-card li {
   color: #c6d7dd;
   font-size: 13px;
@@ -495,8 +480,12 @@
   margin: 4px 0 0;
 }
 
-.win-condition-guide-card header span {
+.win-condition-card-subtitle {
   color: var(--condition-accent);
+  display: block;
+  font-size: 11px;
+  font-weight: 1000;
+  text-transform: uppercase;
 }
 
 .win-condition-main-copy {
@@ -532,62 +521,6 @@
     rgb(0 0 0 / 32%);
   border-color: var(--condition-accent);
   outline: none;
-}
-
-.win-condition-detail-grid {
-  display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.win-condition-detail-grid div {
-  background: rgb(0 0 0 / 30%);
-  border: 1px solid rgb(255 255 255 / 9%);
-  padding: 10px;
-}
-
-.win-condition-detail-grid span {
-  color: var(--condition-accent);
-  font-size: 10px;
-}
-
-.win-condition-detail-grid p {
-  color: #d2e2e8;
-  font-size: 11px;
-  line-height: 1.42;
-  margin-top: 5px;
-}
-
-.win-condition-guide-card.spotlight .win-condition-detail-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.win-condition-pairing-callout {
-  background:
-    radial-gradient(ellipse at 8% 0, color-mix(in srgb, var(--condition-accent) 22%, transparent), transparent 42%),
-    linear-gradient(90deg, color-mix(in srgb, var(--condition-accent) 14%, transparent), rgb(255 255 255 / 4%)),
-    rgb(0 0 0 / 32%);
-  border: 1px solid color-mix(in srgb, var(--condition-accent) 42%, rgb(255 255 255 / 10%));
-  border-left: 3px solid var(--condition-accent);
-  display: grid;
-  gap: 6px;
-  padding: 11px 12px;
-}
-
-.win-condition-pairing-callout span {
-  color: var(--condition-accent);
-  display: block;
-  font-size: 10px;
-  font-weight: 1000;
-  text-transform: uppercase;
-}
-
-.win-condition-pairing-callout p {
-  color: #edf7f9;
-  font-size: 13px;
-  font-weight: 850;
-  line-height: 1.48;
-  margin: 0;
 }
 
 .win-condition-control-examples {
@@ -814,11 +747,7 @@
   width: 112px;
 }
 
-.win-condition-detail-title-row span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
-.win-condition-detail-section span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
-.win-condition-detail-aside span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
-.win-condition-detail-list-grid span:not(.win-condition-kicker):not(.win-condition-kicker-icon),
-.win-condition-detail-matchups span:not(.win-condition-kicker):not(.win-condition-kicker-icon) {
+.win-condition-detail-subtitle {
   color: var(--condition-accent);
   display: block;
   font-size: 11px;
