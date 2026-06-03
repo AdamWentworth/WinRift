@@ -22,13 +22,13 @@
   padding: 20px;
 }
 
-.win-conditions-hero-copy > span,
-.win-conditions-primer-copy > span,
-.win-conditions-section-heading > span,
-.win-condition-reading-card > div > span,
+.win-conditions-hero-copy > span:not(.win-condition-kicker),
+.win-conditions-primer-copy > span:not(.win-condition-kicker),
+.win-conditions-section-heading > span:not(.win-condition-kicker),
+.win-condition-reading-card > div > span:not(.win-condition-kicker),
 .win-condition-guide-card header span,
 .win-condition-detail-grid span,
-.win-condition-example-strip-header > span {
+.win-condition-example-strip-header > span:not(.win-condition-kicker) {
   color: #93dceb;
   display: block;
   font-size: 11px;
@@ -50,11 +50,12 @@
   display: inline-flex;
   font-size: 11px;
   font-weight: 1000;
-  gap: 8px;
+  gap: 10px;
+  justify-self: start;
   letter-spacing: 0;
   min-height: 31px;
   min-width: 0;
-  padding: 4px 10px 4px 5px;
+  padding: 4px 12px 4px 6px;
   text-transform: uppercase;
   width: auto;
 }
