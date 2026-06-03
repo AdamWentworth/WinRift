@@ -1,0 +1,173 @@
+.win-condition-card-art,
+.control-pair-art {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.win-condition-art-layer {
+  filter: saturate(0.92) contrast(0.96) brightness(0.5);
+  height: 108%;
+  inset: -4%;
+  object-fit: cover;
+  opacity: 0;
+  position: absolute;
+  transform: translate3d(0, 0, 0) scale(1.08);
+  width: 108%;
+  will-change: opacity, transform;
+}
+
+.win-condition-art-layer.active.pan-east {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanEast 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-west {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanWest 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-rise {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanRise 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-fall {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanFall 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-northeast {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanNorthEast 10500ms linear forwards;
+}
+
+.win-condition-art-layer.active.pan-southwest {
+  animation: winConditionArtReveal 2200ms ease-out forwards, winConditionPanSouthWest 10500ms linear forwards;
+}
+
+.win-condition-art-layer.exiting {
+  animation: winConditionArtDepart 2600ms ease-in forwards;
+}
+
+.win-condition-art-layer.exiting.pan-east {
+  transform: translate3d(2%, 0, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-west {
+  transform: translate3d(-2%, 0, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-rise {
+  transform: translate3d(0, -2%, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-fall {
+  transform: translate3d(0, 2%, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-northeast {
+  transform: translate3d(2%, -2%, 0) scale(1.12);
+}
+
+.win-condition-art-layer.exiting.pan-southwest {
+  transform: translate3d(-2%, 2%, 0) scale(1.12);
+}
+
+.control-pair-art {
+  display: block;
+}
+
+.control-pair-side {
+  bottom: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  width: 58%;
+}
+
+.control-pair-side.carry {
+  clip-path: polygon(0 0, 100% 0, 82% 100%, 0 100%);
+  left: 0;
+}
+
+.control-pair-side.protector {
+  clip-path: polygon(18% 0, 100% 0, 100% 100%, 0 100%);
+  right: 0;
+}
+
+.control-pair-side .win-condition-art-layer {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  width: 100%;
+}
+
+.control-pair-side.carry .win-condition-art-layer {
+  object-position: 42% center;
+}
+
+.control-pair-side.protector .win-condition-art-layer {
+  object-position: 58% center;
+}
+
+.control-pair-blend {
+  background:
+    linear-gradient(180deg, transparent, color-mix(in srgb, var(--condition-accent) 72%, #fff), transparent),
+    linear-gradient(180deg, transparent 0 18%, rgb(255 255 255 / 34%) 45% 55%, transparent 82%);
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--condition-accent) 46%, transparent),
+    0 0 1px rgb(255 255 255 / 70%);
+  inset: -18% auto -18% 49.8%;
+  opacity: 0.72;
+  position: absolute;
+  transform: rotate(10deg);
+  width: 3px;
+}
+
+@keyframes winConditionArtReveal {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 0.76;
+  }
+}
+
+@keyframes winConditionArtDepart {
+  0% {
+    opacity: 0.58;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes winConditionPanEast {
+  from { transform: translate3d(-2%, 0, 0) scale(1.08); }
+  to { transform: translate3d(2%, 0, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanWest {
+  from { transform: translate3d(2%, 0, 0) scale(1.08); }
+  to { transform: translate3d(-2%, 0, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanRise {
+  from { transform: translate3d(0, 2%, 0) scale(1.08); }
+  to { transform: translate3d(0, -2%, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanFall {
+  from { transform: translate3d(0, -2%, 0) scale(1.08); }
+  to { transform: translate3d(0, 2%, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanNorthEast {
+  from { transform: translate3d(-2%, 2%, 0) scale(1.08); }
+  to { transform: translate3d(2%, -2%, 0) scale(1.12); }
+}
+
+@keyframes winConditionPanSouthWest {
+  from { transform: translate3d(2%, -2%, 0) scale(1.08); }
+  to { transform: translate3d(-2%, 2%, 0) scale(1.12); }
+}

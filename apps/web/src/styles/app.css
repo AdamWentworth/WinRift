@@ -11,5 +11,7 @@
 @import "./app/champion-directory.css";
 @import "./app/tier-list.css";
 @import "./app/win-conditions.css";
+@import "./app/win-condition-art.css";
+@import "./app/win-condition-detail.css";
 @import "./app/build-guide.css";
 @import "./app/responsive.css";

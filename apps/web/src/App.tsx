@@ -25,8 +25,8 @@ const ChampionDirectoryPage = lazy(() => import('./components/ChampionDirectoryP
 const LiveMatchPanel = lazy(() => import('./components/LiveMatchPanel').then((module) => ({ default: module.LiveMatchPanel })));
 const SummonerProfilePage = lazy(() => import('./components/SummonerProfilePage').then((module) => ({ default: module.SummonerProfilePage })));
 const TierListPage = lazy(() => import('./components/TierListPage').then((module) => ({ default: module.TierListPage })));
-const WinConditionsPage = lazy(() => import('./components/WinConditionsPage').then((module) => ({ default: module.WinConditionsPage })));
-const WinConditionDetailPage = lazy(() => import('./components/WinConditionsPage').then((module) => ({ default: module.WinConditionDetailPage })));
+const WinConditionsPage = lazy(() => import('./components/win-conditions/WinConditionsPage').then((module) => ({ default: module.WinConditionsPage })));
+const WinConditionDetailPage = lazy(() => import('./components/win-conditions/WinConditionDetailPage').then((module) => ({ default: module.WinConditionDetailPage })));
 
 export function App() {
   const queryClient = useQueryClient();
