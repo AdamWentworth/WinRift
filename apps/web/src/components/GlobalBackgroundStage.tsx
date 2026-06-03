@@ -61,11 +61,12 @@ type Props = {
   championSplashes?: ChampionSplashData;
   championScopeId?: number;
   championScopeIds?: number[];
+  strictChampionScope?: boolean;
 };
 
-export function GlobalBackgroundStage({ champions, championSplashes, championScopeId, championScopeIds }: Props) {
+export function GlobalBackgroundStage({ champions, championSplashes, championScopeId, championScopeIds, strictChampionScope }: Props) {
   const scopeKey = championScopeIds?.join(':') ?? '';
-  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId, championScopeIds), [champions, championScopeId, championSplashes, scopeKey]);
+  const slidePool = useMemo(() => buildGlobalBackgroundSplashPool(champions, championSplashes, championScopeId, championScopeIds, strictChampionScope), [champions, championScopeId, championSplashes, scopeKey, strictChampionScope]);
   const [slideState, setSlideState] = useState(() => initialGlobalBackgroundSlideState(fallbackGlobalBackgroundSlides));
 
   useEffect(() => {
@@ -81,6 +82,10 @@ export function GlobalBackgroundStage({ champions, championSplashes, championSco
     }, 10500);
     return () => window.clearInterval(interval);
   }, [slidePool]);
+
+  if (!slidePool.length) {
+    return null;
+  }
 
   return (
     <div className="global-art-stage" aria-hidden="true">
@@ -108,7 +113,7 @@ function GlobalBackgroundArtSlide({ slide, state }: { slide: GlobalBackgroundSli
   );
 }
 
-function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number, championScopeIds?: number[]): GlobalBackgroundSlide[] {
+function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplashes?: ChampionSplashData, championScopeId?: number, championScopeIds?: number[], strictChampionScope?: boolean): GlobalBackgroundSlide[] {
   const scopedChampion = championScopeId ? championByKey(champions, championScopeId) : undefined;
   if (scopedChampion) {
     const scopedSplashes = championSplashes?.data.filter((splash) => splash.championId === scopedChampion.id) ?? [];
@@ -137,6 +142,9 @@ function buildGlobalBackgroundSplashPool(champions?: ChampionData, championSplas
       position: globalBackgroundSplashPosition(champion.id),
       panClass: globalBackgroundSplashPan(champion.id, index),
     }));
+  }
+  if (strictChampionScope) {
+    return [];
   }
   if (championSplashes?.data.length) {
     return mapSplashSlides(championSplashes.data);

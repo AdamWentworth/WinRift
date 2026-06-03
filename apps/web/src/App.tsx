@@ -15,7 +15,8 @@ import { patchBucketFromVersion } from './lib/patches';
 import { queryGcTime, queryStaleTime } from './lib/queryPolicies';
 import { CHAMPION_PAGE_QUERY_VERSION } from './lib/queryVersions';
 import { normalizeRole } from './lib/roles';
-import { championImageUrl, championSplashUrl } from './lib/staticData';
+import { championImageUrl, championList, championSplashUrl } from './lib/staticData';
+import { WIN_CONDITION_DEFINITIONS, type WinConditionKey } from './lib/winConditions';
 
 const DEFAULT_QUEUE_ID = 420;
 const BACKGROUND_SPLASH_CATALOG_DELAY_MS = 10_000;
@@ -145,8 +146,13 @@ export function App() {
   const initialChampionId = useMemo(() => (
     route.kind === 'champion' ? championIdFromRoute(champions.data, route.championSlug) : undefined
   ), [champions.data, route]);
+  const winConditionBackgroundChampionIds = useMemo(() => (
+    route.kind === 'win-condition-detail'
+      ? championIdsForWinConditionBackground(champions.data, route.condition)
+      : undefined
+  ), [champions.data, route]);
   const backgroundChampionScopeId = route.kind === 'champion' && route.championSlug ? initialChampionId : undefined;
-  const backgroundChampionScopeIds = route.kind === 'summoner' ? summonerBackgroundChampionIds : undefined;
+  const backgroundChampionScopeIds = route.kind === 'summoner' ? summonerBackgroundChampionIds : winConditionBackgroundChampionIds;
   const appShellClassName = appShellClass(route);
   const showHeaderSearch = route.kind === 'champion'
     || route.kind === 'tier-list'
@@ -167,6 +173,7 @@ export function App() {
         championSplashes={championSplashes.data}
         championScopeId={backgroundChampionScopeId}
         championScopeIds={backgroundChampionScopeIds}
+        strictChampionScope={route.kind === 'win-condition-detail'}
       />
       <header className="topbar">
         <div className="topbar-brand">
@@ -301,6 +308,22 @@ function warmImage(src: string) {
   const image = new Image();
   image.decoding = 'async';
   image.src = src;
+}
+
+function championIdsForWinConditionBackground(champions: Parameters<typeof championList>[0], condition: WinConditionKey) {
+  const definition = WIN_CONDITION_DEFINITIONS.find((candidate) => candidate.key === condition);
+  if (!definition) return [];
+
+  const conditionChampionNames = [
+    ...definition.examples,
+    ...(definition.carryExamples ?? []),
+    ...(definition.protectorExamples ?? []),
+  ];
+  const normalizedNames = new Set(conditionChampionNames.map((name) => name.toLowerCase()));
+  return championList(champions)
+    .filter((champion) => normalizedNames.has(champion.name.toLowerCase()))
+    .map((champion) => Number(champion.key))
+    .filter((championId) => Number.isFinite(championId));
 }
 
 function RouteFallback() {
