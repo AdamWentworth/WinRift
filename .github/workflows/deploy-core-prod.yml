@@ -51,13 +51,17 @@ jobs:
           ENV_FILE="${DEPLOY_ROOT}/.env"
           SCHEMA_SOURCE="${GITHUB_WORKSPACE}/core/internal/clickhouse/schema.sql"
           SCHEMA_TARGET="${DEPLOY_ROOT}/schema.sql"
+          CLICKHOUSE_CONFIG_SOURCE="${GITHUB_WORKSPACE}/ops/clickhouse/config.d"
+          CLICKHOUSE_USERS_SOURCE="${GITHUB_WORKSPACE}/ops/clickhouse/users.d"
+          CLICKHOUSE_CONFIG_TARGET="${DEPLOY_ROOT}/clickhouse/config.d"
+          CLICKHOUSE_USERS_TARGET="${DEPLOY_ROOT}/clickhouse/users.d"
           REFRESH_KEY_SOURCE="${GITHUB_WORKSPACE}/ops/prod/refresh-riot-key.sh"
           REFRESH_KEY_TARGET="${DEPLOY_ROOT}/refresh-riot-key"
           RIOTKEY_SOURCE="${GITHUB_WORKSPACE}/ops/prod/riotkey.sh"
           RIOTKEY_TARGET="${DEPLOY_ROOT}/riotkey"
           REQUIRED_ENV_KEYS="RIOT_API_KEY CLICKHOUSE_PASSWORD CORS_ORIGINS COLLECTOR_PLATFORMS COLLECTOR_CURRENT_PATCH"
 
-          mkdir -p "${DEPLOY_ROOT}" "${DEPLOY_ROOT}/deployments"
+          mkdir -p "${DEPLOY_ROOT}" "${DEPLOY_ROOT}/deployments" "${CLICKHOUSE_CONFIG_TARGET}" "${CLICKHOUSE_USERS_TARGET}"
 
           if [[ ! -f "${ENV_FILE}" ]]; then
             echo "Env file not found: ${ENV_FILE}" >&2
@@ -105,6 +109,10 @@ jobs:
 
           install -m 0644 "${COMPOSE_FILE}" "${DEPLOY_ROOT}/docker-compose.yml"
           cp "${SCHEMA_SOURCE}" "${SCHEMA_TARGET}"
+          find "${CLICKHOUSE_CONFIG_TARGET}" -type f -name '*.xml' -delete
+          find "${CLICKHOUSE_USERS_TARGET}" -type f -name '*.xml' -delete
+          cp "${CLICKHOUSE_CONFIG_SOURCE}"/*.xml "${CLICKHOUSE_CONFIG_TARGET}/"
+          cp "${CLICKHOUSE_USERS_SOURCE}"/*.xml "${CLICKHOUSE_USERS_TARGET}/"
           install -m 0755 "${REFRESH_KEY_SOURCE}" "${REFRESH_KEY_TARGET}"
           install -m 0755 "${RIOTKEY_SOURCE}" "${RIOTKEY_TARGET}"
 

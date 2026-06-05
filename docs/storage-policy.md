@@ -123,6 +123,40 @@ ClickHouse is happier with local disk for active writes. The NAS is a better pla
 
 The current laptop ClickHouse volume is about `56G`. Active ClickHouse parts are much smaller than that, so some of the volume is likely merge/temp/detached overhead from heavy ingest and restarts. Treat that as a warning: the server's mounted data SSD is about `119G`, which is enough for the initial migration but not enough for casual unbounded growth.
 
+## ClickHouse System Logs
+
+ClickHouse's own `system.*_log` tables can outgrow the actual WinRift dataset if left at defaults. On the production server this happened with `system.text_log`, `system.processors_profile_log`, `system.query_log`, and `system.part_log`.
+
+WinRift now ships bounded ClickHouse config in `ops/clickhouse/`:
+
+- `ops/clickhouse/config.d/winrift-system-logs.xml` keeps ClickHouse system log tables on a one-day TTL and lowers `text_log` to warning level.
+- `ops/clickhouse/users.d/winrift-query-logging.xml` disables per-query, query-view, query-thread, and processor-profile logging for the default profile.
+
+These tables are diagnostic history only. Clearing them does not delete Riot match data, normalized participants, build analytics, champion guides, profile summaries, or win-condition summaries.
+
+Useful storage check:
+
+```bash
+docker compose exec clickhouse clickhouse-client --query "
+  SELECT database, formatReadableSize(sum(bytes_on_disk)) AS active_size, sum(rows) AS rows
+  FROM system.parts
+  WHERE active
+  GROUP BY database
+  ORDER BY sum(bytes_on_disk) DESC"
+```
+
+If the system database is unexpectedly large, inspect table sizes:
+
+```bash
+docker compose exec clickhouse clickhouse-client --query "
+  SELECT database, table, formatReadableSize(sum(bytes_on_disk)) AS size, sum(rows) AS rows
+  FROM system.parts
+  WHERE active
+  GROUP BY database, table
+  ORDER BY sum(bytes_on_disk) DESC
+  LIMIT 30"
+```
+
 Use the production env value to move ClickHouse without changing app code:
 
 ```text

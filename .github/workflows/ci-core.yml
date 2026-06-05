@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "core/**"
+      - "ops/clickhouse/**"
       - "ops/prod/**"
       - ".github/workflows/ci-core.yml"
       - ".github/workflows/deploy-core-prod.yml"
@@ -11,6 +12,7 @@ on:
     branches: ["main", "master"]
     paths:
       - "core/**"
+      - "ops/clickhouse/**"
       - "ops/prod/**"
       - ".github/workflows/ci-core.yml"
       - ".github/workflows/deploy-core-prod.yml"

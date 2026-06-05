@@ -30,6 +30,14 @@ The frontend is intentionally not deployed here yet. Run it locally with `VITE_A
 
 Leave ClickHouse paths pointed at `/mnt/storage/clickhouse/...` so database files land on the second SSD, not the OS disk.
 
+ClickHouse system diagnostics are intentionally bounded by `ops/clickhouse` config mounted into the server:
+
+- per-query/profile logging is disabled for the default profile,
+- `text_log` is warning-level,
+- ClickHouse system log tables use a one-day TTL.
+
+This protects the small storage SSD from internal ClickHouse logs growing larger than the WinRift dataset.
+
 ## 🧰 Server Bootstrap
 
 Run once on the server:
@@ -61,6 +69,8 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `RIOT_AUTH_FAILURE_EXIT` | Should stay `true` so the worker stops when the key expires. |
 | `WINRIFT_STORAGE_MOUNT` | Mount guard, usually `/mnt/storage`. |
 | `WINRIFT_CLICKHOUSE_DATA_DIR` | ClickHouse data directory on storage SSD. |
+| `WINRIFT_CLICKHOUSE_CONFIG_DIR` | Mounted ClickHouse config override directory. |
+| `WINRIFT_CLICKHOUSE_USERS_DIR` | Mounted ClickHouse user/profile override directory. |
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
 | `API_REQUEST_LOGS_ENABLED` | Enables grep-friendly API timing logs. |
 | `WORKER_REFRESH_STATUS_PATH` | Runtime JSON file for worker refresh health. |
@@ -142,6 +152,50 @@ Follow monitor logs:
 
 ```bash
 docker logs -f winrift_monitor
+```
+
+Check ClickHouse storage by database:
+
+```bash
+cd /srv/winrift
+docker compose exec clickhouse clickhouse-client --query "
+  SELECT database, formatReadableSize(sum(bytes_on_disk)) AS active_size, sum(rows) AS rows
+  FROM system.parts
+  WHERE active
+  GROUP BY database
+  ORDER BY sum(bytes_on_disk) DESC"
+```
+
+If system logs ever grow unexpectedly again, first confirm the config is mounted and active, then clear only ClickHouse diagnostics:
+
+```bash
+cd /srv/winrift
+docker compose exec clickhouse clickhouse-client --multiquery --query "
+  SYSTEM FLUSH LOGS;
+  TRUNCATE TABLE IF EXISTS system.text_log;
+  TRUNCATE TABLE IF EXISTS system.processors_profile_log;
+  TRUNCATE TABLE IF EXISTS system.query_log;
+  TRUNCATE TABLE IF EXISTS system.query_views_log;
+  TRUNCATE TABLE IF EXISTS system.part_log;
+  TRUNCATE TABLE IF EXISTS system.trace_log;
+  TRUNCATE TABLE IF EXISTS system.metric_log;
+  TRUNCATE TABLE IF EXISTS system.asynchronous_metric_log;
+  TRUNCATE TABLE IF EXISTS system.query_metric_log;"
+```
+
+When ClickHouse changes system-log engine definitions, old tables may be retained with `_0` suffixes. Those are diagnostic history only and can be dropped after verifying the new log tables are tiny:
+
+```bash
+docker compose exec clickhouse clickhouse-client --multiquery --query "
+  DROP TABLE IF EXISTS system.text_log_0 SYNC;
+  DROP TABLE IF EXISTS system.processors_profile_log_0 SYNC;
+  DROP TABLE IF EXISTS system.query_log_0 SYNC;
+  DROP TABLE IF EXISTS system.query_views_log_0 SYNC;
+  DROP TABLE IF EXISTS system.part_log_0 SYNC;
+  DROP TABLE IF EXISTS system.trace_log_0 SYNC;
+  DROP TABLE IF EXISTS system.metric_log_0 SYNC;
+  DROP TABLE IF EXISTS system.asynchronous_metric_log_0 SYNC;
+  DROP TABLE IF EXISTS system.query_metric_log_0 SYNC;"
 ```
 
 Stop the worker only:

@@ -1,0 +1,127 @@
+<clickhouse>
+  <!-- Keep ClickHouse's own diagnostics bounded on the small home-server SSD. -->
+  <logger>
+    <level>warning</level>
+  </logger>
+
+  <text_log replace="replace">
+    <database>system</database>
+    <table>text_log</table>
+    <level>warning</level>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </text_log>
+
+  <query_log replace="replace">
+    <database>system</database>
+    <table>query_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </query_log>
+
+  <query_views_log replace="replace">
+    <database>system</database>
+    <table>query_views_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </query_views_log>
+
+  <processors_profile_log replace="replace">
+    <database>system</database>
+    <table>processors_profile_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </processors_profile_log>
+
+  <part_log replace="replace">
+    <database>system</database>
+    <table>part_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </part_log>
+
+  <trace_log replace="replace">
+    <database>system</database>
+    <table>trace_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </trace_log>
+
+  <metric_log replace="replace">
+    <database>system</database>
+    <table>metric_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <collect_interval_milliseconds>10000</collect_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </metric_log>
+
+  <asynchronous_metric_log replace="replace">
+    <database>system</database>
+    <table>asynchronous_metric_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <collect_interval_milliseconds>10000</collect_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (metric, event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </asynchronous_metric_log>
+
+  <query_metric_log replace="replace">
+    <database>system</database>
+    <table>query_metric_log</table>
+    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    <collect_interval_milliseconds>1000</collect_interval_milliseconds>
+    <engine>
+      ENGINE = MergeTree
+      PARTITION BY toYYYYMM(event_date)
+      ORDER BY (event_date, event_time)
+      TTL event_date + INTERVAL 1 DAY DELETE
+      SETTINGS index_granularity = 8192
+    </engine>
+  </query_metric_log>
+</clickhouse>

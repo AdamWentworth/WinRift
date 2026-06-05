@@ -10,6 +10,8 @@ services:
       CLICKHOUSE_PASSWORD: winrift
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./ops/clickhouse/config.d/winrift-system-logs.xml:/etc/clickhouse-server/config.d/winrift-system-logs.xml:ro
+      - ./ops/clickhouse/users.d/winrift-query-logging.xml:/etc/clickhouse-server/users.d/winrift-query-logging.xml:ro
       - ./core/internal/clickhouse/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
