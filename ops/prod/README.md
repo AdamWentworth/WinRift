@@ -118,7 +118,7 @@ Refresh the daily Riot development key:
 riotkey
 ```
 
-Paste the new key when prompted. The helper updates `/srv/winrift/.env`, clears the auth-failure marker, recreates the API, ensures the monitor is running, and starts the worker. It reads the key silently so the value does not land in shell history. If the shortcut is not on the interactive shell `PATH`, use `/srv/winrift/refresh-riot-key`.
+Paste the new key when prompted. The helper shows the full pasted key back for visual verification and requires typing `YES` before it updates `/srv/winrift/.env`. After confirmation, it clears the auth-failure marker, recreates the API, ensures the monitor is running, and starts the worker. If the shortcut is not on the interactive shell `PATH`, use `/srv/winrift/refresh-riot-key`. Use `refresh-riot-key --hide-key` when you want a masked preview instead of full-key echo.
 
 The deploy workflow installs both `/srv/winrift/refresh-riot-key` and the short `riotkey` wrapper automatically. To install them manually on the server before the next deploy:
 

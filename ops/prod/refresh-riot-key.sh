@@ -12,6 +12,8 @@ READ_FROM_STDIN=0
 KEY_FILE=""
 START_WORKER=1
 RESTART_SERVICES=1
+SHOW_KEY=1
+CONFIRM_KEY=1
 
 usage() {
   cat <<'EOF'
@@ -27,6 +29,8 @@ Options:
   --health-url URL     API health URL. Default: http://127.0.0.1:8000/api/health
   --key-file PATH      Read the Riot key from a file.
   --stdin              Read the Riot key from stdin.
+  --hide-key           Hide interactive key input and show only a masked preview.
+  --yes                Skip the interactive confirmation prompt.
   --no-worker          Restart API/monitor but do not start the worker.
   --no-restart         Only update env and clear auth marker.
   -h, --help           Show this help.
@@ -34,7 +38,9 @@ Options:
 Normal use:
   refresh-riot-key
 
-The key is read silently so it does not land in shell history.
+Interactive use shows the pasted key back to you and requires typing YES before
+the env file is updated. The value is not written to shell history by this script,
+but it will be visible in terminal scrollback unless --hide-key is used.
 EOF
 }
 
@@ -64,6 +70,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --stdin)
       READ_FROM_STDIN=1
+      shift
+      ;;
+    --hide-key)
+      SHOW_KEY=0
+      shift
+      ;;
+    --yes)
+      CONFIRM_KEY=0
       shift
       ;;
     --no-worker)
@@ -139,10 +153,51 @@ read_new_key() {
       echo "No TTY available. Use --stdin or --key-file." >&2
       exit 1
     fi
-    read -r -s -p "Paste new Riot API key: " value
-    echo
+    if [[ "${SHOW_KEY}" -eq 1 ]]; then
+      read -r -p "Paste new Riot API key (input visible): " value
+    else
+      read -r -s -p "Paste new Riot API key: " value
+      echo
+    fi
   fi
   normalize_key_input "${value}"
+}
+
+masked_key() {
+  local key="$1"
+  local length="${#key}"
+  if [[ "${length}" -le 16 ]]; then
+    printf '%s' "${key}"
+    return 0
+  fi
+  printf '%s...%s' "${key:0:10}" "${key: -6}"
+}
+
+confirm_new_key() {
+  local key="$1"
+  local answer=""
+
+  if [[ "${CONFIRM_KEY}" -eq 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${READ_FROM_STDIN}" -eq 1 || -n "${KEY_FILE}" ]]; then
+    echo "Riot API key accepted from non-interactive input: $(masked_key "${key}")"
+    return 0
+  fi
+
+  echo
+  if [[ "${SHOW_KEY}" -eq 1 ]]; then
+    echo "You entered this Riot API key:"
+    printf '  %s\n' "${key}"
+  else
+    echo "Key preview: $(masked_key "${key}")"
+  fi
+  read -r -p "Type YES to update ${ENV_FILE} and restart WinRift services: " answer
+  if [[ "${answer}" != "YES" ]]; then
+    echo "Cancelled. No changes made."
+    exit 1
+  fi
 }
 
 env_value() {
@@ -244,6 +299,8 @@ if [[ "${NEW_KEY}" != RGAPI-* ]]; then
   echo "Riot API key must start with RGAPI-. Aborting before updating ${ENV_FILE}." >&2
   exit 1
 fi
+
+confirm_new_key "${NEW_KEY}"
 
 echo "Updating ${ENV_FILE}."
 write_env_key "RIOT_API_KEY" "${NEW_KEY}"

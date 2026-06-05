@@ -241,7 +241,7 @@ After refreshing the key:
 riotkey
 ```
 
-The helper prompts for the new Riot key without echoing it, updates `/srv/winrift/.env`, clears the shared marker, recreates the API, ensures the monitor is running, and starts the worker. It is designed for laptop SSH, phone SSH clients, and Tailscale SSH sessions. Both API and worker also clear the marker on startup, but the helper avoids manual env editing and Docker command memorization. If the short command is not on the shell `PATH`, use `/srv/winrift/refresh-riot-key`.
+The helper prompts for the new Riot key, shows the full pasted key back for visual verification, and requires typing `YES` before it updates `/srv/winrift/.env`. After confirmation, it clears the shared marker, recreates the API, ensures the monitor is running, and starts the worker. It is designed for laptop and phone SSH workflows. Both API and worker also clear the marker on startup, but the helper avoids manual env editing and Docker command memorization. If the short command is not on the shell `PATH`, use `/srv/winrift/refresh-riot-key`. Use `refresh-riot-key --hide-key` if you want a masked preview instead of full-key echo.
 
 If you intentionally pause collection, set `MONITOR_WORKER_REQUIRED=false` or stop the monitor too. Otherwise production treats a stopped worker container as an alert condition.
 
