@@ -108,12 +108,19 @@ test('records WinRift demo videos', async ({ browser }) => {
     await recordVideo(browser, viewport, 'tier-list', async (page) => {
       await gotoAndSettle(page, '/tier-list');
       await expect(page.getByText('WinRift Tier List')).toBeVisible();
-      await clickWithPointer(page, viewport, page.getByRole('button', { name: /Jungle/i }).first(), 650);
+      await expect(page.getByText(/12 champions shown/)).toBeVisible();
+      await smoothScrollTo(page, page.locator('.tier-feature-grid'), 900);
+      await smoothScrollTo(page, page.locator('.tier-table-card'), 1100);
+      await smoothScrollBy(page, 420, 1100);
+      await smoothScrollTo(page, page.locator('.tier-filter-bar'), 800);
       await selectWithPointer(page, viewport, page.locator('.tier-filter-bar label').filter({ hasText: 'Sort' }).locator('select'), 'Win Rate', 650);
+      await smoothScrollTo(page, page.locator('.tier-table-card'), 900);
+      await smoothScrollTo(page, page.locator('.tier-list-tools'), 700);
       await fillWithPointer(page, viewport, page.getByPlaceholder('Search champions in this tier list'), 'Lee', 600);
+      await smoothScrollTo(page, page.locator('.tier-table-row').filter({ hasText: 'Lee Sin' }), 700);
       await clickWithPointer(page, viewport, page.locator('.tier-table-row').filter({ hasText: 'Lee Sin' }).first(), 650);
       await expect(page.getByText('WinRift Build Atlas')).toBeVisible();
-      await page.waitForTimeout(1400);
+      await smoothScrollTo(page, page.locator('.rune-guide-card'), 1200);
     });
 
     await recordVideo(browser, viewport, 'summoner-profile', async (page) => {
@@ -122,9 +129,13 @@ test('records WinRift demo videos', async ({ browser }) => {
       await clickWithPointer(page, viewport, page.locator('.summoner-leaderboard-row').filter({ hasText: 'Meta Scout' }).first(), 800);
       await expect(page.getByText('Stored Match Form')).toBeVisible();
       await clickWithPointer(page, viewport, page.getByRole('button', { name: 'Champion Stats' }), 850);
+      await smoothScrollTo(page, page.locator('.profile-champion-list'), 1000);
+      await smoothScrollTo(page, page.locator('.profile-section-tabs'), 650);
       await clickWithPointer(page, viewport, page.getByRole('button', { name: 'Builds' }), 850);
+      await smoothScrollTo(page, page.locator('.profile-build-list'), 1000);
+      await smoothScrollTo(page, page.locator('.profile-section-tabs'), 650);
       await clickWithPointer(page, viewport, page.getByRole('button', { name: 'Match History' }), 850);
-      await page.waitForTimeout(1400);
+      await smoothScrollTo(page, page.locator('.profile-match-list'), 1200);
     });
 
     await recordVideo(browser, viewport, 'live-match-analysis', async (page) => {
@@ -136,10 +147,15 @@ test('records WinRift demo videos', async ({ browser }) => {
       await page.waitForTimeout(900);
       await clickWithPointer(page, viewport, page.getByRole('button', { name: 'Show Builds mode' }), 800);
       await expect(page.getByLabel('Focused build matchup')).toBeVisible();
+      await smoothScrollTo(page, page.locator('.focused-build-results'), 900);
+      await smoothScrollTo(page, page.locator('.focused-build-command-row'), 650);
       await clickWithPointer(page, viewport, page.getByLabel('Against Wind Check'), 800);
+      await smoothScrollTo(page, page.locator('.focused-build-results'), 800);
+      await smoothScrollTo(page, page.locator('.live-mode-rail'), 650);
       await clickWithPointer(page, viewport, page.getByRole('button', { name: 'Show Win Conditions mode' }), 800);
       await expect(page.getByText("Your Team's Win Condition")).toBeVisible();
-      await page.waitForTimeout(1400);
+      await smoothScrollTo(page, page.locator('.win-condition-panel'), 1200);
+      await smoothScrollTo(page, page.getByText('Winrate By Game Length'), 1100);
     });
   }
 });
@@ -364,6 +380,14 @@ async function smoothScrollTo(page, locator, pauseMs = 900) {
   await target.evaluate((element) => {
     element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
   });
+  await page.waitForTimeout(pauseMs);
+  await waitForVisualReady(page);
+}
+
+async function smoothScrollBy(page, top, pauseMs = 900) {
+  await page.evaluate((top) => {
+    window.scrollBy({ top, behavior: 'smooth' });
+  }, top);
   await page.waitForTimeout(pauseMs);
   await waitForVisualReady(page);
 }
