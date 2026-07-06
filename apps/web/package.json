@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
-    "perf:routes": "playwright test --config playwright.config.ts"
+    "perf:routes": "playwright test --config playwright.config.ts",
+    "capture:demo:media": "playwright test --config demo-media.playwright.config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.14",

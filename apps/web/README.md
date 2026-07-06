@@ -112,6 +112,21 @@ npm run build
 
 Tests are written with Vitest and React Testing Library. Build validation runs TypeScript first, then Vite.
 
+## 🎬 Demo Media Capture
+
+```bash
+cd apps/web
+npm run capture:demo:media
+```
+
+The capture command builds the app, serves it with deterministic local demo API fixtures, and writes WinRift screenshots plus videos to `.artifacts/demo-media/winrift/`.
+
+Default output:
+
+- 16 screenshots: desktop and mobile for home, champion directory, champion guide, tier list, summoner profile, live match, focused builds, and win conditions.
+- 8 videos: desktop and mobile for champion discovery, tier list, summoner profile, and live match analysis.
+- `manifest.json` listing the generated media paths.
+
 ## 🎨 UI Notes
 
 - Use the global background stage rather than page-specific decorative backgrounds.
