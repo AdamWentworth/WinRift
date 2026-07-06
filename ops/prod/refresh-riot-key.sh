@@ -14,6 +14,9 @@ START_WORKER=1
 RESTART_SERVICES=1
 SHOW_KEY=1
 CONFIRM_KEY=1
+WORKER_START_ATTEMPTS="${WINRIFT_WORKER_START_ATTEMPTS:-5}"
+WORKER_START_CHECK_SECONDS="${WINRIFT_WORKER_START_CHECK_SECONDS:-8}"
+WORKER_START_RETRY_DELAY="${WINRIFT_WORKER_START_RETRY_DELAY:-12}"
 
 usage() {
   cat <<'EOF'
@@ -33,6 +36,7 @@ Options:
   --yes                Skip the interactive confirmation prompt.
   --no-worker          Restart API/monitor but do not start the worker.
   --no-restart         Only update env and clear auth marker.
+  --worker-attempts N  Worker start attempts for transient Riot 401s. Default: 5
   -h, --help           Show this help.
 
 Normal use:
@@ -87,6 +91,10 @@ while [[ $# -gt 0 ]]; do
     --no-restart)
       RESTART_SERVICES=0
       shift
+      ;;
+    --worker-attempts)
+      WORKER_START_ATTEMPTS="${2:?missing value for --worker-attempts}"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -267,6 +275,56 @@ wait_for_health() {
   return 1
 }
 
+positive_integer() {
+  local value="$1"
+  [[ "${value}" =~ ^[1-9][0-9]*$ ]]
+}
+
+clear_auth_marker() {
+  if [[ -n "${host_marker_path:-}" ]]; then
+    echo "Clearing Riot auth marker: ${host_marker_path}"
+    rm -f "${host_marker_path}"
+  fi
+}
+
+worker_failure_is_retryable() {
+  local logs="$1"
+  grep -Eiq 'status=401|riot auth failure|auth-failed|Riot API key is missing, expired, or not authorized' <<<"${logs}"
+}
+
+start_worker_with_retries() {
+  local attempt=1
+  local worker_status=""
+  local worker_logs=""
+
+  while (( attempt <= WORKER_START_ATTEMPTS )); do
+    if (( WORKER_START_ATTEMPTS == 1 )); then
+      echo "Starting worker."
+    else
+      echo "Starting worker. Attempt ${attempt}/${WORKER_START_ATTEMPTS}."
+    fi
+
+    compose up -d --no-deps --force-recreate --no-build worker
+    sleep "${WORKER_START_CHECK_SECONDS}"
+    worker_status="$(docker inspect --format '{{.State.Status}}' winrift_worker 2>/dev/null || true)"
+    if [[ "${worker_status}" == "running" ]]; then
+      return 0
+    fi
+
+    worker_logs="$(docker logs --tail 120 winrift_worker 2>&1 || true)"
+    if ! worker_failure_is_retryable "${worker_logs}" || (( attempt == WORKER_START_ATTEMPTS )); then
+      echo "Worker did not stay running. Status: ${worker_status}" >&2
+      printf '%s\n' "${worker_logs}" >&2
+      return 1
+    fi
+
+    echo "Worker hit a transient Riot auth response while the refreshed key propagates; retrying in ${WORKER_START_RETRY_DELAY}s." >&2
+    clear_auth_marker
+    sleep "${WORKER_START_RETRY_DELAY}"
+    attempt=$((attempt + 1))
+  done
+}
+
 require_file() {
   local path="$1"
   local label="$2"
@@ -277,6 +335,19 @@ require_file() {
 }
 
 require_file "${ENV_FILE}" "Env file"
+
+if ! positive_integer "${WORKER_START_ATTEMPTS}"; then
+  echo "Worker start attempts must be a positive integer: ${WORKER_START_ATTEMPTS}" >&2
+  exit 1
+fi
+if ! positive_integer "${WORKER_START_CHECK_SECONDS}"; then
+  echo "Worker start check seconds must be a positive integer: ${WORKER_START_CHECK_SECONDS}" >&2
+  exit 1
+fi
+if ! positive_integer "${WORKER_START_RETRY_DELAY}"; then
+  echo "Worker start retry delay must be a positive integer: ${WORKER_START_RETRY_DELAY}" >&2
+  exit 1
+fi
 
 if [[ "${RESTART_SERVICES}" -eq 1 && "${COMPOSE_FILE_EXPLICIT}" -eq 0 && "${COMPOSE_FILE}" != "${DEPLOY_ROOT}/docker-compose.yml" ]]; then
   if [[ -f "${SCRIPT_DIR}/docker-compose.yml" && -d "${DEPLOY_ROOT}" ]]; then
@@ -312,10 +383,7 @@ marker_path="$(env_value RIOT_AUTH_FAILURE_MARKER_PATH)"
 marker_path="${marker_path:-/run/winrift/riot-auth-failed}"
 host_marker_path="$(runtime_host_path_for_marker "${marker_path}" "${runtime_dir}")"
 
-if [[ -n "${host_marker_path}" ]]; then
-  echo "Clearing Riot auth marker: ${host_marker_path}"
-  rm -f "${host_marker_path}"
-fi
+clear_auth_marker
 
 if [[ "${RESTART_SERVICES}" -eq 0 ]]; then
   echo "Updated key and cleared marker. Service restart skipped by --no-restart."
@@ -338,15 +406,7 @@ echo "Ensuring monitor is running."
 compose up -d --no-deps --no-build monitor
 
 if [[ "${START_WORKER}" -eq 1 ]]; then
-  echo "Starting worker."
-  compose up -d --no-deps --force-recreate --no-build worker
-  sleep 8
-  worker_status="$(docker inspect --format '{{.State.Status}}' winrift_worker 2>/dev/null || true)"
-  if [[ "${worker_status}" != "running" ]]; then
-    echo "Worker did not stay running. Status: ${worker_status}" >&2
-    docker logs --tail 120 winrift_worker >&2 || true
-    exit 1
-  fi
+  start_worker_with_retries
 else
   echo "Worker start skipped by --no-worker."
 fi
