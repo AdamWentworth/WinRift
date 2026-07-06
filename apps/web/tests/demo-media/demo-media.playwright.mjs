@@ -240,14 +240,14 @@ async function installPointerOverlay(page, viewport) {
       opacity: 0;
     }
     .demo-pointer-dot.desktop {
-      width: 32px;
-      height: 36px;
-      filter: drop-shadow(0 3px 2px rgba(0,0,0,0.65)) drop-shadow(0 0 5px rgba(34,211,238,0.45));
+      width: 24px;
+      height: 28px;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,0.72));
     }
     .demo-pointer-dot.desktop svg {
       display: block;
-      width: 32px;
-      height: 36px;
+      width: 24px;
+      height: 28px;
     }
     .demo-pointer-dot.mobile {
       width: 34px;
@@ -268,11 +268,11 @@ async function installPointerOverlay(page, viewport) {
     .demo-pointer-dot.desktop.tap::after {
       content: "";
       position: absolute;
-      left: 4px;
-      top: 3px;
-      width: 22px;
-      height: 22px;
-      border: 2px solid rgba(34,211,238,0.9);
+      left: 1px;
+      top: 1px;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.72);
       border-radius: 999px;
       animation: demo-cursor-pulse 360ms ease-out;
     }
@@ -303,9 +303,9 @@ async function installPointerOverlay(page, viewport) {
     dot.className = `demo-pointer-dot ${isMobile ? 'mobile' : 'desktop'}`;
     if (!isMobile && !dot.innerHTML.trim()) {
       dot.innerHTML = `
-        <svg viewBox="0 0 32 36" aria-hidden="true">
-          <path d="M3 2L25 23.2H13.9L9 34.2 5.5 32.7 10 22.2H3V2Z" fill="white" stroke="#07131d" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M9.8 21.4H4.8V6.2L21.3 22H13.2L8.8 31.8" fill="none" stroke="#22d3ee" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+        <svg viewBox="0 0 24 28" aria-hidden="true">
+          <path d="M3 2.75v19.2l5.58-5.23 3 7.17 3.18-1.34-2.88-6.9h7.87L3 2.75Z" fill="#fff" stroke="#050505" stroke-width="1.65" stroke-linejoin="round"/>
+          <path d="M5.1 7.52v9.47l3.98-3.73 3.25 7.75" fill="none" stroke="#fff" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round" opacity="0.65"/>
         </svg>
       `;
     }
