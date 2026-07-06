@@ -28,24 +28,50 @@ const championDefs = [
   ['Yasuo', '157', 'Yasuo', 'the Unforgiven'],
 ];
 
+const abilityImageOverrides = {
+  Aatrox: {
+    passive: 'Aatrox_Passive.png',
+    spells: ['AatroxQ.png', 'AatroxW.png', 'AatroxE.png', 'AatroxR.png'],
+  },
+  Ahri: {
+    passive: 'Ahri_SoulEater2.png',
+    spells: ['AhriQ.png', 'AhriW.png', 'AhriE.png', 'AhriR.png'],
+  },
+  Kaisa: {
+    passive: 'Kaisa_Passive.png',
+    spells: ['KaisaQ.png', 'KaisaW.png', 'KaisaE.png', 'KaisaR.png'],
+  },
+  LeeSin: {
+    passive: 'LeeSinPassive.png',
+    spells: ['LeeSinQOne.png', 'LeeSinWOne.png', 'LeeSinEOne.png', 'LeeSinR.png'],
+  },
+};
+
 export const championsResponse = {
   version,
   data: {
-    data: Object.fromEntries(championDefs.map(([id, key, name, title]) => [
-      id,
-      {
+    data: Object.fromEntries(championDefs.map(([id, key, name, title]) => {
+      const abilityImages = abilityImageOverrides[id] ?? {
+        passive: `${id}Passive.png`,
+        spells: ['Q', 'W', 'E', 'R'].map((slot) => `${id}${slot}.png`),
+      };
+      return [
         id,
-        key,
-        name,
-        title,
-        image: { full: `${id}.png` },
-        passive: { id: `${id}Passive`, name: `${name} Passive` },
-        spells: ['Q', 'W', 'E', 'R'].map((slot) => ({
-          id: `${id}${slot}`,
-          name: `${name} ${slot}`,
-        })),
-      },
-    ])),
+        {
+          id,
+          key,
+          name,
+          title,
+          image: { full: `${id}.png` },
+          passive: { id: `${id}Passive`, name: `${name} Passive`, image: { full: abilityImages.passive } },
+          spells: ['Q', 'W', 'E', 'R'].map((slot) => ({
+            id: `${id}${slot}`,
+            name: `${name} ${slot}`,
+            image: { full: abilityImages.spells[['Q', 'W', 'E', 'R'].indexOf(slot)] },
+          })),
+        },
+      ];
+    })),
   },
 };
 
@@ -108,28 +134,58 @@ export const runesResponse = {
     runeStyle(8000, 'Precision', 'perk-images/Styles/7201_Precision.png', [
       rune(8005, 'Press the Attack', 'perk-images/Styles/Precision/PressTheAttack/PressTheAttack.png'),
       rune(8010, 'Conqueror', 'perk-images/Styles/Precision/Conqueror/Conqueror.png'),
+      rune(8021, 'Fleet Footwork', 'perk-images/Styles/Precision/FleetFootwork/FleetFootwork.png'),
       rune(9101, 'Absorb Life', 'perk-images/Styles/Precision/AbsorbLife/AbsorbLife.png'),
+      rune(9111, 'Triumph', 'perk-images/Styles/Precision/Triumph.png'),
+      rune(8009, 'Presence of Mind', 'perk-images/Styles/Precision/PresenceOfMind/PresenceOfMind.png'),
       rune(9104, 'Legend: Alacrity', 'perk-images/Styles/Precision/LegendAlacrity/LegendAlacrity.png'),
+      rune(9105, 'Legend: Haste', 'perk-images/Styles/Precision/LegendHaste/LegendHaste.png'),
+      rune(9103, 'Legend: Bloodline', 'perk-images/Styles/Precision/LegendBloodline/LegendBloodline.png'),
       rune(8014, 'Coup de Grace', 'perk-images/Styles/Precision/CoupDeGrace/CoupDeGrace.png'),
+      rune(8017, 'Cut Down', 'perk-images/Styles/Precision/CutDown/CutDown.png'),
+      rune(8299, 'Last Stand', 'perk-images/Styles/Sorcery/LastStand/LastStand.png'),
     ]),
     runeStyle(8100, 'Domination', 'perk-images/Styles/7200_Domination.png', [
       rune(8112, 'Electrocute', 'perk-images/Styles/Domination/Electrocute/Electrocute.png'),
       rune(8128, 'Dark Harvest', 'perk-images/Styles/Domination/DarkHarvest/DarkHarvest.png'),
+      rune(9923, 'Hail of Blades', 'perk-images/Styles/Domination/HailOfBlades/HailOfBlades.png'),
       rune(8143, 'Sudden Impact', 'perk-images/Styles/Domination/SuddenImpact/SuddenImpact.png'),
+      rune(8126, 'Cheap Shot', 'perk-images/Styles/Domination/CheapShot/CheapShot.png'),
+      rune(8139, 'Taste of Blood', 'perk-images/Styles/Domination/TasteOfBlood/GreenTerror_TasteOfBlood.png'),
       rune(8138, 'Eyeball Collection', 'perk-images/Styles/Domination/EyeballCollection/EyeballCollection.png'),
+      rune(8136, 'Zombie Ward', 'perk-images/Styles/Domination/ZombieWard/ZombieWard.png'),
+      rune(8120, 'Ghost Poro', 'perk-images/Styles/Domination/GhostPoro/GhostPoro.png'),
       rune(8135, 'Treasure Hunter', 'perk-images/Styles/Domination/TreasureHunter/TreasureHunter.png'),
+      rune(8105, 'Relentless Hunter', 'perk-images/Styles/Domination/RelentlessHunter/RelentlessHunter.png'),
+      rune(8106, 'Ultimate Hunter', 'perk-images/Styles/Domination/UltimateHunter/UltimateHunter.png'),
     ]),
     runeStyle(8200, 'Sorcery', 'perk-images/Styles/7202_Sorcery.png', [
       rune(8214, 'Summon Aery', 'perk-images/Styles/Sorcery/SummonAery/SummonAery.png'),
+      rune(8229, 'Arcane Comet', 'perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png'),
+      rune(8230, 'Phase Rush', 'perk-images/Styles/Sorcery/PhaseRush/PhaseRush.png'),
       rune(8226, 'Manaflow Band', 'perk-images/Styles/Sorcery/ManaflowBand/ManaflowBand.png'),
+      rune(8275, 'Nimbus Cloak', 'perk-images/Styles/Sorcery/NimbusCloak/6361.png'),
+      rune(8243, 'Nullifying Orb', 'perk-images/Styles/Sorcery/ManaflowBand/ManaflowBand.png'),
       rune(8233, 'Absolute Focus', 'perk-images/Styles/Sorcery/AbsoluteFocus/AbsoluteFocus.png'),
+      rune(8210, 'Transcendence', 'perk-images/Styles/Sorcery/Transcendence/Transcendence.png'),
+      rune(8234, 'Celerity', 'perk-images/Styles/Sorcery/Celerity/CelerityTemp.png'),
       rune(8236, 'Gathering Storm', 'perk-images/Styles/Sorcery/GatheringStorm/GatheringStorm.png'),
+      rune(8237, 'Scorch', 'perk-images/Styles/Sorcery/Scorch/Scorch.png'),
+      rune(8232, 'Waterwalking', 'perk-images/Styles/Sorcery/Waterwalking/Waterwalking.png'),
     ]),
     runeStyle(8400, 'Resolve', 'perk-images/Styles/7204_Resolve.png', [
       rune(8437, 'Grasp of the Undying', 'perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png'),
+      rune(8439, 'Aftershock', 'perk-images/Styles/Resolve/VeteranAftershock/VeteranAftershock.png'),
+      rune(8465, 'Guardian', 'perk-images/Styles/Resolve/Guardian/Guardian.png'),
       rune(8446, 'Demolish', 'perk-images/Styles/Resolve/Demolish/Demolish.png'),
+      rune(8463, 'Font of Life', 'perk-images/Styles/Resolve/FontOfLife/FontOfLife.png'),
+      rune(8401, 'Shield Bash', 'perk-images/Styles/Resolve/MirrorShell/MirrorShell.png'),
       rune(8444, 'Second Wind', 'perk-images/Styles/Resolve/SecondWind/SecondWind.png'),
+      rune(8473, 'Bone Plating', 'perk-images/Styles/Resolve/BonePlating/BonePlating.png'),
+      rune(8429, 'Conditioning', 'perk-images/Styles/Resolve/Conditioning/Conditioning.png'),
       rune(8451, 'Overgrowth', 'perk-images/Styles/Resolve/Overgrowth/Overgrowth.png'),
+      rune(8453, 'Revitalize', 'perk-images/Styles/Resolve/Revitalize/Revitalize.png'),
+      rune(8242, 'Unflinching', 'perk-images/Styles/Sorcery/Unflinching/Unflinching.png'),
     ]),
   ],
 };
@@ -188,10 +244,10 @@ function runeStyle(id, name, icon, runes) {
     name,
     icon,
     slots: [
-      { runes: runes.slice(0, 2) },
-      { runes: runes.slice(2, 3) },
-      { runes: runes.slice(3, 4) },
-      { runes: runes.slice(4, 5) },
+      { runes: runes.slice(0, 3) },
+      { runes: runes.slice(3, 6) },
+      { runes: runes.slice(6, 9) },
+      { runes: runes.slice(9, 12) },
     ],
   };
 }
@@ -303,8 +359,8 @@ function championGuide(championId, role) {
       { opponentChampionId: 15, wins: 104, games: 182, winRate: 57.1, confidence: 52 },
     ],
     topRunes: [
-      { runeSignature: '8000|8100|8010-9101-9104-8014|5008-5008-5011', wins: 904, games: 1640, winRate: 55.1, confidence: 72 },
-      { runeSignature: '8100|8000|8112-8143-8138-8135|5008-5008-5011', wins: 532, games: 1015, winRate: 52.4, confidence: 64 },
+      { runeSignature: '8000|8100|8010-9101-9104-8014-8138-8135|5008-5008-5011', wins: 904, games: 1640, winRate: 55.1, confidence: 72 },
+      { runeSignature: '8100|8000|8112-8143-8138-8135-9104-8014|5008-5008-5011', wins: 532, games: 1015, winRate: 52.4, confidence: 64 },
     ],
     topSpells: [
       { spellSignature: role === 'JUNGLE' ? '4-11' : '4-12', wins: 1190, games: 2240, winRate: 53.1, confidence: 72 },
@@ -325,7 +381,7 @@ function championGuide(championId, role) {
         core2Signature: '6672-3031',
         core3Signature: '6672-3006-3031',
         finalItemsSignature: '6672-3006-3031-3094-3036-3072',
-        runeSignature: '8000|8100|8010-9101-9104-8014|5008-5008-5011',
+        runeSignature: '8000|8100|8010-9101-9104-8014-8138-8135|5008-5008-5011',
         spellSignature: role === 'JUNGLE' ? '4-11' : '4-12',
         skillOrderSignature: '1-3-2-1-1-4-1-3-1-3-4-3-3-2-2-4-2-2',
         skillOrderWins: 420,
@@ -345,7 +401,7 @@ function championGuide(championId, role) {
         core2Signature: '6692-3071',
         core3Signature: '6692-3071-3158',
         finalItemsSignature: '6692-3071-3158-6333-3065-3075',
-        runeSignature: '8000|8400|8010-9101-9104-8014|5008-5008-5011',
+        runeSignature: '8000|8400|8010-9101-9104-8014-8444-8451|5008-5008-5011',
         spellSignature: role === 'JUNGLE' ? '4-11' : '4-14',
         skillOrderSignature: '1-3-2-1-1-4-1-3-1-3-4-3-3-2-2-4-2-2',
         skillOrderWins: 310,
@@ -720,7 +776,7 @@ function summonerBuild(championId, role, signature, games, winRate) {
     finalItemsSignature: signature,
     core2Signature: items.slice(0, 2).join('-'),
     core3Signature: items.slice(0, 3).join('-'),
-    runeSignature: '8000|8100|8010-9101-9104-8014|5008-5008-5011',
+    runeSignature: '8000|8100|8010-9101-9104-8014-8138-8135|5008-5008-5011',
     spellSignature: role === 'JUNGLE' ? '4-11' : '4-12',
     games,
     wins,

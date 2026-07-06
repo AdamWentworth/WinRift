@@ -100,7 +100,9 @@ test('records WinRift demo videos', async ({ browser }) => {
       await expect(page.getByText('WinRift Build Atlas')).toBeVisible();
       await clickWithPointer(page, viewport, page.getByRole('button', { name: /Bot/i }).first(), 650);
       await selectWithPointer(page, viewport, page.locator('.guide-select-control.matchup select'), 'Jinx', 800);
-      await page.waitForTimeout(1400);
+      await smoothScrollTo(page, page.locator('.rune-guide-card'), 1300);
+      await smoothScrollTo(page, page.locator('.guide-item-grid'), 1500);
+      await smoothScrollTo(page, page.locator('.guide-matchups-section'), 1300);
     });
 
     await recordVideo(browser, viewport, 'tier-list', async (page) => {
@@ -226,42 +228,91 @@ async function waitForVisualReady(page) {
 }
 
 async function installPointerOverlay(page, viewport) {
-  await page.addStyleTag({
-    content: `
-      .demo-pointer-dot {
-        position: fixed;
-        left: 0;
-        top: 0;
-        z-index: 2147483647;
-        width: ${viewport.isMobile ? 34 : 18}px;
-        height: ${viewport.isMobile ? 34 : 18}px;
-        border: 2px solid rgba(255,255,255,0.95);
-        border-radius: 999px;
-        background: ${viewport.isMobile ? 'rgba(45, 212, 191, 0.22)' : 'rgba(34, 211, 238, 0.9)'};
-        box-shadow: 0 0 0 4px rgba(15,23,42,0.32), 0 8px 24px rgba(0,0,0,0.28);
-        pointer-events: none;
-        transform: translate(-999px, -999px);
-        transition: transform 180ms ease, opacity 160ms ease, width 160ms ease, height 160ms ease;
+  const css = `
+    .demo-pointer-dot {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 2147483647;
+      pointer-events: none;
+      transform: translate(-999px, -999px);
+      transition: transform 240ms cubic-bezier(.2,.8,.2,1), opacity 160ms ease;
+      opacity: 0;
+    }
+    .demo-pointer-dot.desktop {
+      width: 32px;
+      height: 36px;
+      filter: drop-shadow(0 3px 2px rgba(0,0,0,0.65)) drop-shadow(0 0 5px rgba(34,211,238,0.45));
+    }
+    .demo-pointer-dot.desktop svg {
+      display: block;
+      width: 32px;
+      height: 36px;
+    }
+    .demo-pointer-dot.mobile {
+      width: 34px;
+      height: 34px;
+      border: 2px solid rgba(255,255,255,0.95);
+      border-radius: 999px;
+      background: rgba(45, 212, 191, 0.22);
+      box-shadow: 0 0 0 4px rgba(15,23,42,0.32), 0 8px 24px rgba(0,0,0,0.28);
+    }
+    .demo-pointer-dot.active {
+      opacity: 1;
+    }
+    .demo-pointer-dot.mobile.tap {
+      width: 54px;
+      height: 54px;
+      background: rgba(45, 212, 191, 0.18);
+    }
+    .demo-pointer-dot.desktop.tap::after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 3px;
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(34,211,238,0.9);
+      border-radius: 999px;
+      animation: demo-cursor-pulse 360ms ease-out;
+    }
+    @keyframes demo-cursor-pulse {
+      from {
+        opacity: 0.95;
+        transform: scale(0.45);
+      }
+      to {
         opacity: 0;
+        transform: scale(1.7);
       }
-      .demo-pointer-dot.active {
-        opacity: 1;
-      }
-      .demo-pointer-dot.tap {
-        width: 54px;
-        height: 54px;
-        background: rgba(45, 212, 191, 0.18);
-      }
-    `,
-  }).catch(() => undefined);
-  await page.evaluate(() => {
-    if (!document.querySelector('.demo-pointer-dot')) {
-      const dot = document.createElement('div');
-      dot.className = 'demo-pointer-dot';
+    }
+  `;
+  await page.evaluate(({ css, isMobile }) => {
+    if (!document.getElementById('demo-pointer-style')) {
+      const style = document.createElement('style');
+      style.id = 'demo-pointer-style';
+      style.textContent = css;
+      document.head.append(style);
+    }
+    let dot = document.querySelector('.demo-pointer-dot');
+    if (!dot) {
+      dot = document.createElement('div');
       dot.setAttribute('aria-hidden', 'true');
       document.body.append(dot);
     }
-  }).catch(() => undefined);
+    dot.className = `demo-pointer-dot ${isMobile ? 'mobile' : 'desktop'}`;
+    if (!isMobile && !dot.innerHTML.trim()) {
+      dot.innerHTML = `
+        <svg viewBox="0 0 32 36" aria-hidden="true">
+          <path d="M3 2L25 23.2H13.9L9 34.2 5.5 32.7 10 22.2H3V2Z" fill="white" stroke="#07131d" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M9.8 21.4H4.8V6.2L21.3 22H13.2L8.8 31.8" fill="none" stroke="#22d3ee" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+        </svg>
+      `;
+    }
+    if (isMobile) {
+      dot.innerHTML = '';
+    }
+  }, { css, isMobile: viewport.isMobile }).catch(() => undefined);
 }
 
 async function clickWithPointer(page, viewport, locator, pauseMs = 500) {
@@ -307,6 +358,16 @@ async function selectWithPointer(page, viewport, locator, label, pauseMs = 500) 
   await page.waitForTimeout(pauseMs);
 }
 
+async function smoothScrollTo(page, locator, pauseMs = 900) {
+  const target = locator.first();
+  await expect(target).toBeVisible();
+  await target.evaluate((element) => {
+    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  });
+  await page.waitForTimeout(pauseMs);
+  await waitForVisualReady(page);
+}
+
 async function centerPoint(locator) {
   const box = await locator.boundingBox();
   if (!box) {
@@ -319,23 +380,31 @@ async function centerPoint(locator) {
 }
 
 async function showPointer(page, viewport, x, y) {
+  await installPointerOverlay(page, viewport);
   await page.evaluate(({ x, y, isMobile }) => {
     const dot = document.querySelector('.demo-pointer-dot');
     if (!dot) return;
     dot.classList.toggle('tap', isMobile);
     dot.classList.add('active');
-    dot.style.transform = `translate(${x - dot.clientWidth / 2}px, ${y - dot.clientHeight / 2}px)`;
+    const left = isMobile ? x - dot.clientWidth / 2 : x - 2;
+    const top = isMobile ? y - dot.clientHeight / 2 : y - 2;
+    dot.style.transform = `translate(${left}px, ${top}px)`;
   }, { x, y, isMobile: viewport.isMobile });
   await page.waitForTimeout(170);
 }
 
 async function pulsePointer(page, viewport, x, y) {
+  await installPointerOverlay(page, viewport);
   await page.evaluate(({ x, y, isMobile }) => {
     const dot = document.querySelector('.demo-pointer-dot');
     if (!dot) return;
-    dot.classList.toggle('tap', true);
+    dot.classList.remove('tap');
+    void dot.getBoundingClientRect();
+    dot.classList.add('tap');
     dot.classList.add('active');
-    dot.style.transform = `translate(${x - dot.clientWidth / 2}px, ${y - dot.clientHeight / 2}px)`;
+    const left = isMobile ? x - dot.clientWidth / 2 : x - 2;
+    const top = isMobile ? y - dot.clientHeight / 2 : y - 2;
+    dot.style.transform = `translate(${left}px, ${top}px)`;
     window.setTimeout(() => {
       dot.classList.toggle('tap', isMobile);
     }, 180);
