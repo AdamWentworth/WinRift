@@ -8,7 +8,7 @@ const videosDir = resolve(outputRoot, 'videos');
 const manifestPath = resolve(outputRoot, 'manifest.json');
 
 const viewports = [
-  { key: 'desktop', width: 1440, height: 1000, isMobile: false },
+  { key: 'desktop', width: 1760, height: 1100, isMobile: false },
   { key: 'mobile', width: 390, height: 844, isMobile: true },
 ];
 
