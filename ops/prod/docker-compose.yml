@@ -3,6 +3,9 @@ services:
     image: clickhouse/clickhouse-server:24.12
     container_name: winrift_clickhouse
     restart: unless-stopped
+    cpus: "2.0"
+    mem_limit: 3g
+    memswap_limit: 4g
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-winrift}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-winrift}
@@ -50,6 +53,9 @@ services:
     container_name: winrift_worker
     command: ["/winrift-worker"]
     restart: "no"
+    cpus: "1.0"
+    mem_limit: 1g
+    memswap_limit: 1536m
     env_file:
       - .env
     environment:
