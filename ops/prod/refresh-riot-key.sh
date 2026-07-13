@@ -17,13 +17,17 @@ CONFIRM_KEY=1
 WORKER_START_ATTEMPTS="${WINRIFT_WORKER_START_ATTEMPTS:-5}"
 WORKER_START_CHECK_SECONDS="${WINRIFT_WORKER_START_CHECK_SECONDS:-8}"
 WORKER_START_RETRY_DELAY="${WINRIFT_WORKER_START_RETRY_DELAY:-12}"
+AUTO_PATCH_ROLLOVER="${WINRIFT_AUTO_PATCH_ROLLOVER:-1}"
+PATCH_ROLLOVER_RETAIN_DAYS="${WINRIFT_PATCH_ROLLOVER_RETAIN_DAYS:-0}"
+PATCH_ROLLOVER_QUEUE_ID="${WINRIFT_PATCH_ROLLOVER_QUEUE_ID:-420}"
 
 usage() {
   cat <<'EOF'
 Usage: refresh-riot-key [options]
 
 Updates RIOT_API_KEY in the server-local WinRift env file, clears the Riot auth
-failure marker, recreates the API, and starts the collector worker.
+failure marker, advances the collector patch when Data Dragon has moved, recreates
+the API, and starts the collector worker.
 
 Options:
   --env-file PATH      Env file to update. Default: /srv/winrift/.env
@@ -36,6 +40,9 @@ Options:
   --yes                Skip the interactive confirmation prompt.
   --no-worker          Restart API/monitor but do not start the worker.
   --no-restart         Only update env and clear auth marker.
+  --no-patch-rollover  Do not check Data Dragon or advance COLLECTOR_CURRENT_PATCH.
+  --patch-retain-days N
+                       Raw retention days for patches archived during rollover. Default: 0
   --worker-attempts N  Worker start attempts for transient Riot 401s. Default: 5
   -h, --help           Show this help.
 
@@ -91,6 +98,14 @@ while [[ $# -gt 0 ]]; do
     --no-restart)
       RESTART_SERVICES=0
       shift
+      ;;
+    --no-patch-rollover)
+      AUTO_PATCH_ROLLOVER=0
+      shift
+      ;;
+    --patch-retain-days)
+      PATCH_ROLLOVER_RETAIN_DAYS="${2:?missing value for --patch-retain-days}"
+      shift 2
       ;;
     --worker-attempts)
       WORKER_START_ATTEMPTS="${2:?missing value for --worker-attempts}"
@@ -258,6 +273,10 @@ compose() {
     "$@"
 }
 
+patchctl() {
+  compose run --rm --no-deps api /winrift-patchctl "$@"
+}
+
 wait_for_health() {
   local status=""
   local body_file="/tmp/winrift_refresh_health.json"
@@ -278,6 +297,47 @@ wait_for_health() {
 positive_integer() {
   local value="$1"
   [[ "${value}" =~ ^[1-9][0-9]*$ ]]
+}
+
+non_negative_integer() {
+  local value="$1"
+  [[ "${value}" =~ ^[0-9]+$ ]]
+}
+
+truthy() {
+  case "${1,,}" in
+    1|true|yes|y|on)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+patch_bucket_parts() {
+  local patch="$1"
+  if [[ ! "${patch}" =~ ^([0-9]+)\.([0-9]+)$ ]]; then
+    return 1
+  fi
+  printf '%s %s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+}
+
+patch_is_newer() {
+  local target="$1"
+  local current="$2"
+  local target_major target_minor current_major current_minor
+
+  read -r target_major target_minor < <(patch_bucket_parts "${target}") || return 1
+  read -r current_major current_minor < <(patch_bucket_parts "${current}") || return 1
+
+  if (( target_major > current_major )); then
+    return 0
+  fi
+  if (( target_major < current_major )); then
+    return 1
+  fi
+  (( target_minor > current_minor ))
 }
 
 clear_auth_marker() {
@@ -325,6 +385,45 @@ start_worker_with_retries() {
   done
 }
 
+rollover_patch_window_if_needed() {
+  local current_patch=""
+  local latest_patch=""
+
+  if ! truthy "${AUTO_PATCH_ROLLOVER}"; then
+    echo "Patch rollover skipped by configuration."
+    return 0
+  fi
+
+  current_patch="$(env_value COLLECTOR_CURRENT_PATCH)"
+  if [[ -z "${current_patch}" ]]; then
+    echo "Patch rollover skipped because COLLECTOR_CURRENT_PATCH is empty."
+    return 0
+  fi
+
+  echo "Checking latest Riot patch from Data Dragon."
+  latest_patch="$(patchctl -action latest-patch | tr -d '\r' | tail -n 1)"
+  if [[ -z "${latest_patch}" ]]; then
+    echo "Latest Riot patch lookup returned an empty value." >&2
+    return 1
+  fi
+
+  if patch_is_newer "${latest_patch}" "${current_patch}"; then
+    echo "Detected newer Riot patch: ${current_patch} -> ${latest_patch}."
+    echo "Archiving and pruning raw data that falls outside the new retention window."
+    patchctl \
+      -action rollover \
+      -patch "${latest_patch}" \
+      -platform ALL \
+      -queue "${PATCH_ROLLOVER_QUEUE_ID}" \
+      -retain-days "${PATCH_ROLLOVER_RETAIN_DAYS}" \
+      -prune-raw=true
+    write_env_key "COLLECTOR_CURRENT_PATCH" "${latest_patch}"
+    echo "Updated COLLECTOR_CURRENT_PATCH=${latest_patch} in ${ENV_FILE}."
+  else
+    echo "Collector patch ${current_patch} is already current for latest Riot patch ${latest_patch}."
+  fi
+}
+
 require_file() {
   local path="$1"
   local label="$2"
@@ -346,6 +445,14 @@ if ! positive_integer "${WORKER_START_CHECK_SECONDS}"; then
 fi
 if ! positive_integer "${WORKER_START_RETRY_DELAY}"; then
   echo "Worker start retry delay must be a positive integer: ${WORKER_START_RETRY_DELAY}" >&2
+  exit 1
+fi
+if ! non_negative_integer "${PATCH_ROLLOVER_RETAIN_DAYS}"; then
+  echo "Patch rollover retain days must be a non-negative integer: ${PATCH_ROLLOVER_RETAIN_DAYS}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCH_ROLLOVER_QUEUE_ID}"; then
+  echo "Patch rollover queue id must be a positive integer: ${PATCH_ROLLOVER_QUEUE_ID}" >&2
   exit 1
 fi
 
@@ -397,6 +504,8 @@ compose stop worker >/dev/null 2>&1 || true
 
 echo "Starting ClickHouse if needed."
 compose up -d --no-build clickhouse
+
+rollover_patch_window_if_needed
 
 echo "Recreating API with refreshed environment."
 compose up -d --no-deps --force-recreate --no-build api

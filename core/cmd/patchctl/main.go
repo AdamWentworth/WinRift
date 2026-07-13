@@ -16,8 +16,8 @@ import (
 )
 
 func main() {
-	action := flag.String("action", "", "one of: collecting, compile, archive, win-conditions, item-slots, champion-guides, delete-raw")
-	patch := flag.String("patch", "", "patch bucket, for example 16.10")
+	action := flag.String("action", "", "one of: latest-patch, collecting, compile, archive, rollover, win-conditions, item-slots, champion-guides, delete-raw")
+	patch := flag.String("patch", "", "patch bucket, for example 16.10. For rollover, this is the target patch and defaults to the latest Data Dragon patch.")
 	platform := flag.String("platform", "NA1", "platform route, or ALL for archive/delete-raw")
 	queueID := flag.Int("queue", 420, "queue id")
 	retainDays := flag.Int("retain-days", 30, "raw retention window after compile")
@@ -25,20 +25,30 @@ func main() {
 	pruneRaw := flag.Bool("prune-raw", true, "delete archived raw payload/timeline rows after archive compilation")
 	flag.Parse()
 
-	if *action == "" || *patch == "" {
-		fmt.Fprintln(os.Stderr, "usage: patchctl -action collecting|compile|archive|win-conditions|item-slots|champion-guides|delete-raw -patch 16.10 [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
+	if *action == "" || patchRequired(*action) && strings.TrimSpace(*patch) == "" {
+		fmt.Fprintln(os.Stderr, "usage: patchctl -action latest-patch|collecting|compile|archive|rollover|win-conditions|item-slots|champion-guides|delete-raw [-patch 16.10] [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
 		os.Exit(2)
 	}
 
 	cfg := config.Load()
 	riotClient := riot.NewClient(cfg)
+	staticService := staticdata.NewService(riotClient)
+
+	ctx := context.Background()
+	if *action == "latest-patch" {
+		latestPatch, err := latestDataDragonPatchBucket(ctx, staticService)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(latestPatch)
+		return
+	}
+
 	repo, err := clickhouse.NewRepository(cfg)
 	if err != nil {
 		log.Fatalf("clickhouse: %v", err)
 	}
-	staticService := staticdata.NewService(riotClient)
 
-	ctx := context.Background()
 	normalizedPlatform := riot.NormalizePlatform(*platform)
 	switch *action {
 	case "collecting":
@@ -49,6 +59,9 @@ func main() {
 	case "archive":
 		retainedUntil := time.Now().Add(time.Duration(*retainDays) * 24 * time.Hour)
 		err = archivePatch(ctx, repo, staticService, *patch, normalizedPlatform, uint16(*queueID), retainedUntil, *pruneRaw)
+	case "rollover":
+		retainedUntil := time.Now().Add(time.Duration(*retainDays) * 24 * time.Hour)
+		err = rolloverPatchWindow(ctx, repo, staticService, *patch, cfg.CollectorCurrentPatch, cfg.CollectorPatchRetention, normalizedPlatform, uint16(*queueID), retainedUntil, *pruneRaw)
 	case "win-conditions":
 		err = repo.RefreshWinConditionMetrics(ctx, *patch, normalizedPlatform, uint16(*queueID))
 	case "item-slots":
@@ -85,6 +98,15 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("patchctl action=%s patch=%s platform=%s queue=%d complete", *action, *patch, normalizedPlatform, *queueID)
+}
+
+func patchRequired(action string) bool {
+	switch strings.TrimSpace(action) {
+	case "latest-patch", "rollover":
+		return false
+	default:
+		return true
+	}
 }
 
 func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticService *staticdata.Service, patch, platform string, queueID uint16, retainedUntil time.Time, pruneRaw bool) error {
