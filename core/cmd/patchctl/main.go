@@ -140,10 +140,17 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 		}
 	}
 	if pruneRaw {
-		for _, platform := range platforms {
-			log.Printf("patch archive raw prune patch=%s platform=%s queue=%d", patch, platform, queueID)
-			if err := repo.DeleteRawPatchData(ctx, patch, platform, queueID); err != nil {
-				return fmt.Errorf("raw prune %s: %w", platform, err)
+		if strings.EqualFold(strings.TrimSpace(platform), "ALL") {
+			log.Printf("patch archive raw prune patch=%s platform=ALL queue=%d", patch, queueID)
+			if err := repo.DeleteRawPatchDataForPatch(ctx, patch, queueID); err != nil {
+				return fmt.Errorf("raw prune ALL: %w", err)
+			}
+		} else {
+			for _, platform := range platforms {
+				log.Printf("patch archive raw prune patch=%s platform=%s queue=%d", patch, platform, queueID)
+				if err := repo.DeleteRawPatchData(ctx, patch, platform, queueID); err != nil {
+					return fmt.Errorf("raw prune %s: %w", platform, err)
+				}
 			}
 		}
 	}
@@ -151,6 +158,9 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 }
 
 func deleteRawPatchData(ctx context.Context, repo *clickhouse.Repository, patch, platform string, queueID uint16) error {
+	if strings.EqualFold(strings.TrimSpace(platform), "ALL") {
+		return repo.DeleteRawPatchDataForPatch(ctx, patch, queueID)
+	}
 	platforms, err := patchPlatforms(ctx, repo, patch, platform, queueID)
 	if err != nil {
 		return err

@@ -223,11 +223,12 @@ CREATE TABLE IF NOT EXISTS winrift.raw_matches
     game_start_timestamp UInt64,
     game_end_timestamp UInt64,
     duration_seconds UInt32,
-    raw_json String,
+    raw_json String CODEC(ZSTD(3)),
     ingested_at DateTime DEFAULT now()
 )
 ENGINE = ReplacingMergeTree(ingested_at)
-ORDER BY match_id;
+PARTITION BY (patch, queue_id)
+ORDER BY (patch, queue_id, platform, match_id);
 
 CREATE TABLE IF NOT EXISTS winrift.raw_timelines
 (
@@ -235,11 +236,12 @@ CREATE TABLE IF NOT EXISTS winrift.raw_timelines
     platform LowCardinality(String),
     patch LowCardinality(String),
     queue_id UInt16,
-    raw_json String,
+    raw_json String CODEC(ZSTD(3)),
     ingested_at DateTime DEFAULT now()
 )
 ENGINE = ReplacingMergeTree(ingested_at)
-ORDER BY match_id;
+PARTITION BY (patch, queue_id)
+ORDER BY (patch, queue_id, platform, match_id);
 
 CREATE TABLE IF NOT EXISTS winrift.patch_snapshots
 (

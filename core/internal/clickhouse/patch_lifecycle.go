@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -78,6 +79,50 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 	return nil
 }
 
+func (r *Repository) DeleteRawPatchDataForPatch(ctx context.Context, patch string, queueID uint16) error {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		return nil
+	}
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	platforms, err := r.PatchPlatforms(ctx, patch, queueID)
+	if err != nil {
+		return err
+	}
+	if len(platforms) == 0 {
+		return nil
+	}
+	for _, platform := range platforms {
+		if err := r.requirePatchClosed(ctx, patch, platform, queueID); err != nil {
+			return err
+		}
+	}
+
+	rawTables := []string{"raw_timelines", "raw_matches"}
+	for _, table := range rawTables {
+		if err := r.deleteRawTablePatchData(ctx, table, patch, queueID); err != nil {
+			return err
+		}
+	}
+
+	statements := []string{
+		`ALTER TABLE timeline_participant_frames DELETE WHERE patch = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_item_events DELETE WHERE patch = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_skill_events DELETE WHERE patch = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_combat_events DELETE WHERE patch = ? AND queue_id = ?`,
+		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND queue_id = ?`,
+		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND queue_id = ?`,
+	}
+	for _, statement := range statements {
+		if _, err := r.db.ExecContext(ctx, statement+` SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *Repository) DeletePatchesOutsideWindow(ctx context.Context, currentPatch string, retentionCount int) ([]string, error) {
 	if strings.TrimSpace(currentPatch) == "" {
 		return nil, nil
@@ -96,14 +141,8 @@ func (r *Repository) DeletePatchesOutsideWindow(ctx context.Context, currentPatc
 		return nil, nil
 	}
 	for _, patch := range prune {
-		platforms, err := r.PatchPlatforms(ctx, patch, analytics.RankedSoloQueueID)
-		if err != nil {
+		if err := r.DeleteRawPatchDataForPatch(ctx, patch, analytics.RankedSoloQueueID); err != nil {
 			return nil, err
-		}
-		for _, platform := range platforms {
-			if err := r.DeleteRawPatchData(ctx, patch, platform, analytics.RankedSoloQueueID); err != nil {
-				return nil, err
-			}
 		}
 	}
 	return prune, nil
@@ -257,6 +296,52 @@ func (r *Repository) DeletePatches(ctx context.Context, patches []string) error 
 		}
 	}
 	return nil
+}
+
+func (r *Repository) deleteRawTablePatchData(ctx context.Context, table, patch string, queueID uint16) error {
+	partitioned, err := r.rawTableCanDropPatchQueuePartition(ctx, table)
+	if err != nil {
+		return err
+	}
+	if partitioned {
+		partition, err := patchQueuePartitionLiteral(patch, queueID)
+		if err != nil {
+			return err
+		}
+		query := fmt.Sprintf("ALTER TABLE %s DROP PARTITION %s SETTINGS mutations_sync = 2", table, partition)
+		_, err = r.db.ExecContext(ctx, query)
+		return err
+	}
+	query := fmt.Sprintf("ALTER TABLE %s DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2", table)
+	_, err = r.db.ExecContext(ctx, query, patch, queueID)
+	return err
+}
+
+func (r *Repository) rawTableCanDropPatchQueuePartition(ctx context.Context, table string) (bool, error) {
+	var partitionKey sql.NullString
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = ?`,
+		table,
+	).Scan(&partitionKey)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	key := strings.ToLower(partitionKey.String)
+	return strings.Contains(key, "patch") && strings.Contains(key, "queue_id"), nil
+}
+
+var clickHouseSimplePartitionValue = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
+func patchQueuePartitionLiteral(patch string, queueID uint16) (string, error) {
+	patch = strings.TrimSpace(patch)
+	if !clickHouseSimplePartitionValue.MatchString(patch) {
+		return "", fmt.Errorf("unsafe patch partition value %q", patch)
+	}
+	return fmt.Sprintf("tuple('%s', %d)", patch, queueID), nil
 }
 
 func (r *Repository) requirePatchClosed(ctx context.Context, patch, platform string, queueID uint16) error {
