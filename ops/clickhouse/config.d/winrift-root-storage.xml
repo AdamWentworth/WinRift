@@ -1,0 +1,20 @@
+<clickhouse>
+  <!-- Secondary local disk used for compressed raw timeline storage on the home server.
+       The main ClickHouse data directory remains under /mnt/storage. -->
+  <storage_configuration>
+    <disks>
+      <winrift_root_hot>
+        <path>/var/lib/clickhouse-hot/</path>
+      </winrift_root_hot>
+    </disks>
+    <policies>
+      <winrift_root_hot_only>
+        <volumes>
+          <root_hot>
+            <disk>winrift_root_hot</disk>
+          </root_hot>
+        </volumes>
+      </winrift_root_hot_only>
+    </policies>
+  </storage_configuration>
+</clickhouse>

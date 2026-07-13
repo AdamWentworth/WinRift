@@ -82,11 +82,13 @@ jobs:
 
           storage_mount="$(env_value WINRIFT_STORAGE_MOUNT)"
           clickhouse_dir="$(env_value WINRIFT_CLICKHOUSE_DATA_DIR)"
+          clickhouse_hot_dir="$(env_value WINRIFT_CLICKHOUSE_HOT_DIR)"
           clickhouse_log_dir="$(env_value WINRIFT_CLICKHOUSE_LOG_DIR)"
           clickhouse_backup_dir="$(env_value WINRIFT_CLICKHOUSE_BACKUP_DIR)"
           runtime_dir="$(env_value WINRIFT_RUNTIME_STATE_DIR)"
           storage_mount="${storage_mount:-/mnt/storage}"
           clickhouse_dir="${clickhouse_dir:-${storage_mount}/clickhouse/data}"
+          clickhouse_hot_dir="${clickhouse_hot_dir:-${DEPLOY_ROOT}/clickhouse-hot}"
           clickhouse_log_dir="${clickhouse_log_dir:-${storage_mount}/clickhouse/logs}"
           clickhouse_backup_dir="${clickhouse_backup_dir:-${storage_mount}/clickhouse/backups}"
           runtime_dir="${runtime_dir:-${DEPLOY_ROOT}/runtime}"
@@ -105,7 +107,8 @@ jobs:
               ;;
           esac
 
-          mkdir -p "${clickhouse_dir}" "${clickhouse_log_dir}" "${clickhouse_backup_dir}" "${runtime_dir}"
+          mkdir -p "${clickhouse_dir}" "${clickhouse_hot_dir}" "${clickhouse_log_dir}" "${clickhouse_backup_dir}" "${runtime_dir}"
+          docker run --rm -v "${clickhouse_hot_dir}:/target" alpine sh -c 'chown 101:101 /target && chmod 755 /target'
 
           install -m 0644 "${COMPOSE_FILE}" "${DEPLOY_ROOT}/docker-compose.yml"
           cp "${SCHEMA_SOURCE}" "${SCHEMA_TARGET}"
