@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
+	"strconv"
 	"time"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
@@ -21,13 +23,13 @@ const (
 )
 
 func NewRepository(cfg config.Config) (*Repository, error) {
-	dsn := fmt.Sprintf("clickhouse://%s:%d/%s?username=%s&password=%s", cfg.ClickHouseHost, cfg.ClickHousePort, cfg.ClickHouseDatabase, cfg.ClickHouseUser, cfg.ClickHousePassword)
+	dsn := clickHouseDSN(cfg)
 	db, err := sql.Open("clickhouse", dsn)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(positiveOrDefault(cfg.ClickHouseMaxOpenConns, 10))
+	db.SetMaxIdleConns(positiveOrDefault(cfg.ClickHouseMaxIdleConns, 10))
 	db.SetConnMaxLifetime(time.Hour)
 	ctx, cancel := context.WithTimeout(context.Background(), clickHousePingTimeout)
 	defer cancel()
@@ -42,6 +44,29 @@ func NewRepository(cfg config.Config) (*Repository, error) {
 		return nil, err
 	}
 	return repo, nil
+}
+
+func clickHouseDSN(cfg config.Config) string {
+	values := url.Values{}
+	values.Set("username", cfg.ClickHouseUser)
+	values.Set("password", cfg.ClickHousePassword)
+	if cfg.ClickHouseMaxThreads > 0 {
+		values.Set("max_threads", strconv.Itoa(cfg.ClickHouseMaxThreads))
+	}
+	if cfg.ClickHouseMaxMemoryMB > 0 {
+		values.Set("max_memory_usage", strconv.FormatInt(int64(cfg.ClickHouseMaxMemoryMB)*1024*1024, 10))
+	}
+	if cfg.ClickHouseMaxExecutionTimeSeconds > 0 {
+		values.Set("max_execution_time", strconv.Itoa(cfg.ClickHouseMaxExecutionTimeSeconds))
+	}
+	return fmt.Sprintf("clickhouse://%s:%d/%s?%s", cfg.ClickHouseHost, cfg.ClickHousePort, cfg.ClickHouseDatabase, values.Encode())
+}
+
+func positiveOrDefault(value, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
 }
 
 func (r *Repository) MatchExists(ctx context.Context, matchID string) (bool, error) {

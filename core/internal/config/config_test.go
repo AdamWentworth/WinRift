@@ -88,6 +88,31 @@ func TestLoadAPIObservabilityConfig(t *testing.T) {
 	}
 }
 
+func TestLoadClickHouseResourceConfig(t *testing.T) {
+	t.Setenv("CLICKHOUSE_MAX_OPEN_CONNS", "2")
+	t.Setenv("CLICKHOUSE_MAX_IDLE_CONNS", "1")
+	t.Setenv("CLICKHOUSE_MAX_THREADS", "2")
+	t.Setenv("CLICKHOUSE_MAX_MEMORY_MB", "2048")
+	t.Setenv("CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS", "1800")
+
+	cfg := Load()
+	if cfg.ClickHouseMaxOpenConns != 2 {
+		t.Fatalf("max open conns = %d, want 2", cfg.ClickHouseMaxOpenConns)
+	}
+	if cfg.ClickHouseMaxIdleConns != 1 {
+		t.Fatalf("max idle conns = %d, want 1", cfg.ClickHouseMaxIdleConns)
+	}
+	if cfg.ClickHouseMaxThreads != 2 {
+		t.Fatalf("max threads = %d, want 2", cfg.ClickHouseMaxThreads)
+	}
+	if cfg.ClickHouseMaxMemoryMB != 2048 {
+		t.Fatalf("max memory mb = %d, want 2048", cfg.ClickHouseMaxMemoryMB)
+	}
+	if cfg.ClickHouseMaxExecutionTimeSeconds != 1800 {
+		t.Fatalf("max execution seconds = %d, want 1800", cfg.ClickHouseMaxExecutionTimeSeconds)
+	}
+}
+
 func TestLoadMonitorConfig(t *testing.T) {
 	t.Setenv("MONITOR_API_HEALTH_URL", "http://api:8000/api/health")
 	t.Setenv("MONITOR_INTERVAL_SECONDS", "30")

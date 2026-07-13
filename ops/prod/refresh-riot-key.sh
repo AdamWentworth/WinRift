@@ -20,6 +20,16 @@ WORKER_START_RETRY_DELAY="${WINRIFT_WORKER_START_RETRY_DELAY:-12}"
 AUTO_PATCH_ROLLOVER="${WINRIFT_AUTO_PATCH_ROLLOVER:-1}"
 PATCH_ROLLOVER_RETAIN_DAYS="${WINRIFT_PATCH_ROLLOVER_RETAIN_DAYS:-0}"
 PATCH_ROLLOVER_QUEUE_ID="${WINRIFT_PATCH_ROLLOVER_QUEUE_ID:-420}"
+PATCHCTL_CLICKHOUSE_MAX_THREADS="${WINRIFT_PATCHCTL_CLICKHOUSE_MAX_THREADS:-2}"
+PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB="${WINRIFT_PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB:-2048}"
+PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS="${WINRIFT_PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS:-2}"
+PATCHCTL_CLICKHOUSE_MAX_IDLE_CONNS="${WINRIFT_PATCHCTL_CLICKHOUSE_MAX_IDLE_CONNS:-1}"
+PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS="${WINRIFT_PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS:-1800}"
+PATCHCTL_MAX_LOAD_1M="${WINRIFT_PATCHCTL_MAX_LOAD_1M:-}"
+PATCHCTL_MIN_AVAILABLE_MEMORY_MB="${WINRIFT_PATCHCTL_MIN_AVAILABLE_MEMORY_MB:-1024}"
+PATCHCTL_PRESSURE_CHECK_ATTEMPTS="${WINRIFT_PATCHCTL_PRESSURE_CHECK_ATTEMPTS:-60}"
+PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS="${WINRIFT_PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS:-10}"
+MONITOR_STOPPED_FOR_MAINTENANCE=0
 
 usage() {
   cat <<'EOF'
@@ -43,6 +53,10 @@ Options:
   --no-patch-rollover  Do not check Data Dragon or advance COLLECTOR_CURRENT_PATCH.
   --patch-retain-days N
                        Raw retention days for patches archived during rollover. Default: 0
+  --patchctl-max-threads N
+                       Max ClickHouse query threads for rollover maintenance. Default: 2
+  --patchctl-max-memory-mb N
+                       Max ClickHouse query memory for rollover maintenance. Default: 2048
   --worker-attempts N  Worker start attempts for transient Riot 401s. Default: 5
   -h, --help           Show this help.
 
@@ -105,6 +119,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --patch-retain-days)
       PATCH_ROLLOVER_RETAIN_DAYS="${2:?missing value for --patch-retain-days}"
+      shift 2
+      ;;
+    --patchctl-max-threads)
+      PATCHCTL_CLICKHOUSE_MAX_THREADS="${2:?missing value for --patchctl-max-threads}"
+      shift 2
+      ;;
+    --patchctl-max-memory-mb)
+      PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB="${2:?missing value for --patchctl-max-memory-mb}"
       shift 2
       ;;
     --worker-attempts)
@@ -274,7 +296,20 @@ compose() {
 }
 
 patchctl() {
-  compose run --rm --no-deps api /winrift-patchctl "$@"
+  compose run \
+    --rm \
+    --no-deps \
+    -e CLICKHOUSE_MAX_OPEN_CONNS="${PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS}" \
+    -e CLICKHOUSE_MAX_IDLE_CONNS="${PATCHCTL_CLICKHOUSE_MAX_IDLE_CONNS}" \
+    -e CLICKHOUSE_MAX_THREADS="${PATCHCTL_CLICKHOUSE_MAX_THREADS}" \
+    -e CLICKHOUSE_MAX_MEMORY_MB="${PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB}" \
+    -e CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS="${PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS}" \
+    -e PATCHCTL_MAX_LOAD_1M="${PATCHCTL_MAX_LOAD_1M}" \
+    -e PATCHCTL_MIN_AVAILABLE_MEMORY_MB="${PATCHCTL_MIN_AVAILABLE_MEMORY_MB}" \
+    -e PATCHCTL_PRESSURE_CHECK_ATTEMPTS="${PATCHCTL_PRESSURE_CHECK_ATTEMPTS}" \
+    -e PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS="${PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS}" \
+    api \
+    /winrift-patchctl "$@"
 }
 
 wait_for_health() {
@@ -304,6 +339,11 @@ non_negative_integer() {
   [[ "${value}" =~ ^[0-9]+$ ]]
 }
 
+positive_number() {
+  local value="$1"
+  [[ "${value}" =~ ^[0-9]+([.][0-9]+)?$ ]] && awk -v value="${value}" 'BEGIN { exit !(value > 0) }'
+}
+
 truthy() {
   case "${1,,}" in
     1|true|yes|y|on)
@@ -313,6 +353,13 @@ truthy() {
       return 1
       ;;
   esac
+}
+
+default_patchctl_max_load() {
+  if [[ -n "${PATCHCTL_MAX_LOAD_1M}" ]]; then
+    return 0
+  fi
+  PATCHCTL_MAX_LOAD_1M="$(nproc 2>/dev/null || printf '4')"
 }
 
 patch_bucket_parts() {
@@ -385,6 +432,16 @@ start_worker_with_retries() {
   done
 }
 
+restore_monitor_after_failure() {
+  local status=$?
+  trap - EXIT
+  if [[ "${status}" -ne 0 && "${MONITOR_STOPPED_FOR_MAINTENANCE}" -eq 1 ]]; then
+    echo "Refresh failed during maintenance; restarting monitor before exiting." >&2
+    compose up -d --no-deps --no-build monitor >/dev/null 2>&1 || true
+  fi
+  exit "${status}"
+}
+
 rollover_patch_window_if_needed() {
   local current_patch=""
   local latest_patch=""
@@ -447,12 +504,49 @@ if ! positive_integer "${WORKER_START_RETRY_DELAY}"; then
   echo "Worker start retry delay must be a positive integer: ${WORKER_START_RETRY_DELAY}" >&2
   exit 1
 fi
+default_patchctl_max_load
 if ! non_negative_integer "${PATCH_ROLLOVER_RETAIN_DAYS}"; then
   echo "Patch rollover retain days must be a non-negative integer: ${PATCH_ROLLOVER_RETAIN_DAYS}" >&2
   exit 1
 fi
 if ! positive_integer "${PATCH_ROLLOVER_QUEUE_ID}"; then
   echo "Patch rollover queue id must be a positive integer: ${PATCH_ROLLOVER_QUEUE_ID}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_CLICKHOUSE_MAX_THREADS}"; then
+  echo "Patchctl ClickHouse max threads must be a positive integer: ${PATCHCTL_CLICKHOUSE_MAX_THREADS}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB}"; then
+  echo "Patchctl ClickHouse max memory must be a positive integer MB value: ${PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS}"; then
+  echo "Patchctl ClickHouse max open connections must be a positive integer: ${PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_CLICKHOUSE_MAX_IDLE_CONNS}"; then
+  echo "Patchctl ClickHouse max idle connections must be a positive integer: ${PATCHCTL_CLICKHOUSE_MAX_IDLE_CONNS}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS}"; then
+  echo "Patchctl ClickHouse max execution time must be a positive integer: ${PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS}" >&2
+  exit 1
+fi
+if ! positive_number "${PATCHCTL_MAX_LOAD_1M}"; then
+  echo "Patchctl max load must be a positive number: ${PATCHCTL_MAX_LOAD_1M}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_MIN_AVAILABLE_MEMORY_MB}"; then
+  echo "Patchctl minimum available memory must be a positive integer MB value: ${PATCHCTL_MIN_AVAILABLE_MEMORY_MB}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_PRESSURE_CHECK_ATTEMPTS}"; then
+  echo "Patchctl pressure check attempts must be a positive integer: ${PATCHCTL_PRESSURE_CHECK_ATTEMPTS}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS}"; then
+  echo "Patchctl pressure check sleep seconds must be a positive integer: ${PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS}" >&2
   exit 1
 fi
 
@@ -499,6 +593,12 @@ fi
 
 require_file "${COMPOSE_FILE}" "Compose file"
 
+trap restore_monitor_after_failure EXIT
+
+echo "Stopping monitor during intentional key-refresh maintenance."
+compose stop monitor >/dev/null 2>&1 || true
+MONITOR_STOPPED_FOR_MAINTENANCE=1
+
 echo "Stopping worker before recreating API."
 compose stop worker >/dev/null 2>&1 || true
 
@@ -513,6 +613,7 @@ wait_for_health
 
 echo "Ensuring monitor is running."
 compose up -d --no-deps --no-build monitor
+MONITOR_STOPPED_FOR_MAINTENANCE=0
 
 if [[ "${START_WORKER}" -eq 1 ]]; then
   start_worker_with_retries

@@ -18,6 +18,11 @@ type Config struct {
 	ClickHouseDatabase                     string
 	ClickHouseUser                         string
 	ClickHousePassword                     string
+	ClickHouseMaxOpenConns                 int
+	ClickHouseMaxIdleConns                 int
+	ClickHouseMaxThreads                   int
+	ClickHouseMaxMemoryMB                  int
+	ClickHouseMaxExecutionTimeSeconds      int
 	CORSOrigins                            []string
 	APIRequestLogsEnabled                  bool
 	APISlowRequestThreshold                time.Duration
@@ -104,6 +109,11 @@ func Load() Config {
 		ClickHouseDatabase:                     env("CLICKHOUSE_DATABASE", "winrift"),
 		ClickHouseUser:                         env("CLICKHOUSE_USER", "winrift"),
 		ClickHousePassword:                     env("CLICKHOUSE_PASSWORD", "winrift"),
+		ClickHouseMaxOpenConns:                 envInt("CLICKHOUSE_MAX_OPEN_CONNS", 10),
+		ClickHouseMaxIdleConns:                 envInt("CLICKHOUSE_MAX_IDLE_CONNS", 10),
+		ClickHouseMaxThreads:                   envInt("CLICKHOUSE_MAX_THREADS", 0),
+		ClickHouseMaxMemoryMB:                  envInt("CLICKHOUSE_MAX_MEMORY_MB", 0),
+		ClickHouseMaxExecutionTimeSeconds:      envInt("CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS", 0),
 		CORSOrigins:                            splitOrigins(env("CORS_ORIGINS", "http://localhost:5173")),
 		APIRequestLogsEnabled:                  envBool("API_REQUEST_LOGS_ENABLED", true),
 		APISlowRequestThreshold:                time.Duration(envInt("API_SLOW_REQUEST_MS", 500)) * time.Millisecond,

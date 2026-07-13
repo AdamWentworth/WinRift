@@ -116,18 +116,27 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 	}
 	log.Printf("patch archive start patch=%s platforms=%s queue=%d prune_raw=%t", patch, strings.Join(platforms, ","), queueID, pruneRaw)
 
+	if err := waitForMaintenancePressure(ctx, "participant-performance"); err != nil {
+		return err
+	}
 	performance, err := repo.BackfillParticipantPerformance(ctx, patch, queueID)
 	if err != nil {
 		return fmt.Errorf("participant performance backfill: %w", err)
 	}
 	log.Printf("patch archive participant performance patch=%s rows=%d", patch, performance.Rows)
 
+	if err := waitForMaintenancePressure(ctx, "champion-guide-events"); err != nil {
+		return err
+	}
 	events, err := repo.BackfillChampionGuideEvents(ctx, patch, queueID)
 	if err != nil {
 		return fmt.Errorf("champion guide event backfill: %w", err)
 	}
 	log.Printf("patch archive champion guide events patch=%s matches=%d skill_events=%d bans=%d", patch, events.Matches, events.SkillEvents, events.Bans)
 
+	if err := waitForMaintenancePressure(ctx, "item-slot-analytics"); err != nil {
+		return err
+	}
 	itemContexts, err := itemSlotRefreshContexts(ctx, staticService)
 	if err != nil {
 		return fmt.Errorf("item slot contexts: %w", err)
@@ -144,11 +153,17 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 	}
 	log.Printf("patch archive item summaries patch=%s item_contexts=%d loadout_contexts=%d", patch, len(itemContexts), len(loadoutContexts))
 
+	if err := waitForMaintenancePressure(ctx, "champion-guide-analytics"); err != nil {
+		return err
+	}
 	if err := repo.RefreshChampionGuideDerivedAnalytics(ctx, patch, queueID); err != nil {
 		return fmt.Errorf("champion guide derived analytics: %w", err)
 	}
 	log.Printf("patch archive champion guide summaries patch=%s complete", patch)
 
+	if err := waitForMaintenancePressure(ctx, "summoner-profile-analytics"); err != nil {
+		return err
+	}
 	profiles, err := repo.RefreshSummonerProfileAnalytics(ctx, queueID)
 	if err != nil {
 		return fmt.Errorf("summoner profile analytics: %w", err)
@@ -156,12 +171,18 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 	log.Printf("patch archive summoner profile summaries queue=%d identities=%d profiles=%d champions=%d champion_roles=%d recent_matches=%d builds=%d", queueID, profiles.IdentityRows, profiles.ProfileRows, profiles.ChampionRows, profiles.ChampionRoleRows, profiles.RecentMatchRows, profiles.BuildRows)
 
 	for _, platform := range platforms {
+		if err := waitForMaintenancePressure(ctx, "patch-compile-"+platform); err != nil {
+			return err
+		}
 		log.Printf("patch archive compile platform patch=%s platform=%s queue=%d", patch, platform, queueID)
 		if err := repo.CompilePatchMetrics(ctx, patch, platform, queueID, retainedUntil); err != nil {
 			return fmt.Errorf("compile %s: %w", platform, err)
 		}
 	}
 	if pruneRaw {
+		if err := waitForMaintenancePressure(ctx, "raw-prune"); err != nil {
+			return err
+		}
 		if strings.EqualFold(strings.TrimSpace(platform), "ALL") {
 			log.Printf("patch archive raw prune patch=%s platform=ALL queue=%d", patch, queueID)
 			if err := repo.DeleteRawPatchDataForPatch(ctx, patch, queueID); err != nil {
