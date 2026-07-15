@@ -34,8 +34,12 @@ func TestRefreshChampionGuideSummaryAnalyticsUsesSpillableJoinSettings(t *testin
 	}
 	defer db.Close()
 
-	mock.ExpectExec("(?s)INSERT INTO champion_guide_summary_analytics.*SETTINGS.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456.*max_bytes_before_external_sort = 268435456").
-		WithArgs("16.12", uint16(420)).
+	mock.ExpectExec("(?s)INSERT INTO champion_guide_summary_analytics.*FROM participant_performance FINAL.*WHERE patch = \\? AND queue_id = \\?.*FROM team_kill_summary FINAL.*WHERE patch = \\? AND queue_id = \\?.*SETTINGS.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456.*max_bytes_before_external_sort = 268435456").
+		WithArgs(
+			"16.12", uint16(420),
+			"16.12", uint16(420),
+			"16.12", uint16(420),
+		).
 		WillReturnResult(sqlmock.NewResult(0, 10))
 
 	repo := &Repository{db: db}

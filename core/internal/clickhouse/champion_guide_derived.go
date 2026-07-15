@@ -470,11 +470,21 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 				multiIf(pp.time_played > 0, pp.time_played, pm.time_played) AS time_played,
 				ifNull(tks.kills, toUInt64(0)) AS team_kills
 			FROM participant_matchups AS pm FINAL
-			LEFT JOIN participant_performance AS pp FINAL
+			LEFT JOIN
+			(
+				SELECT *
+				FROM participant_performance FINAL
+				WHERE patch = ? AND queue_id = ?
+			) AS pp
 				ON pp.match_id = pm.match_id
 				AND pp.platform = pm.platform
 				AND pp.participant_id = pm.participant_id
-			LEFT JOIN team_kill_summary AS tks FINAL
+			LEFT JOIN
+			(
+				SELECT *
+				FROM team_kill_summary FINAL
+				WHERE patch = ? AND queue_id = ?
+			) AS tks
 				ON tks.match_id = pm.match_id
 				AND tks.platform = pm.platform
 				AND tks.patch = pm.patch
@@ -526,6 +536,10 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 			join_algorithm = 'grace_hash',
 			max_bytes_before_external_group_by = 268435456,
 			max_bytes_before_external_sort = 268435456`,
+		patch,
+		queueID,
+		patch,
+		queueID,
 		patch,
 		queueID,
 	)
