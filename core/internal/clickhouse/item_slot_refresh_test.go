@@ -103,6 +103,23 @@ func TestRetryAnalyticsMemoryPressureRetriesTransientFailure(t *testing.T) {
 	}
 }
 
+func TestRetryAnalyticsMemoryPressureRecognizesNestedMutationFailure(t *testing.T) {
+	attempts := 0
+	err := retryAnalyticsMemoryPressureWithDelay(context.Background(), "cleanup batch", 0, func() error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("code: 341, mutation failed reason: Code: 241. memory limit exceeded")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("retry nested mutation failure: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+}
+
 func TestRefreshStartingLoadoutAnalyticsBatchesPlatformsBeforeAllAggregation(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

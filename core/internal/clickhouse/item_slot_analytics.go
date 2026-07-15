@@ -659,7 +659,9 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 		if len(completionItemIDs) == 0 && len(itemContext.StartingItemIDs) == 0 {
 			continue
 		}
-		if err := r.cleanupOrphanedItemAnalyticsBatches(ctx, "item_slot_analytics", patch, queueID, key); err != nil {
+		if err := retryAnalyticsMemoryPressure(ctx, "cleanup orphaned item slot context "+key, func() error {
+			return r.cleanupOrphanedItemAnalyticsBatches(ctx, "item_slot_analytics", patch, queueID, key)
+		}); err != nil {
 			return err
 		}
 		compiledAt := time.Now().UTC().Truncate(time.Second)
@@ -702,15 +704,21 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 			}); err != nil {
 				return err
 			}
-			if err := r.cleanupItemSlotAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms); err != nil {
+			if err := retryAnalyticsMemoryPressure(ctx, "cleanup item slot platform "+platform, func() error {
+				return r.cleanupItemSlotAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms)
+			}); err != nil {
 				return err
 			}
 			log.Printf("item slot analytics progress patch=%s context=%s platform=%s batches=%d", patch, key, platform, len(partialPlatforms))
 		}
-		if err := r.aggregateItemSlotAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
+		if err := retryAnalyticsMemoryPressure(ctx, "aggregate item slot context "+key, func() error {
+			return r.aggregateItemSlotAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms)
+		}); err != nil {
 			return err
 		}
-		if err := r.cleanupOldItemSlotAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
+		if err := retryAnalyticsMemoryPressure(ctx, "cleanup old item slot context "+key, func() error {
+			return r.cleanupOldItemSlotAnalytics(ctx, patch, queueID, key, compiledAt)
+		}); err != nil {
 			return err
 		}
 	}
@@ -972,7 +980,9 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 		if len(context.OpeningItemCosts) == 0 {
 			continue
 		}
-		if err := r.cleanupOrphanedItemAnalyticsBatches(ctx, "starting_loadout_analytics", patch, queueID, key); err != nil {
+		if err := retryAnalyticsMemoryPressure(ctx, "cleanup orphaned starting loadout context "+key, func() error {
+			return r.cleanupOrphanedItemAnalyticsBatches(ctx, "starting_loadout_analytics", patch, queueID, key)
+		}); err != nil {
 			return err
 		}
 		compiledAt := time.Now().UTC().Truncate(time.Second)
@@ -1016,15 +1026,21 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 			}); err != nil {
 				return err
 			}
-			if err := r.cleanupStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms); err != nil {
+			if err := retryAnalyticsMemoryPressure(ctx, "cleanup starting loadout platform "+platform, func() error {
+				return r.cleanupStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms)
+			}); err != nil {
 				return err
 			}
 			log.Printf("starting loadout analytics progress patch=%s context=%s platform=%s batches=%d", patch, key, platform, len(partialPlatforms))
 		}
-		if err := r.aggregateStartingLoadoutAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
+		if err := retryAnalyticsMemoryPressure(ctx, "aggregate starting loadout context "+key, func() error {
+			return r.aggregateStartingLoadoutAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms)
+		}); err != nil {
 			return err
 		}
-		if err := r.cleanupOldStartingLoadoutAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
+		if err := retryAnalyticsMemoryPressure(ctx, "cleanup old starting loadout context "+key, func() error {
+			return r.cleanupOldStartingLoadoutAnalytics(ctx, patch, queueID, key, compiledAt)
+		}); err != nil {
 			return err
 		}
 	}
