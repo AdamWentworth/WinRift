@@ -55,6 +55,7 @@ const startingItemWindowMS uint32 = 120000
 const openingPurchaseFirstWindowMS uint32 = 45000
 const openingPurchaseBurstWindowMS uint32 = 20000
 const openingPurchaseGoldCap uint32 = 500
+const itemAnalyticsMatchBatchSize = 500
 
 func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs, startingItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
 	completionItemIDs := removeItemIDs(allowedItemIDs, startingItemIDs)
@@ -659,20 +660,104 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 			continue
 		}
 		compiledAt := time.Now().UTC().Truncate(time.Second)
+		runNonce := time.Now().UTC().UnixNano()
 		itemList := uint32ListSQL(completionItemIDs)
 		startingItemList := uint32ListSQL(itemContext.StartingItemIDs)
 		for _, platform := range platforms {
-			_, err := r.db.ExecContext(
-				ctx,
-				fmt.Sprintf(`
+			matchIDs, err := r.rawMatchIDsForPlatform(ctx, patch, queueID, platform)
+			if err != nil {
+				return fmt.Errorf("item slot match IDs platform %s: %w", platform, err)
+			}
+			partialPlatforms := make([]string, 0, (len(matchIDs)+itemAnalyticsMatchBatchSize-1)/itemAnalyticsMatchBatchSize)
+			for start := 0; start < len(matchIDs); start += itemAnalyticsMatchBatchSize {
+				end := start + itemAnalyticsMatchBatchSize
+				if end > len(matchIDs) {
+					end = len(matchIDs)
+				}
+				partialPlatform := fmt.Sprintf("__ROLLOVER_%d_%s_%04d", runNonce, platform, start/itemAnalyticsMatchBatchSize)
+				if err := r.refreshItemSlotAnalyticsBatch(
+					ctx,
+					patch,
+					queueID,
+					platform,
+					partialPlatform,
+					key,
+					compiledAt,
+					startingItemList,
+					itemList,
+					matchIDs[start:end],
+				); err != nil {
+					return fmt.Errorf("item slot analytics platform %s context %s batch %d: %w", platform, key, start/itemAnalyticsMatchBatchSize+1, err)
+				}
+				partialPlatforms = append(partialPlatforms, partialPlatform)
+			}
+			if err := r.aggregateItemSlotAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms); err != nil {
+				return err
+			}
+			if err := r.cleanupItemSlotAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms); err != nil {
+				return err
+			}
+			log.Printf("item slot analytics progress patch=%s context=%s platform=%s batches=%d", patch, key, platform, len(partialPlatforms))
+		}
+		if err := r.aggregateItemSlotAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
+			return err
+		}
+		if err := r.cleanupOldItemSlotAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) refreshItemSlotAnalyticsBatch(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	sourcePlatform string,
+	partialPlatform string,
+	itemContext string,
+	compiledAt time.Time,
+	startingItemList string,
+	itemList string,
+	matchIDs []string,
+) error {
+	if len(matchIDs) == 0 {
+		return nil
+	}
+	matchFilter, matchArgs := rawPayloadMatchFilter(matchIDs)
+	args := make([]any, 0, len(matchArgs)+21)
+	args = append(args, matchArgs...)
+	args = append(args,
+		partialPlatform,
+		itemContext,
+		sourcePlatform,
+		patch,
+		queueID,
+		sourcePlatform,
+		patch,
+		queueID,
+		sourcePlatform,
+		startingItemWindowMS,
+		sourcePlatform,
+		patch,
+		queueID,
+		sourcePlatform,
+		patch,
+		queueID,
+		sourcePlatform,
+		partialPlatform,
+		itemContext,
+		compiledAt,
+		compiledAt,
+	)
+	_, err := r.db.ExecContext(
+		ctx,
+		fmt.Sprintf(`
 				INSERT INTO item_slot_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games, compiled_at)
 				WITH target_match_ids AS
 				(
-					SELECT DISTINCT match_id
-					FROM raw_matches
-					PREWHERE patch = ? AND queue_id = ?
-					WHERE platform = ?
+					SELECT arrayJoin([%s]) AS match_id
 				),
 				raw_starting_items AS
 				(
@@ -856,45 +941,10 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 				SETTINGS
 					join_algorithm = 'grace_hash',
 					max_bytes_before_external_group_by = 268435456,
-					max_bytes_before_external_sort = 268435456`, startingItemList, itemList),
-				patch,
-				queueID,
-				platform,
-				platform,
-				key,
-				platform,
-				patch,
-				queueID,
-				platform,
-				patch,
-				queueID,
-				platform,
-				startingItemWindowMS,
-				platform,
-				patch,
-				queueID,
-				platform,
-				patch,
-				queueID,
-				platform,
-				platform,
-				key,
-				compiledAt,
-				compiledAt,
-			)
-			if err != nil {
-				return fmt.Errorf("item slot analytics platform %s context %s: %w", platform, key, err)
-			}
-			log.Printf("item slot analytics progress patch=%s context=%s platform=%s", patch, key, platform)
-		}
-		if err := r.aggregateItemSlotAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
-			return err
-		}
-		if err := r.cleanupOldItemSlotAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
-			return err
-		}
-	}
-	return nil
+					max_bytes_before_external_sort = 268435456`, matchFilter, startingItemList, itemList),
+		args...,
+	)
+	return err
 }
 
 func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch string, queueID uint16, contexts []StartingLoadoutAnalyticsContext) error {
@@ -915,21 +965,97 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 			continue
 		}
 		compiledAt := time.Now().UTC().Truncate(time.Second)
+		runNonce := time.Now().UTC().UnixNano()
 		openingItemIDs := uint32MapKeysSorted(context.OpeningItemCosts)
 		itemList := uint32ListSQL(openingItemIDs)
 		itemCostExpr := itemCostExpressionSQL("tie.item_id", context.OpeningItemCosts)
 		for _, platform := range platforms {
-			_, err := r.db.ExecContext(
-				ctx,
-				fmt.Sprintf(`
+			matchIDs, err := r.rawMatchIDsForPlatform(ctx, patch, queueID, platform)
+			if err != nil {
+				return fmt.Errorf("starting loadout match IDs platform %s: %w", platform, err)
+			}
+			partialPlatforms := make([]string, 0, (len(matchIDs)+itemAnalyticsMatchBatchSize-1)/itemAnalyticsMatchBatchSize)
+			for start := 0; start < len(matchIDs); start += itemAnalyticsMatchBatchSize {
+				end := start + itemAnalyticsMatchBatchSize
+				if end > len(matchIDs) {
+					end = len(matchIDs)
+				}
+				partialPlatform := fmt.Sprintf("__ROLLOVER_%d_%s_%04d", runNonce, platform, start/itemAnalyticsMatchBatchSize)
+				if err := r.refreshStartingLoadoutAnalyticsBatch(
+					ctx,
+					patch,
+					queueID,
+					platform,
+					partialPlatform,
+					key,
+					compiledAt,
+					itemCostExpr,
+					itemList,
+					matchIDs[start:end],
+				); err != nil {
+					return fmt.Errorf("starting loadout analytics platform %s context %s batch %d: %w", platform, key, start/itemAnalyticsMatchBatchSize+1, err)
+				}
+				partialPlatforms = append(partialPlatforms, partialPlatform)
+			}
+			if err := r.aggregateStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms); err != nil {
+				return err
+			}
+			if err := r.cleanupStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms); err != nil {
+				return err
+			}
+			log.Printf("starting loadout analytics progress patch=%s context=%s platform=%s batches=%d", patch, key, platform, len(partialPlatforms))
+		}
+		if err := r.aggregateStartingLoadoutAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
+			return err
+		}
+		if err := r.cleanupOldStartingLoadoutAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) refreshStartingLoadoutAnalyticsBatch(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	sourcePlatform string,
+	partialPlatform string,
+	itemContext string,
+	compiledAt time.Time,
+	itemCostExpr string,
+	itemList string,
+	matchIDs []string,
+) error {
+	if len(matchIDs) == 0 {
+		return nil
+	}
+	matchFilter, matchArgs := rawPayloadMatchFilter(matchIDs)
+	args := make([]any, 0, len(matchArgs)+12)
+	args = append(args, matchArgs...)
+	args = append(args,
+		sourcePlatform,
+		patch,
+		queueID,
+		sourcePlatform,
+		patch,
+		queueID,
+		sourcePlatform,
+		openingPurchaseFirstWindowMS,
+		openingPurchaseBurstWindowMS,
+		openingPurchaseGoldCap,
+		partialPlatform,
+		itemContext,
+		compiledAt,
+	)
+	_, err := r.db.ExecContext(
+		ctx,
+		fmt.Sprintf(`
 				INSERT INTO starting_loadout_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games, compiled_at)
 				WITH target_match_ids AS
 				(
-					SELECT DISTINCT match_id
-					FROM raw_matches
-					PREWHERE patch = ? AND queue_id = ?
-					WHERE platform = ?
+					SELECT arrayJoin([%s]) AS match_id
 				),
 				raw_opening_item_events AS
 				(
@@ -1042,37 +1168,195 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 				SETTINGS
 					join_algorithm = 'grace_hash',
 					max_bytes_before_external_group_by = 268435456,
-					max_bytes_before_external_sort = 268435456`, itemCostExpr, itemList),
-				patch,
-				queueID,
-				platform,
-				platform,
-				patch,
-				queueID,
-				platform,
-				patch,
-				queueID,
-				platform,
-				openingPurchaseFirstWindowMS,
-				openingPurchaseBurstWindowMS,
-				openingPurchaseGoldCap,
-				platform,
-				key,
-				compiledAt,
-			)
-			if err != nil {
-				return fmt.Errorf("starting loadout analytics platform %s context %s: %w", platform, key, err)
-			}
-			log.Printf("starting loadout analytics progress patch=%s context=%s platform=%s", patch, key, platform)
+					max_bytes_before_external_sort = 268435456`, matchFilter, itemCostExpr, itemList),
+		args...,
+	)
+	return err
+}
+
+func (r *Repository) rawMatchIDsForPlatform(ctx context.Context, patch string, queueID uint16, platform string) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT match_id
+		FROM raw_matches
+		PREWHERE patch = ? AND queue_id = ?
+		WHERE platform = ?
+		ORDER BY match_id`, patch, queueID, platform)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	matchIDs := []string{}
+	for rows.Next() {
+		var matchID string
+		if err := rows.Scan(&matchID); err != nil {
+			return nil, err
 		}
-		if err := r.aggregateStartingLoadoutAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
-			return err
-		}
-		if err := r.cleanupOldStartingLoadoutAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
-			return err
+		matchID = strings.TrimSpace(matchID)
+		if matchID != "" {
+			matchIDs = append(matchIDs, matchID)
 		}
 	}
+	return matchIDs, rows.Err()
+}
+
+func (r *Repository) aggregateItemSlotAnalyticsBatches(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	platform string,
+	compiledAt time.Time,
+	partialPlatforms []string,
+) error {
+	if len(partialPlatforms) == 0 {
+		return nil
+	}
+	partialFilter, partialArgs := rawPayloadMatchFilter(partialPlatforms)
+	args := make([]any, 0, len(partialArgs)+6)
+	args = append(args, platform, compiledAt, patch, queueID, normalizedItemContext(itemContext), compiledAt)
+	args = append(args, partialArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO item_slot_analytics
+		(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games, compiled_at)
+		SELECT
+			patch,
+			? AS platform,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_slot,
+			item_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			? AS compiled_at
+		FROM item_slot_analytics
+		WHERE patch = ?
+			AND queue_id = ?
+			AND item_context = ?
+			AND compiled_at = ?
+			AND platform IN (%s)
+		GROUP BY
+			patch,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_slot,
+			item_id`, partialFilter), args...)
+	if err != nil {
+		return fmt.Errorf("aggregate item slot analytics platform %s context %s batches: %w", platform, itemContext, err)
+	}
 	return nil
+}
+
+func (r *Repository) aggregateStartingLoadoutAnalyticsBatches(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	platform string,
+	compiledAt time.Time,
+	partialPlatforms []string,
+) error {
+	if len(partialPlatforms) == 0 {
+		return nil
+	}
+	partialFilter, partialArgs := rawPayloadMatchFilter(partialPlatforms)
+	args := make([]any, 0, len(partialArgs)+6)
+	args = append(args, platform, compiledAt, patch, queueID, normalizedItemContext(itemContext), compiledAt)
+	args = append(args, partialArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO starting_loadout_analytics
+		(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games, compiled_at)
+		SELECT
+			patch,
+			? AS platform,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			? AS compiled_at
+		FROM starting_loadout_analytics
+		WHERE patch = ?
+			AND queue_id = ?
+			AND item_context = ?
+			AND compiled_at = ?
+			AND platform IN (%s)
+		GROUP BY
+			patch,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_signature`, partialFilter), args...)
+	if err != nil {
+		return fmt.Errorf("aggregate starting loadout analytics platform %s context %s batches: %w", platform, itemContext, err)
+	}
+	return nil
+}
+
+func (r *Repository) cleanupItemSlotAnalyticsBatches(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	compiledAt time.Time,
+	partialPlatforms []string,
+) error {
+	return r.cleanupItemAnalyticsBatches(ctx, "item_slot_analytics", patch, queueID, itemContext, compiledAt, partialPlatforms)
+}
+
+func (r *Repository) cleanupStartingLoadoutAnalyticsBatches(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	compiledAt time.Time,
+	partialPlatforms []string,
+) error {
+	return r.cleanupItemAnalyticsBatches(ctx, "starting_loadout_analytics", patch, queueID, itemContext, compiledAt, partialPlatforms)
+}
+
+func (r *Repository) cleanupItemAnalyticsBatches(
+	ctx context.Context,
+	table string,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	compiledAt time.Time,
+	partialPlatforms []string,
+) error {
+	if len(partialPlatforms) == 0 {
+		return nil
+	}
+	if table != "item_slot_analytics" && table != "starting_loadout_analytics" {
+		return fmt.Errorf("unsupported item analytics table %q", table)
+	}
+	partialFilter, partialArgs := rawPayloadMatchFilter(partialPlatforms)
+	args := make([]any, 0, len(partialArgs)+4)
+	args = append(args, patch, queueID, normalizedItemContext(itemContext), compiledAt)
+	args = append(args, partialArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+		ALTER TABLE %s DELETE
+		WHERE patch = ?
+			AND queue_id = ?
+			AND item_context = ?
+			AND compiled_at = ?
+			AND platform IN (%s)
+		SETTINGS mutations_sync = 2`, table, partialFilter), args...)
+	return err
 }
 
 func (r *Repository) aggregateStartingLoadoutAnalyticsPlatforms(
