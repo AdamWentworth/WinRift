@@ -12,7 +12,7 @@ READ_FROM_STDIN=0
 KEY_FILE=""
 START_WORKER=1
 RESTART_SERVICES=1
-SHOW_KEY=1
+SHOW_KEY=0
 CONFIRM_KEY=1
 WORKER_START_ATTEMPTS="${WINRIFT_WORKER_START_ATTEMPTS:-5}"
 WORKER_START_CHECK_SECONDS="${WINRIFT_WORKER_START_CHECK_SECONDS:-8}"
@@ -46,7 +46,7 @@ Options:
   --health-url URL     API health URL. Default: http://127.0.0.1:8000/api/health
   --key-file PATH      Read the Riot key from a file.
   --stdin              Read the Riot key from stdin.
-  --hide-key           Hide interactive key input and show only a masked preview.
+  --show-key           Show interactive key input and the full key preview.
   --yes                Skip the interactive confirmation prompt.
   --no-worker          Restart API/monitor but do not start the worker.
   --no-restart         Only update env and clear auth marker.
@@ -63,9 +63,9 @@ Options:
 Normal use:
   refresh-riot-key
 
-Interactive use shows the pasted key back to you and requires typing YES before
-the env file is updated. The value is not written to shell history by this script,
-but it will be visible in terminal scrollback unless --hide-key is used.
+Interactive use hides the pasted key, shows a masked preview, and requires typing
+YES before the env file is updated. Use --show-key only when you deliberately want
+the secret visible in terminal scrollback.
 EOF
 }
 
@@ -95,6 +95,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --stdin)
       READ_FROM_STDIN=1
+      shift
+      ;;
+    --show-key)
+      SHOW_KEY=1
       shift
       ;;
     --hide-key)
@@ -438,6 +442,7 @@ restore_monitor_after_failure() {
   if [[ "${status}" -ne 0 && "${MONITOR_STOPPED_FOR_MAINTENANCE}" -eq 1 ]]; then
     echo "Refresh failed during maintenance; restarting monitor before exiting." >&2
     compose up -d --no-deps --no-build monitor >/dev/null 2>&1 || true
+    echo "The API remains available; the worker remains stopped to avoid collecting against a stale patch marker." >&2
   fi
   exit "${status}"
 }

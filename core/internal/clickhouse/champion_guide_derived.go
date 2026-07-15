@@ -48,20 +48,19 @@ func (r *Repository) BackfillChampionGuideEvents(ctx context.Context, patch stri
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
-	for _, statement := range []string{
-		`ALTER TABLE timeline_skill_events DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`,
-		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND queue_id = ? SETTINGS mutations_sync = 2`,
-	} {
-		if _, err := r.db.ExecContext(ctx, statement, patch, queueID); err != nil {
-			return ChampionGuideEventBackfillResult{}, err
-		}
-	}
 	platforms, err := r.rawMatchPlatforms(ctx, patch, queueID)
 	if err != nil {
 		return ChampionGuideEventBackfillResult{}, err
 	}
 	for _, platform := range platforms {
-		if err := r.backfillChampionGuideEventsForPlatform(ctx, patch, platform, queueID); err != nil {
+		if err := r.forEachMissingRawPayloadMatchBatch(ctx, "raw_timelines", "timeline_skill_events", patch, platform, queueID, func(matchIDs []string) error {
+			return r.backfillChampionGuideSkillEventsBatch(ctx, patch, platform, queueID, matchIDs)
+		}); err != nil {
+			return ChampionGuideEventBackfillResult{}, err
+		}
+		if err := r.forEachMissingRawPayloadMatchBatch(ctx, "raw_matches", "champion_bans", patch, platform, queueID, func(matchIDs []string) error {
+			return r.backfillChampionBansBatch(ctx, patch, platform, queueID, matchIDs)
+		}); err != nil {
 			return ChampionGuideEventBackfillResult{}, err
 		}
 	}
@@ -98,9 +97,12 @@ func (r *Repository) rawMatchPlatforms(ctx context.Context, patch string, queueI
 	return platforms, rows.Err()
 }
 
-func (r *Repository) backfillChampionGuideEventsForPlatform(ctx context.Context, patch, platform string, queueID uint16) error {
-	if _, err := r.db.ExecContext(ctx, `
-		INSERT INTO timeline_skill_events
+func (r *Repository) backfillChampionGuideSkillEventsBatch(ctx context.Context, patch, platform string, queueID uint16, matchIDs []string) error {
+	matchFilter, matchArgs := rawPayloadMatchFilter(matchIDs)
+	queryArgs := []any{patch, platform, queueID}
+	queryArgs = append(queryArgs, matchArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO timeline_skill_events
 		(match_id, platform, patch, queue_id, timestamp_ms, participant_id, skill_slot, skill_order, level_up_type)
 		SELECT
 			match_id,
@@ -139,25 +141,27 @@ func (r *Repository) backfillChampionGuideEventsForPlatform(ctx context.Context,
 					toUInt8(JSONExtractInt(event, 'participantId')) AS participant_id,
 					toUInt8(JSONExtractInt(event, 'skillSlot')) AS skill_slot,
 					JSONExtractString(event, 'levelUpType') AS level_up_type
-				FROM raw_timelines AS rt
-				ARRAY JOIN JSONExtractArrayRaw(JSONExtractRaw(raw_json, 'info'), 'frames') AS frame
-				ARRAY JOIN JSONExtractArrayRaw(frame, 'events') AS event
-				WHERE patch = ?
-					AND platform = ?
-					AND queue_id = ?
-					AND JSONExtractString(event, 'type') = 'SKILL_LEVEL_UP'
+					FROM raw_timelines AS rt FINAL
+					ARRAY JOIN JSONExtractArrayRaw(JSONExtractRaw(raw_json, 'info'), 'frames') AS frame
+					ARRAY JOIN JSONExtractArrayRaw(frame, 'events') AS event
+					WHERE patch = ?
+						AND platform = ?
+						AND queue_id = ?
+						AND match_id IN (%s)
+						AND JSONExtractString(event, 'type') = 'SKILL_LEVEL_UP'
 			)
 			WHERE participant_id > 0 AND skill_slot BETWEEN 1 AND 4
 		)
-		WHERE skill_order BETWEEN 1 AND 18`,
-		patch,
-		platform,
-		queueID,
-	); err != nil {
-		return err
-	}
-	if _, err := r.db.ExecContext(ctx, `
-		INSERT INTO champion_bans
+			WHERE skill_order BETWEEN 1 AND 18`, matchFilter), queryArgs...)
+	return err
+}
+
+func (r *Repository) backfillChampionBansBatch(ctx context.Context, patch, platform string, queueID uint16, matchIDs []string) error {
+	matchFilter, matchArgs := rawPayloadMatchFilter(matchIDs)
+	queryArgs := []any{patch, platform, queueID}
+	queryArgs = append(queryArgs, matchArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+			INSERT INTO champion_bans
 		(match_id, platform, patch, queue_id, team_id, champion_id, pick_turn)
 		SELECT
 			match_id,
@@ -167,20 +171,16 @@ func (r *Repository) backfillChampionGuideEventsForPlatform(ctx context.Context,
 			toUInt16(JSONExtractInt(team, 'teamId')) AS team_id,
 			toUInt16(JSONExtractInt(ban, 'championId')) AS champion_id,
 			toUInt8(JSONExtractInt(ban, 'pickTurn')) AS pick_turn
-		FROM raw_matches AS rm
-		ARRAY JOIN JSONExtractArrayRaw(JSONExtractRaw(raw_json, 'info'), 'teams') AS team
-		ARRAY JOIN JSONExtractArrayRaw(team, 'bans') AS ban
-		WHERE patch = ?
-			AND platform = ?
-			AND queue_id = ?
-			AND champion_id > 0`,
-		patch,
-		platform,
-		queueID,
-	); err != nil {
-		return err
-	}
-	return nil
+			FROM raw_matches AS rm FINAL
+			ARRAY JOIN JSONExtractArrayRaw(JSONExtractRaw(raw_json, 'info'), 'teams') AS team
+			ARRAY JOIN JSONExtractArrayRaw(team, 'bans') AS ban
+			WHERE patch = ?
+				AND platform = ?
+				AND queue_id = ?
+				AND match_id IN (%s)
+				AND champion_id > 0`,
+		matchFilter), queryArgs...)
+	return err
 }
 
 func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, patch string, queueID uint16) error {
