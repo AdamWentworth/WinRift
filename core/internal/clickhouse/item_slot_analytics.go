@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"strconv"
@@ -666,7 +667,14 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 				fmt.Sprintf(`
 				INSERT INTO item_slot_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games, compiled_at)
-				WITH raw_starting_items AS
+				WITH target_match_ids AS
+				(
+					SELECT DISTINCT match_id
+					FROM raw_matches
+					PREWHERE patch = ? AND queue_id = ?
+					WHERE platform = ?
+				),
+				raw_starting_items AS
 				(
 					SELECT
 						pm.patch AS patch,
@@ -705,6 +713,8 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 						AND tie.patch = ?
 						AND tie.queue_id = ?
 						AND tie.platform = ?
+						AND pm.match_id IN (SELECT match_id FROM target_match_ids)
+						AND tie.match_id IN (SELECT match_id FROM target_match_ids)
 						AND tie.event_type = 'ITEM_PURCHASED'
 						AND tie.timestamp_ms <= ?
 						AND tie.item_id IN (%s)
@@ -757,6 +767,8 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 						AND tie.patch = ?
 						AND tie.queue_id = ?
 						AND tie.platform = ?
+						AND pm.match_id IN (SELECT match_id FROM target_match_ids)
+						AND tie.match_id IN (SELECT match_id FROM target_match_ids)
 						AND tie.event_type = 'ITEM_PURCHASED'
 						AND tie.item_id IN (%s)
 					GROUP BY
@@ -842,6 +854,9 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					item_slot,
 					item_id
 				SETTINGS join_algorithm = 'grace_hash'`, startingItemList, itemList),
+				patch,
+				queueID,
+				platform,
 				platform,
 				key,
 				platform,
@@ -867,6 +882,7 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 			if err != nil {
 				return fmt.Errorf("item slot analytics platform %s context %s: %w", platform, key, err)
 			}
+			log.Printf("item slot analytics progress patch=%s context=%s platform=%s", patch, key, platform)
 		}
 		if err := r.aggregateItemSlotAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
 			return err
@@ -905,7 +921,14 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 				fmt.Sprintf(`
 				INSERT INTO starting_loadout_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games, compiled_at)
-				WITH raw_opening_item_events AS
+				WITH target_match_ids AS
+				(
+					SELECT DISTINCT match_id
+					FROM raw_matches
+					PREWHERE patch = ? AND queue_id = ?
+					WHERE platform = ?
+				),
+				raw_opening_item_events AS
 				(
 					SELECT
 						pm.match_id AS match_id,
@@ -945,6 +968,8 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 						AND tie.patch = ?
 						AND tie.queue_id = ?
 						AND tie.platform = ?
+						AND pm.match_id IN (SELECT match_id FROM target_match_ids)
+						AND tie.match_id IN (SELECT match_id FROM target_match_ids)
 						AND tie.event_type = 'ITEM_PURCHASED'
 						AND tie.timestamp_ms <= ?
 						AND tie.item_id IN (%s)
@@ -1012,6 +1037,9 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 					rank_bucket,
 					item_signature
 				SETTINGS join_algorithm = 'grace_hash'`, itemCostExpr, itemList),
+				patch,
+				queueID,
+				platform,
 				platform,
 				patch,
 				queueID,
@@ -1029,6 +1057,7 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 			if err != nil {
 				return fmt.Errorf("starting loadout analytics platform %s context %s: %w", platform, key, err)
 			}
+			log.Printf("starting loadout analytics progress patch=%s context=%s platform=%s", patch, key, platform)
 		}
 		if err := r.aggregateStartingLoadoutAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
 			return err
