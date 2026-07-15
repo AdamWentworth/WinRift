@@ -32,24 +32,27 @@ func (r *Repository) BackfillParticipantPerformance(ctx context.Context, patch s
 		}
 	}
 	var result ParticipantPerformanceBackfillResult
-	err = r.db.QueryRowContext(ctx, `SELECT count() FROM participant_performance FINAL WHERE patch = ? AND queue_id = ?`, patch, queueID).Scan(&result.Rows)
+	err = r.db.QueryRowContext(ctx, `SELECT count() FROM participant_performance WHERE patch = ? AND queue_id = ?`, patch, queueID).Scan(&result.Rows)
 	return result, err
 }
 
 func (r *Repository) backfillParticipantPerformanceBatch(ctx context.Context, patch, platform string, queueID uint16, matchIDs []string) error {
 	matchFilter, matchArgs := rawPayloadMatchFilter(matchIDs)
-	queryArgs := []any{patch, platform, queueID}
+	queryArgs := make([]any, 0, len(matchArgs)+3)
 	queryArgs = append(queryArgs, matchArgs...)
+	queryArgs = append(queryArgs, patch, platform, queueID)
 	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO participant_performance
 		(%s)
 		SELECT
 			%s
-		FROM participants FINAL
+		FROM participants
+		PREWHERE match_id IN (%s)
 		WHERE patch = ?
 			AND platform = ?
 			AND queue_id = ?
-			AND match_id IN (%s)
-			AND participant_id > 0`, participantPerformanceColumns, participantPerformanceColumns, matchFilter), queryArgs...)
+			AND participant_id > 0
+		ORDER BY ingested_at DESC
+		LIMIT 1 BY match_id, participant_id`, participantPerformanceColumns, participantPerformanceColumns, matchFilter), queryArgs...)
 	return err
 }

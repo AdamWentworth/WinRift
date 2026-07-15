@@ -29,6 +29,7 @@ PATCHCTL_MAX_LOAD_1M="${WINRIFT_PATCHCTL_MAX_LOAD_1M:-}"
 PATCHCTL_MIN_AVAILABLE_MEMORY_MB="${WINRIFT_PATCHCTL_MIN_AVAILABLE_MEMORY_MB:-1024}"
 PATCHCTL_PRESSURE_CHECK_ATTEMPTS="${WINRIFT_PATCHCTL_PRESSURE_CHECK_ATTEMPTS:-60}"
 PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS="${WINRIFT_PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS:-10}"
+PATCH_ROLLOVER_RETRY_DELAY_SECONDS="${WINRIFT_PATCH_ROLLOVER_RETRY_DELAY_SECONDS:-20}"
 MONITOR_STOPPED_FOR_MAINTENANCE=0
 
 usage() {
@@ -57,6 +58,8 @@ Options:
                        Max ClickHouse query threads for rollover maintenance. Default: 2
   --patchctl-max-memory-mb N
                        Max ClickHouse query memory for rollover maintenance. Default: 2048
+  --rollover-retry-delay N
+                       Seconds between resumable rollover attempts. Default: 20
   --worker-attempts N  Worker start attempts for transient Riot 401s. Default: 5
   -h, --help           Show this help.
 
@@ -131,6 +134,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --patchctl-max-memory-mb)
       PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB="${2:?missing value for --patchctl-max-memory-mb}"
+      shift 2
+      ;;
+    --rollover-retry-delay)
+      PATCH_ROLLOVER_RETRY_DELAY_SECONDS="${2:?missing value for --rollover-retry-delay}"
       shift 2
       ;;
     --worker-attempts)
@@ -391,6 +398,30 @@ patch_is_newer() {
   (( target_minor > current_minor ))
 }
 
+run_patch_rollover_until_complete() {
+  local target_patch="$1"
+  local attempt=1
+
+  while true; do
+    echo "Patch rollover maintenance attempt ${attempt}. Completed batches will be skipped automatically."
+    if patchctl \
+      -action rollover \
+      -patch "${target_patch}" \
+      -platform ALL \
+      -queue "${PATCH_ROLLOVER_QUEUE_ID}" \
+      -retain-days "${PATCH_ROLLOVER_RETAIN_DAYS}" \
+      -prune-raw=true; then
+      return 0
+    fi
+
+    echo "Patch rollover attempt ${attempt} was interrupted by a transient maintenance failure." >&2
+    echo "The key refresh will stay active and resume missing work in ${PATCH_ROLLOVER_RETRY_DELAY_SECONDS}s. Press Ctrl+C only if you want to stop maintenance." >&2
+    compose up -d --no-build clickhouse >/dev/null 2>&1 || true
+    sleep "${PATCH_ROLLOVER_RETRY_DELAY_SECONDS}"
+    attempt=$((attempt + 1))
+  done
+}
+
 clear_auth_marker() {
   if [[ -n "${host_marker_path:-}" ]]; then
     echo "Clearing Riot auth marker: ${host_marker_path}"
@@ -472,13 +503,7 @@ rollover_patch_window_if_needed() {
   if patch_is_newer "${latest_patch}" "${current_patch}"; then
     echo "Detected newer Riot patch: ${current_patch} -> ${latest_patch}."
     echo "Archiving and pruning raw data that falls outside the new retention window."
-    patchctl \
-      -action rollover \
-      -patch "${latest_patch}" \
-      -platform ALL \
-      -queue "${PATCH_ROLLOVER_QUEUE_ID}" \
-      -retain-days "${PATCH_ROLLOVER_RETAIN_DAYS}" \
-      -prune-raw=true
+    run_patch_rollover_until_complete "${latest_patch}"
     write_env_key "COLLECTOR_CURRENT_PATCH" "${latest_patch}"
     echo "Updated COLLECTOR_CURRENT_PATCH=${latest_patch} in ${ENV_FILE}."
   else
@@ -552,6 +577,10 @@ if ! positive_integer "${PATCHCTL_PRESSURE_CHECK_ATTEMPTS}"; then
 fi
 if ! positive_integer "${PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS}"; then
   echo "Patchctl pressure check sleep seconds must be a positive integer: ${PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS}" >&2
+  exit 1
+fi
+if ! positive_integer "${PATCH_ROLLOVER_RETRY_DELAY_SECONDS}"; then
+  echo "Patch rollover retry delay must be a positive integer: ${PATCH_ROLLOVER_RETRY_DELAY_SECONDS}" >&2
   exit 1
 fi
 

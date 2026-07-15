@@ -37,25 +37,16 @@ func (r *Repository) forEachMissingRawPayloadMatchBatch(
 	}
 
 	query := fmt.Sprintf(`
-		SELECT match_id
-		FROM %s FINAL
-		WHERE patch = ?
-			AND platform = ?
-			AND queue_id = ?
-			AND match_id NOT IN
-			(
-				SELECT match_id
-				FROM %s FINAL
-				WHERE patch = ?
-					AND platform = ?
-					AND queue_id = ?
-			)
-		ORDER BY match_id`, sourceTable, destinationTable)
-	rows, err := r.db.QueryContext(ctx, query, patch, platform, queueID, patch, platform, queueID)
+		SELECT DISTINCT match_id
+		FROM %s
+		PREWHERE patch = ? AND queue_id = ?
+		WHERE platform = ?
+		ORDER BY match_id`, sourceTable)
+	rows, err := r.db.QueryContext(ctx, query, patch, queueID, platform)
 	if err != nil {
 		return err
 	}
-	missingMatchIDs := []string{}
+	sourceMatchIDs := []string{}
 	for rows.Next() {
 		var matchID string
 		if err := rows.Scan(&matchID); err != nil {
@@ -64,7 +55,7 @@ func (r *Repository) forEachMissingRawPayloadMatchBatch(
 		}
 		matchID = strings.TrimSpace(matchID)
 		if matchID != "" {
-			missingMatchIDs = append(missingMatchIDs, matchID)
+			sourceMatchIDs = append(sourceMatchIDs, matchID)
 		}
 	}
 	rowsErr := rows.Err()
@@ -72,9 +63,9 @@ func (r *Repository) forEachMissingRawPayloadMatchBatch(
 	if rowsErr != nil {
 		return rowsErr
 	}
-	if len(missingMatchIDs) == 0 {
+	if len(sourceMatchIDs) == 0 {
 		log.Printf(
-			"raw payload backfill current source=%s destination=%s patch=%s platform=%s queue=%d",
+			"raw payload backfill empty source=%s destination=%s patch=%s platform=%s queue=%d",
 			sourceTable,
 			destinationTable,
 			patch,
@@ -84,19 +75,34 @@ func (r *Repository) forEachMissingRawPayloadMatchBatch(
 		return nil
 	}
 
-	totalBatches := (len(missingMatchIDs) + rawPayloadBackfillBatchSize - 1) / rawPayloadBackfillBatchSize
-	for start := 0; start < len(missingMatchIDs); start += rawPayloadBackfillBatchSize {
+	totalBatches := (len(sourceMatchIDs) + rawPayloadBackfillBatchSize - 1) / rawPayloadBackfillBatchSize
+	missingTotal := 0
+	for start := 0; start < len(sourceMatchIDs); start += rawPayloadBackfillBatchSize {
 		end := start + rawPayloadBackfillBatchSize
-		if end > len(missingMatchIDs) {
-			end = len(missingMatchIDs)
+		if end > len(sourceMatchIDs) {
+			end = len(sourceMatchIDs)
 		}
-		if err := process(missingMatchIDs[start:end]); err != nil {
+		missingMatchIDs, err := r.missingRawPayloadDestinationMatches(
+			ctx,
+			destinationTable,
+			patch,
+			platform,
+			queueID,
+			sourceMatchIDs[start:end],
+		)
+		if err != nil {
 			return err
+		}
+		if len(missingMatchIDs) > 0 {
+			if err := process(missingMatchIDs); err != nil {
+				return err
+			}
+			missingTotal += len(missingMatchIDs)
 		}
 		batchNumber := start/rawPayloadBackfillBatchSize + 1
 		if batchNumber == 1 || batchNumber%10 == 0 || batchNumber == totalBatches {
 			log.Printf(
-				"raw payload backfill progress source=%s destination=%s patch=%s platform=%s queue=%d batch=%d/%d matches=%d/%d",
+				"raw payload backfill progress source=%s destination=%s patch=%s platform=%s queue=%d batch=%d/%d checked=%d/%d missing_processed=%d",
 				sourceTable,
 				destinationTable,
 				patch,
@@ -105,11 +111,69 @@ func (r *Repository) forEachMissingRawPayloadMatchBatch(
 				batchNumber,
 				totalBatches,
 				end,
-				len(missingMatchIDs),
+				len(sourceMatchIDs),
+				missingTotal,
 			)
 		}
 	}
+	if missingTotal == 0 {
+		log.Printf(
+			"raw payload backfill current source=%s destination=%s patch=%s platform=%s queue=%d",
+			sourceTable,
+			destinationTable,
+			patch,
+			platform,
+			queueID,
+		)
+	}
 	return nil
+}
+
+func (r *Repository) missingRawPayloadDestinationMatches(
+	ctx context.Context,
+	destinationTable string,
+	patch string,
+	platform string,
+	queueID uint16,
+	matchIDs []string,
+) ([]string, error) {
+	if len(matchIDs) == 0 {
+		return nil, nil
+	}
+	matchFilter, matchArgs := rawPayloadMatchFilter(matchIDs)
+	queryArgs := make([]any, 0, len(matchArgs)+3)
+	queryArgs = append(queryArgs, matchArgs...)
+	queryArgs = append(queryArgs, patch, platform, queueID)
+	query := fmt.Sprintf(`
+		SELECT DISTINCT match_id
+		FROM %s
+		PREWHERE match_id IN (%s)
+		WHERE patch = ? AND platform = ? AND queue_id = ?`, destinationTable, matchFilter)
+	rows, err := r.db.QueryContext(ctx, query, queryArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	existing := make(map[string]struct{}, len(matchIDs))
+	for rows.Next() {
+		var matchID string
+		if err := rows.Scan(&matchID); err != nil {
+			return nil, err
+		}
+		existing[strings.TrimSpace(matchID)] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	missing := make([]string, 0, len(matchIDs))
+	for _, matchID := range matchIDs {
+		if _, ok := existing[matchID]; !ok {
+			missing = append(missing, matchID)
+		}
+	}
+	return missing, nil
 }
 
 func rawPayloadMatchFilter(matchIDs []string) (string, []any) {

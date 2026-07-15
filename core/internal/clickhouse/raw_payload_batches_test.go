@@ -20,9 +20,13 @@ func TestForEachMissingRawPayloadMatchBatchChunksCandidateIDs(t *testing.T) {
 	for i := 0; i < rawPayloadBackfillBatchSize+1; i++ {
 		missingRows.AddRow("NA1_" + leftPadNumber(i, 4))
 	}
-	mock.ExpectQuery("(?s)SELECT match_id.*FROM raw_matches FINAL.*match_id NOT IN.*FROM participant_performance FINAL.*ORDER BY match_id").
-		WithArgs("16.12", "NA1", uint16(420), "16.12", "NA1", uint16(420)).
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*WHERE platform = \\?.*ORDER BY match_id").
+		WithArgs("16.12", uint16(420), "NA1").
 		WillReturnRows(missingRows)
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM participant_performance.*PREWHERE match_id IN").
+		WillReturnRows(sqlmock.NewRows([]string{"match_id"}))
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM participant_performance.*PREWHERE match_id IN").
+		WillReturnRows(sqlmock.NewRows([]string{"match_id"}))
 
 	var batchSizes []int
 	repo := &Repository{db: db}
@@ -57,6 +61,37 @@ func TestForEachMissingRawPayloadMatchBatchRejectsUnknownTables(t *testing.T) {
 	}
 }
 
+func TestForEachMissingRawPayloadMatchBatchResumesOnlyMissingIDs(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*WHERE platform = \\?.*ORDER BY match_id").
+		WithArgs("16.12", uint16(420), "NA1").
+		WillReturnRows(sqlmock.NewRows([]string{"match_id"}).AddRow("NA1_1").AddRow("NA1_2").AddRow("NA1_3"))
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM participant_performance.*PREWHERE match_id IN \\(\\?, \\?, \\?\\)").
+		WithArgs("NA1_1", "NA1_2", "NA1_3", "16.12", "NA1", uint16(420)).
+		WillReturnRows(sqlmock.NewRows([]string{"match_id"}).AddRow("NA1_1").AddRow("NA1_3"))
+
+	var processed []string
+	repo := &Repository{db: db}
+	err = repo.forEachMissingRawPayloadMatchBatch(context.Background(), "raw_matches", "participant_performance", "16.12", "NA1", 420, func(matchIDs []string) error {
+		processed = append(processed, matchIDs...)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("resume batches: %v", err)
+	}
+	if len(processed) != 1 || processed[0] != "NA1_2" {
+		t.Fatalf("processed = %v, want only NA1_2", processed)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestBackfillParticipantPerformanceUsesBoundedRawMatchBatch(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -67,13 +102,16 @@ func TestBackfillParticipantPerformanceUsesBoundedRawMatchBatch(t *testing.T) {
 	mock.ExpectQuery("(?s)SELECT DISTINCT platform FROM raw_matches.*ORDER BY platform").
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("NA1"))
-	mock.ExpectQuery("(?s)SELECT match_id.*FROM raw_matches FINAL.*match_id NOT IN.*FROM participant_performance FINAL.*ORDER BY match_id").
-		WithArgs("16.12", "NA1", uint16(420), "16.12", "NA1", uint16(420)).
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*WHERE platform = \\?.*ORDER BY match_id").
+		WithArgs("16.12", uint16(420), "NA1").
 		WillReturnRows(sqlmock.NewRows([]string{"match_id"}).AddRow("NA1_1").AddRow("NA1_2"))
-	mock.ExpectExec("(?s)INSERT INTO participant_performance.*FROM participants FINAL.*match_id IN \\(\\?, \\?\\)").
-		WithArgs("16.12", "NA1", uint16(420), "NA1_1", "NA1_2").
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM participant_performance.*PREWHERE match_id IN \\(\\?, \\?\\)").
+		WithArgs("NA1_1", "NA1_2", "16.12", "NA1", uint16(420)).
+		WillReturnRows(sqlmock.NewRows([]string{"match_id"}))
+	mock.ExpectExec("(?s)INSERT INTO participant_performance.*FROM participants.*PREWHERE match_id IN \\(\\?, \\?\\).*ORDER BY ingested_at DESC.*LIMIT 1 BY match_id, participant_id").
+		WithArgs("NA1_1", "NA1_2", "16.12", "NA1", uint16(420)).
 		WillReturnResult(sqlmock.NewResult(0, 20))
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT count() FROM participant_performance FINAL WHERE patch = ? AND queue_id = ?")).
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT count() FROM participant_performance WHERE patch = ? AND queue_id = ?")).
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"count()"}).AddRow(20))
 
@@ -127,11 +165,11 @@ func TestBackfillChampionGuideEventsOnlyProcessesMissingMatches(t *testing.T) {
 	mock.ExpectQuery("(?s)SELECT DISTINCT platform FROM raw_matches.*ORDER BY platform").
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("NA1"))
-	mock.ExpectQuery("(?s)SELECT match_id.*FROM raw_timelines FINAL.*match_id NOT IN.*FROM timeline_skill_events FINAL.*ORDER BY match_id").
-		WithArgs("16.12", "NA1", uint16(420), "16.12", "NA1", uint16(420)).
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM raw_timelines.*PREWHERE patch = \\? AND queue_id = \\?.*WHERE platform = \\?.*ORDER BY match_id").
+		WithArgs("16.12", uint16(420), "NA1").
 		WillReturnRows(sqlmock.NewRows([]string{"match_id"}))
-	mock.ExpectQuery("(?s)SELECT match_id.*FROM raw_matches FINAL.*match_id NOT IN.*FROM champion_bans FINAL.*ORDER BY match_id").
-		WithArgs("16.12", "NA1", uint16(420), "16.12", "NA1", uint16(420)).
+	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*WHERE platform = \\?.*ORDER BY match_id").
+		WithArgs("16.12", uint16(420), "NA1").
 		WillReturnRows(sqlmock.NewRows([]string{"match_id"}))
 	mock.ExpectQuery("(?s)SELECT.*SELECT count\\(\\) FROM raw_matches.*SELECT count\\(\\) FROM timeline_skill_events.*SELECT count\\(\\) FROM champion_bans").
 		WithArgs("16.12", uint16(420), "16.12", uint16(420), "16.12", uint16(420)).
