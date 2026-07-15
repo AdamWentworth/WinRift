@@ -521,7 +521,11 @@ func (r *Repository) refreshChampionGuideSummaryAnalytics(ctx context.Context, p
 			toUInt64(sum(time_played)) AS time_played_sum,
 			sum(multiIf(team_kills > 0, toFloat64(participant_kills + participant_assists) / toFloat64(team_kills), 0)) AS kill_participation_sum
 		FROM participant_rows
-		GROUP BY patch, queue_id, champion_id, role, rank_bucket`,
+		GROUP BY patch, queue_id, champion_id, role, rank_bucket
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`,
 		patch,
 		queueID,
 	)
