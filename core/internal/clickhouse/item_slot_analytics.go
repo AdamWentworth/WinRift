@@ -647,6 +647,10 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
+	platforms, err := r.rawMatchPlatforms(ctx, patch, queueID)
+	if err != nil {
+		return err
+	}
 	for _, itemContext := range contexts {
 		key := normalizedItemContext(itemContext.Key)
 		completionItemIDs := removeItemIDs(itemContext.ItemIDs, itemContext.StartingItemIDs)
@@ -656,16 +660,17 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 		compiledAt := time.Now().UTC().Truncate(time.Second)
 		itemList := uint32ListSQL(completionItemIDs)
 		startingItemList := uint32ListSQL(itemContext.StartingItemIDs)
-		_, err := r.db.ExecContext(
-			ctx,
-			fmt.Sprintf(`
+		for _, platform := range platforms {
+			_, err := r.db.ExecContext(
+				ctx,
+				fmt.Sprintf(`
 				INSERT INTO item_slot_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games, compiled_at)
 				WITH raw_starting_items AS
 				(
 					SELECT
 						pm.patch AS patch,
-						'ALL' AS platform,
+						? AS platform,
 						pm.queue_id AS queue_id,
 						? AS item_context,
 						pm.champion_id AS champion_id,
@@ -690,11 +695,16 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 							argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
 						FROM summoner_rank_snapshots FINAL
 						WHERE queue_type = 'RANKED_SOLO_5x5'
+							AND platform = ?
 						GROUP BY platform, puuid
 					) AS s
 						ON s.platform = pm.platform AND s.puuid = pm.puuid
 					WHERE pm.patch = ?
 						AND pm.queue_id = ?
+						AND pm.platform = ?
+						AND tie.patch = ?
+						AND tie.queue_id = ?
+						AND tie.platform = ?
 						AND tie.event_type = 'ITEM_PURCHASED'
 						AND tie.timestamp_ms <= ?
 						AND tie.item_id IN (%s)
@@ -737,11 +747,16 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 							argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
 						FROM summoner_rank_snapshots FINAL
 						WHERE queue_type = 'RANKED_SOLO_5x5'
+							AND platform = ?
 						GROUP BY platform, puuid
 					) AS s
 						ON s.platform = pm.platform AND s.puuid = pm.puuid
 					WHERE pm.patch = ?
 						AND pm.queue_id = ?
+						AND pm.platform = ?
+						AND tie.patch = ?
+						AND tie.queue_id = ?
+						AND tie.platform = ?
 						AND tie.event_type = 'ITEM_PURCHASED'
 						AND tie.item_id IN (%s)
 					GROUP BY
@@ -760,7 +775,7 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 				(
 					SELECT
 						patch,
-						'ALL' AS platform,
+						? AS platform,
 						queue_id,
 						? AS item_context,
 						champion_id,
@@ -825,18 +840,35 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					opponent_champion_id,
 					rank_bucket,
 					item_slot,
-					item_id`, startingItemList, itemList),
-			key,
-			patch,
-			queueID,
-			startingItemWindowMS,
-			patch,
-			queueID,
-			key,
-			compiledAt,
-			compiledAt,
-		)
-		if err != nil {
+					item_id
+				SETTINGS join_algorithm = 'grace_hash'`, startingItemList, itemList),
+				platform,
+				key,
+				platform,
+				patch,
+				queueID,
+				platform,
+				patch,
+				queueID,
+				platform,
+				startingItemWindowMS,
+				platform,
+				patch,
+				queueID,
+				platform,
+				patch,
+				queueID,
+				platform,
+				platform,
+				key,
+				compiledAt,
+				compiledAt,
+			)
+			if err != nil {
+				return fmt.Errorf("item slot analytics platform %s context %s: %w", platform, key, err)
+			}
+		}
+		if err := r.aggregateItemSlotAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
 			return err
 		}
 		if err := r.cleanupOldItemSlotAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
@@ -854,6 +886,10 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
+	platforms, err := r.rawMatchPlatforms(ctx, patch, queueID)
+	if err != nil {
+		return err
+	}
 	for _, context := range contexts {
 		key := normalizedItemContext(context.Key)
 		if len(context.OpeningItemCosts) == 0 {
@@ -863,9 +899,10 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 		openingItemIDs := uint32MapKeysSorted(context.OpeningItemCosts)
 		itemList := uint32ListSQL(openingItemIDs)
 		itemCostExpr := itemCostExpressionSQL("tie.item_id", context.OpeningItemCosts)
-		_, err := r.db.ExecContext(
-			ctx,
-			fmt.Sprintf(`
+		for _, platform := range platforms {
+			_, err := r.db.ExecContext(
+				ctx,
+				fmt.Sprintf(`
 				INSERT INTO starting_loadout_analytics
 				(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games, compiled_at)
 				WITH raw_opening_item_events AS
@@ -898,11 +935,16 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 							argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
 						FROM summoner_rank_snapshots FINAL
 						WHERE queue_type = 'RANKED_SOLO_5x5'
+							AND platform = ?
 						GROUP BY platform, puuid
 					) AS s
 						ON s.platform = pm.platform AND s.puuid = pm.puuid
 					WHERE pm.patch = ?
 						AND pm.queue_id = ?
+						AND pm.platform = ?
+						AND tie.patch = ?
+						AND tie.queue_id = ?
+						AND tie.platform = ?
 						AND tie.event_type = 'ITEM_PURCHASED'
 						AND tie.timestamp_ms <= ?
 						AND tie.item_id IN (%s)
@@ -949,7 +991,7 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 				)
 				SELECT
 					patch,
-					'ALL' AS platform,
+					? AS platform,
 					queue_id,
 					? AS item_context,
 					champion_id,
@@ -968,21 +1010,138 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 					role,
 					opponent_champion_id,
 					rank_bucket,
-					item_signature`, itemCostExpr, itemList),
-			patch,
-			queueID,
-			openingPurchaseFirstWindowMS,
-			openingPurchaseBurstWindowMS,
-			openingPurchaseGoldCap,
-			key,
-			compiledAt,
-		)
-		if err != nil {
+					item_signature
+				SETTINGS join_algorithm = 'grace_hash'`, itemCostExpr, itemList),
+				platform,
+				patch,
+				queueID,
+				platform,
+				patch,
+				queueID,
+				platform,
+				openingPurchaseFirstWindowMS,
+				openingPurchaseBurstWindowMS,
+				openingPurchaseGoldCap,
+				platform,
+				key,
+				compiledAt,
+			)
+			if err != nil {
+				return fmt.Errorf("starting loadout analytics platform %s context %s: %w", platform, key, err)
+			}
+		}
+		if err := r.aggregateStartingLoadoutAnalyticsPlatforms(ctx, patch, queueID, key, compiledAt, platforms); err != nil {
 			return err
 		}
 		if err := r.cleanupOldStartingLoadoutAnalytics(ctx, patch, queueID, key, compiledAt); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (r *Repository) aggregateStartingLoadoutAnalyticsPlatforms(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	compiledAt time.Time,
+	platforms []string,
+) error {
+	if len(platforms) == 0 {
+		return nil
+	}
+	platformFilter, platformArgs := rawPayloadMatchFilter(platforms)
+	args := make([]any, 0, len(platformArgs)+5)
+	args = append(args, compiledAt, patch, queueID, normalizedItemContext(itemContext), compiledAt)
+	args = append(args, platformArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO starting_loadout_analytics
+		(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_signature, wins, games, compiled_at)
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_signature,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			? AS compiled_at
+		FROM starting_loadout_analytics
+		WHERE patch = ?
+			AND queue_id = ?
+			AND item_context = ?
+			AND compiled_at = ?
+			AND platform IN (%s)
+		GROUP BY
+			patch,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_signature`, platformFilter), args...)
+	if err != nil {
+		return fmt.Errorf("aggregate starting loadout analytics context %s: %w", itemContext, err)
+	}
+	return nil
+}
+
+func (r *Repository) aggregateItemSlotAnalyticsPlatforms(
+	ctx context.Context,
+	patch string,
+	queueID uint16,
+	itemContext string,
+	compiledAt time.Time,
+	platforms []string,
+) error {
+	if len(platforms) == 0 {
+		return nil
+	}
+	platformFilter, platformArgs := rawPayloadMatchFilter(platforms)
+	args := make([]any, 0, len(platformArgs)+5)
+	args = append(args, compiledAt, patch, queueID, normalizedItemContext(itemContext), compiledAt)
+	args = append(args, platformArgs...)
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+		INSERT INTO item_slot_analytics
+		(patch, platform, queue_id, item_context, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_id, wins, games, compiled_at)
+		SELECT
+			patch,
+			'ALL' AS platform,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_slot,
+			item_id,
+			toUInt64(sum(wins)) AS wins,
+			toUInt64(sum(games)) AS games,
+			? AS compiled_at
+		FROM item_slot_analytics
+		WHERE patch = ?
+			AND queue_id = ?
+			AND item_context = ?
+			AND compiled_at = ?
+			AND platform IN (%s)
+		GROUP BY
+			patch,
+			queue_id,
+			item_context,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			item_slot,
+			item_id`, platformFilter), args...)
+	if err != nil {
+		return fmt.Errorf("aggregate item slot analytics context %s: %w", itemContext, err)
 	}
 	return nil
 }
