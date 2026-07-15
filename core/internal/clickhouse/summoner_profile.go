@@ -236,69 +236,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		queueID = analytics.RankedSoloQueueID
 	}
 	compiledAt := time.Now().UTC().Truncate(time.Second)
-	if err := r.refreshSummonerProfileTable(ctx, "summoner_identity_summary", `
-		INSERT INTO summoner_identity_summary
-			(platform, puuid, game_name, tag_line, profile_icon_id, summoner_level, last_seen_at, compiled_at)
-		WITH latest_alias AS
-		(
-			SELECT
-				puuid,
-				platform,
-				argMax(game_name, last_seen_at) AS game_name,
-				argMax(tag_line, last_seen_at) AS tag_line,
-				max(last_seen_at) AS alias_last_seen_at
-			FROM riot_account_aliases FINAL
-			GROUP BY platform, puuid
-		),
-		latest_account AS
-		(
-			SELECT
-				puuid,
-				platform,
-				argMax(profile_icon_id, fetched_at) AS profile_icon_id,
-				argMax(summoner_level, fetched_at) AS summoner_level
-			FROM summoner_account_snapshots FINAL
-			GROUP BY platform, puuid
-		),
-		latest_raw_profile AS
-		(
-			SELECT
-				platform,
-				puuid,
-				argMax(raw_profile_icon_id, game_start_timestamp) AS profile_icon_id
-			FROM
-			(
-				SELECT
-					platform,
-					game_start_timestamp,
-					JSONExtractString(participant_json, 'puuid') AS puuid,
-					toUInt32(JSONExtractUInt(participant_json, 'profileIcon')) AS raw_profile_icon_id
-				FROM raw_matches FINAL
-				ARRAY JOIN JSONExtractArrayRaw(raw_json, 'info', 'participants') AS participant_json
-				WHERE queue_id = ?
-			)
-			WHERE puuid != '' AND raw_profile_icon_id > 0
-			GROUP BY platform, puuid
-		)
-		SELECT
-			a.platform,
-			a.puuid,
-			a.game_name,
-			a.tag_line,
-			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
-			ifNull(s.summoner_level, 0) AS summoner_level,
-			a.alias_last_seen_at,
-			? AS compiled_at
-		FROM latest_alias AS a
-		LEFT JOIN latest_account AS s
-			ON s.platform = a.platform AND s.puuid = a.puuid
-		LEFT JOIN latest_raw_profile AS rp
-			ON rp.platform = a.platform AND rp.puuid = a.puuid
-		WHERE a.game_name != '' AND a.tag_line != ''
-		SETTINGS
-			join_algorithm = 'grace_hash',
-			max_bytes_before_external_group_by = 268435456,
-			max_bytes_before_external_sort = 268435456`, queueID, compiledAt); err != nil {
+	if err := r.refreshSummonerIdentitySummary(ctx, queueID, compiledAt); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.refreshSummonerProfileTable(ctx, "summoner_profile_summary", `
@@ -489,6 +427,99 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 	return result, nil
 }
 
+func (r *Repository) refreshSummonerIdentitySummary(ctx context.Context, queueID uint16, compiledAt time.Time) error {
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT platform FROM riot_account_aliases FINAL ORDER BY platform`)
+	if err != nil {
+		return err
+	}
+	platforms := []string{}
+	for rows.Next() {
+		var platform string
+		if err := rows.Scan(&platform); err != nil {
+			rows.Close()
+			return err
+		}
+		platforms = append(platforms, platform)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, platform := range platforms {
+		if err := r.refreshSummonerProfileTable(ctx, "summoner_identity_summary platform="+platform, `
+		INSERT INTO summoner_identity_summary
+			(platform, puuid, game_name, tag_line, profile_icon_id, summoner_level, last_seen_at, compiled_at)
+		WITH latest_alias AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(game_name, last_seen_at) AS game_name,
+				argMax(tag_line, last_seen_at) AS tag_line,
+				max(last_seen_at) AS alias_last_seen_at
+			FROM riot_account_aliases FINAL
+			WHERE platform = ?
+			GROUP BY platform, puuid
+		),
+		latest_account AS
+		(
+			SELECT
+				puuid,
+				platform,
+				argMax(profile_icon_id, fetched_at) AS profile_icon_id,
+				argMax(summoner_level, fetched_at) AS summoner_level
+			FROM summoner_account_snapshots FINAL
+			WHERE platform = ?
+			GROUP BY platform, puuid
+		),
+		latest_raw_profile AS
+		(
+			SELECT
+				platform,
+				puuid,
+				argMax(raw_profile_icon_id, game_start_timestamp) AS profile_icon_id
+			FROM
+			(
+				SELECT
+					platform,
+					game_start_timestamp,
+					JSONExtractString(participant_json, 'puuid') AS puuid,
+					toUInt32(JSONExtractUInt(participant_json, 'profileIcon')) AS raw_profile_icon_id
+				FROM raw_matches FINAL
+				ARRAY JOIN JSONExtractArrayRaw(raw_json, 'info', 'participants') AS participant_json
+				WHERE queue_id = ? AND platform = ?
+			)
+			WHERE puuid != '' AND raw_profile_icon_id > 0
+			GROUP BY platform, puuid
+		)
+		SELECT
+			a.platform,
+			a.puuid,
+			a.game_name,
+			a.tag_line,
+			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
+			ifNull(s.summoner_level, 0) AS summoner_level,
+			a.alias_last_seen_at,
+			? AS compiled_at
+		FROM latest_alias AS a
+		LEFT JOIN latest_account AS s
+			ON s.platform = a.platform AND s.puuid = a.puuid
+		LEFT JOIN latest_raw_profile AS rp
+			ON rp.platform = a.platform AND rp.puuid = a.puuid
+		WHERE a.game_name != '' AND a.tag_line != ''
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`, platform, platform, queueID, platform, compiledAt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *Repository) refreshSummonerProfileTable(ctx context.Context, table, query string, args ...any) error {
 	return r.refreshSummonerProfileTableWithDelay(ctx, table, query, analyticsMemoryRetryDelay, args...)
 }
@@ -501,37 +532,51 @@ func (r *Repository) refreshSummonerProfileTableWithDelay(ctx context.Context, t
 }
 
 func (r *Repository) cleanupOldSummonerProfileSummaries(ctx context.Context, queueID uint16, compiledAt time.Time) error {
+	return r.cleanupOldSummonerProfileSummariesWithDelay(ctx, queueID, compiledAt, analyticsMemoryRetryDelay)
+}
+
+func (r *Repository) cleanupOldSummonerProfileSummariesWithDelay(ctx context.Context, queueID uint16, compiledAt time.Time, delay time.Duration) error {
 	statements := []struct {
+		table string
 		query string
 		args  []any
 	}{
 		{
+			table: "summoner_identity_summary",
 			query: `ALTER TABLE summoner_identity_summary DELETE WHERE compiled_at < ? SETTINGS mutations_sync = 2`,
 			args:  []any{compiledAt},
 		},
 		{
+			table: "summoner_profile_summary",
 			query: `ALTER TABLE summoner_profile_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
 			args:  []any{queueID, compiledAt},
 		},
 		{
+			table: "summoner_champion_summary",
 			query: `ALTER TABLE summoner_champion_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
 			args:  []any{queueID, compiledAt},
 		},
 		{
+			table: "summoner_champion_role_summary",
 			query: `ALTER TABLE summoner_champion_role_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
 			args:  []any{queueID, compiledAt},
 		},
 		{
+			table: "summoner_recent_match_summary",
 			query: `ALTER TABLE summoner_recent_match_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
 			args:  []any{queueID, compiledAt},
 		},
 		{
+			table: "summoner_build_summary",
 			query: `ALTER TABLE summoner_build_summary DELETE WHERE queue_id = ? AND compiled_at < ? SETTINGS mutations_sync = 2`,
 			args:  []any{queueID, compiledAt},
 		},
 	}
 	for _, statement := range statements {
-		if _, err := r.db.ExecContext(ctx, statement.query, statement.args...); err != nil {
+		if err := retryAnalyticsMemoryPressureWithDelay(ctx, "summoner profile cleanup table="+statement.table, delay, func() error {
+			_, err := r.db.ExecContext(ctx, statement.query, statement.args...)
+			return err
+		}); err != nil {
 			return err
 		}
 	}
