@@ -193,8 +193,11 @@ func (r *Repository) RefreshChampionGuideDerivedAnalytics(ctx context.Context, p
 	}
 	cutoff := time.Now().UTC().Add(-5 * time.Second)
 	refresh := func(table string, fn func(context.Context, string, uint16) error) error {
-		return r.replacePatchReadModelRows(ctx, table, patch, queueID, cutoff, func() error {
-			return fn(ctx, patch, queueID)
+		label := "champion guide derived table=" + table
+		return retryAnalyticsMemoryPressure(ctx, label, func() error {
+			return r.replacePatchReadModelRows(ctx, table, patch, queueID, cutoff, func() error {
+				return fn(ctx, patch, queueID)
+			})
 		})
 	}
 	if err := refresh("champion_skill_analytics", r.refreshChampionSkillAnalytics); err != nil {
@@ -318,7 +321,11 @@ func (r *Repository) refreshChampionSkillAnalytics(ctx context.Context, patch st
 			pm.champion_id,
 			pm.role,
 			rank_bucket,
-			sp.skill_order_signature`,
+			sp.skill_order_signature
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`,
 		patch,
 		queueID,
 		patch,

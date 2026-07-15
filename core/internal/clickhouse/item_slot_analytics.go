@@ -56,7 +56,6 @@ const openingPurchaseFirstWindowMS uint32 = 45000
 const openingPurchaseBurstWindowMS uint32 = 20000
 const openingPurchaseGoldCap uint32 = 500
 const itemAnalyticsMatchBatchSize = 500
-const itemAnalyticsRetryDelay = 5 * time.Second
 
 func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs, startingItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
 	completionItemIDs := removeItemIDs(allowedItemIDs, startingItemIDs)
@@ -680,7 +679,7 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 				}
 				partialPlatform := fmt.Sprintf("__ROLLOVER_%d_%s_%04d", runNonce, platform, start/itemAnalyticsMatchBatchSize)
 				label := fmt.Sprintf("item slot patch=%s context=%s platform=%s batch=%d", patch, key, platform, start/itemAnalyticsMatchBatchSize+1)
-				if err := retryItemAnalyticsMemoryPressure(ctx, label, func() error {
+				if err := retryAnalyticsMemoryPressure(ctx, label, func() error {
 					return r.refreshItemSlotAnalyticsBatch(
 						ctx,
 						patch,
@@ -698,7 +697,7 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 				}
 				partialPlatforms = append(partialPlatforms, partialPlatform)
 			}
-			if err := retryItemAnalyticsMemoryPressure(ctx, "aggregate item slot platform "+platform, func() error {
+			if err := retryAnalyticsMemoryPressure(ctx, "aggregate item slot platform "+platform, func() error {
 				return r.aggregateItemSlotAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms)
 			}); err != nil {
 				return err
@@ -994,7 +993,7 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 				}
 				partialPlatform := fmt.Sprintf("__ROLLOVER_%d_%s_%04d", runNonce, platform, start/itemAnalyticsMatchBatchSize)
 				label := fmt.Sprintf("starting loadout patch=%s context=%s platform=%s batch=%d", patch, key, platform, start/itemAnalyticsMatchBatchSize+1)
-				if err := retryItemAnalyticsMemoryPressure(ctx, label, func() error {
+				if err := retryAnalyticsMemoryPressure(ctx, label, func() error {
 					return r.refreshStartingLoadoutAnalyticsBatch(
 						ctx,
 						patch,
@@ -1012,7 +1011,7 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 				}
 				partialPlatforms = append(partialPlatforms, partialPlatform)
 			}
-			if err := retryItemAnalyticsMemoryPressure(ctx, "aggregate starting loadout platform "+platform, func() error {
+			if err := retryAnalyticsMemoryPressure(ctx, "aggregate starting loadout platform "+platform, func() error {
 				return r.aggregateStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms)
 			}); err != nil {
 				return err
@@ -1189,31 +1188,6 @@ func (r *Repository) refreshStartingLoadoutAnalyticsBatch(
 		args...,
 	)
 	return err
-}
-
-func retryItemAnalyticsMemoryPressure(ctx context.Context, label string, operation func() error) error {
-	for attempt := 1; ; attempt++ {
-		err := operation()
-		if err == nil {
-			return nil
-		}
-		message := strings.ToLower(err.Error())
-		if !strings.Contains(message, "memory limit exceeded") &&
-			!strings.Contains(message, "overcommittracker") &&
-			!strings.Contains(message, "code: 241") {
-			return err
-		}
-		log.Printf("item analytics memory pressure label=%q attempt=%d retry_in=%s error=%v", label, attempt, itemAnalyticsRetryDelay, err)
-		timer := time.NewTimer(itemAnalyticsRetryDelay)
-		select {
-		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
-			return ctx.Err()
-		case <-timer.C:
-		}
-	}
 }
 
 func (r *Repository) rawMatchIDsForPlatform(ctx context.Context, patch string, queueID uint16, platform string) ([]string, error) {

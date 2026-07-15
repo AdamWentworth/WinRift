@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
@@ -54,11 +55,11 @@ func TestRefreshItemSlotAnalyticsBatchesPlatformsBeforeAllAggregation(t *testing
 	}
 }
 
-func TestRetryItemAnalyticsMemoryPressureStopsOnContextCancellation(t *testing.T) {
+func TestRetryAnalyticsMemoryPressureStopsOnContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	attempts := 0
-	err := retryItemAnalyticsMemoryPressure(ctx, "test batch", func() error {
+	err := retryAnalyticsMemoryPressureWithDelay(ctx, "test batch", time.Hour, func() error {
 		attempts++
 		return errors.New("code: 241, memory limit exceeded by OvercommitTracker")
 	})
@@ -70,10 +71,10 @@ func TestRetryItemAnalyticsMemoryPressureStopsOnContextCancellation(t *testing.T
 	}
 }
 
-func TestRetryItemAnalyticsMemoryPressureDoesNotHidePermanentErrors(t *testing.T) {
+func TestRetryAnalyticsMemoryPressureDoesNotHidePermanentErrors(t *testing.T) {
 	want := errors.New("unknown table")
 	attempts := 0
-	err := retryItemAnalyticsMemoryPressure(context.Background(), "test batch", func() error {
+	err := retryAnalyticsMemoryPressureWithDelay(context.Background(), "test batch", 0, func() error {
 		attempts++
 		return want
 	})
@@ -82,6 +83,23 @@ func TestRetryItemAnalyticsMemoryPressureDoesNotHidePermanentErrors(t *testing.T
 	}
 	if attempts != 1 {
 		t.Fatalf("attempts = %d, want 1", attempts)
+	}
+}
+
+func TestRetryAnalyticsMemoryPressureRetriesTransientFailure(t *testing.T) {
+	attempts := 0
+	err := retryAnalyticsMemoryPressureWithDelay(context.Background(), "test batch", 0, func() error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("code: 241, memory limit exceeded by OvercommitTracker")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("retry transient failure: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
 	}
 }
 
