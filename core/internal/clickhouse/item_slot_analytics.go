@@ -853,7 +853,10 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					rank_bucket,
 					item_slot,
 					item_id
-				SETTINGS join_algorithm = 'grace_hash'`, startingItemList, itemList),
+				SETTINGS
+					join_algorithm = 'grace_hash',
+					max_bytes_before_external_group_by = 268435456,
+					max_bytes_before_external_sort = 268435456`, startingItemList, itemList),
 				patch,
 				queueID,
 				platform,
@@ -1036,7 +1039,10 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 					opponent_champion_id,
 					rank_bucket,
 					item_signature
-				SETTINGS join_algorithm = 'grace_hash'`, itemCostExpr, itemList),
+				SETTINGS
+					join_algorithm = 'grace_hash',
+					max_bytes_before_external_group_by = 268435456,
+					max_bytes_before_external_sort = 268435456`, itemCostExpr, itemList),
 				patch,
 				queueID,
 				platform,

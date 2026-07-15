@@ -17,7 +17,7 @@ func TestRefreshItemSlotAnalyticsBatchesPlatformsBeforeAllAggregation(t *testing
 	mock.ExpectQuery("(?s)SELECT DISTINCT platform FROM raw_matches.*ORDER BY platform").
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("EUW1").AddRow("NA1"))
-	platformInsert := "(?s)INSERT INTO item_slot_analytics.*WITH target_match_ids AS.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\).*SETTINGS join_algorithm = 'grace_hash'"
+	platformInsert := "(?s)INSERT INTO item_slot_analytics.*WITH target_match_ids AS.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\).*SETTINGS.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456"
 	mock.ExpectExec(platformInsert).WillReturnResult(sqlmock.NewResult(0, 10))
 	mock.ExpectExec(platformInsert).WillReturnResult(sqlmock.NewResult(0, 10))
 	mock.ExpectExec("(?s)INSERT INTO item_slot_analytics.*'ALL' AS platform.*FROM item_slot_analytics.*platform IN \\(\\?, \\?\\)").
@@ -49,7 +49,7 @@ func TestRefreshStartingLoadoutAnalyticsBatchesPlatformsBeforeAllAggregation(t *
 	mock.ExpectQuery("(?s)SELECT DISTINCT platform FROM raw_matches.*ORDER BY platform").
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("EUW1").AddRow("NA1"))
-	platformInsert := "(?s)INSERT INTO starting_loadout_analytics.*WITH target_match_ids AS.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\).*SETTINGS join_algorithm = 'grace_hash'"
+	platformInsert := "(?s)INSERT INTO starting_loadout_analytics.*WITH target_match_ids AS.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\).*SETTINGS.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456"
 	mock.ExpectExec(platformInsert).WillReturnResult(sqlmock.NewResult(0, 10))
 	mock.ExpectExec(platformInsert).WillReturnResult(sqlmock.NewResult(0, 10))
 	mock.ExpectExec("(?s)INSERT INTO starting_loadout_analytics.*'ALL' AS platform.*FROM starting_loadout_analytics.*platform IN \\(\\?, \\?\\)").
