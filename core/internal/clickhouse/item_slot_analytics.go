@@ -660,6 +660,9 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 		if len(completionItemIDs) == 0 && len(itemContext.StartingItemIDs) == 0 {
 			continue
 		}
+		if err := r.cleanupOrphanedItemAnalyticsBatches(ctx, "item_slot_analytics", patch, queueID, key); err != nil {
+			return err
+		}
 		compiledAt := time.Now().UTC().Truncate(time.Second)
 		runNonce := time.Now().UTC().UnixNano()
 		itemList := uint32ListSQL(completionItemIDs)
@@ -969,6 +972,9 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 		key := normalizedItemContext(context.Key)
 		if len(context.OpeningItemCosts) == 0 {
 			continue
+		}
+		if err := r.cleanupOrphanedItemAnalyticsBatches(ctx, "starting_loadout_analytics", patch, queueID, key); err != nil {
+			return err
 		}
 		compiledAt := time.Now().UTC().Truncate(time.Second)
 		runNonce := time.Now().UTC().UnixNano()
@@ -1392,6 +1398,26 @@ func (r *Repository) cleanupItemAnalyticsBatches(
 			AND compiled_at = ?
 			AND platform IN (%s)
 		SETTINGS mutations_sync = 2`, table, partialFilter), args...)
+	return err
+}
+
+func (r *Repository) cleanupOrphanedItemAnalyticsBatches(
+	ctx context.Context,
+	table string,
+	patch string,
+	queueID uint16,
+	itemContext string,
+) error {
+	if table != "item_slot_analytics" && table != "starting_loadout_analytics" {
+		return fmt.Errorf("unsupported item analytics table %q", table)
+	}
+	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+		ALTER TABLE %s DELETE
+		WHERE patch = ?
+			AND queue_id = ?
+			AND item_context = ?
+			AND startsWith(platform, '__ROLLOVER_')
+		SETTINGS mutations_sync = 2`, table), patch, queueID, normalizedItemContext(itemContext))
 	return err
 }
 

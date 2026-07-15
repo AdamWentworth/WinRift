@@ -19,6 +19,8 @@ func TestRefreshItemSlotAnalyticsBatchesPlatformsBeforeAllAggregation(t *testing
 	mock.ExpectQuery("(?s)SELECT DISTINCT platform FROM raw_matches.*ORDER BY platform").
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("EUW1"))
+	mock.ExpectExec("(?s)ALTER TABLE item_slot_analytics DELETE.*startsWith\\(platform, '__ROLLOVER_'\\)").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	matchRows := sqlmock.NewRows([]string{"match_id"})
 	for i := 0; i < itemAnalyticsMatchBatchSize+1; i++ {
 		matchRows.AddRow(fmt.Sprintf("EUW1_%04d", i))
@@ -93,6 +95,8 @@ func TestRefreshStartingLoadoutAnalyticsBatchesPlatformsBeforeAllAggregation(t *
 	mock.ExpectQuery("(?s)SELECT DISTINCT platform FROM raw_matches.*ORDER BY platform").
 		WithArgs("16.12", uint16(420)).
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("EUW1"))
+	mock.ExpectExec("(?s)ALTER TABLE starting_loadout_analytics DELETE.*startsWith\\(platform, '__ROLLOVER_'\\)").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("(?s)SELECT DISTINCT match_id.*FROM raw_matches.*PREWHERE patch = \\? AND queue_id = \\?.*WHERE platform = \\?.*ORDER BY match_id").
 		WithArgs("16.12", uint16(420), "EUW1").
 		WillReturnRows(sqlmock.NewRows([]string{"match_id"}).AddRow("EUW1_0001"))
