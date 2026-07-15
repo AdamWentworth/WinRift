@@ -236,7 +236,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		queueID = analytics.RankedSoloQueueID
 	}
 	compiledAt := time.Now().UTC().Truncate(time.Second)
-	if _, err := r.db.ExecContext(ctx, `
+	if err := r.refreshSummonerProfileTable(ctx, "summoner_identity_summary", `
 		INSERT INTO summoner_identity_summary
 			(platform, puuid, game_name, tag_line, profile_icon_id, summoner_level, last_seen_at, compiled_at)
 		WITH latest_alias AS
@@ -294,10 +294,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			ON s.platform = a.platform AND s.puuid = a.puuid
 		LEFT JOIN latest_raw_profile AS rp
 			ON rp.platform = a.platform AND rp.puuid = a.puuid
-		WHERE a.game_name != '' AND a.tag_line != ''`, queueID, compiledAt); err != nil {
+		WHERE a.game_name != '' AND a.tag_line != ''
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`, queueID, compiledAt); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
-	if _, err := r.db.ExecContext(ctx, `
+	if err := r.refreshSummonerProfileTable(ctx, "summoner_profile_summary", `
 		INSERT INTO summoner_profile_summary
 			(platform, queue_id, puuid, games, wins, kills, deaths, assists, first_seen_at, last_seen_at, compiled_at)
 		SELECT
@@ -318,10 +322,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			AND rm.platform = p.platform
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
-		GROUP BY p.platform, p.queue_id, p.puuid`, compiledAt, queueID); err != nil {
+		GROUP BY p.platform, p.queue_id, p.puuid
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
-	if _, err := r.db.ExecContext(ctx, `
+	if err := r.refreshSummonerProfileTable(ctx, "summoner_champion_summary", `
 		INSERT INTO summoner_champion_summary
 			(platform, queue_id, puuid, champion_id, games, wins, kills, deaths, assists, first_seen_at, last_seen_at, compiled_at)
 		SELECT
@@ -344,10 +352,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
 			AND p.champion_id > 0
-	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id`, compiledAt, queueID); err != nil {
+	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id
+	SETTINGS
+		join_algorithm = 'grace_hash',
+		max_bytes_before_external_group_by = 268435456,
+		max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
-	if _, err := r.db.ExecContext(ctx, `
+	if err := r.refreshSummonerProfileTable(ctx, "summoner_champion_role_summary", `
 		INSERT INTO summoner_champion_role_summary
 			(platform, queue_id, puuid, champion_id, role, games, wins, kills, deaths, assists, first_seen_at, last_seen_at, compiled_at)
 		SELECT
@@ -372,10 +384,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			AND p.puuid != ''
 			AND p.champion_id > 0
 			AND p.role IN ('TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY')
-	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role`, compiledAt, queueID); err != nil {
+	GROUP BY p.platform, p.queue_id, p.puuid, p.champion_id, p.role
+	SETTINGS
+		join_algorithm = 'grace_hash',
+		max_bytes_before_external_group_by = 268435456,
+		max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
-	if _, err := r.db.ExecContext(ctx, `
+	if err := r.refreshSummonerProfileTable(ctx, "summoner_recent_match_summary", `
 		INSERT INTO summoner_recent_match_summary
 			(platform, queue_id, puuid, match_id, patch, champion_id, role, win, kills, deaths, assists, game_start_timestamp, duration_seconds, compiled_at)
 		SELECT
@@ -399,10 +415,14 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			AND rm.platform = p.platform
 		WHERE p.queue_id = ?
 			AND p.puuid != ''
-			AND p.match_id != ''`, compiledAt, queueID); err != nil {
+			AND p.match_id != ''
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
-	if _, err := r.db.ExecContext(ctx, `
+	if err := r.refreshSummonerProfileTable(ctx, "summoner_build_summary", `
 		INSERT INTO summoner_build_summary
 			(platform, queue_id, puuid, champion_id, role, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature, games, wins, kills, deaths, assists, compiled_at)
 		SELECT
@@ -437,7 +457,11 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			core2_signature,
 			core3_signature,
 			rune_signature,
-			spell_signature`, compiledAt, queueID); err != nil {
+			spell_signature
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.cleanupOldSummonerProfileSummaries(ctx, queueID, compiledAt); err != nil {
@@ -463,6 +487,17 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	return result, nil
+}
+
+func (r *Repository) refreshSummonerProfileTable(ctx context.Context, table, query string, args ...any) error {
+	return r.refreshSummonerProfileTableWithDelay(ctx, table, query, analyticsMemoryRetryDelay, args...)
+}
+
+func (r *Repository) refreshSummonerProfileTableWithDelay(ctx context.Context, table, query string, delay time.Duration, args ...any) error {
+	return retryAnalyticsMemoryPressureWithDelay(ctx, "summoner profile table="+table, delay, func() error {
+		_, err := r.db.ExecContext(ctx, query, args...)
+		return err
+	})
 }
 
 func (r *Repository) cleanupOldSummonerProfileSummaries(ctx context.Context, queueID uint16, compiledAt time.Time) error {
