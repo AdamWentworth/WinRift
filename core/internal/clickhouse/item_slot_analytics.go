@@ -56,6 +56,7 @@ const openingPurchaseFirstWindowMS uint32 = 45000
 const openingPurchaseBurstWindowMS uint32 = 20000
 const openingPurchaseGoldCap uint32 = 500
 const itemAnalyticsMatchBatchSize = 500
+const itemAnalyticsRetryDelay = 5 * time.Second
 
 func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]string, itemContext string, allowedItemIDs, startingItemIDs []uint32, minGames, limit int) ([]ItemSlotRow, error) {
 	completionItemIDs := removeItemIDs(allowedItemIDs, startingItemIDs)
@@ -675,23 +676,28 @@ func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string,
 					end = len(matchIDs)
 				}
 				partialPlatform := fmt.Sprintf("__ROLLOVER_%d_%s_%04d", runNonce, platform, start/itemAnalyticsMatchBatchSize)
-				if err := r.refreshItemSlotAnalyticsBatch(
-					ctx,
-					patch,
-					queueID,
-					platform,
-					partialPlatform,
-					key,
-					compiledAt,
-					startingItemList,
-					itemList,
-					matchIDs[start:end],
-				); err != nil {
+				label := fmt.Sprintf("item slot patch=%s context=%s platform=%s batch=%d", patch, key, platform, start/itemAnalyticsMatchBatchSize+1)
+				if err := retryItemAnalyticsMemoryPressure(ctx, label, func() error {
+					return r.refreshItemSlotAnalyticsBatch(
+						ctx,
+						patch,
+						queueID,
+						platform,
+						partialPlatform,
+						key,
+						compiledAt,
+						startingItemList,
+						itemList,
+						matchIDs[start:end],
+					)
+				}); err != nil {
 					return fmt.Errorf("item slot analytics platform %s context %s batch %d: %w", platform, key, start/itemAnalyticsMatchBatchSize+1, err)
 				}
 				partialPlatforms = append(partialPlatforms, partialPlatform)
 			}
-			if err := r.aggregateItemSlotAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms); err != nil {
+			if err := retryItemAnalyticsMemoryPressure(ctx, "aggregate item slot platform "+platform, func() error {
+				return r.aggregateItemSlotAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms)
+			}); err != nil {
 				return err
 			}
 			if err := r.cleanupItemSlotAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms); err != nil {
@@ -981,23 +987,28 @@ func (r *Repository) RefreshStartingLoadoutAnalytics(ctx context.Context, patch 
 					end = len(matchIDs)
 				}
 				partialPlatform := fmt.Sprintf("__ROLLOVER_%d_%s_%04d", runNonce, platform, start/itemAnalyticsMatchBatchSize)
-				if err := r.refreshStartingLoadoutAnalyticsBatch(
-					ctx,
-					patch,
-					queueID,
-					platform,
-					partialPlatform,
-					key,
-					compiledAt,
-					itemCostExpr,
-					itemList,
-					matchIDs[start:end],
-				); err != nil {
+				label := fmt.Sprintf("starting loadout patch=%s context=%s platform=%s batch=%d", patch, key, platform, start/itemAnalyticsMatchBatchSize+1)
+				if err := retryItemAnalyticsMemoryPressure(ctx, label, func() error {
+					return r.refreshStartingLoadoutAnalyticsBatch(
+						ctx,
+						patch,
+						queueID,
+						platform,
+						partialPlatform,
+						key,
+						compiledAt,
+						itemCostExpr,
+						itemList,
+						matchIDs[start:end],
+					)
+				}); err != nil {
 					return fmt.Errorf("starting loadout analytics platform %s context %s batch %d: %w", platform, key, start/itemAnalyticsMatchBatchSize+1, err)
 				}
 				partialPlatforms = append(partialPlatforms, partialPlatform)
 			}
-			if err := r.aggregateStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms); err != nil {
+			if err := retryItemAnalyticsMemoryPressure(ctx, "aggregate starting loadout platform "+platform, func() error {
+				return r.aggregateStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, platform, compiledAt, partialPlatforms)
+			}); err != nil {
 				return err
 			}
 			if err := r.cleanupStartingLoadoutAnalyticsBatches(ctx, patch, queueID, key, compiledAt, partialPlatforms); err != nil {
@@ -1174,6 +1185,31 @@ func (r *Repository) refreshStartingLoadoutAnalyticsBatch(
 	return err
 }
 
+func retryItemAnalyticsMemoryPressure(ctx context.Context, label string, operation func() error) error {
+	for attempt := 1; ; attempt++ {
+		err := operation()
+		if err == nil {
+			return nil
+		}
+		message := strings.ToLower(err.Error())
+		if !strings.Contains(message, "memory limit exceeded") &&
+			!strings.Contains(message, "overcommittracker") &&
+			!strings.Contains(message, "code: 241") {
+			return err
+		}
+		log.Printf("item analytics memory pressure label=%q attempt=%d retry_in=%s error=%v", label, attempt, itemAnalyticsRetryDelay, err)
+		timer := time.NewTimer(itemAnalyticsRetryDelay)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
 func (r *Repository) rawMatchIDsForPlatform(ctx context.Context, patch string, queueID uint16, platform string) ([]string, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT DISTINCT match_id
@@ -1232,7 +1268,7 @@ func (r *Repository) aggregateItemSlotAnalyticsBatches(
 			toUInt64(sum(wins)) AS wins,
 			toUInt64(sum(games)) AS games,
 			? AS compiled_at
-		FROM item_slot_analytics
+		FROM item_slot_analytics FINAL
 		WHERE patch = ?
 			AND queue_id = ?
 			AND item_context = ?
@@ -1286,7 +1322,7 @@ func (r *Repository) aggregateStartingLoadoutAnalyticsBatches(
 			toUInt64(sum(wins)) AS wins,
 			toUInt64(sum(games)) AS games,
 			? AS compiled_at
-		FROM starting_loadout_analytics
+		FROM starting_loadout_analytics FINAL
 		WHERE patch = ?
 			AND queue_id = ?
 			AND item_context = ?
@@ -1390,7 +1426,7 @@ func (r *Repository) aggregateStartingLoadoutAnalyticsPlatforms(
 			toUInt64(sum(wins)) AS wins,
 			toUInt64(sum(games)) AS games,
 			? AS compiled_at
-		FROM starting_loadout_analytics
+		FROM starting_loadout_analytics FINAL
 		WHERE patch = ?
 			AND queue_id = ?
 			AND item_context = ?
@@ -1443,7 +1479,7 @@ func (r *Repository) aggregateItemSlotAnalyticsPlatforms(
 			toUInt64(sum(wins)) AS wins,
 			toUInt64(sum(games)) AS games,
 			? AS compiled_at
-		FROM item_slot_analytics
+		FROM item_slot_analytics FINAL
 		WHERE patch = ?
 			AND queue_id = ?
 			AND item_context = ?

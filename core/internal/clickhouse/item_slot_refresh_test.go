@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -48,6 +49,37 @@ func TestRefreshItemSlotAnalyticsBatchesPlatformsBeforeAllAggregation(t *testing
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestRetryItemAnalyticsMemoryPressureStopsOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	attempts := 0
+	err := retryItemAnalyticsMemoryPressure(ctx, "test batch", func() error {
+		attempts++
+		return errors.New("code: 241, memory limit exceeded by OvercommitTracker")
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context cancellation", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
+	}
+}
+
+func TestRetryItemAnalyticsMemoryPressureDoesNotHidePermanentErrors(t *testing.T) {
+	want := errors.New("unknown table")
+	attempts := 0
+	err := retryItemAnalyticsMemoryPressure(context.Background(), "test batch", func() error {
+		attempts++
+		return want
+	})
+	if !errors.Is(err, want) {
+		t.Fatalf("error = %v, want %v", err, want)
+	}
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
 	}
 }
 
