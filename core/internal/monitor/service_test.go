@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -109,6 +110,31 @@ func TestCheckSuppressesDownWorkerContainerDuringStartupGrace(t *testing.T) {
 	issue := service.Check(context.Background())
 	if issue.Key != "" {
 		t.Fatalf("issue key = %q, want startup grace suppression", issue.Key)
+	}
+}
+
+func TestCheckSuppressesTransientAPIFailureDuringStartupGrace(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "starting", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	started := time.Date(2026, 5, 30, 10, 0, 0, 0, time.UTC)
+	service := NewService(config.Config{
+		RiotAuthFailureMarkerPath: filepath.Join(t.TempDir(), "missing-marker"),
+		MonitorAPIHealthURL:       server.URL,
+		MonitorStartupGrace:       2 * time.Minute,
+	}, nil)
+	service.started = started
+	service.now = func() time.Time { return started.Add(30 * time.Second) }
+
+	if issue := service.Check(context.Background()); issue.Key != "" {
+		t.Fatalf("issue key during startup grace = %q, want no alert", issue.Key)
+	}
+
+	service.now = func() time.Time { return started.Add(3 * time.Minute) }
+	if issue := service.Check(context.Background()); issue.Key != "api-unhealthy-status" {
+		t.Fatalf("issue key after startup grace = %q, want api-unhealthy-status", issue.Key)
 	}
 }
 

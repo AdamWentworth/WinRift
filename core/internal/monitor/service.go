@@ -111,7 +111,11 @@ func (s Service) Check(ctx context.Context) Issue {
 		return issue
 	}
 	if issue := s.checkAPI(ctx); issue.Key != "" {
-		return issue
+		if s.inStartupGrace() && isTransientAPIStartupIssue(issue.Key) {
+			log.Printf("monitor API unhealthy during startup grace issue=%s", issue.Key)
+		} else {
+			return issue
+		}
 	}
 	if issue := s.checkWorkerAuthHeartbeat(); issue.Key != "" {
 		return issue
@@ -123,6 +127,15 @@ func (s Service) Check(ctx context.Context) Issue {
 		return issue
 	}
 	return Issue{}
+}
+
+func isTransientAPIStartupIssue(key string) bool {
+	switch key {
+	case "api-unreachable", "api-unhealthy-status", "api-health-json-invalid", "api-unhealthy":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s Service) checkRiotAuthMarker() Issue {
