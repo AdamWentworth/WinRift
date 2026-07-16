@@ -2,13 +2,57 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
+	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 
 	"winrift/core/internal/analytics"
 )
+
+func TestPatchMaintenanceStepRetriesMemoryPressureInPlace(t *testing.T) {
+	attempts := 0
+	err := retryPatchMaintenanceStepWithDelay(context.Background(), "compile BR1", 0, func() error {
+		attempts++
+		if attempts == 1 {
+			return errors.New("code: 241, memory limit exceeded by OvercommitTracker")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("retry patch maintenance step: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+}
+
+func TestPatchCompileAndPruneKeepMemoryRetriesInsideSteps(t *testing.T) {
+	sourceBytes, err := os.ReadFile("patch_lifecycle.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	source := string(sourceBytes)
+	compileStart := strings.Index(source, "func (r *Repository) CompilePatchMetrics")
+	if compileStart < 0 {
+		t.Fatal("could not locate patch compile implementation")
+	}
+	compileEnd := strings.Index(source[compileStart:], "func (r *Repository) DeleteRawPatchData")
+	if compileEnd < 0 {
+		t.Fatal("could not locate patch compile implementation")
+	}
+	compileImplementation := source[compileStart : compileStart+compileEnd]
+	if count := strings.Count(compileImplementation, "retryPatchMaintenanceStep"); count != 8 {
+		t.Fatalf("compile retry steps = %d, want 8", count)
+	}
+	if !strings.Contains(source, `retryPatchMaintenanceStep(ctx, "raw prune table="+table`) ||
+		!strings.Contains(source, `retryPatchMaintenanceStep(ctx, label`) {
+		t.Fatal("raw prune mutations are not protected by in-place memory retries")
+	}
+}
 
 func TestDeleteRawPatchDataForPatchDropsRawPartitionsWhenAvailable(t *testing.T) {
 	db, mock, err := sqlmock.New()

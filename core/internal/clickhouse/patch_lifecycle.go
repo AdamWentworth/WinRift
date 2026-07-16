@@ -33,28 +33,44 @@ func (r *Repository) MarkPatchCollecting(ctx context.Context, patch, platform st
 }
 
 func (r *Repository) CompilePatchMetrics(ctx context.Context, patch, platform string, queueID uint16, rawRetainedUntil time.Time) error {
-	if err := r.deleteCompiledPatchMetrics(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "compile cleanup "+platform, func() error {
+		return r.deleteCompiledPatchMetrics(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	if err := r.markPatchCompiling(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "mark compiling "+platform, func() error {
+		return r.markPatchCompiling(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	if err := r.compilePatchBuildMetrics(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "build metrics "+platform, func() error {
+		return r.compilePatchBuildMetrics(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	if err := r.compilePatchItemTimingMetrics(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "item timing metrics "+platform, func() error {
+		return r.compilePatchItemTimingMetrics(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	if err := r.compilePatchPowerCurveMetrics(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "power curve metrics "+platform, func() error {
+		return r.compilePatchPowerCurveMetrics(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	if err := r.RefreshWinConditionMetrics(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "win condition metrics "+platform, func() error {
+		return r.RefreshWinConditionMetrics(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	if err := r.deleteLiveBuildAggregate(ctx, patch, platform, queueID); err != nil {
+	if err := retryPatchMaintenanceStep(ctx, "live aggregate cleanup "+platform, func() error {
+		return r.deleteLiveBuildAggregate(ctx, patch, platform, queueID)
+	}); err != nil {
 		return err
 	}
-	return r.markPatchClosed(ctx, patch, platform, queueID, rawRetainedUntil)
+	return retryPatchMaintenanceStep(ctx, "mark closed "+platform, func() error {
+		return r.markPatchClosed(ctx, patch, platform, queueID, rawRetainedUntil)
+	})
 }
 
 func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform string, queueID uint16) error {
@@ -71,8 +87,12 @@ func (r *Repository) DeleteRawPatchData(ctx context.Context, patch, platform str
 		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND platform = ? AND queue_id = ?`,
 	}
-	for _, statement := range statements {
-		if _, err := r.db.ExecContext(ctx, statement+` SETTINGS mutations_sync = 2`, patch, platform, queueID); err != nil {
+	for index, statement := range statements {
+		label := fmt.Sprintf("raw prune platform=%s step=%d", platform, index+1)
+		if err := retryPatchMaintenanceStep(ctx, label, func() error {
+			_, err := r.db.ExecContext(ctx, statement+` SETTINGS mutations_sync = 2`, patch, platform, queueID)
+			return err
+		}); err != nil {
 			return err
 		}
 	}
@@ -102,7 +122,9 @@ func (r *Repository) DeleteRawPatchDataForPatch(ctx context.Context, patch strin
 
 	rawTables := []string{"raw_timelines", "raw_matches"}
 	for _, table := range rawTables {
-		if err := r.deleteRawTablePatchData(ctx, table, patch, queueID); err != nil {
+		if err := retryPatchMaintenanceStep(ctx, "raw prune table="+table, func() error {
+			return r.deleteRawTablePatchData(ctx, table, patch, queueID)
+		}); err != nil {
 			return err
 		}
 	}
@@ -115,12 +137,24 @@ func (r *Repository) DeleteRawPatchDataForPatch(ctx context.Context, patch strin
 		`ALTER TABLE timeline_objective_events DELETE WHERE patch = ? AND queue_id = ?`,
 		`ALTER TABLE champion_bans DELETE WHERE patch = ? AND queue_id = ?`,
 	}
-	for _, statement := range statements {
-		if _, err := r.db.ExecContext(ctx, statement+` SETTINGS mutations_sync = 2`, patch, queueID); err != nil {
+	for index, statement := range statements {
+		label := fmt.Sprintf("raw prune normalized step=%d", index+1)
+		if err := retryPatchMaintenanceStep(ctx, label, func() error {
+			_, err := r.db.ExecContext(ctx, statement+` SETTINGS mutations_sync = 2`, patch, queueID)
+			return err
+		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func retryPatchMaintenanceStep(ctx context.Context, label string, operation func() error) error {
+	return retryPatchMaintenanceStepWithDelay(ctx, label, analyticsMemoryRetryDelay, operation)
+}
+
+func retryPatchMaintenanceStepWithDelay(ctx context.Context, label string, delay time.Duration, operation func() error) error {
+	return retryAnalyticsMemoryPressureWithDelay(ctx, "patch maintenance "+label, delay, operation)
 }
 
 func (r *Repository) DeletePatchesOutsideWindow(ctx context.Context, currentPatch string, retentionCount int) ([]string, error) {
