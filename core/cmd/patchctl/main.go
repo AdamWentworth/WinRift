@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	action := flag.String("action", "", "one of: latest-patch, collecting, compile, archive, rollover, win-conditions, item-slots, champion-guides, delete-raw")
+	action := flag.String("action", "", "one of: latest-patch, collecting, compile, archive, rollover, win-conditions, item-slots, champion-guides, summoner-profiles, delete-raw")
 	patch := flag.String("patch", "", "patch bucket, for example 16.10. For rollover, this is the target patch and defaults to the latest Data Dragon patch.")
 	platform := flag.String("platform", "NA1", "platform route, or ALL for archive/delete-raw")
 	queueID := flag.Int("queue", 420, "queue id")
@@ -26,7 +26,7 @@ func main() {
 	flag.Parse()
 
 	if *action == "" || patchRequired(*action) && strings.TrimSpace(*patch) == "" {
-		fmt.Fprintln(os.Stderr, "usage: patchctl -action latest-patch|collecting|compile|archive|rollover|win-conditions|item-slots|champion-guides|delete-raw [-patch 16.10] [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
+		fmt.Fprintln(os.Stderr, "usage: patchctl -action latest-patch|collecting|compile|archive|rollover|win-conditions|item-slots|champion-guides|summoner-profiles|delete-raw [-patch 16.10] [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
 		os.Exit(2)
 	}
 
@@ -89,6 +89,15 @@ func main() {
 			}
 		}
 		err = repo.RefreshChampionGuideDerivedAnalytics(ctx, *patch, uint16(*queueID))
+	case "summoner-profiles":
+		if err = waitForMaintenancePressure(ctx, "summoner-profile-analytics"); err != nil {
+			break
+		}
+		var profiles clickhouse.SummonerProfileRefreshResult
+		profiles, err = repo.RefreshSummonerProfileAnalytics(ctx, uint16(*queueID))
+		if err == nil {
+			log.Printf("summoner profile summaries queue=%d identities=%d profiles=%d champions=%d champion_roles=%d recent_matches=%d builds=%d", *queueID, profiles.IdentityRows, profiles.ProfileRows, profiles.ChampionRows, profiles.ChampionRoleRows, profiles.RecentMatchRows, profiles.BuildRows)
+		}
 	case "delete-raw":
 		err = deleteRawPatchData(ctx, repo, *patch, normalizedPlatform, uint16(*queueID))
 	default:
@@ -102,7 +111,7 @@ func main() {
 
 func patchRequired(action string) bool {
 	switch strings.TrimSpace(action) {
-	case "latest-patch", "rollover":
+	case "latest-patch", "rollover", "summoner-profiles":
 		return false
 	default:
 		return true
