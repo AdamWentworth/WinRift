@@ -21,12 +21,12 @@ func TestRefreshSummonerIdentitySummaryProcessesPlatformsIndependently(t *testin
 	compiledAt := time.Date(2026, time.July, 15, 23, 0, 0, 0, time.UTC)
 	mock.ExpectQuery("SELECT DISTINCT platform FROM riot_account_aliases FINAL ORDER BY platform").
 		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("BR1").AddRow("KR"))
-	platformQuery := "(?s)INSERT INTO summoner_identity_summary.*FROM riot_account_aliases FINAL.*WHERE platform = \\?.*FROM summoner_account_snapshots FINAL.*WHERE platform = \\?.*FROM raw_matches FINAL.*WHERE queue_id = \\? AND platform = \\?.*SETTINGS"
+	platformQuery := "(?s)INSERT INTO summoner_identity_summary.*FROM riot_account_aliases FINAL.*WHERE platform = \\?.*FROM summoner_account_snapshots FINAL.*WHERE platform = \\?.*FROM summoner_identity_summary FINAL.*WHERE platform = \\?.*LEFT JOIN previous_identity.*SETTINGS"
 	mock.ExpectExec(platformQuery).
-		WithArgs("BR1", "BR1", uint16(420), "BR1", compiledAt).
+		WithArgs("BR1", "BR1", "BR1", compiledAt).
 		WillReturnResult(sqlmock.NewResult(0, 10))
 	mock.ExpectExec(platformQuery).
-		WithArgs("KR", "KR", uint16(420), "KR", compiledAt).
+		WithArgs("KR", "KR", "KR", compiledAt).
 		WillReturnResult(sqlmock.NewResult(0, 10))
 
 	repo := &Repository{db: db}
@@ -35,6 +35,29 @@ func TestRefreshSummonerIdentitySummaryProcessesPlatformsIndependently(t *testin
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestSummonerIdentityRefreshDoesNotRescanRawMatches(t *testing.T) {
+	sourceBytes, err := os.ReadFile("summoner_profile.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	source := string(sourceBytes)
+	start := strings.Index(source, "func (r *Repository) refreshSummonerIdentitySummary")
+	if start < 0 {
+		t.Fatal("could not locate identity refresh implementation")
+	}
+	end := strings.Index(source[start:], "func (r *Repository) refreshSummonerProfileTable")
+	if end < 0 {
+		t.Fatal("could not locate end of identity refresh implementation")
+	}
+	implementation := source[start : start+end]
+	if strings.Contains(implementation, "FROM raw_matches") {
+		t.Fatal("identity refresh must use durable identity data instead of rescanning raw matches")
+	}
+	if !strings.Contains(implementation, "FROM summoner_identity_summary FINAL") {
+		t.Fatal("identity refresh does not preserve prior durable identity data")
 	}
 }
 

@@ -475,45 +475,35 @@ func (r *Repository) refreshSummonerIdentitySummary(ctx context.Context, queueID
 			WHERE platform = ?
 			GROUP BY platform, puuid
 		),
-		latest_raw_profile AS
+		previous_identity AS
 		(
 			SELECT
-				platform,
 				puuid,
-				argMax(raw_profile_icon_id, game_start_timestamp) AS profile_icon_id
-			FROM
-			(
-				SELECT
-					platform,
-					game_start_timestamp,
-					JSONExtractString(participant_json, 'puuid') AS puuid,
-					toUInt32(JSONExtractUInt(participant_json, 'profileIcon')) AS raw_profile_icon_id
-				FROM raw_matches FINAL
-				ARRAY JOIN JSONExtractArrayRaw(raw_json, 'info', 'participants') AS participant_json
-				WHERE queue_id = ? AND platform = ?
-			)
-			WHERE puuid != '' AND raw_profile_icon_id > 0
-			GROUP BY platform, puuid
+				platform,
+				profile_icon_id,
+				summoner_level
+			FROM summoner_identity_summary FINAL
+			WHERE platform = ?
 		)
 		SELECT
 			a.platform,
 			a.puuid,
 			a.game_name,
 			a.tag_line,
-			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(rp.profile_icon_id, 0)) AS profile_icon_id,
-			ifNull(s.summoner_level, 0) AS summoner_level,
+			if(ifNull(s.profile_icon_id, 0) > 0, ifNull(s.profile_icon_id, 0), ifNull(previous.profile_icon_id, 0)) AS profile_icon_id,
+			if(ifNull(s.summoner_level, 0) > 0, ifNull(s.summoner_level, 0), ifNull(previous.summoner_level, 0)) AS summoner_level,
 			a.alias_last_seen_at,
 			? AS compiled_at
 		FROM latest_alias AS a
 		LEFT JOIN latest_account AS s
 			ON s.platform = a.platform AND s.puuid = a.puuid
-		LEFT JOIN latest_raw_profile AS rp
-			ON rp.platform = a.platform AND rp.puuid = a.puuid
+		LEFT JOIN previous_identity AS previous
+			ON previous.platform = a.platform AND previous.puuid = a.puuid
 		WHERE a.game_name != '' AND a.tag_line != ''
 		SETTINGS
 			join_algorithm = 'grace_hash',
 			max_bytes_before_external_group_by = 268435456,
-			max_bytes_before_external_sort = 268435456`, platform, platform, queueID, platform, compiledAt); err != nil {
+			max_bytes_before_external_sort = 268435456`, platform, platform, platform, compiledAt); err != nil {
 			return err
 		}
 	}
