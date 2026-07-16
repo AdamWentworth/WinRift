@@ -71,24 +71,24 @@ func TestPatchTimelineMetricsFilterBothSidesAndCompileByRole(t *testing.T) {
 		return sqlmock.NewRows([]string{"role"}).AddRow("JUNGLE").AddRow("TOP")
 	}
 
-	mock.ExpectQuery("(?s)SELECT DISTINCT role.*FROM participant_matchups FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?").
-		WithArgs("16.12", "BR1", queueID).
+	mock.ExpectQuery("(?s)WITH target_match_ids AS.*FROM raw_matches FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?.*SELECT DISTINCT role.*FROM participant_matchups FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?.*match_id IN \\(SELECT match_id FROM target_match_ids\\)").
+		WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID).
 		WillReturnRows(roleRows())
 	for _, role := range []string{"JUNGLE", "TOP"} {
-		mock.ExpectExec("(?s)INSERT INTO patch_item_timing_metrics.*FROM timeline_item_events AS tie FINAL.*INNER JOIN participant_matchups AS pm FINAL.*tie.patch = \\?.*tie.platform = \\?.*tie.queue_id = \\?.*pm.patch = \\?.*pm.platform = \\?.*pm.queue_id = \\?.*pm.role = \\?.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456").
-			WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID, role).
+		mock.ExpectExec("(?s)INSERT INTO patch_item_timing_metrics.*WITH target_match_ids AS.*FROM raw_matches FINAL.*FROM timeline_item_events AS tie FINAL.*INNER JOIN participant_matchups AS pm FINAL.*tie.patch = \\?.*tie.platform = \\?.*tie.queue_id = \\?.*pm.patch = \\?.*pm.platform = \\?.*pm.queue_id = \\?.*pm.role = \\?.*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\).*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456").
+			WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID, "16.12", "BR1", queueID, role).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 	}
 	if err := repo.compilePatchItemTimingMetrics(context.Background(), "16.12", "BR1", queueID); err != nil {
 		t.Fatalf("compile item timing metrics: %v", err)
 	}
 
-	mock.ExpectQuery("(?s)SELECT DISTINCT role.*FROM participant_matchups FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?").
-		WithArgs("16.12", "BR1", queueID).
+	mock.ExpectQuery("(?s)WITH target_match_ids AS.*FROM raw_matches FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?.*SELECT DISTINCT role.*FROM participant_matchups FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?.*match_id IN \\(SELECT match_id FROM target_match_ids\\)").
+		WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID).
 		WillReturnRows(roleRows())
 	for _, role := range []string{"JUNGLE", "TOP"} {
-		mock.ExpectExec("(?s)INSERT INTO patch_power_curve_metrics.*FROM timeline_participant_frames AS tpf FINAL.*INNER JOIN participant_matchups AS pm FINAL.*tpf.patch = \\?.*tpf.platform = \\?.*tpf.queue_id = \\?.*pm.patch = \\?.*pm.platform = \\?.*pm.queue_id = \\?.*pm.role = \\?.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456").
-			WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID, role).
+		mock.ExpectExec("(?s)INSERT INTO patch_power_curve_metrics.*WITH target_match_ids AS.*FROM raw_matches FINAL.*FROM timeline_participant_frames AS tpf FINAL.*INNER JOIN participant_matchups AS pm FINAL.*tpf.patch = \\?.*tpf.platform = \\?.*tpf.queue_id = \\?.*pm.patch = \\?.*pm.platform = \\?.*pm.queue_id = \\?.*pm.role = \\?.*tpf.match_id IN \\(SELECT match_id FROM target_match_ids\\).*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456").
+			WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID, "16.12", "BR1", queueID, role).
 			WillReturnResult(sqlmock.NewResult(0, 1))
 	}
 	if err := repo.compilePatchPowerCurveMetrics(context.Background(), "16.12", "BR1", queueID); err != nil {

@@ -126,7 +126,23 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 	patch := strings.TrimSpace(filters.Patch)
 	platform := strings.ToUpper(strings.TrimSpace(filters.Platform))
 	query := `
-		WITH participant_ranked AS
+		WITH target_matches AS
+		(
+			SELECT match_id, duration_seconds, game_end_timestamp
+			FROM raw_matches FINAL
+			WHERE queue_id = ?`
+	args := []any{queueID}
+	if patch != "" {
+		query += " AND patch = ?"
+		args = append(args, patch)
+	}
+	if platform != "" {
+		query += " AND platform = ?"
+		args = append(args, platform)
+	}
+	query += `
+		),
+		participant_ranked AS
 		(
 			SELECT
 				p.match_id,
@@ -150,7 +166,6 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 				FROM summoner_rank_snapshots FINAL
 				WHERE queue_type = 'RANKED_SOLO_5x5'
 				`
-	args := []any{}
 	if platform != "" {
 		query += " AND platform = ?"
 		args = append(args, platform)
@@ -170,6 +185,7 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 		args = append(args, platform)
 	}
 	query += `
+				AND p.match_id IN (SELECT match_id FROM target_matches)
 		)
 		SELECT
 			pr.match_id,
@@ -182,22 +198,7 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 			groupArray(toUInt16(pr.champion_id)) AS champion_ids,
 			groupArray(rank_value) AS rank_buckets
 		FROM participant_ranked AS pr
-		INNER JOIN
-		(
-			SELECT match_id, duration_seconds, game_end_timestamp
-			FROM raw_matches FINAL
-			WHERE queue_id = ?`
-	args = append(args, queueID)
-	if patch != "" {
-		query += " AND patch = ?"
-		args = append(args, patch)
-	}
-	if platform != "" {
-		query += " AND platform = ?"
-		args = append(args, platform)
-	}
-	query += `
-		) AS rm ON rm.match_id = pr.match_id
+		INNER JOIN target_matches AS rm ON rm.match_id = pr.match_id
 		GROUP BY pr.match_id, pr.team_id
 		HAVING length(champion_ids) = 5
 		ORDER BY max(rm.game_end_timestamp) DESC`

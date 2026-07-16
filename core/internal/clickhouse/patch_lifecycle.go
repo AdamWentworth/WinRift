@@ -453,6 +453,12 @@ func (r *Repository) compilePatchBuildMetrics(ctx context.Context, patch, platfo
 		ctx,
 		`INSERT INTO patch_build_metrics
 		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature, wins, games)
+		WITH target_match_ids AS
+		(
+			SELECT match_id
+			FROM raw_matches FINAL
+			WHERE patch = ? AND platform = ? AND queue_id = ?
+		)
 		SELECT
 			patch,
 			platform,
@@ -470,6 +476,7 @@ func (r *Repository) compilePatchBuildMetrics(ctx context.Context, patch, platfo
 			toUInt64(count()) AS games
 		FROM participant_matchups FINAL
 		WHERE patch = ? AND platform = ? AND queue_id = ?
+			AND match_id IN (SELECT match_id FROM target_match_ids)
 		GROUP BY
 			patch,
 			platform,
@@ -483,6 +490,7 @@ func (r *Repository) compilePatchBuildMetrics(ctx context.Context, patch, platfo
 			core3_signature,
 			rune_signature,
 			spell_signature`,
+		patch, platform, queueID,
 		patch, platform, queueID,
 	)
 	return err
@@ -509,7 +517,13 @@ func (r *Repository) compilePatchItemTimingMetricsForRole(ctx context.Context, p
 		ctx,
 		`INSERT INTO patch_item_timing_metrics
 		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, item_slot, item_signature, games, avg_timing_ms, p50_timing_ms, p75_timing_ms, p90_timing_ms)
-		WITH item_purchases AS
+		WITH target_match_ids AS
+		(
+			SELECT match_id
+			FROM raw_matches FINAL
+			WHERE patch = ? AND platform = ? AND queue_id = ?
+		),
+		item_purchases AS
 		(
 			SELECT
 				pm.patch AS patch,
@@ -529,6 +543,8 @@ func (r *Repository) compilePatchItemTimingMetricsForRole(ctx context.Context, p
 				AND pm.participant_id = tie.participant_id
 			WHERE tie.patch = ? AND tie.platform = ? AND tie.queue_id = ?
 				AND pm.patch = ? AND pm.platform = ? AND pm.queue_id = ? AND pm.role = ?
+				AND tie.match_id IN (SELECT match_id FROM target_match_ids)
+				AND pm.match_id IN (SELECT match_id FROM target_match_ids)
 				AND tie.event_type = 'ITEM_PURCHASED'
 				AND tie.item_id NOT IN (3340, 3363, 3364, 3330, 3348, 2052)
 			GROUP BY
@@ -582,6 +598,7 @@ func (r *Repository) compilePatchItemTimingMetricsForRole(ctx context.Context, p
 			max_bytes_before_external_group_by = 268435456,
 			max_bytes_before_external_sort = 268435456`,
 		patch, platform, queueID,
+		patch, platform, queueID,
 		patch, platform, queueID, role,
 	)
 	return err
@@ -608,6 +625,12 @@ func (r *Repository) compilePatchPowerCurveMetricsForRole(ctx context.Context, p
 		ctx,
 		`INSERT INTO patch_power_curve_metrics
 		(patch, platform, queue_id, champion_id, role, opponent_champion_id, rank_bucket, minute_mark, games, avg_level, avg_total_gold, avg_cs, avg_jungle_cs, avg_damage_done_to_champions, avg_damage_taken)
+		WITH target_match_ids AS
+		(
+			SELECT match_id
+			FROM raw_matches FINAL
+			WHERE patch = ? AND platform = ? AND queue_id = ?
+		)
 		SELECT
 			pm.patch AS patch,
 			pm.platform AS platform,
@@ -630,6 +653,8 @@ func (r *Repository) compilePatchPowerCurveMetricsForRole(ctx context.Context, p
 			AND pm.participant_id = tpf.participant_id
 		WHERE tpf.patch = ? AND tpf.platform = ? AND tpf.queue_id = ?
 			AND pm.patch = ? AND pm.platform = ? AND pm.queue_id = ? AND pm.role = ?
+			AND tpf.match_id IN (SELECT match_id FROM target_match_ids)
+			AND pm.match_id IN (SELECT match_id FROM target_match_ids)
 			AND tpf.timestamp_ms BETWEEN 590000 AND 1210000
 			AND toUInt8(round(tpf.timestamp_ms / 60000)) IN (10, 15, 20)
 		GROUP BY
@@ -646,6 +671,7 @@ func (r *Repository) compilePatchPowerCurveMetricsForRole(ctx context.Context, p
 			max_bytes_before_external_group_by = 268435456,
 			max_bytes_before_external_sort = 268435456`,
 		patch, platform, queueID,
+		patch, platform, queueID,
 		patch, platform, queueID, role,
 	)
 	return err
@@ -654,10 +680,18 @@ func (r *Repository) compilePatchPowerCurveMetricsForRole(ctx context.Context, p
 func (r *Repository) patchRoles(ctx context.Context, patch, platform string, queueID uint16) ([]string, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
-		`SELECT DISTINCT role
+		`WITH target_match_ids AS
+		(
+			SELECT match_id
+			FROM raw_matches FINAL
+			WHERE patch = ? AND platform = ? AND queue_id = ?
+		)
+		SELECT DISTINCT role
 		FROM participant_matchups FINAL
 		WHERE patch = ? AND platform = ? AND queue_id = ?
+			AND match_id IN (SELECT match_id FROM target_match_ids)
 		ORDER BY role`,
+		patch, platform, queueID,
 		patch, platform, queueID,
 	)
 	if err != nil {
