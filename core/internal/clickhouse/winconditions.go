@@ -123,6 +123,8 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 	if queueID == 0 {
 		queueID = 420
 	}
+	patch := strings.TrimSpace(filters.Patch)
+	platform := strings.ToUpper(strings.TrimSpace(filters.Platform))
 	query := `
 		WITH participant_ranked AS
 		(
@@ -147,18 +149,25 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 					argMax(rank_bucket, fetched_at) AS snapshot_rank_bucket
 				FROM summoner_rank_snapshots FINAL
 				WHERE queue_type = 'RANKED_SOLO_5x5'
+				`
+	args := []any{}
+	if platform != "" {
+		query += " AND platform = ?"
+		args = append(args, platform)
+	}
+	query += `
 				GROUP BY platform, puuid
 			) AS s
 				ON s.platform = p.platform AND s.puuid = p.puuid
 			WHERE p.queue_id = ?`
-	args := []any{queueID}
-	if strings.TrimSpace(filters.Patch) != "" {
+	args = append(args, queueID)
+	if patch != "" {
 		query += " AND p.patch = ?"
-		args = append(args, strings.TrimSpace(filters.Patch))
+		args = append(args, patch)
 	}
-	if strings.TrimSpace(filters.Platform) != "" {
+	if platform != "" {
 		query += " AND p.platform = ?"
-		args = append(args, strings.ToUpper(strings.TrimSpace(filters.Platform)))
+		args = append(args, platform)
 	}
 	query += `
 		)
@@ -173,7 +182,22 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 			groupArray(toUInt16(pr.champion_id)) AS champion_ids,
 			groupArray(rank_value) AS rank_buckets
 		FROM participant_ranked AS pr
-		INNER JOIN raw_matches AS rm FINAL ON rm.match_id = pr.match_id
+		INNER JOIN
+		(
+			SELECT match_id, duration_seconds, game_end_timestamp
+			FROM raw_matches FINAL
+			WHERE queue_id = ?`
+	args = append(args, queueID)
+	if patch != "" {
+		query += " AND patch = ?"
+		args = append(args, patch)
+	}
+	if platform != "" {
+		query += " AND platform = ?"
+		args = append(args, platform)
+	}
+	query += `
+		) AS rm ON rm.match_id = pr.match_id
 		GROUP BY pr.match_id, pr.team_id
 		HAVING length(champion_ids) = 5
 		ORDER BY max(rm.game_end_timestamp) DESC`
@@ -181,6 +205,11 @@ func (r *Repository) QueryTeamCompositions(ctx context.Context, filters TeamComp
 		query += " LIMIT ?"
 		args = append(args, filters.MaxRows)
 	}
+	query += `
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
