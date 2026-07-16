@@ -61,6 +61,54 @@ func TestSummonerIdentityRefreshDoesNotRescanRawMatches(t *testing.T) {
 	}
 }
 
+func TestRefreshSummonerBuildSummaryProcessesPlatformsIndependently(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	compiledAt := time.Date(2026, time.July, 16, 2, 0, 0, 0, time.UTC)
+	mock.ExpectQuery("(?s)SELECT DISTINCT platform.*FROM participants FINAL.*WHERE queue_id = \\?.*ORDER BY platform").
+		WithArgs(uint16(420)).
+		WillReturnRows(sqlmock.NewRows([]string{"platform"}).AddRow("BR1").AddRow("KR"))
+	platformQuery := "(?s)INSERT INTO summoner_build_summary.*FROM participants FINAL.*WHERE queue_id = \\?.*AND platform = \\?.*GROUP BY"
+	mock.ExpectExec(platformQuery).
+		WithArgs(compiledAt, uint16(420), "BR1").
+		WillReturnResult(sqlmock.NewResult(0, 10))
+	mock.ExpectExec(platformQuery).
+		WithArgs(compiledAt, uint16(420), "KR").
+		WillReturnResult(sqlmock.NewResult(0, 10))
+
+	repo := &Repository{db: db}
+	if err := repo.refreshSummonerBuildSummary(context.Background(), 420, compiledAt); err != nil {
+		t.Fatalf("refresh summoner build summary: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
+func TestSummonerBuildRefreshDoesNotAggregateAllPlatformsTogether(t *testing.T) {
+	sourceBytes, err := os.ReadFile("summoner_profile.go")
+	if err != nil {
+		t.Fatalf("read source: %v", err)
+	}
+	source := string(sourceBytes)
+	start := strings.Index(source, "func (r *Repository) refreshSummonerBuildSummary")
+	if start < 0 {
+		t.Fatal("could not locate build summary refresh implementation")
+	}
+	end := strings.Index(source[start:], "func (r *Repository) refreshSummonerIdentitySummary")
+	if end < 0 {
+		t.Fatal("could not locate end of build summary refresh implementation")
+	}
+	implementation := source[start : start+end]
+	if !strings.Contains(implementation, "AND platform = ?") {
+		t.Fatal("build summaries must be aggregated one platform at a time")
+	}
+}
+
 func TestRefreshSummonerProfileTableRetriesMemoryPressureInPlace(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

@@ -360,46 +360,7 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 			max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
-	if err := r.refreshSummonerProfileTable(ctx, "summoner_build_summary", `
-		INSERT INTO summoner_build_summary
-			(platform, queue_id, puuid, champion_id, role, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature, games, wins, kills, deaths, assists, compiled_at)
-		SELECT
-			platform,
-			queue_id,
-			puuid,
-			champion_id,
-			role,
-			final_items_signature,
-			core2_signature,
-			core3_signature,
-			rune_signature,
-			spell_signature,
-			toUInt64(count()) AS games,
-			toUInt64(sum(win)) AS wins,
-			toUInt64(sum(kills)) AS kills,
-			toUInt64(sum(deaths)) AS deaths,
-			toUInt64(sum(assists)) AS assists,
-			? AS compiled_at
-		FROM participants FINAL
-		WHERE queue_id = ?
-			AND puuid != ''
-			AND champion_id > 0
-			AND (final_items_signature != '' OR core3_signature != '')
-		GROUP BY
-			platform,
-			queue_id,
-			puuid,
-			champion_id,
-			role,
-			final_items_signature,
-			core2_signature,
-			core3_signature,
-			rune_signature,
-			spell_signature
-		SETTINGS
-			join_algorithm = 'grace_hash',
-			max_bytes_before_external_group_by = 268435456,
-			max_bytes_before_external_sort = 268435456`, compiledAt, queueID); err != nil {
+	if err := r.refreshSummonerBuildSummary(ctx, queueID, compiledAt); err != nil {
 		return SummonerProfileRefreshResult{}, err
 	}
 	if err := r.cleanupOldSummonerProfileSummaries(ctx, queueID, compiledAt); err != nil {
@@ -425,6 +386,79 @@ func (r *Repository) RefreshSummonerProfileAnalytics(ctx context.Context, queueI
 		return SummonerProfileRefreshResult{}, err
 	}
 	return result, nil
+}
+
+func (r *Repository) refreshSummonerBuildSummary(ctx context.Context, queueID uint16, compiledAt time.Time) error {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT platform
+		FROM participants FINAL
+		WHERE queue_id = ? AND platform != ''
+		ORDER BY platform`, queueID)
+	if err != nil {
+		return err
+	}
+	platforms := []string{}
+	for rows.Next() {
+		var platform string
+		if err := rows.Scan(&platform); err != nil {
+			rows.Close()
+			return err
+		}
+		platforms = append(platforms, platform)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, platform := range platforms {
+		if err := r.refreshSummonerProfileTable(ctx, "summoner_build_summary platform="+platform, `
+		INSERT INTO summoner_build_summary
+			(platform, queue_id, puuid, champion_id, role, final_items_signature, core2_signature, core3_signature, rune_signature, spell_signature, games, wins, kills, deaths, assists, compiled_at)
+		SELECT
+			platform,
+			queue_id,
+			puuid,
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			toUInt64(count()) AS games,
+			toUInt64(sum(win)) AS wins,
+			toUInt64(sum(kills)) AS kills,
+			toUInt64(sum(deaths)) AS deaths,
+			toUInt64(sum(assists)) AS assists,
+			? AS compiled_at
+		FROM participants FINAL
+		WHERE queue_id = ?
+			AND platform = ?
+			AND puuid != ''
+			AND champion_id > 0
+			AND (final_items_signature != '' OR core3_signature != '')
+		GROUP BY
+			platform,
+			queue_id,
+			puuid,
+			champion_id,
+			role,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`, compiledAt, queueID, platform); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) refreshSummonerIdentitySummary(ctx context.Context, queueID uint16, compiledAt time.Time) error {
