@@ -208,6 +208,17 @@ func (r *Repository) RefreshWinConditionMetricsForPlatforms(ctx context.Context,
 	return r.refreshWinConditionMetricsForPlatforms(ctx, patch, platforms, queueID, true)
 }
 
+func (r *Repository) RefreshCombinedWinConditionMetrics(ctx context.Context, patch string, queueID uint16) error {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		return fmt.Errorf("patch is required")
+	}
+	if queueID == 0 {
+		queueID = 420
+	}
+	return r.refreshAllPlatformWinConditionMetrics(ctx, patch, queueID, time.Now().UTC().Truncate(time.Second))
+}
+
 func (r *Repository) refreshWinConditionMetricsForPlatforms(ctx context.Context, patch string, platforms []string, queueID uint16, refreshAll bool) error {
 	patch = strings.TrimSpace(patch)
 	platforms = normalizeWinConditionPlatforms(platforms)

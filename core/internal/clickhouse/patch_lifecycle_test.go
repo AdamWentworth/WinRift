@@ -48,6 +48,10 @@ func TestPatchCompileAndPruneKeepMemoryRetriesInsideSteps(t *testing.T) {
 	if count := strings.Count(compileImplementation, "retryPatchMaintenanceStep"); count != 8 {
 		t.Fatalf("compile retry steps = %d, want 8", count)
 	}
+	if !strings.Contains(compileImplementation, "refreshWinConditionMetricsForPlatforms(ctx, patch, []string{platform}, queueID, false)") ||
+		strings.Contains(compileImplementation, "RefreshWinConditionMetrics(ctx") {
+		t.Fatal("platform compile must defer the combined win-condition refresh")
+	}
 	if !strings.Contains(source, `retryPatchMaintenanceStep(ctx, "raw prune table="+table`) ||
 		!strings.Contains(source, `retryPatchMaintenanceStep(ctx, label`) {
 		t.Fatal("raw prune mutations are not protected by in-place memory retries")

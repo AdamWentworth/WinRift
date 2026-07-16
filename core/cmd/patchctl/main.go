@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	action := flag.String("action", "", "one of: latest-patch, collecting, compile, archive, rollover, win-conditions, item-slots, champion-guides, summoner-profiles, delete-raw")
+	action := flag.String("action", "", "one of: latest-patch, collecting, compile, archive, rollover, win-conditions, win-conditions-combined, item-slots, champion-guides, summoner-profiles, delete-raw")
 	patch := flag.String("patch", "", "patch bucket, for example 16.10. For rollover, this is the target patch and defaults to the latest Data Dragon patch.")
 	platform := flag.String("platform", "NA1", "platform route, or ALL for archive/delete-raw")
 	queueID := flag.Int("queue", 420, "queue id")
@@ -26,7 +26,7 @@ func main() {
 	flag.Parse()
 
 	if *action == "" || patchRequired(*action) && strings.TrimSpace(*patch) == "" {
-		fmt.Fprintln(os.Stderr, "usage: patchctl -action latest-patch|collecting|compile|archive|rollover|win-conditions|item-slots|champion-guides|summoner-profiles|delete-raw [-patch 16.10] [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
+		fmt.Fprintln(os.Stderr, "usage: patchctl -action latest-patch|collecting|compile|archive|rollover|win-conditions|win-conditions-combined|item-slots|champion-guides|summoner-profiles|delete-raw [-patch 16.10] [-platform NA1|ALL] [-queue 420] [-retain-days 30] [-backfill] [-prune-raw=true]")
 		os.Exit(2)
 	}
 
@@ -64,6 +64,8 @@ func main() {
 		err = rolloverPatchWindow(ctx, repo, staticService, *patch, cfg.CollectorCurrentPatch, cfg.CollectorPatchRetention, normalizedPlatform, uint16(*queueID), retainedUntil, *pruneRaw)
 	case "win-conditions":
 		err = repo.RefreshWinConditionMetrics(ctx, *patch, normalizedPlatform, uint16(*queueID))
+	case "win-conditions-combined":
+		err = repo.RefreshCombinedWinConditionMetrics(ctx, *patch, uint16(*queueID))
 	case "item-slots":
 		contexts, contextErr := itemSlotRefreshContexts(ctx, staticService)
 		if contextErr != nil {
@@ -188,6 +190,13 @@ func archivePatch(ctx context.Context, repo *clickhouse.Repository, staticServic
 			return fmt.Errorf("compile %s: %w", platform, err)
 		}
 	}
+	if err := waitForMaintenancePressure(ctx, "combined-win-condition-metrics"); err != nil {
+		return err
+	}
+	if err := repo.RefreshCombinedWinConditionMetrics(ctx, patch, queueID); err != nil {
+		return fmt.Errorf("combined win condition metrics: %w", err)
+	}
+	log.Printf("patch archive combined win condition summaries patch=%s complete", patch)
 	if pruneRaw {
 		if err := waitForMaintenancePressure(ctx, "raw-prune"); err != nil {
 			return err

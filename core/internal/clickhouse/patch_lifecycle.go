@@ -59,7 +59,7 @@ func (r *Repository) CompilePatchMetrics(ctx context.Context, patch, platform st
 		return err
 	}
 	if err := retryPatchMaintenanceStep(ctx, "win condition metrics "+platform, func() error {
-		return r.RefreshWinConditionMetrics(ctx, patch, platform, queueID)
+		return r.refreshWinConditionMetricsForPlatforms(ctx, patch, []string{platform}, queueID, false)
 	}); err != nil {
 		return err
 	}
