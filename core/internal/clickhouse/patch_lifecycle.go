@@ -489,6 +489,22 @@ func (r *Repository) compilePatchBuildMetrics(ctx context.Context, patch, platfo
 }
 
 func (r *Repository) compilePatchItemTimingMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	roles, err := r.patchRoles(ctx, patch, platform, queueID)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles {
+		role := role
+		if err := retryPatchMaintenanceStep(ctx, "item timing metrics "+platform+" role="+role, func() error {
+			return r.compilePatchItemTimingMetricsForRole(ctx, patch, platform, role, queueID)
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) compilePatchItemTimingMetricsForRole(ctx context.Context, patch, platform, role string, queueID uint16) error {
 	_, err := r.db.ExecContext(
 		ctx,
 		`INSERT INTO patch_item_timing_metrics
@@ -507,11 +523,12 @@ func (r *Repository) compilePatchItemTimingMetrics(ctx context.Context, patch, p
 				pm.participant_id AS participant_id,
 				tie.item_id AS item_id,
 				min(tie.timestamp_ms) AS first_purchase_ms
-			FROM participant_matchups AS pm FINAL
-			INNER JOIN timeline_item_events AS tie FINAL
+			FROM timeline_item_events AS tie FINAL
+			INNER JOIN participant_matchups AS pm FINAL
 				ON pm.match_id = tie.match_id
 				AND pm.participant_id = tie.participant_id
-			WHERE pm.patch = ? AND pm.platform = ? AND pm.queue_id = ?
+			WHERE tie.patch = ? AND tie.platform = ? AND tie.queue_id = ?
+				AND pm.patch = ? AND pm.platform = ? AND pm.queue_id = ? AND pm.role = ?
 				AND tie.event_type = 'ITEM_PURCHASED'
 				AND tie.item_id NOT IN (3340, 3363, 3364, 3330, 3348, 2052)
 			GROUP BY
@@ -559,13 +576,34 @@ func (r *Repository) compilePatchItemTimingMetrics(ctx context.Context, patch, p
 			opponent_champion_id,
 			rank_bucket,
 			item_slot,
-			item_id`,
+			item_id
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`,
 		patch, platform, queueID,
+		patch, platform, queueID, role,
 	)
 	return err
 }
 
 func (r *Repository) compilePatchPowerCurveMetrics(ctx context.Context, patch, platform string, queueID uint16) error {
+	roles, err := r.patchRoles(ctx, patch, platform, queueID)
+	if err != nil {
+		return err
+	}
+	for _, role := range roles {
+		role := role
+		if err := retryPatchMaintenanceStep(ctx, "power curve metrics "+platform+" role="+role, func() error {
+			return r.compilePatchPowerCurveMetricsForRole(ctx, patch, platform, role, queueID)
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Repository) compilePatchPowerCurveMetricsForRole(ctx context.Context, patch, platform, role string, queueID uint16) error {
 	_, err := r.db.ExecContext(
 		ctx,
 		`INSERT INTO patch_power_curve_metrics
@@ -586,11 +624,12 @@ func (r *Repository) compilePatchPowerCurveMetrics(ctx context.Context, patch, p
 			avg(tpf.jungle_minions_killed) AS avg_jungle_cs,
 			avg(tpf.total_damage_done_to_champions) AS avg_damage_done_to_champions,
 			avg(tpf.total_damage_taken) AS avg_damage_taken
-		FROM participant_matchups AS pm FINAL
-		INNER JOIN timeline_participant_frames AS tpf FINAL
+		FROM timeline_participant_frames AS tpf FINAL
+		INNER JOIN participant_matchups AS pm FINAL
 			ON pm.match_id = tpf.match_id
 			AND pm.participant_id = tpf.participant_id
-		WHERE pm.patch = ? AND pm.platform = ? AND pm.queue_id = ?
+		WHERE tpf.patch = ? AND tpf.platform = ? AND tpf.queue_id = ?
+			AND pm.patch = ? AND pm.platform = ? AND pm.queue_id = ? AND pm.role = ?
 			AND tpf.timestamp_ms BETWEEN 590000 AND 1210000
 			AND toUInt8(round(tpf.timestamp_ms / 60000)) IN (10, 15, 20)
 		GROUP BY
@@ -601,10 +640,43 @@ func (r *Repository) compilePatchPowerCurveMetrics(ctx context.Context, patch, p
 			pm.role,
 			pm.opponent_champion_id,
 			pm.rank_bucket,
-			minute_mark`,
+			minute_mark
+		SETTINGS
+			join_algorithm = 'grace_hash',
+			max_bytes_before_external_group_by = 268435456,
+			max_bytes_before_external_sort = 268435456`,
 		patch, platform, queueID,
+		patch, platform, queueID, role,
 	)
 	return err
+}
+
+func (r *Repository) patchRoles(ctx context.Context, patch, platform string, queueID uint16) ([]string, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT DISTINCT role
+		FROM participant_matchups FINAL
+		WHERE patch = ? AND platform = ? AND queue_id = ?
+		ORDER BY role`,
+		patch, platform, queueID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	roles := []string{}
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, err
+		}
+		role = strings.TrimSpace(role)
+		if role != "" {
+			roles = append(roles, role)
+		}
+	}
+	return roles, rows.Err()
 }
 
 func patchLess(left, right string) bool {

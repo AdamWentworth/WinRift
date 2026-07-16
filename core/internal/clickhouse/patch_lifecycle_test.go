@@ -54,6 +54,47 @@ func TestPatchCompileAndPruneKeepMemoryRetriesInsideSteps(t *testing.T) {
 	}
 }
 
+func TestPatchTimelineMetricsFilterBothSidesAndCompileByRole(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	repo := &Repository{db: db}
+	queueID := uint16(analytics.RankedSoloQueueID)
+	roleRows := func() *sqlmock.Rows {
+		return sqlmock.NewRows([]string{"role"}).AddRow("JUNGLE").AddRow("TOP")
+	}
+
+	mock.ExpectQuery("(?s)SELECT DISTINCT role.*FROM participant_matchups FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?").
+		WithArgs("16.12", "BR1", queueID).
+		WillReturnRows(roleRows())
+	for _, role := range []string{"JUNGLE", "TOP"} {
+		mock.ExpectExec("(?s)INSERT INTO patch_item_timing_metrics.*FROM timeline_item_events AS tie FINAL.*INNER JOIN participant_matchups AS pm FINAL.*tie.patch = \\?.*tie.platform = \\?.*tie.queue_id = \\?.*pm.patch = \\?.*pm.platform = \\?.*pm.queue_id = \\?.*pm.role = \\?.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456").
+			WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID, role).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	if err := repo.compilePatchItemTimingMetrics(context.Background(), "16.12", "BR1", queueID); err != nil {
+		t.Fatalf("compile item timing metrics: %v", err)
+	}
+
+	mock.ExpectQuery("(?s)SELECT DISTINCT role.*FROM participant_matchups FINAL.*WHERE patch = \\? AND platform = \\? AND queue_id = \\?").
+		WithArgs("16.12", "BR1", queueID).
+		WillReturnRows(roleRows())
+	for _, role := range []string{"JUNGLE", "TOP"} {
+		mock.ExpectExec("(?s)INSERT INTO patch_power_curve_metrics.*FROM timeline_participant_frames AS tpf FINAL.*INNER JOIN participant_matchups AS pm FINAL.*tpf.patch = \\?.*tpf.platform = \\?.*tpf.queue_id = \\?.*pm.patch = \\?.*pm.platform = \\?.*pm.queue_id = \\?.*pm.role = \\?.*join_algorithm = 'grace_hash'.*max_bytes_before_external_group_by = 268435456").
+			WithArgs("16.12", "BR1", queueID, "16.12", "BR1", queueID, role).
+			WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	if err := repo.compilePatchPowerCurveMetrics(context.Background(), "16.12", "BR1", queueID); err != nil {
+		t.Fatalf("compile power curve metrics: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations: %v", err)
+	}
+}
+
 func TestDeleteRawPatchDataForPatchDropsRawPartitionsWhenAvailable(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
