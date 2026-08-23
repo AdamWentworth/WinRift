@@ -88,7 +88,7 @@ jobs:
           runtime_dir="$(env_value WINRIFT_RUNTIME_STATE_DIR)"
           storage_mount="${storage_mount:-/mnt/storage}"
           clickhouse_dir="${clickhouse_dir:-${storage_mount}/clickhouse/data}"
-          clickhouse_hot_dir="${clickhouse_hot_dir:-${DEPLOY_ROOT}/clickhouse-hot}"
+          clickhouse_hot_dir="${clickhouse_hot_dir:-${storage_mount}/clickhouse/hot}"
           clickhouse_log_dir="${clickhouse_log_dir:-${storage_mount}/clickhouse/logs}"
           clickhouse_backup_dir="${clickhouse_backup_dir:-${storage_mount}/clickhouse/backups}"
           runtime_dir="${runtime_dir:-${DEPLOY_ROOT}/runtime}"
@@ -103,6 +103,14 @@ jobs:
             "${storage_mount}"/*) ;;
             *)
               echo "WINRIFT_CLICKHOUSE_DATA_DIR must live under ${storage_mount}: ${clickhouse_dir}" >&2
+              exit 1
+              ;;
+          esac
+
+          case "${clickhouse_hot_dir}" in
+            "${storage_mount}"/*) ;;
+            *)
+              echo "WINRIFT_CLICKHOUSE_HOT_DIR must live under ${storage_mount}: ${clickhouse_hot_dir}" >&2
               exit 1
               ;;
           esac

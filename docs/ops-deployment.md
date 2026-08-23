@@ -79,7 +79,7 @@ The production-like setup follows the same private-runner pattern used by the ot
 - CI builds and pushes `ghcr.io/adamwentworth/winrift-core` from `core/Dockerfile`.
 - A manual GitHub Actions deploy runs on the self-hosted runner labeled `self-hosted`, `linux`, `x64`, `prod`.
 - Durable server state lives at `/srv/winrift`.
-- ClickHouse data, logs, and backups live on the mounted storage SSD under `/mnt/storage/clickhouse`.
+- ClickHouse data, hot data, logs, and backups live on the mounted storage SSD under `/mnt/storage/clickhouse`.
 - The API is bound to the private LAN by default. Do not router-forward it.
 - The worker starts only after the API passes health.
 
@@ -97,6 +97,7 @@ Server layout:
 
 /mnt/storage/clickhouse/
   data/
+  hot/
   logs/
   backups/
 ```
@@ -118,7 +119,7 @@ Before starting ClickHouse on the server, verify the storage mount:
 ```bash
 findmnt /mnt/storage
 df -hT /mnt/storage
-sudo mkdir -p /mnt/storage/clickhouse/{data,logs,backups}
+sudo mkdir -p /mnt/storage/clickhouse/{data,hot,logs,backups}
 sudo chown -R $USER:$USER /mnt/storage/clickhouse
 ```
 
@@ -196,6 +197,7 @@ WINRIFT_API_BIND=0.0.0.0
 WINRIFT_API_PORT=8000
 WINRIFT_STORAGE_MOUNT=/mnt/storage
 WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/storage/clickhouse/data
+WINRIFT_CLICKHOUSE_HOT_DIR=/mnt/storage/clickhouse/hot
 WINRIFT_CLICKHOUSE_LOG_DIR=/mnt/storage/clickhouse/logs
 WINRIFT_CLICKHOUSE_BACKUP_DIR=/mnt/storage/clickhouse/backups
 WINRIFT_RUNTIME_STATE_DIR=/srv/winrift/runtime

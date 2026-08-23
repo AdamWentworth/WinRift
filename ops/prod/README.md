@@ -6,7 +6,7 @@
 
 | Service | Purpose | Notes |
 |---------|---------|-------|
-| `winrift_clickhouse` | Persistent analytics database | Data/logs/backups should live on the storage SSD. |
+| `winrift_clickhouse` | Persistent analytics database | Data, hot data, logs, and backups should live on the storage SSD. |
 | `winrift_api` | Private-LAN API | Bound to `0.0.0.0:8000` by default. |
 | `winrift_worker` | Riot collector worker | Started explicitly, `restart: "no"` to avoid expired-key loops. |
 | `winrift_monitor` | Health and alert monitor | Watches API health, Riot auth marker, and worker heartbeat. |
@@ -24,6 +24,7 @@ The frontend is intentionally not deployed here yet. Run it locally with `VITE_A
 
 /mnt/storage/clickhouse/
 ├── data/             # ClickHouse data files
+├── hot/              # Large raw-timeline parts
 ├── logs/             # ClickHouse logs
 └── backups/          # Manual or scheduled backups
 ```
@@ -47,7 +48,7 @@ sudo mkdir -p /srv/winrift
 sudo chown -R $USER:$USER /srv/winrift
 
 findmnt /mnt/storage
-sudo mkdir -p /mnt/storage/clickhouse/{data,logs,backups}
+sudo mkdir -p /mnt/storage/clickhouse/{data,hot,logs,backups}
 sudo chown -R $USER:$USER /mnt/storage/clickhouse
 
 cp ops/prod/winrift.env.example /srv/winrift/.env
@@ -69,6 +70,7 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `RIOT_AUTH_FAILURE_EXIT` | Should stay `true` so the worker stops when the key expires. |
 | `WINRIFT_STORAGE_MOUNT` | Mount guard, usually `/mnt/storage`. |
 | `WINRIFT_CLICKHOUSE_DATA_DIR` | ClickHouse data directory on storage SSD. |
+| `WINRIFT_CLICKHOUSE_HOT_DIR` | Large raw-timeline parts on the storage SSD. |
 | `WINRIFT_CLICKHOUSE_CONFIG_DIR` | Mounted ClickHouse config override directory. |
 | `WINRIFT_CLICKHOUSE_USERS_DIR` | Mounted ClickHouse user/profile override directory. |
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |

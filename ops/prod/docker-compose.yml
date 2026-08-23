@@ -3,7 +3,8 @@ services:
     image: clickhouse/clickhouse-server:24.12
     container_name: winrift_clickhouse
     restart: unless-stopped
-    cpus: "2.0"
+    cpus: "1.0"
+    cpu_shares: 256
     mem_limit: 3g
     memswap_limit: 4g
     environment:
@@ -12,11 +13,12 @@ services:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-winrift}
     volumes:
       - ${WINRIFT_CLICKHOUSE_DATA_DIR:-/mnt/storage/clickhouse/data}:/var/lib/clickhouse
-      - ${WINRIFT_CLICKHOUSE_HOT_DIR:-/srv/winrift/clickhouse-hot}:/var/lib/clickhouse-hot
+      - ${WINRIFT_CLICKHOUSE_HOT_DIR:-/mnt/storage/clickhouse/hot}:/var/lib/clickhouse-hot
       - ${WINRIFT_CLICKHOUSE_LOG_DIR:-/mnt/storage/clickhouse/logs}:/var/log/clickhouse-server
       - ${WINRIFT_CLICKHOUSE_BACKUP_DIR:-/mnt/storage/clickhouse/backups}:/backups
       - ${WINRIFT_CLICKHOUSE_CONFIG_DIR:-/srv/winrift/clickhouse/config.d}/winrift-system-logs.xml:/etc/clickhouse-server/config.d/winrift-system-logs.xml:ro
       - ${WINRIFT_CLICKHOUSE_CONFIG_DIR:-/srv/winrift/clickhouse/config.d}/winrift-root-storage.xml:/etc/clickhouse-server/config.d/winrift-root-storage.xml:ro
+      - ${WINRIFT_CLICKHOUSE_CONFIG_DIR:-/srv/winrift/clickhouse/config.d}/winrift-resource-limits.xml:/etc/clickhouse-server/config.d/winrift-resource-limits.xml:ro
       - ${WINRIFT_CLICKHOUSE_USERS_DIR:-/srv/winrift/clickhouse/users.d}/winrift-query-logging.xml:/etc/clickhouse-server/users.d/winrift-query-logging.xml:ro
       - ${WINRIFT_SCHEMA_FILE:-/srv/winrift/schema.sql}:/docker-entrypoint-initdb.d/001_schema.sql:ro
     healthcheck:

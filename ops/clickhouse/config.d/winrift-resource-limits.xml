@@ -1,0 +1,40 @@
+<clickhouse>
+  <!-- Let this small server converge steadily after boot without monopolizing it. -->
+  <background_pool_size>2</background_pool_size>
+  <background_merges_mutations_concurrency_ratio>1</background_merges_mutations_concurrency_ratio>
+  <background_schedule_pool_size>32</background_schedule_pool_size>
+  <background_common_pool_size>2</background_common_pool_size>
+  <background_move_pool_size>1</background_move_pool_size>
+  <background_fetches_pool_size>2</background_fetches_pool_size>
+  <background_buffer_flush_schedule_pool_size>2</background_buffer_flush_schedule_pool_size>
+  <background_distributed_schedule_pool_size>2</background_distributed_schedule_pool_size>
+  <background_message_broker_schedule_pool_size>2</background_message_broker_schedule_pool_size>
+
+  <!-- Bound bursty startup, cleanup, query, and I/O thread allocation. -->
+  <max_active_parts_loading_thread_pool_size>4</max_active_parts_loading_thread_pool_size>
+  <max_outdated_parts_loading_thread_pool_size>2</max_outdated_parts_loading_thread_pool_size>
+  <max_unexpected_parts_loading_thread_pool_size>2</max_unexpected_parts_loading_thread_pool_size>
+  <max_parts_cleaning_thread_pool_size>4</max_parts_cleaning_thread_pool_size>
+  <tables_loader_background_pool_size>2</tables_loader_background_pool_size>
+  <max_io_thread_pool_size>16</max_io_thread_pool_size>
+  <max_io_thread_pool_free_size>4</max_io_thread_pool_free_size>
+  <max_backups_io_thread_pool_size>4</max_backups_io_thread_pool_size>
+  <max_backups_io_thread_pool_free_size>1</max_backups_io_thread_pool_free_size>
+  <max_thread_pool_size>256</max_thread_pool_size>
+  <max_thread_pool_free_size>32</max_thread_pool_free_size>
+  <thread_pool_queue_size>1000</thread_pool_queue_size>
+  <io_thread_pool_queue_size>1000</io_thread_pool_queue_size>
+
+  <!-- Leave headroom below the container's 3 GiB hard memory limit. -->
+  <max_server_memory_usage_to_ram_ratio>0.75</max_server_memory_usage_to_ram_ratio>
+
+  <!-- Keep MergeTree work small enough for this host's memory and I/O budget. -->
+  <merge_tree>
+    <number_of_free_entries_in_pool_to_lower_max_size_of_merge>1</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+    <number_of_free_entries_in_pool_to_execute_mutation>1</number_of_free_entries_in_pool_to_execute_mutation>
+    <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>1</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
+    <max_bytes_to_merge_at_max_space_in_pool>2147483648</max_bytes_to_merge_at_max_space_in_pool>
+    <merge_max_block_size>4096</merge_max_block_size>
+    <merge_max_block_size_bytes>4194304</merge_max_block_size_bytes>
+  </merge_tree>
+</clickhouse>
