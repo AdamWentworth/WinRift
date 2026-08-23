@@ -8,6 +8,11 @@
       <log_query_threads>0</log_query_threads>
       <log_processors_profiles>0</log_processors_profiles>
       <log_query_settings>0</log_query_settings>
+      <!-- Partition large grace-hash joins early to keep maintenance RAM bounded. -->
+      <grace_hash_join_initial_buckets>32</grace_hash_join_initial_buckets>
+      <!-- Spill large aggregations and sorts before they threaten the host. -->
+      <max_bytes_before_external_group_by>268435456</max_bytes_before_external_group_by>
+      <max_bytes_before_external_sort>268435456</max_bytes_before_external_sort>
     </default>
   </profiles>
 </clickhouse>
