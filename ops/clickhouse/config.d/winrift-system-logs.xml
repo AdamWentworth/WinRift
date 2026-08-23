@@ -111,17 +111,6 @@
     </engine>
   </asynchronous_metric_log>
 
-  <query_metric_log replace="replace">
-    <database>system</database>
-    <table>query_metric_log</table>
-    <flush_interval_milliseconds>7500</flush_interval_milliseconds>
-    <collect_interval_milliseconds>1000</collect_interval_milliseconds>
-    <engine>
-      ENGINE = MergeTree
-      PARTITION BY toYYYYMM(event_date)
-      ORDER BY (event_date, event_time)
-      TTL event_date + INTERVAL 1 DAY DELETE
-      SETTINGS index_granularity = 8192
-    </engine>
-  </query_metric_log>
+  <!-- Per-second, hundreds-of-column samples are too costly to merge on this host. -->
+  <query_metric_log remove="1"/>
 </clickhouse>

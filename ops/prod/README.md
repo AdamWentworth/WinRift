@@ -34,6 +34,7 @@ Leave ClickHouse paths pointed at `/mnt/storage/clickhouse/...` so database file
 ClickHouse system diagnostics are intentionally bounded by `ops/clickhouse` config mounted into the server:
 
 - per-query/profile logging is disabled for the default profile,
+- the high-frequency `query_metric_log` is disabled,
 - `text_log` is warning-level,
 - ClickHouse system log tables use a one-day TTL.
 
