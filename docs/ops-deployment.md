@@ -160,6 +160,8 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 11. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
 12. Runs post-deploy smoke checks for container state, `/api/health`, leaderboard/profile cache-hit behavior, and worker refresh-status readability when the status file exists.
 
+The server-wide `docker-image-retention.timer` checks disk pressure weekly. At 65% root usage it prunes Docker images older than seven days that are not referenced by a container. This keeps deployment and rollback tags from growing without bound while preserving every running or stopped workload and all persistent volumes. Installation commands are in [ops/prod/README.md](../ops/prod/README.md).
+
 Use `image_ref` only when you intentionally need a pinned image. It accepts `latest`, `sha-<full-commit>`, or a full image reference.
 
 For the one-time laptop database bootstrap, use [ops/prod/data-migration.md](../ops/prod/data-migration.md). The important rule is to deploy with `start_worker=false`, verify restored match counts, and only then start the worker.

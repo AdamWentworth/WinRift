@@ -1,0 +1,12 @@
+[Unit]
+Description=Prune stale Docker images when the OS disk is under pressure
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=MAX_ROOT_USE_PERCENT=65
+Environment=IMAGE_RETENTION=168h
+ExecStart=/usr/local/sbin/winrift-prune-docker-images
+Nice=10
+IOSchedulingClass=idle

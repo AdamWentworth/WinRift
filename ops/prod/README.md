@@ -99,6 +99,18 @@ Core production deploys use the latest published core image by default. Normal f
 
 After the API, monitor, and optional worker are recreated, the deploy workflow runs a post-deploy smoke pass. It verifies container state, `/api/health`, leaderboard/profile cache-hit behavior, and the worker refresh-status JSON when present. A deploy should fail loudly before those issues reach the browser.
 
+The production host also uses `docker-image-retention.timer` to keep deployment images from filling the OS disk. Once a week it checks root filesystem usage. If usage is at least 65%, it removes images that are older than seven days and are not referenced by any container. Running and stopped containers, volumes, and build caches are left alone.
+
+Install or refresh the maintenance timer with:
+
+```bash
+sudo install -m 0755 ops/prod/prune-docker-images.sh /usr/local/sbin/winrift-prune-docker-images
+sudo install -m 0644 ops/prod/systemd/docker-image-retention.service /etc/systemd/system/docker-image-retention.service
+sudo install -m 0644 ops/prod/systemd/docker-image-retention.timer /etc/systemd/system/docker-image-retention.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now docker-image-retention.timer
+```
+
 ```mermaid
 flowchart LR
   Push[Push to GitHub] --> CI[Core CI]

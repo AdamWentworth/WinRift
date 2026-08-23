@@ -1,0 +1,11 @@
+[Unit]
+Description=Check weekly for stale Docker deployment images
+
+[Timer]
+OnCalendar=Sun *-*-* 04:30:00
+RandomizedDelaySec=30m
+AccuracySec=5m
+Unit=docker-image-retention.service
+
+[Install]
+WantedBy=timers.target
