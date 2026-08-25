@@ -39,8 +39,9 @@ type Issue struct {
 }
 
 type alertState struct {
-	ActiveKey  string    `json:"activeKey,omitempty"`
-	LastSentAt time.Time `json:"lastSentAt,omitempty"`
+	ActiveKey     string    `json:"activeKey,omitempty"`
+	LastAttemptAt time.Time `json:"lastAttemptAt,omitempty"`
+	LastSentAt    time.Time `json:"lastSentAt,omitempty"`
 }
 
 type apiHealth struct {
@@ -100,9 +101,15 @@ func (s Service) runOnce(ctx context.Context) {
 		return
 	}
 	log.Printf("monitor alert key=%s subject=%q", issue.Key, issue.Subject)
-	s.send(issue.Subject, issue.Body)
+	if state.ActiveKey != issue.Key {
+		state.LastAttemptAt = time.Time{}
+		state.LastSentAt = time.Time{}
+	}
 	state.ActiveKey = issue.Key
-	state.LastSentAt = s.now()
+	state.LastAttemptAt = s.now()
+	if s.send(issue.Subject, issue.Body) {
+		state.LastSentAt = state.LastAttemptAt
+	}
 	s.writeState(state)
 }
 
@@ -389,28 +396,30 @@ func (s Service) shouldSend(state alertState, issue Issue) bool {
 	if state.ActiveKey != issue.Key {
 		return true
 	}
-	if isOneShotIssue(issue.Key) {
-		return false
+	if state.LastSentAt.IsZero() {
+		retryInterval := s.cfg.MonitorAlertRetryInterval
+		if retryInterval <= 0 {
+			retryInterval = 15 * time.Minute
+		}
+		return state.LastAttemptAt.IsZero() || s.now().Sub(state.LastAttemptAt) >= retryInterval
 	}
 	cooldown := s.cfg.MonitorAlertCooldown
 	if cooldown <= 0 {
-		cooldown = 6 * time.Hour
+		cooldown = 24 * time.Hour
 	}
-	return state.LastSentAt.IsZero() || s.now().Sub(state.LastSentAt) >= cooldown
+	return s.now().Sub(state.LastSentAt) >= cooldown
 }
 
-func isOneShotIssue(key string) bool {
-	return key == "riot-auth-failed"
-}
-
-func (s Service) send(subject, body string) {
+func (s Service) send(subject, body string) bool {
 	if s.notifier == nil {
 		log.Printf("monitor alert notification skipped subject=%q reason=no_notifier", subject)
-		return
+		return true
 	}
 	if err := s.notifier.Send(subject, body); err != nil {
 		log.Printf("monitor alert notification failed subject=%q err=%v", subject, err)
+		return false
 	}
+	return true
 }
 
 func (s Service) readState() alertState {

@@ -125,6 +125,7 @@ func TestLoadMonitorConfig(t *testing.T) {
 	t.Setenv("MONITOR_STARTUP_GRACE_SECONDS", "45")
 	t.Setenv("MONITOR_ALERT_STATE_PATH", "/run/winrift/alerts.json")
 	t.Setenv("MONITOR_ALERT_COOLDOWN_MINUTES", "90")
+	t.Setenv("MONITOR_ALERT_RETRY_MINUTES", "10")
 	t.Setenv("ALERT_EMAIL_ENABLED", "true")
 	t.Setenv("SMTP_HOST", "smtp.example.test")
 	t.Setenv("SMTP_PORT", "2525")
@@ -160,6 +161,9 @@ func TestLoadMonitorConfig(t *testing.T) {
 	}
 	if cfg.MonitorAlertCooldown != 90*time.Minute {
 		t.Fatalf("alert cooldown = %s, want 90m", cfg.MonitorAlertCooldown)
+	}
+	if cfg.MonitorAlertRetryInterval != 10*time.Minute {
+		t.Fatalf("alert retry interval = %s, want 10m", cfg.MonitorAlertRetryInterval)
 	}
 	if !cfg.AlertEmailEnabled || cfg.SMTPHost != "smtp.example.test" || cfg.SMTPPort != 2525 || cfg.SMTPUsername != "winrift" || cfg.SMTPPassword != "secret" || cfg.SMTPFrom != "winrift@example.test" {
 		t.Fatalf("smtp config not loaded: %+v", cfg)

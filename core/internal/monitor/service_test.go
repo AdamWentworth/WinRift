@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,11 +18,12 @@ import (
 
 type recordingNotifier struct {
 	subjects []string
+	err      error
 }
 
 func (n *recordingNotifier) Send(subject, body string) error {
 	n.subjects = append(n.subjects, subject)
-	return nil
+	return n.err
 }
 
 func TestCheckReportsRiotAuthMarker(t *testing.T) {
@@ -205,7 +207,7 @@ func TestRunOnceSuppressesDuplicateNonAuthAlertsUntilCooldown(t *testing.T) {
 	}
 }
 
-func TestRunOnceSendsRiotAuthFailureOnceUntilRecovery(t *testing.T) {
+func TestRunOnceRepeatsRiotAuthFailureAfterCooldown(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "riot-auth-failed")
 	if err := os.WriteFile(marker, []byte("status=403\n"), 0o600); err != nil {
@@ -228,8 +230,8 @@ func TestRunOnceSendsRiotAuthFailureOnceUntilRecovery(t *testing.T) {
 
 	now = now.Add(2 * time.Hour)
 	service.runOnce(context.Background())
-	if got := len(notifier.subjects); got != 1 {
-		t.Fatalf("notifications after cooldown = %d, want still 1", got)
+	if got := len(notifier.subjects); got != 2 {
+		t.Fatalf("notifications after cooldown = %d, want 2", got)
 	}
 
 	if err := os.Remove(marker); err != nil {
@@ -244,8 +246,49 @@ func TestRunOnceSendsRiotAuthFailureOnceUntilRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	service.runOnce(context.Background())
+	if got := len(notifier.subjects); got != 3 {
+		t.Fatalf("notifications for new auth incident = %d, want 3", got)
+	}
+}
+
+func TestRunOnceRetriesFailedDeliveryWithoutRecordingItAsSent(t *testing.T) {
+	dir := t.TempDir()
+	notifier := &recordingNotifier{err: errors.New("smtp rejected")}
+	service := NewService(config.Config{
+		RiotAuthFailureMarkerPath:  filepath.Join(dir, "missing-marker"),
+		MonitorWorkerRequired:      true,
+		MonitorWorkerHeartbeatPath: filepath.Join(dir, "missing-heartbeat.json"),
+		MonitorWorkerStaleAfter:    15 * time.Minute,
+		MonitorAlertStatePath:      filepath.Join(dir, "state.json"),
+		MonitorAlertCooldown:       24 * time.Hour,
+		MonitorAlertRetryInterval:  15 * time.Minute,
+	}, notifier)
+	now := time.Date(2026, 5, 30, 10, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return now }
+
+	service.runOnce(context.Background())
+	state := service.readState()
+	if state.LastAttemptAt.IsZero() {
+		t.Fatal("last attempt was not recorded")
+	}
+	if !state.LastSentAt.IsZero() {
+		t.Fatalf("failed delivery recorded as sent at %s", state.LastSentAt)
+	}
+
+	now = now.Add(10 * time.Minute)
+	service.runOnce(context.Background())
+	if got := len(notifier.subjects); got != 1 {
+		t.Fatalf("notifications before retry interval = %d, want 1", got)
+	}
+
+	now = now.Add(5 * time.Minute)
+	notifier.err = nil
+	service.runOnce(context.Background())
 	if got := len(notifier.subjects); got != 2 {
-		t.Fatalf("notifications for new auth incident = %d, want 2", got)
+		t.Fatalf("notifications after retry interval = %d, want 2", got)
+	}
+	if state := service.readState(); state.LastSentAt.IsZero() {
+		t.Fatal("successful retry was not recorded as sent")
 	}
 }
 

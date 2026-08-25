@@ -88,6 +88,7 @@ type Config struct {
 	MonitorStartupGrace                    time.Duration
 	MonitorAlertStatePath                  string
 	MonitorAlertCooldown                   time.Duration
+	MonitorAlertRetryInterval              time.Duration
 	AlertEmailEnabled                      bool
 	SMTPHost                               string
 	SMTPPort                               int
@@ -178,7 +179,8 @@ func Load() Config {
 		MonitorDockerSocketPath:                env("MONITOR_DOCKER_SOCKET_PATH", "/var/run/docker.sock"),
 		MonitorStartupGrace:                    time.Duration(envInt("MONITOR_STARTUP_GRACE_SECONDS", 120)) * time.Second,
 		MonitorAlertStatePath:                  env("MONITOR_ALERT_STATE_PATH", "/run/winrift/monitor-alert-state.json"),
-		MonitorAlertCooldown:                   time.Duration(envInt("MONITOR_ALERT_COOLDOWN_MINUTES", 360)) * time.Minute,
+		MonitorAlertCooldown:                   time.Duration(envInt("MONITOR_ALERT_COOLDOWN_MINUTES", 1440)) * time.Minute,
+		MonitorAlertRetryInterval:              time.Duration(envInt("MONITOR_ALERT_RETRY_MINUTES", 15)) * time.Minute,
 		AlertEmailEnabled:                      envBool("ALERT_EMAIL_ENABLED", false),
 		SMTPHost:                               env("SMTP_HOST", ""),
 		SMTPPort:                               envInt("SMTP_PORT", 587),

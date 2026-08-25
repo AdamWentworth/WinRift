@@ -157,7 +157,7 @@ The helper prompts for the key with hidden input, shows a masked preview, and re
 
 Patch rollover maintenance is deliberately paced. Backfills walk source match IDs in 250-match batches, check destination completeness through the match-ID primary key, copy only missing normalized participant data, and restrict the remaining raw JSON work to those same bounded batches. The helper also runs `patchctl` with conservative ClickHouse query settings by default: `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_THREADS=2`, `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB=2304`, `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS=2`, and `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS=1800`. `patchctl` waits between archive phases when one-minute load is above `WINRIFT_PATCHCTL_MAX_LOAD_1M` (default: host CPU count) or available memory is below `WINRIFT_PATCHCTL_MIN_AVAILABLE_MEMORY_MB` (default: 1024). Tune these only if the server has more room or if maintenance needs to be even gentler.
 
-The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health`, the auth-failure marker, and, in production, the worker Docker container state. In production, keep `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` so a stopped worker sends an email instead of quietly falling behind. Riot auth-failure emails are one-shot per marker or auth-failed heartbeat incident, and stale heartbeat observations are logged but do not send email.
+The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health`, the auth-failure marker, and, in production, the worker Docker container state. In production, keep `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` so a stopped worker sends an email instead of quietly falling behind. Unresolved alerts repeat after `MONITOR_ALERT_COOLDOWN_MINUTES`; failed SMTP deliveries retry after `MONITOR_ALERT_RETRY_MINUTES`. Stale heartbeat observations are logged but do not send email.
 
 Riot 404s are different: they mean the requested resource is absent, such as an unknown Riot ID or a player not currently being in a live game. They do not write the auth-failure marker.
 
@@ -179,6 +179,8 @@ Safety knobs:
 - `MONITOR_WORKER_CONTAINER_NAME`: optional Docker container name used by the monitor to detect that the collector worker is actually down.
 - `MONITOR_DOCKER_SOCKET_PATH`: Docker socket path used when `MONITOR_WORKER_CONTAINER_NAME` is set.
 - `MONITOR_STARTUP_GRACE_SECONDS`: short grace window after monitor startup before worker-down container checks send email.
+- `MONITOR_ALERT_COOLDOWN_MINUTES`: interval between successfully delivered reminders for an unresolved issue; production defaults to 24 hours.
+- `MONITOR_ALERT_RETRY_MINUTES`: interval before retrying an alert that the SMTP provider rejected or failed to deliver.
 - `ALERT_EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TO`: SMTP email alert settings used by the monitor.
 - `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
 - `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.10`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch. The production `riotkey` helper advances this automatically when Data Dragon reports a newer patch.
