@@ -292,6 +292,39 @@ func TestRunOnceRetriesFailedDeliveryWithoutRecordingItAsSent(t *testing.T) {
 	}
 }
 
+func TestRunOnceClearsPreviousSentTimeWhenReminderDeliveryFails(t *testing.T) {
+	dir := t.TempDir()
+	statePath := filepath.Join(dir, "state.json")
+	notifier := &recordingNotifier{err: errors.New("smtp rejected")}
+	service := NewService(config.Config{
+		RiotAuthFailureMarkerPath:  filepath.Join(dir, "missing-marker"),
+		MonitorWorkerRequired:      true,
+		MonitorWorkerHeartbeatPath: filepath.Join(dir, "missing-heartbeat.json"),
+		MonitorWorkerStaleAfter:    15 * time.Minute,
+		MonitorAlertStatePath:      statePath,
+		MonitorAlertCooldown:       time.Hour,
+		MonitorAlertRetryInterval:  15 * time.Minute,
+	}, notifier)
+	now := time.Date(2026, 5, 30, 12, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return now }
+	service.writeState(alertState{
+		ActiveKey:  "worker-heartbeat-missing",
+		LastSentAt: now.Add(-2 * time.Hour),
+	})
+
+	service.runOnce(context.Background())
+	state := service.readState()
+	if !state.LastSentAt.IsZero() {
+		t.Fatalf("failed reminder retained sent time %s", state.LastSentAt)
+	}
+
+	now = now.Add(10 * time.Minute)
+	service.runOnce(context.Background())
+	if got := len(notifier.subjects); got != 1 {
+		t.Fatalf("notifications before retry interval = %d, want 1", got)
+	}
+}
+
 func TestRunOnceDoesNotSendRecoveryEmail(t *testing.T) {
 	dir := t.TempDir()
 	statePath := filepath.Join(dir, "state.json")

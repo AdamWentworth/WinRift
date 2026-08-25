@@ -109,6 +109,8 @@ func (s Service) runOnce(ctx context.Context) {
 	state.LastAttemptAt = s.now()
 	if s.send(issue.Subject, issue.Body) {
 		state.LastSentAt = state.LastAttemptAt
+	} else {
+		state.LastSentAt = time.Time{}
 	}
 	s.writeState(state)
 }
