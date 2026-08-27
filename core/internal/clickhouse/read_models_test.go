@@ -630,9 +630,10 @@ func TestCachedChampionPageBundleUsesPersistentCache(t *testing.T) {
 	defer cleanup()
 	repo := &Repository{db: db}
 
-	mock.ExpectQuery("(?s)FROM champion_page_bundle_cache FINAL").
+	expiresAt := time.Now().Add(time.Hour)
+	mock.ExpectQuery("(?s)FROM champion_page_bundle_cache.*PREWHERE cache_key = \\?.*ORDER BY compiled_at DESC").
 		WithArgs("champion-page:test").
-		WillReturnRows(sqlmock.NewRows([]string{"payload_json"}).AddRow(`{"ok":true}`))
+		WillReturnRows(sqlmock.NewRows([]string{"payload_json", "expires_at"}).AddRow(`{"ok":true}`, expiresAt))
 
 	body, ok, err := repo.CachedChampionPageBundle(context.Background(), "champion-page:test")
 	if err != nil {
@@ -646,13 +647,35 @@ func TestCachedChampionPageBundleUsesPersistentCache(t *testing.T) {
 	}
 }
 
+func TestCachedChampionPageBundleRejectsLatestExpiredEntry(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM champion_page_bundle_cache.*PREWHERE cache_key = \\?.*ORDER BY compiled_at DESC").
+		WithArgs("champion-page:expired").
+		WillReturnRows(sqlmock.NewRows([]string{"payload_json", "expires_at"}).
+			AddRow(`{"stale":true}`, time.Now().Add(-time.Minute)))
+
+	body, ok, err := repo.CachedChampionPageBundle(context.Background(), "champion-page:expired")
+	if err != nil {
+		t.Fatalf("cached champion page bundle: %v", err)
+	}
+	if ok || body != nil {
+		t.Fatalf("expired bundle ok=%t body=%s; want cache miss", ok, string(body))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestCachedChampionPageBundlesLoadsCanonicalBundlesInOneQuery(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()
 	repo := &Repository{db: db}
 	expiresAt := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
 
-	mock.ExpectQuery("(?s)SELECT cache_key, payload_json, expires_at.*FROM champion_page_bundle_cache FINAL.*WHERE cache_key IN \\(\\?,\\?\\)").
+	mock.ExpectQuery("(?s)SELECT cache_key, payload_json, expires_at.*FROM champion_page_bundle_cache.*PREWHERE cache_key IN \\(\\?,\\?\\).*LIMIT 1 BY cache_key").
 		WithArgs("champion-page:one", "champion-page:two").
 		WillReturnRows(sqlmock.NewRows([]string{"cache_key", "payload_json", "expires_at"}).
 			AddRow("champion-page:one", `{"champion":1}`, expiresAt).

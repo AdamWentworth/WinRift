@@ -38,20 +38,24 @@ func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey stri
 		return nil, false, nil
 	}
 	var payload string
+	var expiresAt time.Time
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT payload_json
-		FROM champion_page_bundle_cache FINAL
-		WHERE cache_key = ? AND expires_at > now()
+		`SELECT payload_json, expires_at
+		FROM champion_page_bundle_cache
+		PREWHERE cache_key = ?
 		ORDER BY compiled_at DESC
 		LIMIT 1`,
 		cacheKey,
-	).Scan(&payload)
+	).Scan(&payload, &expiresAt)
 	if err == sql.ErrNoRows {
 		return nil, false, nil
 	}
 	if err != nil {
 		return nil, false, err
+	}
+	if !expiresAt.After(time.Now()) {
+		return nil, false, nil
 	}
 	return []byte(payload), true, nil
 }
@@ -80,8 +84,10 @@ func (r *Repository) CachedChampionPageBundles(ctx context.Context, cacheKeys []
 	rows, err := r.db.QueryContext(
 		ctx,
 		fmt.Sprintf(`SELECT cache_key, payload_json, expires_at
-		FROM champion_page_bundle_cache FINAL
-		WHERE cache_key IN (%s) AND expires_at > now()`, strings.Join(placeholders, ",")),
+		FROM champion_page_bundle_cache
+		PREWHERE cache_key IN (%s)
+		ORDER BY cache_key, compiled_at DESC
+		LIMIT 1 BY cache_key`, strings.Join(placeholders, ",")),
 		args...,
 	)
 	if err != nil {
