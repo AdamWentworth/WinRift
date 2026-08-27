@@ -148,7 +148,14 @@ func (r *Repository) queryStartingItemLoadoutsLiveScan(ctx context.Context, filt
 		args = append(args, filters["patch"])
 	}
 	query := fmt.Sprintf(`
-		WITH raw_opening_item_events AS
+		WITH target_match_ids AS
+		(
+			SELECT DISTINCT pm.match_id
+			FROM participant_matchups AS pm FINAL
+			WHERE 1 = 1
+				%s
+		),
+		raw_opening_item_events AS
 		(
 			SELECT
 				pm.match_id AS match_id,
@@ -183,6 +190,8 @@ func (r *Repository) queryStartingItemLoadoutsLiveScan(ctx context.Context, filt
 			WHERE tie.event_type = 'ITEM_PURCHASED'
 				AND tie.timestamp_ms <= ?
 				AND tie.item_id IN (%s)
+				AND pm.match_id IN (SELECT match_id FROM target_match_ids)
+				AND tie.match_id IN (SELECT match_id FROM target_match_ids)
 				%s
 		),
 		first_opening_purchases AS
@@ -236,8 +245,10 @@ func (r *Repository) queryStartingItemLoadoutsLiveScan(ctx context.Context, filt
 			toUInt64(count()) AS games,
 			wins / games AS win_rate
 		FROM opening_purchases
-		WHERE length(item_ids) > 0`, itemCostExpr, itemList, rawFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
-	queryArgs := append([]any{openingPurchaseFirstWindowMS}, args...)
+		WHERE length(item_ids) > 0`, rawFilters, itemCostExpr, itemList, rawFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+	queryArgs := append([]any{}, args...)
+	queryArgs = append(queryArgs, openingPurchaseFirstWindowMS)
+	queryArgs = append(queryArgs, args...)
 	queryArgs = append(queryArgs, openingPurchaseBurstWindowMS, openingPurchaseGoldCap)
 	if filters["rank_bucket"] != "" {
 		query += " AND rank_value = ?"
@@ -439,7 +450,14 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 	rawArgs := append([]any{}, args...)
 	compiledArgs := append([]any{}, args...)
 	query := fmt.Sprintf(`
-		WITH raw_starting_items AS
+		WITH target_match_ids AS
+		(
+			SELECT DISTINCT pm.match_id
+			FROM participant_matchups AS pm FINAL
+			WHERE 1 = 1
+				%s
+		),
+		raw_starting_items AS
 		(
 			SELECT
 				pm.match_id AS match_id,
@@ -472,6 +490,8 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 			WHERE tie.event_type = 'ITEM_PURCHASED'
 				AND tie.timestamp_ms <= ?
 				AND tie.item_id IN (%s)
+				AND pm.match_id IN (SELECT match_id FROM target_match_ids)
+				AND tie.match_id IN (SELECT match_id FROM target_match_ids)
 				%s
 			GROUP BY
 				pm.match_id,
@@ -517,6 +537,8 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 				ON s.platform = pm.platform AND s.puuid = pm.puuid
 			WHERE tie.event_type = 'ITEM_PURCHASED'
 				AND tie.item_id IN (%s)
+				AND pm.match_id IN (SELECT match_id FROM target_match_ids)
+				AND tie.match_id IN (SELECT match_id FROM target_match_ids)
 				%s
 			GROUP BY
 				pm.match_id,
@@ -602,8 +624,10 @@ func (r *Repository) queryItemSlotsLiveScan(ctx context.Context, filters map[str
 			UNION ALL
 			SELECT * FROM compiled_item_slots WHERE item_slot <= 6
 		)
-		WHERE item_id > 0`, startingItemList, rawFilters, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
-	args = append([]any{startingItemWindowMS}, rawArgs...)
+		WHERE item_id > 0`, rawFilters, startingItemList, rawFilters, itemList, rawFilters, itemList, compiledFilters, roleScope.selectExpr, opponentBucketExpr, patchBucketExpr, rankBucketExpr)
+	args = append([]any{}, rawArgs...)
+	args = append(args, startingItemWindowMS)
+	args = append(args, rawArgs...)
 	args = append(args, rawArgs...)
 	args = append(args, compiledArgs...)
 	if filters["rank_bucket"] != "" {

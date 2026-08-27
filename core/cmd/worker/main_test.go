@@ -190,3 +190,33 @@ func TestChampionPagePrewarmPatchListIncludesSelectableArchivedPatches(t *testin
 		}
 	}
 }
+
+func TestChampionPageStartupPrewarmPatchListUsesMatureFallback(t *testing.T) {
+	patches := championPageStartupPrewarmPatchList(
+		"16.17",
+		2,
+		[]clickhouse.PatchStat{
+			{Patch: "16.15", Matches: 7000},
+			{Patch: "16.17", Matches: 200},
+			{Patch: "16.16", Matches: 4000},
+			{Patch: "16.14", Matches: 9000},
+		},
+	)
+	want := []string{"16.17", "16.15"}
+	if len(patches) != len(want) {
+		t.Fatalf("patches = %v, want %v", patches, want)
+	}
+	for index := range want {
+		if patches[index] != want[index] {
+			t.Fatalf("patches = %v, want %v", patches, want)
+		}
+	}
+}
+
+func TestChampionPageStartupPrewarmPatchListFallsBackToRetentionWindow(t *testing.T) {
+	patches := championPageStartupPrewarmPatchList("16.17", 2, nil)
+	want := []string{"16.17", "16.16"}
+	if len(patches) != len(want) || patches[0] != want[0] || patches[1] != want[1] {
+		t.Fatalf("patches = %v, want %v", patches, want)
+	}
+}

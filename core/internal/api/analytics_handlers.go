@@ -66,6 +66,20 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, badRequest)
 		return
 	}
+	if championPageCanonicalAliasEligible(request) {
+		aliasKey := championPageBundleCacheKey(request)
+		if body, ok := s.responseCache.get(aliasKey); ok {
+			writeJSONBytes(w, http.StatusOK, body, true)
+			return
+		}
+		if body, ok, err := s.repo.CachedChampionPageBundle(r.Context(), aliasKey); err != nil {
+			log.Printf("champion page canonical alias cache lookup failed key=%s err=%v", aliasKey, err)
+		} else if ok {
+			s.responseCache.set(aliasKey, body, s.championPageBundleTTL(request.Build.Patch))
+			writeJSONBytes(w, http.StatusOK, body, true)
+			return
+		}
+	}
 	request, err := s.resolveChampionPageBundleRequest(r.Context(), request)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -108,6 +122,19 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSONBytes(w, http.StatusOK, body, cacheHit || shared)
+}
+
+func championPageCanonicalAliasEligible(request championPageBundleRequest) bool {
+	return strings.TrimSpace(request.Build.Role) == "" &&
+		request.Build.OpponentChampionID == 0 &&
+		normalizedItemContext(request.Build.ItemContext, "") == "DEFAULT"
+}
+
+func championPageCanonicalAliasRequest(request championPageBundleRequest) championPageBundleRequest {
+	request.Build.Role = ""
+	request.Build.OpponentChampionID = 0
+	request.Build.ItemContext = normalizedItemContext("", "")
+	return request
 }
 
 type championPageBundleRequest struct {

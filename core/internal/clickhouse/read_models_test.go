@@ -366,6 +366,107 @@ func TestQueryStartingItemLoadoutsUsesSummaryReadModel(t *testing.T) {
 	}
 }
 
+func TestQueryStartingItemLoadoutsPrunesLiveScanToTargetMatches(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM starting_loadout_analytics FINAL").
+		WithArgs("JUNGLE", "62", "JUNGLE", "16.17", 5).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role_bucket",
+			"opponent_champion_id",
+			"patch_bucket",
+			"rank_bucket",
+			"item_signature",
+			"wins",
+			"games",
+			"win_rate",
+		}))
+	mock.ExpectQuery("SELECT toUInt8\\(1\\) FROM starting_loadout_analytics WHERE item_context = \\? AND patch = \\? LIMIT 1").
+		WithArgs("JUNGLE", "16.17").
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("(?s)WITH target_match_ids AS.*SELECT DISTINCT pm.match_id.*pm.champion_id = \\?.*pm.role = \\?.*pm.patch = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\)").
+		WithArgs(
+			"62", "JUNGLE", "16.17",
+			openingPurchaseFirstWindowMS,
+			"62", "JUNGLE", "16.17",
+			openingPurchaseBurstWindowMS,
+			openingPurchaseGoldCap,
+			5,
+		).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role_bucket",
+			"opponent_champion_id",
+			"patch_bucket",
+			"rank_bucket",
+			"item_signature",
+			"wins",
+			"games",
+			"win_rate",
+		}).AddRow(62, "JUNGLE", 0, "16.17", "ALL", "1101-2003", 7, 12, 0.5833))
+
+	rows, err := repo.QueryStartingItemLoadouts(context.Background(), map[string]string{
+		"champion_id": "62",
+		"role":        "JUNGLE",
+		"patch":       "16.17",
+	}, "JUNGLE", map[uint32]uint32{1101: 450, 2003: 50}, 5, 4)
+	if err != nil {
+		t.Fatalf("query starting loadouts: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ChampionID != 62 || rows[0].ItemSignature != "1101-2003" {
+		t.Fatalf("rows = %+v; want target-match-pruned live result", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestQueryItemSlotsLiveScanPrunesToTargetMatches(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)WITH target_match_ids AS.*SELECT DISTINCT pm.match_id.*pm.champion_id = \\?.*pm.role = \\?.*pm.patch = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\)").
+		WithArgs(
+			"62", "JUNGLE", "16.17",
+			startingItemWindowMS,
+			"62", "JUNGLE", "16.17",
+			"62", "JUNGLE", "16.17",
+			"62", "JUNGLE", "16.17",
+			5,
+		).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id",
+			"role_bucket",
+			"opponent_champion_id",
+			"patch_bucket",
+			"rank_bucket",
+			"item_slot",
+			"item_id",
+			"wins",
+			"games",
+			"win_rate",
+		}).AddRow(62, "JUNGLE", 0, "16.17", "ALL", 1, 3071, 7, 12, 0.5833))
+
+	rows, err := repo.queryItemSlotsLiveScan(context.Background(), map[string]string{
+		"champion_id": "62",
+		"role":        "JUNGLE",
+		"patch":       "16.17",
+	}, []uint32{3071}, []uint32{1101}, 5, 4)
+	if err != nil {
+		t.Fatalf("query item slots: %v", err)
+	}
+	if len(rows) != 1 || rows[0].ChampionID != 62 || rows[0].ItemID != 3071 {
+		t.Fatalf("rows = %+v; want target-match-pruned live result", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestChampionGuideItemPathsUseBuildSignatureReadModel(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()

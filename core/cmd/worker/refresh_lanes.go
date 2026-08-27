@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,11 @@ type refreshSchedulerState struct {
 	lastSummonerProfileRefresh time.Time
 	nextLane                   int
 }
+
+const (
+	championPageStartupPrewarmConcurrency = 4
+	championPageStartupReadinessGrace     = 45 * time.Second
+)
 
 func newRefreshStatusRecorder(path string) *refreshStatusRecorder {
 	return &refreshStatusRecorder{path: path, statuses: map[string]runstate.RefreshStatus{}}
@@ -85,22 +91,13 @@ func (r *refreshStatusRecorder) flush() {
 	}
 }
 
-func startRefreshScheduler(ctx context.Context, cfg config.Config, staticService *staticdata.Service, apiServer api.Server, repo *clickhouse.Repository, platforms []string, firstSweepComplete <-chan struct{}) {
+func startRefreshScheduler(ctx context.Context, cfg config.Config, staticService *staticdata.Service, apiServer api.Server, repo *clickhouse.Repository, platforms []string) {
 	go func() {
-		log.Printf("analytics refresh scheduler waiting for first collector sweep")
-		select {
-		case <-ctx.Done():
-			log.Printf("analytics refresh scheduler stopped before first sweep err=%v", ctx.Err())
-			return
-		case <-firstSweepComplete:
-			log.Printf("analytics refresh scheduler starting after first collector sweep")
-		}
-
 		interval := cfg.AnalyticsRefreshSchedulerInterval
 		if interval <= 0 {
 			interval = time.Minute
 		}
-		log.Printf("analytics refresh scheduler started interval=%s policy=one_due_family_per_tick", interval)
+		log.Printf("analytics refresh scheduler started interval=%s policy=start_immediately_one_due_family_per_tick", interval)
 		state := refreshSchedulerState{}
 		refreshStatus := newRefreshStatusRecorder(cfg.WorkerRefreshStatusPath)
 		for {
@@ -151,6 +148,137 @@ func runNextRefreshSchedulerLane(ctx context.Context, cfg config.Config, staticS
 		}
 	}
 	log.Printf("analytics refresh scheduler idle: no due refresh families")
+}
+
+func prewarmChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiServer api.Server, repo *clickhouse.Repository) {
+	if !cfg.ChampionPagePrewarmEnabled {
+		return
+	}
+	currentPatch := strings.TrimSpace(cfg.CollectorCurrentPatch)
+	if currentPatch == "" {
+		return
+	}
+	stats, err := repo.PatchStats(ctx, analytics.RankedSoloQueueID)
+	if err != nil {
+		log.Printf("champion page canonical startup prewarm patch discovery failed err=%v", err)
+	}
+	patches := championPageStartupPrewarmPatchList(currentPatch, cfg.CollectorPatchRetention, stats)
+	hadErrors := false
+	for _, patch := range patches {
+		startedAt := time.Now()
+		log.Printf("champion page canonical startup prewarm start patch=%s queue=%d concurrency=%d", patch, analytics.RankedSoloQueueID, championPageStartupPrewarmConcurrency)
+		result, prewarmErr := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
+			Patch:         patch,
+			CanonicalOnly: true,
+			Concurrency:   championPageStartupPrewarmConcurrency,
+			RankBucket:    cfg.ChampionPagePrewarmRankBucket,
+			QueueID:       analytics.RankedSoloQueueID,
+		})
+		if prewarmErr != nil {
+			hadErrors = true
+			log.Printf(
+				"champion page canonical startup prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d errors=%d duration=%s err=%v",
+				patch,
+				analytics.RankedSoloQueueID,
+				result.Candidates,
+				result.Stored,
+				result.Cached,
+				result.Skipped,
+				result.Errors,
+				time.Since(startedAt).Round(time.Millisecond),
+				prewarmErr,
+			)
+			continue
+		}
+		log.Printf(
+			"champion page canonical startup prewarm complete patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d errors=%d duration=%s",
+			patch,
+			analytics.RankedSoloQueueID,
+			result.Candidates,
+			result.Stored,
+			result.Cached,
+			result.Skipped,
+			result.Errors,
+			time.Since(startedAt).Round(time.Millisecond),
+		)
+	}
+	if hadErrors {
+		return
+	}
+	log.Printf("champion page canonical startup readiness grace start duration=%s", championPageStartupReadinessGrace)
+	timer := time.NewTimer(championPageStartupReadinessGrace)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+		log.Printf("champion page canonical startup readiness grace complete duration=%s", championPageStartupReadinessGrace)
+	}
+}
+
+func championPageStartupPrewarmPatchList(currentPatch string, retention int, stats []clickhouse.PatchStat) []string {
+	currentPatch = strings.TrimSpace(currentPatch)
+	if currentPatch == "" {
+		return nil
+	}
+	var newestPrevious string
+	var maturePrevious string
+	for _, stat := range stats {
+		patch := strings.TrimSpace(stat.Patch)
+		if patch == "" || stat.Matches == 0 || compareChampionPagePatches(patch, currentPatch) >= 0 {
+			continue
+		}
+		if newestPrevious == "" || compareChampionPagePatches(patch, newestPrevious) > 0 {
+			newestPrevious = patch
+		}
+		if stat.Matches >= 5000 && (maturePrevious == "" || compareChampionPagePatches(patch, maturePrevious) > 0) {
+			maturePrevious = patch
+		}
+	}
+	fallbackPatch := maturePrevious
+	if fallbackPatch == "" {
+		fallbackPatch = newestPrevious
+	}
+	if fallbackPatch == "" {
+		window := analytics.PatchWindow(currentPatch, retention)
+		if len(window) > 1 {
+			fallbackPatch = window[1]
+		}
+	}
+	patches := []string{currentPatch}
+	if fallbackPatch != "" && fallbackPatch != currentPatch {
+		patches = append(patches, fallbackPatch)
+	}
+	return patches
+}
+
+func compareChampionPagePatches(left, right string) int {
+	parse := func(value string) (int, int, bool) {
+		parts := strings.Split(strings.TrimSpace(value), ".")
+		if len(parts) < 2 {
+			return 0, 0, false
+		}
+		major, majorErr := strconv.Atoi(parts[0])
+		minor, minorErr := strconv.Atoi(parts[1])
+		return major, minor, majorErr == nil && minorErr == nil
+	}
+	leftMajor, leftMinor, leftOK := parse(left)
+	rightMajor, rightMinor, rightOK := parse(right)
+	if !leftOK || !rightOK {
+		return strings.Compare(strings.TrimSpace(left), strings.TrimSpace(right))
+	}
+	if leftMajor != rightMajor {
+		if leftMajor < rightMajor {
+			return -1
+		}
+		return 1
+	}
+	if leftMinor < rightMinor {
+		return -1
+	}
+	if leftMinor > rightMinor {
+		return 1
+	}
+	return 0
 }
 
 func maybeRefreshItemSlotAnalytics(ctx context.Context, cfg config.Config, staticService *staticdata.Service, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, lastRefresh *time.Time) bool {
@@ -335,6 +463,7 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 				Roles:               cfg.ChampionPagePrewarmRoles,
 				PerRole:             cfg.ChampionPagePrewarmPerRole,
 				MinGames:            cfg.ChampionPagePrewarmMinGames,
+				Concurrency:         championPageStartupPrewarmConcurrency,
 				MatchupsPerChampion: matchupsPerChampion,
 				MatchupMinGames:     cfg.ChampionPagePrewarmMatchupMinGames,
 				MaxMatchupBundles:   maxMatchupBundles,

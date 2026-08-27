@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"winrift/core/internal/analytics"
 	"winrift/core/internal/config"
 	"winrift/core/internal/riot"
 )
@@ -192,5 +193,38 @@ func TestChampionPageBundleCacheKeyCanonicalizesEffectiveRequest(t *testing.T) {
 	}
 	if championPageBundleCacheKey(noRank) != championPageBundleCacheKey(allRanks) {
 		t.Fatalf("cache key with rankBucket=ALL should match omitted all-ranks key")
+	}
+}
+
+func TestChampionPageCanonicalAliasMatchesNoRoleFrontendRequest(t *testing.T) {
+	resolved := championPagePrewarmRequest(62, "JUNGLE", "16.17", "", analytics.RankedSoloQueueID)
+	alias := championPageCanonicalAliasRequest(resolved)
+	if !championPageCanonicalAliasEligible(alias) {
+		t.Fatalf("canonical alias should be eligible: %+v", alias.Build)
+	}
+	if alias.Build.Role != "" || alias.Build.ItemContext != "DEFAULT" || alias.Build.OpponentChampionID != 0 {
+		t.Fatalf("canonical alias build = %+v", alias.Build)
+	}
+	if championPageBundleCacheKey(alias) == championPageBundleCacheKey(resolved) {
+		t.Fatal("automatic-role alias must not overwrite the resolved-role cache key")
+	}
+
+	incoming, badRequest := parseChampionPageBundleRequest(url.Values{
+		"championId":       {"62"},
+		"patch":            {"16.17"},
+		"minGames":         {"5"},
+		"championMinGames": {"10"},
+		"limit":            {"4"},
+		"guideMinGames":    {"5"},
+		"guideLimit":       {"12"},
+		"indexMinGames":    {"1"},
+		"indexLimit":       {"250"},
+		"queueId":          {"420"},
+	})
+	if badRequest != "" {
+		t.Fatal(badRequest)
+	}
+	if championPageBundleCacheKey(alias) != championPageBundleCacheKey(incoming) {
+		t.Fatalf("alias key does not match no-role frontend request:\nalias:    %s\nincoming: %s", championPageBundleCacheKey(alias), championPageBundleCacheKey(incoming))
 	}
 }

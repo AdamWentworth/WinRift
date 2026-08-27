@@ -24,7 +24,7 @@ Build advice and champion item paths use `build_signature_analytics` for current
 
 Summary refreshes should stage new rows before deleting older compiled rows. Champion-guide, summoner-profile, item-slot/loadout, and win-condition lanes now insert a fresh snapshot into ReplacingMergeTree read models, then remove rows with an older `compiled_at`. Public reads keep seeing the previous snapshot during the rebuild, and a failed refresh leaves the old snapshot intact instead of briefly exposing empty tables.
 
-After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. Every selectable patch gets a canonical page for each indexed champion plus the configured high-volume role pages. Retained-patch bundles expire after two hours so they follow refreshes; archived-patch bundles remain reusable for 30 days because their source data is stable.
+At startup, before Riot collection, the worker prewarms canonical champion-page bundles for the current patch and the mature fallback patch into `champion_page_bundle_cache` with bounded concurrency. Each canonical bundle is also stored under an automatic-role alias, allowing the normal no-role frontend request to hit persistent cache without first querying ClickHouse for role resolution. The later champion-guide lane expands coverage to every selectable patch and the configured high-volume role pages. This is ClickHouse/local cache work only; it does not spend Riot API budget. Retained-patch bundles expire after two hours so they follow refreshes; archived-patch bundles remain reusable for 30 days because their source data is stable.
 
 Exact opponent-filtered champion pages are the expensive cold path because they assemble the same guide bundle plus matchup-specific item panels. The worker therefore prewarms a bounded number of common opponent bundles for retained patches only. Keep `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES` conservative; the default is `100` per patch. Simultaneous misses for the same page are coalesced into one build, so a burst of first visitors cannot multiply the same ClickHouse work. Warm responses should be effectively instant, but the first build of an obscure, uncached exact matchup can still take seconds.
 
@@ -70,7 +70,7 @@ python3 ops/prod/champion-page-perf-audit.py \
   --json champion-page-performance.json
 ```
 
-`deploy-core-prod` waits for the current-patch prewarm completion log and then runs this audit as a required deployment gate. The manual `perf-smoke` workflow runs it too. A missing prewarm entry, slow response, incomplete bundle, or empty fallback fails the workflow rather than being downgraded to a warning.
+`deploy-core-prod` waits for explicit canonical-startup prewarm completion logs for both the current patch and mature fallback, then runs this audit as a required deployment gate. The manual `perf-smoke` workflow runs it too. A missing prewarm entry, slow response, incomplete bundle, or empty fallback fails the workflow rather than being downgraded to a warning.
 
 Targets for private-LAN reads:
 

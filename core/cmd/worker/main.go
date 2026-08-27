@@ -73,6 +73,7 @@ func main() {
 		cfg.SummonerProfileRefreshInterval,
 		cfg.AnalyticsRefreshSchedulerInterval,
 	)
+	prewarmChampionPagesOnStartup(context.Background(), cfg, apiServer, repo)
 	seedRequestsByRegion, err := seedFrontier(context.Background(), cfg, riotClient, repo, platforms)
 	if err != nil {
 		if isRiotAuthError(err) {
@@ -83,9 +84,7 @@ func main() {
 	ledger := newRegionRequestLedger(cfg)
 	recordSeedRequests(ledger, seedRequestsByRegion)
 	regions := configuredRegions(platforms)
-	firstSweepComplete := make(chan struct{})
-	startRefreshScheduler(context.Background(), cfg, staticService, apiServer, repo, platforms, firstSweepComplete)
-	firstSweepSignaled := false
+	startRefreshScheduler(context.Background(), cfg, staticService, apiServer, repo, platforms)
 	for {
 		ctx := context.Background()
 		rateLimitedRegions := map[string]bool{}
@@ -181,10 +180,6 @@ func main() {
 			}
 		}
 
-		if !firstSweepSignaled {
-			close(firstSweepComplete)
-			firstSweepSignaled = true
-		}
 		sleepFor := nextSweepSleep(cfg, ledger, regions, requestsThisSweep)
 		writeWorkerHeartbeat(cfg, "active", len(platforms), platformsWithWork, requestsThisSweep, "sleep="+sleepFor.Round(time.Second).String())
 		log.Printf(

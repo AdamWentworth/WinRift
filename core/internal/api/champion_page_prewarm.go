@@ -3,8 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"winrift/core/internal/analytics"
 	"winrift/core/internal/clickhouse"
@@ -15,6 +18,8 @@ type ChampionPagePrewarmOptions struct {
 	Roles               []string
 	PerRole             int
 	MinGames            int
+	CanonicalOnly       bool
+	Concurrency         int
 	MatchupsPerChampion int
 	MatchupMinGames     int
 	MaxMatchupBundles   int
@@ -72,6 +77,7 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	result := ChampionPagePrewarmResult{}
 	var firstErr error
 	seenKeys := map[string]bool{}
+	canonicalRequests := []championPageBundleRequest{}
 	canonicalFilters := map[string]string{
 		"role":        "",
 		"patch":       patch,
@@ -126,13 +132,20 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 				continue
 			}
 			request := championPagePrewarmRequest(championID, role, patch, rankBucket, queueID)
-			if err := s.prewarmChampionPageBundle(ctx, request, seenKeys, false, &result); err != nil {
-				result.Errors++
-				if firstErr == nil {
-					firstErr = err
-				}
+			cacheKey := championPageBundleCacheKey(request)
+			if !seenKeys[cacheKey] {
+				seenKeys[cacheKey] = true
+				canonicalRequests = append(canonicalRequests, request)
 			}
 		}
+	}
+	canonicalResult, canonicalErr := s.prewarmChampionPageRequests(ctx, canonicalRequests, options.Concurrency, false, true)
+	mergeChampionPagePrewarmResult(&result, canonicalResult)
+	if canonicalErr != nil && firstErr == nil {
+		firstErr = canonicalErr
+	}
+	if options.CanonicalOnly {
+		return result, firstErr
 	}
 	for _, role := range roles {
 		filters := map[string]string{
@@ -203,6 +216,98 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	return result, firstErr
 }
 
+func (s Server) prewarmChampionPageRequests(ctx context.Context, requests []championPageBundleRequest, concurrency int, matchup, storeCanonicalAlias bool) (ChampionPagePrewarmResult, error) {
+	if len(requests) == 0 {
+		return ChampionPagePrewarmResult{}, nil
+	}
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	if concurrency > len(requests) {
+		concurrency = len(requests)
+	}
+	type outcome struct {
+		result ChampionPagePrewarmResult
+		err    error
+	}
+	jobs := make(chan championPageBundleRequest)
+	outcomes := make(chan outcome, len(requests))
+	var workers sync.WaitGroup
+	for range concurrency {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for request := range jobs {
+				localResult := ChampionPagePrewarmResult{}
+				err := s.prewarmChampionPageBundle(ctx, request, map[string]bool{}, matchup, &localResult)
+				if err == nil && storeCanonicalAlias {
+					err = s.storeChampionPageCanonicalAlias(ctx, request)
+				}
+				if err != nil {
+					localResult.Errors++
+				}
+				outcomes <- outcome{result: localResult, err: err}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, request := range requests {
+			select {
+			case jobs <- request:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		workers.Wait()
+		close(outcomes)
+	}()
+
+	result := ChampionPagePrewarmResult{}
+	var firstErr error
+	for outcome := range outcomes {
+		mergeChampionPagePrewarmResult(&result, outcome.result)
+		if outcome.err != nil && firstErr == nil {
+			firstErr = outcome.err
+		}
+	}
+	if firstErr == nil && ctx.Err() != nil {
+		firstErr = ctx.Err()
+	}
+	return result, firstErr
+}
+
+func (s Server) storeChampionPageCanonicalAlias(ctx context.Context, request championPageBundleRequest) error {
+	body, ok := s.responseCache.get(championPageBundleCacheKey(request))
+	if !ok {
+		return fmt.Errorf("canonical champion page body missing after prewarm champion=%d patch=%s role=%s", request.Build.ChampionID, request.Build.Patch, request.Build.Role)
+	}
+	aliasRequest := championPageCanonicalAliasRequest(request)
+	aliasKey := championPageBundleCacheKey(aliasRequest)
+	ttl := s.championPageBundleTTL(request.Build.Patch)
+	s.responseCache.set(aliasKey, body, ttl)
+	storeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return s.repo.StoreChampionPageBundle(storeCtx, aliasKey, body, ttl)
+}
+
+func mergeChampionPagePrewarmResult(target *ChampionPagePrewarmResult, addition ChampionPagePrewarmResult) {
+	if target == nil {
+		return
+	}
+	target.Candidates += addition.Candidates
+	target.Stored += addition.Stored
+	target.Skipped += addition.Skipped
+	target.Cached += addition.Cached
+	target.Errors += addition.Errors
+	target.MatchupCandidates += addition.MatchupCandidates
+	target.MatchupStored += addition.MatchupStored
+	target.MatchupSkipped += addition.MatchupSkipped
+	target.MatchupCached += addition.MatchupCached
+}
+
 func championPagePrewarmChampionIDs(indexes ...[]clickhouse.ChampionGuideSummary) []uint16 {
 	seen := map[uint16]bool{}
 	championIDs := []uint16{}
@@ -219,6 +324,8 @@ func championPagePrewarmChampionIDs(indexes ...[]clickhouse.ChampionGuideSummary
 }
 
 func (s Server) prewarmChampionPageBundle(ctx context.Context, request championPageBundleRequest, seenKeys map[string]bool, matchup bool, result *ChampionPagePrewarmResult) error {
+	buildCtx, cancel := context.WithTimeout(ctx, championPageBundleBuildTimeout)
+	defer cancel()
 	cacheKey := championPageBundleCacheKey(request)
 	ttl := s.championPageBundleTTL(request.Build.Patch)
 	if seenKeys[cacheKey] {
@@ -229,7 +336,7 @@ func (s Server) prewarmChampionPageBundle(ctx context.Context, request championP
 	if matchup {
 		result.MatchupCandidates++
 	}
-	if body, ok, err := s.repo.CachedChampionPageBundle(ctx, cacheKey); err == nil && ok {
+	if body, ok, err := s.repo.CachedChampionPageBundle(buildCtx, cacheKey); err == nil && ok {
 		s.responseCache.set(cacheKey, body, ttl)
 		result.Skipped++
 		result.Cached++
@@ -241,11 +348,11 @@ func (s Server) prewarmChampionPageBundle(ctx context.Context, request championP
 	} else if err != nil {
 		return err
 	}
-	body, err := s.buildChampionPageBundleJSON(ctx, request)
+	body, err := s.buildChampionPageBundleJSON(buildCtx, request)
 	if err != nil {
 		return err
 	}
-	if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, ttl); err != nil {
+	if err := s.repo.StoreChampionPageBundle(buildCtx, cacheKey, body, ttl); err != nil {
 		return err
 	}
 	s.responseCache.set(cacheKey, body, ttl)

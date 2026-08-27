@@ -537,18 +537,18 @@ jobs:
             WORKER_LOGS="$(docker logs winrift_worker 2>&1 || true)"
             ALL_COMPLETE=1
             for REQUIRED_PATCH in "${REQUIRED_PATCHES[@]}"; do
-              if grep -Fq "champion page prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
+              if grep -Fq "champion page canonical startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
                 echo "Champion-page prewarming reported errors for ${REQUIRED_PATCH}." >&2
-                grep -F "champion page prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1 >&2
+                grep -F "champion page canonical startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1 >&2
                 exit 1
               fi
-              if ! grep -Fq "champion page prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
+              if ! grep -Fq "champion page canonical startup prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
                 ALL_COMPLETE=0
               fi
             done
             if [[ "${ALL_COMPLETE}" -eq 1 ]]; then
               for REQUIRED_PATCH in "${REQUIRED_PATCHES[@]}"; do
-                grep -F "champion page prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1
+                grep -F "champion page canonical startup prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1
               done
               echo "Required champion-page prewarming completed."
               exit 0
