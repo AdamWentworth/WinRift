@@ -264,7 +264,11 @@ func (s *Service) OpeningItemCosts(ctx context.Context, patch string, includeJun
 			continue
 		}
 		totalGold, _ := itemGold(item)
-		costs[id] = uint32(totalGold)
+		cost, ok := uint32FromInt(totalGold)
+		if !ok {
+			continue
+		}
+		costs[id] = cost
 	}
 	return costs, nil
 }
@@ -443,6 +447,13 @@ func itemNumber(value any) int {
 	default:
 		return 0
 	}
+}
+
+func uint32FromInt(value int) (uint32, bool) {
+	if value < 0 || uint64(value) > uint64(^uint32(0)) {
+		return 0, false
+	}
+	return uint32(value), true
 }
 
 func hasItemTargets(item map[string]any) bool {

@@ -167,7 +167,7 @@ func parseChampionPageBundleRequest(query url.Values) (championPageBundleRequest
 	if indexLimit <= 0 {
 		indexLimit = 250
 	}
-	queueID := uint16(queryInt(query.Get("queueId"), analytics.RankedSoloQueueID))
+	queueID := queryUint16(query.Get("queueId"), analytics.RankedSoloQueueID)
 	if queueID == 0 {
 		queueID = analytics.RankedSoloQueueID
 	}
@@ -333,7 +333,7 @@ type buildAdviceRequest struct {
 }
 
 func parseBuildAdviceRequest(query url.Values) (buildAdviceRequest, string) {
-	championID := uint16(queryInt(query.Get("championId"), 0))
+	championID := queryUint16(query.Get("championId"), 0)
 	if championID == 0 {
 		return buildAdviceRequest{}, "championId is required"
 	}
@@ -353,7 +353,7 @@ func parseBuildAdviceRequest(query url.Values) (buildAdviceRequest, string) {
 	return buildAdviceRequest{
 		ChampionID:         championID,
 		Role:               role,
-		OpponentChampionID: uint16(queryInt(query.Get("opponentChampionId"), 0)),
+		OpponentChampionID: queryUint16(query.Get("opponentChampionId"), 0),
 		Patch:              strings.TrimSpace(query.Get("patch")),
 		RankBucket:         strings.ToUpper(strings.TrimSpace(query.Get("rankBucket"))),
 		MinGames:           minGames,
@@ -536,10 +536,10 @@ func (s Server) analyticsChampionGuide(w http.ResponseWriter, r *http.Request) {
 func (s Server) analyticsItemSlots(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	request := itemSlotAnalyticsRequest{
-		ChampionID:         uint16(queryInt(query.Get("championId"), 0)),
+		ChampionID:         queryUint16(query.Get("championId"), 0),
 		Role:               strings.ToUpper(query.Get("role")),
 		ItemContext:        strings.ToUpper(query.Get("itemContext")),
-		OpponentChampionID: uint16(queryInt(query.Get("opponentChampionId"), 0)),
+		OpponentChampionID: queryUint16(query.Get("opponentChampionId"), 0),
 		Patch:              query.Get("patch"),
 		RankBucket:         strings.ToUpper(query.Get("rankBucket")),
 		MinGames:           queryInt(query.Get("minGames"), defaultItemSlotMinGames),
@@ -582,7 +582,7 @@ func (s Server) analyticsItemSlotsBatch(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s Server) analyticsPatches(w http.ResponseWriter, r *http.Request) {
-	queueID := uint16(queryInt(r.URL.Query().Get("queueId"), analytics.RankedSoloQueueID))
+	queueID := queryUint16(r.URL.Query().Get("queueId"), analytics.RankedSoloQueueID)
 	cacheKey := analyticsPatchesCacheKey(queueID)
 	if body, ok := s.responseCache.get(cacheKey); ok {
 		writeJSONBytes(w, http.StatusOK, body, true)
@@ -1311,7 +1311,7 @@ func cloneStringMap(values map[string]string) map[string]string {
 func (s Server) analyticsChampionRoles(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	championIDs := queryUint16List(query.Get("championIds"))
-	queueID := uint16(queryInt(query.Get("queueId"), 420))
+	queueID := queryUint16(query.Get("queueId"), 420)
 	rows, err := s.repo.ChampionRoleRatesForPatch(r.Context(), championIDs, queueID, query.Get("patch"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())

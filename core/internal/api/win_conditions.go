@@ -201,7 +201,7 @@ func (s Server) analyticsWinConditions(w http.ResponseWriter, r *http.Request) {
 
 func (s Server) analyticsWinConditionDiagnostics(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	queueID := uint16(queryInt(query.Get("queueId"), 420))
+	queueID := queryUint16(query.Get("queueId"), 420)
 	rankBucket := strings.ToUpper(strings.TrimSpace(query.Get("rankBucket")))
 	if rankBucket == "ALL" {
 		rankBucket = ""
@@ -221,7 +221,7 @@ func (s Server) analyticsWinConditionDiagnostics(w http.ResponseWriter, r *http.
 
 func (s Server) analyticsWinConditionValidation(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	queueID := uint16(queryInt(query.Get("queueId"), 420))
+	queueID := queryUint16(query.Get("queueId"), 420)
 	minGames := queryInt(query.Get("minGames"), 50)
 	weakSignalWinRate := queryFloat(query.Get("weakSignalWinRate"), 55)
 	limit := queryInt(query.Get("limit"), 25)

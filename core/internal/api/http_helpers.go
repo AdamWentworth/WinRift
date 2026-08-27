@@ -370,33 +370,45 @@ func queryUint16List(value string) []uint16 {
 	return out
 }
 
+func queryUint16(value string, fallback uint16) uint16 {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseUint(value, 10, 16)
+	if err != nil {
+		return fallback
+	}
+	return uint16(parsed)
+}
+
 func uint16FromAny(value any) uint16 {
 	switch typed := value.(type) {
 	case int:
-		if typed > 0 {
+		if typed > 0 && uint64(typed) <= uint64(^uint16(0)) {
 			return uint16(typed)
 		}
 	case int64:
-		if typed > 0 {
+		if typed > 0 && uint64(typed) <= uint64(^uint16(0)) {
 			return uint16(typed)
 		}
 	case uint16:
 		return typed
 	case uint64:
-		if typed > 0 {
+		if typed > 0 && typed <= uint64(^uint16(0)) {
 			return uint16(typed)
 		}
 	case float64:
-		if typed > 0 {
+		if typed > 0 && typed <= float64(^uint16(0)) {
 			return uint16(typed)
 		}
 	case json.Number:
 		parsed, err := typed.Int64()
-		if err == nil && parsed > 0 {
+		if err == nil && parsed > 0 && uint64(parsed) <= uint64(^uint16(0)) {
 			return uint16(parsed)
 		}
 	case string:
-		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
+		parsed, err := strconv.ParseUint(strings.TrimSpace(typed), 10, 16)
 		if err == nil && parsed > 0 {
 			return uint16(parsed)
 		}

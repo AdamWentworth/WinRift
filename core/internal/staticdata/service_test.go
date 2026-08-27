@@ -3,9 +3,27 @@ package staticdata
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"testing"
 )
+
+func TestUint32FromIntRejectsOutOfRangeValues(t *testing.T) {
+	t.Parallel()
+
+	if got, ok := uint32FromInt(650); !ok || got != 650 {
+		t.Fatalf("uint32FromInt(650) = (%d, %t), want (650, true)", got, ok)
+	}
+	if got, ok := uint32FromInt(-1); ok || got != 0 {
+		t.Fatalf("uint32FromInt(-1) = (%d, %t), want (0, false)", got, ok)
+	}
+	if strconv.IntSize > 32 {
+		overflow := int(uint64(^uint32(0)) + 1)
+		if got, ok := uint32FromInt(overflow); ok || got != 0 {
+			t.Fatalf("uint32FromInt(max uint32 + 1) = (%d, %t), want (0, false)", got, ok)
+		}
+	}
+}
 
 func TestChampionSplashesIncludesSkinSplashArt(t *testing.T) {
 	client := &fakeRiotClient{
