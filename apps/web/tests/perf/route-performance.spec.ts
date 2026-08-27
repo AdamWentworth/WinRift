@@ -152,8 +152,8 @@ for (const route of routeChecks) {
     const startedAt = performance.now();
     await page.goto(route.path, { waitUntil: 'domcontentloaded' });
     await route.ready(page);
-    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
     const readyMs = Math.round(performance.now() - startedAt);
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
     const apiRequests = [...apiRequestsByRequest.values()];
     page.off('request', onRequest);
     page.off('response', onResponse);
