@@ -38,7 +38,7 @@ jobs:
           cache-dependency-path: core/go.sum
 
       - name: Validate GitHub Actions
-        working-directory: ..
+        working-directory: .
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
       - name: Install govulncheck
