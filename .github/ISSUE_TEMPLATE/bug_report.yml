@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve WinRift. Do not include API keys, private server details, raw match payloads, or player information that is not your own.
+        Owner maintenance form. WinRift does not accept outside contributions. Do not include API keys, private server details, raw match payloads, or player information that is not your own.
   - type: dropdown
     id: area
     attributes:

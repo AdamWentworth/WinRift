@@ -26,6 +26,7 @@ All notable WinRift milestones are recorded here. The project follows milestone-
 
 ### Repository
 
-- Added branded GitHub presentation, current documentation navigation, contribution guidance, issue/PR templates, CodeQL, and hardened dependency automation.
+- Added branded GitHub presentation, current documentation navigation, owner-maintenance guidance, issue/PR templates, CodeQL, and hardened dependency checks.
+- Clarified sole authorship, view-only portfolio presentation, and the repository's no-contribution policy.
 - Brought the maintained Go and web dependency sets current, including ClickHouse, React, Vite, Vitest, TypeScript, jsdom, and Testing Library updates.
-- Established the first source-available milestone release.
+- Established the first view-only portfolio milestone release.

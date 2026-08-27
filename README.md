@@ -7,11 +7,13 @@
 <p align="center">
   <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml/badge.svg?branch=master" alt="Core CI"></a>
   <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml/badge.svg?branch=master" alt="Web CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-00c8dc" alt="Source-available license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-all%20rights%20reserved-00c8dc" alt="All rights reserved"></a>
   <a href="https://github.com/AdamWentworth/WinRift/releases"><img src="https://img.shields.io/github/v/release/AdamWentworth/WinRift?display_name=tag" alt="Latest release"></a>
 </p>
 
-WinRift is a production-capable, full-stack analytics project for League of Legends ranked data. It collects Riot match and timeline payloads, normalizes player builds and matchup context into ClickHouse, and serves a React app focused on practical build, rune, champion, summoner, and win-condition analysis.
+WinRift is a solo portfolio application designed, built, and operated by **Adam Wentworth**. It is a production-capable, full-stack analytics project for League of Legends ranked data: it collects Riot match and timeline payloads, normalizes player builds and matchup context into ClickHouse, and serves a React app focused on practical build, rune, champion, summoner, and win-condition analysis.
+
+The repository is public so the engineering and product work can be reviewed. It is not an open-source project, is not accepting outside contributions, and grants no permission to run, reuse, redistribute, deploy, or derive work from the code. See [LICENSE](LICENSE).
 
 The current rebuild is centered on one product idea: the best build is often matchup-specific. WinRift compares what champions build overall with what performs into the champion they are actually facing.
 
@@ -82,7 +84,7 @@ Go is used for the API and collector because the target deployment is a lightwei
 
 ## 🧭 Project Status
 
-WinRift `v0.1.0` is a working private-LAN product and a public source portfolio. The server runs the production web application, API, ClickHouse, monitoring, and Riot-aware collector; GitHub Actions test, scan, package, deploy, and performance-check the system.
+WinRift `v0.1.0` is a working private-LAN product and Adam Wentworth's public, view-only source portfolio. The server runs the production web application, API, ClickHouse, monitoring, and Riot-aware collector; GitHub Actions test, scan, package, deploy, and performance-check the system.
 
 The app is not yet a public internet service. Current production use is private-LAN first: the server owns the production web application, API, ClickHouse, monitoring, and worker collection, while Vite remains available for laptop development against that private API.
 
@@ -365,7 +367,7 @@ curl http://localhost:8000/api/health
 
 WinRift is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties.
 
-This repository is source-available for portfolio review and technical discussion, but it is not open source. Reuse, deployment, redistribution, or derivative work requires prior written permission; see [LICENSE](LICENSE).
+This repository is visible for portfolio review, but it is not open source and is not accepting contributions. Copyright and project ownership belong to Adam Wentworth. Running, cloning for use, deployment, redistribution, or derivative work requires prior written permission; see [LICENSE](LICENSE).
 
 Riot-owned names, icons, splash art, and screenshots containing Riot imagery are not licensed by this repository; see [NOTICE.md](NOTICE.md).
 
@@ -400,8 +402,8 @@ See [ops/prod/README.md](ops/prod/README.md) and [docs/ops-deployment.md](docs/o
 
 ---
 
-## 🧠 Author Notes
+## 🧠 Built By Adam Wentworth
 
-WinRift started as an experiment in modeling League team win conditions. The rebuild keeps that strategic idea, but puts the foundation on matchup-specific builds, trustworthy data collection, and precomputed analytics that can load quickly in a real app.
+I designed and built WinRift as a solo portfolio project, from its product direction and frontend through its Go services, analytics model, collection pipeline, performance guardrails, deployment, and operations. It started as an experiment in modeling League team win conditions. The rebuild keeps that strategic idea, but puts the foundation on matchup-specific builds, trustworthy data collection, and precomputed analytics that can load quickly in a real app.
 
 The first production milestone is complete. The next phase is less about proving the architecture and more about maintaining trustworthy data, fast pages, disciplined public exposure, and strong product judgment as the corpus grows.

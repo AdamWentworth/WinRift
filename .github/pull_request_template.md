@@ -1,3 +1,5 @@
+> WinRift does not accept outside contributions. This template is for owner-operated maintenance only.
+
 ## Outcome
 
 Describe the user-visible, operational, or repository outcome.
@@ -18,6 +20,6 @@ Describe the user-visible, operational, or repository outcome.
 
 Describe notable deployment, data, dependency, or compatibility risk and how the change can be rolled back.
 
-## Source-Available Contribution
+## Ownership
 
-- [ ] I have the right to submit this material and understand that acceptance may require separate written contribution terms under WinRift's source-available model.
+- [ ] This change is authored and submitted by the repository owner.

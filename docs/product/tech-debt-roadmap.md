@@ -14,7 +14,7 @@ Add a dedicated web workflow for `apps/web`:
 - `npm test -- --run`
 - `npm run build`
 
-The Go core has good CI now, but the frontend is a major part of the product story. A recruiter or collaborator should see both sides protected.
+The Go core has good CI now, but the frontend is a major part of the product story. A recruiter or portfolio reviewer should see both sides protected.
 
 Status: implemented as `.github/workflows/ci-web.yml`.
 
