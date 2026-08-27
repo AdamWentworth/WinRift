@@ -39,6 +39,7 @@ jobs:
         run: |
           python3 ops/prod/champion-page-perf-audit.py \
             --base-url "${{ inputs.api_base_url }}" \
+            --all-patches \
             --max-ms "${{ inputs.champion_page_max_ms }}" \
             --concurrency 4 \
             --timeout-seconds 5 \

@@ -20,7 +20,7 @@ const analyticsResponseCacheTTL = 10 * time.Minute
 const championPageBundleCurrentCacheTTL = 2 * time.Hour
 const championPageBundleArchivedCacheTTL = 30 * 24 * time.Hour
 const championPageBundleBuildTimeout = 2 * time.Minute
-const championPageBundleCacheKeyPrefix = "champion-page:v5:"
+const championPageBundleCacheKeyPrefix = "champion-page:v6:"
 
 func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()

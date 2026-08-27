@@ -387,6 +387,9 @@ func TestQueryStartingItemLoadoutsPrunesLiveScanToTargetMatches(t *testing.T) {
 	mock.ExpectQuery("SELECT toUInt8\\(1\\) FROM starting_loadout_analytics WHERE item_context = \\? AND patch = \\? LIMIT 1").
 		WithArgs("JUNGLE", "16.17").
 		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("(?s)SELECT toUInt8\\(count\\(\\) > 0\\).*FROM patch_snapshots FINAL.*WHERE patch = \\? AND status = 'closed'").
+		WithArgs("16.17").
+		WillReturnRows(sqlmock.NewRows([]string{"closed"}).AddRow(0))
 	mock.ExpectQuery("(?s)WITH target_match_ids AS.*SELECT DISTINCT pm.match_id.*pm.champion_id = \\?.*pm.role = \\?.*pm.patch = \\?.*pm.match_id IN \\(SELECT match_id FROM target_match_ids\\).*tie.match_id IN \\(SELECT match_id FROM target_match_ids\\)").
 		WithArgs(
 			"62", "JUNGLE", "16.17",
@@ -418,6 +421,102 @@ func TestQueryStartingItemLoadoutsPrunesLiveScanToTargetMatches(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].ChampionID != 62 || rows[0].ItemSignature != "1101-2003" {
 		t.Fatalf("rows = %+v; want target-match-pruned live result", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestQueryStartingItemLoadoutsDoesNotLiveScanClosedPatchWithoutSummaryRows(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM starting_loadout_analytics FINAL").
+		WithArgs("DEFAULT", "266", "16.15", 5).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id", "role_bucket", "opponent_champion_id", "patch_bucket", "rank_bucket",
+			"item_signature", "wins", "games", "win_rate",
+		}))
+	mock.ExpectQuery("SELECT toUInt8\\(1\\) FROM starting_loadout_analytics WHERE item_context = \\? AND patch = \\? LIMIT 1").
+		WithArgs("DEFAULT", "16.15").
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("(?s)SELECT toUInt8\\(count\\(\\) > 0\\).*FROM patch_snapshots FINAL.*WHERE patch = \\? AND status = 'closed'").
+		WithArgs("16.15").
+		WillReturnRows(sqlmock.NewRows([]string{"closed"}).AddRow(1))
+
+	rows, err := repo.QueryStartingItemLoadouts(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.15",
+	}, "DEFAULT", map[uint32]uint32{1055: 450}, 5, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("rows = %+v, want no archived loadout rows", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestProductionStartingItemLoadoutsAreSummaryOnly(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db, summaryOnly: true}
+
+	mock.ExpectQuery("(?s)FROM starting_loadout_analytics FINAL").
+		WithArgs("JUNGLE", "62", "JUNGLE", "16.17", 5).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id", "role_bucket", "opponent_champion_id", "patch_bucket", "rank_bucket",
+			"item_signature", "wins", "games", "win_rate",
+		}))
+
+	rows, err := repo.QueryStartingItemLoadouts(context.Background(), map[string]string{
+		"champion_id": "62",
+		"role":        "JUNGLE",
+		"patch":       "16.17",
+	}, "JUNGLE", map[uint32]uint32{1101: 450}, 5, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("rows = %+v, want summary-only empty result", rows)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestQueryItemSlotsDoesNotLiveScanClosedPatchWithoutSummaryRows(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+
+	mock.ExpectQuery("(?s)FROM item_slot_analytics FINAL").
+		WithArgs("DEFAULT", "266", "16.15", 5).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"champion_id", "role_bucket", "opponent_champion_id", "patch_bucket", "rank_bucket",
+			"item_slot", "item_id", "wins", "games", "win_rate",
+		}))
+	mock.ExpectQuery("SELECT toUInt8\\(1\\) FROM item_slot_analytics WHERE item_context = \\? AND patch = \\? LIMIT 1").
+		WithArgs("DEFAULT", "16.15").
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectQuery("(?s)SELECT toUInt8\\(count\\(\\) > 0\\).*FROM patch_snapshots FINAL.*WHERE patch = \\? AND status = 'closed'").
+		WithArgs("16.15").
+		WillReturnRows(sqlmock.NewRows([]string{"closed"}).AddRow(1))
+
+	rows, err := repo.QueryItemSlots(context.Background(), map[string]string{
+		"champion_id": "266",
+		"role":        "TOP",
+		"patch":       "16.15",
+	}, "DEFAULT", []uint32{3071}, nil, 5, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("rows = %+v, want no archived item-slot rows", rows)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)

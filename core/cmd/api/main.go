@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +48,7 @@ func maintainChampionPageMemoryCache(ctx context.Context, cfg config.Config, rep
 		log.Printf("champion page API memory hydration fallback discovery failed current_patch=%s err=%v", patch, err)
 	}
 	patches := championPageHydrationPatchList(patch, cfg.CollectorPatchRetention, stats)
+	stablePatchesHydrated := map[string]bool{}
 	for {
 		currentResult, currentErr := server.HydrateChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
 			Patch:      patch,
@@ -80,8 +82,41 @@ func maintainChampionPageMemoryCache(ctx context.Context, cfg config.Config, rep
 			} else if fallbackMissing > 0 {
 				log.Printf("champion page API memory hydration incomplete patch=%s scope=current-guide-gaps loaded=%d missing=%d retry_in=%s", fallbackPatch, fallbackLoaded, fallbackMissing, championPageHydrationRetryInterval)
 			} else {
-				log.Printf("champion page API memory hydration complete patch=%s candidates=%d loaded=%d missing=%d missing_guide_champions=%d fallback_patch=%s fallback_loaded=%d refresh_in=%s", patch, currentResult.Candidates, currentResult.Loaded, currentResult.Missing, len(currentResult.MissingGuideIDs), fallbackPatch, fallbackLoaded, championPageHydrationRefreshInterval)
-				delay = championPageHydrationRefreshInterval
+				allPatchesReady := true
+				totalCandidates := currentResult.Candidates
+				totalLoaded := currentResult.Loaded
+				for _, archivedPatch := range patches[1:] {
+					if stablePatchesHydrated[archivedPatch] {
+						continue
+					}
+					archivedResult, err := server.HydrateChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
+						Patch:      archivedPatch,
+						PerRole:    cfg.ChampionPagePrewarmPerRole,
+						RankBucket: cfg.ChampionPagePrewarmRankBucket,
+						QueueID:    analytics.RankedSoloQueueID,
+					})
+					totalCandidates += archivedResult.Candidates
+					totalLoaded += archivedResult.Loaded
+					if err != nil {
+						allPatchesReady = false
+						log.Printf("champion page API memory hydration failed patch=%s scope=all err=%v", archivedPatch, err)
+						continue
+					}
+					if archivedResult.Candidates == 0 || archivedResult.Missing > 0 {
+						allPatchesReady = false
+						log.Printf("champion page API memory hydration incomplete patch=%s scope=all candidates=%d loaded=%d missing=%d retry_in=%s", archivedPatch, archivedResult.Candidates, archivedResult.Loaded, archivedResult.Missing, championPageHydrationRetryInterval)
+						continue
+					}
+					if !analytics.PatchInWindow(archivedPatch, patch, cfg.CollectorPatchRetention) {
+						stablePatchesHydrated[archivedPatch] = true
+					}
+					log.Printf("champion page API memory hydration patch complete patch=%s scope=all candidates=%d loaded=%d missing=%d", archivedPatch, archivedResult.Candidates, archivedResult.Loaded, archivedResult.Missing)
+				}
+				if allPatchesReady {
+					log.Printf("champion page API memory hydration complete patch=%s candidates=%d loaded=%d missing=%d missing_guide_champions=%d fallback_patch=%s fallback_loaded=%d refresh_in=%s", patch, currentResult.Candidates, currentResult.Loaded, currentResult.Missing, len(currentResult.MissingGuideIDs), fallbackPatch, fallbackLoaded, championPageHydrationRefreshInterval)
+					log.Printf("champion page API memory hydration all patches complete current_patch=%s patches=%s candidates=%d loaded=%d refresh_in=%s", patch, strings.Join(patches, ","), totalCandidates, totalLoaded, championPageHydrationRefreshInterval)
+					delay = championPageHydrationRefreshInterval
+				}
 			}
 		} else {
 			log.Printf("champion page API memory hydration incomplete patch=%s candidates=%d loaded=%d missing=%d retry_in=%s", patch, currentResult.Candidates, currentResult.Loaded, currentResult.Missing, championPageHydrationRetryInterval)
@@ -104,35 +139,39 @@ func championPageHydrationPatchList(currentPatch string, retention int, stats []
 	if currentPatch == "" {
 		return nil
 	}
-	var newestPrevious string
-	var maturePrevious string
+	seen := map[string]bool{currentPatch: true}
+	previous := make([]string, 0, len(stats))
+	maturePrevious := ""
 	for _, stat := range stats {
 		patch := strings.TrimSpace(stat.Patch)
-		if patch == "" || stat.Matches == 0 || compareChampionPagePatches(patch, currentPatch) >= 0 {
+		if patch == "" || stat.Matches == 0 || seen[patch] || compareChampionPagePatches(patch, currentPatch) >= 0 {
 			continue
 		}
-		if newestPrevious == "" || compareChampionPagePatches(patch, newestPrevious) > 0 {
-			newestPrevious = patch
-		}
+		seen[patch] = true
+		previous = append(previous, patch)
 		if stat.Matches >= 5000 && (maturePrevious == "" || compareChampionPagePatches(patch, maturePrevious) > 0) {
 			maturePrevious = patch
 		}
 	}
-	fallbackPatch := maturePrevious
-	if fallbackPatch == "" {
-		fallbackPatch = newestPrevious
+	sort.Slice(previous, func(left, right int) bool {
+		return compareChampionPagePatches(previous[left], previous[right]) > 0
+	})
+	if maturePrevious != "" && len(previous) > 0 && previous[0] != maturePrevious {
+		ordered := []string{maturePrevious}
+		for _, patch := range previous {
+			if patch != maturePrevious {
+				ordered = append(ordered, patch)
+			}
+		}
+		previous = ordered
 	}
-	if fallbackPatch == "" {
+	if len(previous) == 0 {
 		window := analytics.PatchWindow(currentPatch, retention)
 		if len(window) > 1 {
-			fallbackPatch = window[1]
+			previous = append(previous, window[1])
 		}
 	}
-	patches := []string{currentPatch}
-	if fallbackPatch != "" && fallbackPatch != currentPatch {
-		patches = append(patches, fallbackPatch)
-	}
-	return patches
+	return append([]string{currentPatch}, previous...)
 }
 
 func compareChampionPagePatches(left, right string) int {

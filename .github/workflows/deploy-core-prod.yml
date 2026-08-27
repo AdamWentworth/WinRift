@@ -520,13 +520,32 @@ jobs:
           previous = [row for row in previous if row[0] and key(row[0]) < key(current) and row[1] > 0]
           print(next((patch for patch, matches in previous if matches >= 5000), previous[0][0] if previous else ""))
           ' "${CURRENT_PATCH}" <<<"${PATCH_BODY}")"
-          REQUIRED_PATCHES=("${CURRENT_PATCH}")
+          mapfile -t ARCHIVED_PATCHES < <(python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          current = sys.argv[1]
+          def key(value):
+              try:
+                  major, minor = str(value).split(".")[:2]
+                  return int(major), int(minor)
+              except (TypeError, ValueError):
+                  return 0, 0
+          patches = {
+              str(row.get("patch", "")).strip()
+              for row in data.get("results", [])
+              if int(row.get("matches", 0) or 0) > 0
+              and key(str(row.get("patch", ""))) < key(current)
+          }
+          for patch in sorted(patches, key=key, reverse=True):
+              print(patch)
+          ' "${CURRENT_PATCH}" <<<"${PATCH_BODY}")
+          REQUIRED_CURRENT_PATCHES=("${CURRENT_PATCH}")
           if [[ -n "${FALLBACK_PATCH}" && "${FALLBACK_PATCH}" != "${CURRENT_PATCH}" ]]; then
-            REQUIRED_PATCHES+=("${FALLBACK_PATCH}")
+            REQUIRED_CURRENT_PATCHES+=("${FALLBACK_PATCH}")
           fi
 
-          echo "Waiting for champion-page prewarming to finish for: ${REQUIRED_PATCHES[*]}."
-          for _ in $(seq 1 180); do
+          echo "Waiting for champion-page prewarming to finish for current/fallback: ${REQUIRED_CURRENT_PATCHES[*]}; archived: ${ARCHIVED_PATCHES[*]}."
+          for _ in $(seq 1 360); do
             WORKER_STATUS="$(docker inspect --format '{{.State.Status}}' winrift_worker 2>/dev/null || true)"
             if [[ "${WORKER_STATUS}" != "running" ]]; then
               echo "Worker stopped while waiting for champion-page prewarming. Status: ${WORKER_STATUS}" >&2
@@ -537,7 +556,7 @@ jobs:
             WORKER_LOGS="$(docker logs winrift_worker 2>&1 || true)"
             API_LOGS="$(docker logs winrift_api 2>&1 || true)"
             ALL_COMPLETE=1
-            for REQUIRED_PATCH in "${REQUIRED_PATCHES[@]}"; do
+            for REQUIRED_PATCH in "${REQUIRED_CURRENT_PATCHES[@]}"; do
               if grep -Fq "champion page canonical startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
                 echo "Champion-page prewarming reported errors for ${REQUIRED_PATCH}." >&2
                 grep -F "champion page canonical startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1 >&2
@@ -547,21 +566,34 @@ jobs:
                 ALL_COMPLETE=0
               fi
             done
-            if ! grep -Fq "champion page API memory hydration complete patch=${CURRENT_PATCH} " <<<"${API_LOGS}"; then
+            for REQUIRED_PATCH in "${ARCHIVED_PATCHES[@]}"; do
+              if grep -Fq "champion page archived startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
+                echo "Archived champion-page prewarming reported errors for ${REQUIRED_PATCH}." >&2
+                grep -F "champion page archived startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1 >&2
+                exit 1
+              fi
+              if ! grep -Fq "champion page archived startup prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
+                ALL_COMPLETE=0
+              fi
+            done
+            if ! grep -Fq "champion page API memory hydration all patches complete current_patch=${CURRENT_PATCH} " <<<"${API_LOGS}"; then
               ALL_COMPLETE=0
             fi
             if [[ "${ALL_COMPLETE}" -eq 1 ]]; then
-              for REQUIRED_PATCH in "${REQUIRED_PATCHES[@]}"; do
+              for REQUIRED_PATCH in "${REQUIRED_CURRENT_PATCHES[@]}"; do
                 grep -F "champion page canonical startup prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1
               done
-              grep -F "champion page API memory hydration complete patch=${CURRENT_PATCH} " <<<"${API_LOGS}" | tail -1
+              for REQUIRED_PATCH in "${ARCHIVED_PATCHES[@]}"; do
+                grep -F "champion page archived startup prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1
+              done
+              grep -F "champion page API memory hydration all patches complete current_patch=${CURRENT_PATCH} " <<<"${API_LOGS}" | tail -1
               echo "Required champion-page prewarming completed."
               exit 0
             fi
             sleep 10
           done
 
-          echo "Timed out waiting 30 minutes for champion-page prewarming on: ${REQUIRED_PATCHES[*]}." >&2
+          echo "Timed out waiting 60 minutes for champion-page prewarming on current/fallback: ${REQUIRED_CURRENT_PATCHES[*]}; archived: ${ARCHIVED_PATCHES[*]}." >&2
           docker logs --tail 300 winrift_worker || true
           exit 1
 
@@ -583,6 +615,7 @@ jobs:
 
           python3 "${GITHUB_WORKSPACE}/ops/prod/champion-page-perf-audit.py" \
             --base-url "${API_BASE}" \
+            --all-patches \
             --max-ms "${{ inputs.champion_page_max_ms }}" \
             --concurrency 4 \
             --timeout-seconds 5 \

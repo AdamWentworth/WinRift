@@ -248,6 +248,21 @@ func (c *responseCache) set(key string, body []byte, ttl time.Duration) {
 	}
 }
 
+// setShared stores an immutable response body without copying it. It is used by
+// bulk hydration so canonical and automatic-role aliases share one payload in
+// memory instead of retaining two copies of every champion page.
+func (c *responseCache) setShared(key string, body []byte, ttl time.Duration) {
+	if c == nil || key == "" || len(body) == 0 || ttl <= 0 {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = cachedAPIResponse{
+		body:      body,
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
 func (s Server) writeCachedJSON(w http.ResponseWriter, status int, cacheKey string, ttl time.Duration, value any) {
 	body, err := json.Marshal(value)
 	if err != nil {

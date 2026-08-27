@@ -14,7 +14,8 @@ import (
 )
 
 type Repository struct {
-	db *sql.DB
+	db          *sql.DB
+	summaryOnly bool
 }
 
 const (
@@ -36,7 +37,7 @@ func NewRepository(cfg config.Config) (*Repository, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
-	repo := &Repository{db: db}
+	repo := &Repository{db: db, summaryOnly: !cfg.IsDevelopment()}
 	schemaCtx, schemaCancel := context.WithTimeout(context.Background(), clickHouseSchemaTimeout)
 	defer schemaCancel()
 	if err := repo.EnsureRuntimeSchema(schemaCtx); err != nil {

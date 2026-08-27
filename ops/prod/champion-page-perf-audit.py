@@ -81,7 +81,7 @@ def load_champions(base_url: str, timeout_seconds: float) -> list[Champion]:
     return champions
 
 
-def load_patch_scope(base_url: str, timeout_seconds: float, requested_patch: str) -> tuple[str, str]:
+def load_patch_scope(base_url: str, timeout_seconds: float, requested_patch: str) -> tuple[str, str, list[str]]:
     payload, _ = fetch_json(f"{base_url}/api/analytics/patches?queueId=420", timeout_seconds)
     current_patch = requested_patch.strip() or str(payload.get("currentPatch", "")).strip()
     if not current_patch:
@@ -97,7 +97,9 @@ def load_patch_scope(base_url: str, timeout_seconds: float, requested_patch: str
     fallback_patch = next((patch for patch, matches in previous if matches >= 5000), "")
     if not fallback_patch and previous:
         fallback_patch = previous[0][0]
-    return current_patch, fallback_patch
+    selectable_patches = [current_patch]
+    selectable_patches.extend(patch for patch, _ in previous if patch != current_patch)
+    return current_patch, fallback_patch, selectable_patches
 
 
 def patch_key(patch: str) -> tuple[int, int]:
@@ -129,6 +131,14 @@ def champion_page_url(base_url: str, champion_id: int, patch: str, role: str = "
         elif role == "UTILITY":
             params["itemContext"] = "SUPPORT"
     return f"{base_url}/api/analytics/champion-page?{urllib.parse.urlencode(params)}"
+
+
+def audit_targets(champions: list[Champion], patches: list[str], current_patch: str) -> list[tuple[Champion, str, str]]:
+    return [
+        (champion, patch, "current" if patch == current_patch else "archived")
+        for patch in patches
+        for champion in champions
+    ]
 
 
 def audit_page(
@@ -217,6 +227,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout-seconds", type=float, default=env_float("WINRIFT_PERF_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))
     parser.add_argument("--json", default=os.getenv("WINRIFT_CHAMPION_PAGE_AUDIT_JSON", ""))
     parser.add_argument("--allow-cache-miss", action="store_true")
+    parser.add_argument("--all-patches", action="store_true", help="Audit every selectable patch instead of only the current patch.")
     parser.add_argument("--champion-id", type=int, action="append", default=[], help="Audit only selected champion IDs; repeatable and intended for diagnostics.")
     return parser.parse_args()
 
@@ -234,31 +245,43 @@ def main() -> int:
         missing_ids = selected_ids.difference(champion.champion_id for champion in champions)
         if missing_ids:
             raise SystemExit(f"unknown champion IDs: {sorted(missing_ids)}")
-    current_patch, fallback_patch = load_patch_scope(base_url, args.timeout_seconds, args.patch)
+    current_patch, fallback_patch, selectable_patches = load_patch_scope(base_url, args.timeout_seconds, args.patch)
+    audited_patches = selectable_patches if args.all_patches else [current_patch]
     require_cache_hit = not args.allow_cache_miss
     print(
         f"WinRift champion-page audit base_url={base_url} current_patch={current_patch} "
-        f"fallback_patch={fallback_patch or 'none'} champions={len(champions)} max_ms={args.max_ms} "
+        f"fallback_patch={fallback_patch or 'none'} patches={','.join(audited_patches)} "
+        f"champions={len(champions)} max_ms={args.max_ms} "
         f"concurrency={args.concurrency} require_cache_hit={str(require_cache_hit).lower()}"
     )
 
     results: list[AuditResult] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.concurrency) as executor:
         futures = [
-            executor.submit(audit_page, base_url, champion, current_patch, "current", args.timeout_seconds)
-            for champion in champions
+            executor.submit(
+                audit_page,
+                base_url,
+                champion,
+                patch,
+                request_kind,
+                args.timeout_seconds,
+            )
+            for champion, patch, request_kind in audit_targets(champions, audited_patches, current_patch)
         ]
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
 
-    current_failures = [(result, result_failure(result, args.max_ms, require_cache_hit, False)) for result in results]
-    current_failures = [(result, reason) for result, reason in current_failures if reason]
+    page_failures = [(result, result_failure(result, args.max_ms, require_cache_hit, False)) for result in results]
+    page_failures = [(result, reason) for result, reason in page_failures if reason]
 
     fallback_candidates = [
         (champion, "")
         for champion in champions
         for result in results
-        if result.champion_id == champion.champion_id and not result.error and result.guide_games <= 0
+        if result.data_patch == current_patch
+        and result.champion_id == champion.champion_id
+        and not result.error
+        and result.guide_games <= 0
     ]
     if fallback_candidates and not fallback_patch:
         for champion, role in fallback_candidates:
@@ -272,7 +295,7 @@ def main() -> int:
             for future in concurrent.futures.as_completed(futures):
                 results.append(future.result())
 
-    failures = list(current_failures)
+    failures = list(page_failures)
     for result in results:
         if result.request_kind != "fallback":
             continue
@@ -287,6 +310,7 @@ def main() -> int:
         "baseUrl": base_url,
         "currentPatch": current_patch,
         "fallbackPatch": fallback_patch,
+        "auditedPatches": audited_patches,
         "champions": len(champions),
         "requests": len(results),
         "fallbackRequests": sum(1 for result in results if result.request_kind == "fallback"),

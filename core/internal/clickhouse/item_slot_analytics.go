@@ -77,7 +77,10 @@ func (r *Repository) QueryItemSlots(ctx context.Context, filters map[string]stri
 	if len(rows) > 0 {
 		return rows, nil
 	}
-	hasSummary, err := r.ItemSlotAnalyticsHasData(ctx, itemContext)
+	if r.summaryOnly {
+		return rows, nil
+	}
+	hasSummary, err := r.ItemSlotAnalyticsHasData(ctx, itemContext, filters["patch"])
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +106,9 @@ func (r *Repository) QueryStartingItemLoadouts(ctx context.Context, filters map[
 		return nil, err
 	}
 	if len(rows) > 0 {
+		return rows, nil
+	}
+	if r.summaryOnly {
 		return rows, nil
 	}
 	hasSummary, err := r.StartingLoadoutAnalyticsHasData(ctx, itemContext, filters["patch"])
@@ -327,7 +333,7 @@ func (r *Repository) StartingLoadoutAnalyticsHasData(ctx context.Context, itemCo
 	var exists uint8
 	err := r.db.QueryRowContext(ctx, query, args...).Scan(&exists)
 	if err == sql.ErrNoRows {
-		return false, nil
+		return r.championPagePatchIsClosed(ctx, patch)
 	}
 	return exists > 0, err
 }
@@ -663,13 +669,37 @@ func (r *Repository) scanItemSlotRows(ctx context.Context, query string, args []
 	return trimItemSlotRows(out, limit), nil
 }
 
-func (r *Repository) ItemSlotAnalyticsHasData(ctx context.Context, itemContext string) (bool, error) {
+func (r *Repository) ItemSlotAnalyticsHasData(ctx context.Context, itemContext, patch string) (bool, error) {
+	query := "SELECT toUInt8(1) FROM item_slot_analytics WHERE item_context = ?"
+	args := []any{normalizedItemContext(itemContext)}
+	if strings.TrimSpace(patch) != "" {
+		query += " AND patch = ?"
+		args = append(args, patch)
+	}
+	query += " LIMIT 1"
 	var exists uint8
-	err := r.db.QueryRowContext(ctx, "SELECT toUInt8(1) FROM item_slot_analytics WHERE item_context = ? LIMIT 1", normalizedItemContext(itemContext)).Scan(&exists)
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&exists)
 	if err == sql.ErrNoRows {
-		return false, nil
+		return r.championPagePatchIsClosed(ctx, patch)
 	}
 	return exists > 0, err
+}
+
+// championPagePatchIsClosed treats a compiled, closed patch as authoritative
+// even when a summary query returns no rows. Raw timeline payloads are retired
+// after archival, so retrying the live-scan fallback cannot recover data and
+// only turns a harmless empty panel into a multi-second ClickHouse scan.
+func (r *Repository) championPagePatchIsClosed(ctx context.Context, patch string) (bool, error) {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		return false, nil
+	}
+	var closed uint8
+	err := r.db.QueryRowContext(ctx, `
+		SELECT toUInt8(count() > 0)
+		FROM patch_snapshots FINAL
+		WHERE patch = ? AND status = 'closed'`, patch).Scan(&closed)
+	return closed > 0, err
 }
 
 func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string, queueID uint16, contexts []ItemSlotAnalyticsContext) error {

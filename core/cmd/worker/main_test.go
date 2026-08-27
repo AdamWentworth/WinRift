@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -217,6 +218,21 @@ func TestChampionPageStartupPrewarmPatchListFallsBackToRetentionWindow(t *testin
 	patches := championPageStartupPrewarmPatchList("16.17", 2, nil)
 	want := []string{"16.17", "16.16"}
 	if len(patches) != len(want) || patches[0] != want[0] || patches[1] != want[1] {
+		t.Fatalf("patches = %v, want %v", patches, want)
+	}
+}
+
+func TestChampionPageArchivedPrewarmPatchListIncludesEverySelectableOlderPatchNewestFirst(t *testing.T) {
+	patches := championPageArchivedPrewarmPatchList("16.17", []clickhouse.PatchStat{
+		{Patch: "16.9", Matches: 10000},
+		{Patch: "16.17", Matches: 2000},
+		{Patch: "16.15", Matches: 3000},
+		{Patch: "16.16", Matches: 60000},
+		{Patch: "16.14", Matches: 0},
+		{Patch: "16.16", Matches: 60000},
+	})
+	want := []string{"16.16", "16.15", "16.9"}
+	if !reflect.DeepEqual(patches, want) {
 		t.Fatalf("patches = %v, want %v", patches, want)
 	}
 }

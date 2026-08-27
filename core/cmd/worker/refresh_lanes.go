@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,8 +30,9 @@ type refreshSchedulerState struct {
 }
 
 const (
-	championPageStartupPrewarmConcurrency = 4
-	championPageStartupReadinessGrace     = 45 * time.Second
+	championPageStartupPrewarmConcurrency  = 4
+	championPageArchivedPrewarmConcurrency = 2
+	championPageStartupReadinessGrace      = 45 * time.Second
 )
 
 func newRefreshStatusRecorder(path string) *refreshStatusRecorder {
@@ -228,9 +230,81 @@ func prewarmChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiSe
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
+		return
 	case <-timer.C:
 		log.Printf("champion page canonical startup readiness grace complete duration=%s", championPageStartupReadinessGrace)
 	}
+	prewarmArchivedChampionPagesOnStartup(ctx, cfg, apiServer, stats)
+}
+
+func prewarmArchivedChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiServer api.Server, stats []clickhouse.PatchStat) {
+	patches := championPageArchivedPrewarmPatchList(cfg.CollectorCurrentPatch, stats)
+	totalErrors := 0
+	for _, patch := range patches {
+		startedAt := time.Now()
+		log.Printf(
+			"champion page archived startup prewarm start patch=%s queue=%d concurrency=%d scope=all",
+			patch,
+			analytics.RankedSoloQueueID,
+			championPageArchivedPrewarmConcurrency,
+		)
+		result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
+			Patch:         patch,
+			CanonicalOnly: true,
+			Concurrency:   championPageArchivedPrewarmConcurrency,
+			RankBucket:    cfg.ChampionPagePrewarmRankBucket,
+			QueueID:       analytics.RankedSoloQueueID,
+		})
+		if err != nil {
+			totalErrors += result.Errors
+			if result.Errors == 0 {
+				totalErrors++
+			}
+			log.Printf(
+				"champion page archived startup prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d errors=%d duration=%s err=%v",
+				patch,
+				analytics.RankedSoloQueueID,
+				result.Candidates,
+				result.Stored,
+				result.Cached,
+				result.Skipped,
+				result.Errors,
+				time.Since(startedAt).Round(time.Millisecond),
+				err,
+			)
+			continue
+		}
+		log.Printf(
+			"champion page archived startup prewarm complete patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d errors=%d duration=%s scope=all",
+			patch,
+			analytics.RankedSoloQueueID,
+			result.Candidates,
+			result.Stored,
+			result.Cached,
+			result.Skipped,
+			result.Errors,
+			time.Since(startedAt).Round(time.Millisecond),
+		)
+	}
+	log.Printf("champion page archived startup prewarm all complete patches=%d errors=%d", len(patches), totalErrors)
+}
+
+func championPageArchivedPrewarmPatchList(currentPatch string, stats []clickhouse.PatchStat) []string {
+	currentPatch = strings.TrimSpace(currentPatch)
+	seen := map[string]bool{}
+	patches := make([]string, 0, len(stats))
+	for _, stat := range stats {
+		patch := strings.TrimSpace(stat.Patch)
+		if patch == "" || stat.Matches == 0 || seen[patch] || compareChampionPagePatches(patch, currentPatch) >= 0 {
+			continue
+		}
+		seen[patch] = true
+		patches = append(patches, patch)
+	}
+	sort.Slice(patches, func(left, right int) bool {
+		return compareChampionPagePatches(patches[left], patches[right]) > 0
+	})
+	return patches
 }
 
 func championPageStartupPrewarmPatchList(currentPatch string, retention int, stats []clickhouse.PatchStat) []string {

@@ -271,8 +271,8 @@ func (s Server) hydrateChampionPageRequests(
 			continue
 		}
 		ttl := s.championPageBundleTTL(request.Build.Patch)
-		s.responseCache.set(cacheKey, entry.Body, ttl)
-		s.responseCache.set(championPageBundleCacheKey(championPageCanonicalAliasRequest(request)), entry.Body, ttl)
+		s.responseCache.setShared(cacheKey, entry.Body, ttl)
+		s.responseCache.setShared(championPageBundleCacheKey(championPageCanonicalAliasRequest(request)), entry.Body, ttl)
 		guideGames, err := championPageGuideGames(entry.Body)
 		if err != nil {
 			return result, fmt.Errorf("decode hydrated champion page champion=%d patch=%s: %w", request.Build.ChampionID, request.Build.Patch, err)

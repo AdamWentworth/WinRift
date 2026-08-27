@@ -25,10 +25,11 @@ class ChampionPagePerfAuditTests(unittest.TestCase):
             ],
         }
         with mock.patch.object(AUDIT, "fetch_json", return_value=(patch_payload, {})):
-            current, fallback = AUDIT.load_patch_scope("http://api", 1, "")
+            current, fallback, selectable = AUDIT.load_patch_scope("http://api", 1, "")
 
         self.assertEqual(current, "16.17")
         self.assertEqual(fallback, "16.16")
+        self.assertEqual(selectable, ["16.17", "16.16", "16.15", "16.13"])
 
     def test_builds_the_exact_frontend_canonical_cache_key_request(self):
         url = AUDIT.champion_page_url("http://api", 62, "16.17", "JUNGLE")
@@ -42,6 +43,23 @@ class ChampionPagePerfAuditTests(unittest.TestCase):
         self.assertEqual(params["championMinGames"], ["10"])
         self.assertEqual(params["guideLimit"], ["12"])
         self.assertEqual(params["indexLimit"], ["250"])
+
+    def test_all_patch_targets_cover_every_champion_patch_pair(self):
+        champions = [AUDIT.Champion(62, "Wukong"), AUDIT.Champion(103, "Ahri")]
+        targets = AUDIT.audit_targets(champions, ["16.17", "16.16", "16.15"], "16.17")
+
+        self.assertEqual(len(targets), 6)
+        self.assertEqual(
+            {(champion.champion_id, patch, kind) for champion, patch, kind in targets},
+            {
+                (62, "16.17", "current"),
+                (103, "16.17", "current"),
+                (62, "16.16", "archived"),
+                (103, "16.16", "archived"),
+                (62, "16.15", "archived"),
+                (103, "16.15", "archived"),
+            },
+        )
 
     def test_fails_slow_or_uncached_pages(self):
         result = AUDIT.AuditResult(
