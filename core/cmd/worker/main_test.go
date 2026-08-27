@@ -171,17 +171,9 @@ func TestRefreshStatusRecorderWritesSuccessAndFailure(t *testing.T) {
 	}
 }
 
-func TestChampionPagePrewarmPatchListIncludesSelectableArchivedPatches(t *testing.T) {
-	patches := championPagePrewarmPatchList(
-		[]string{"16.17", "16.16"},
-		[]clickhouse.PatchStat{
-			{Patch: "16.17"},
-			{Patch: "16.16"},
-			{Patch: "16.15"},
-			{Patch: "16.13"},
-		},
-	)
-	want := []string{"16.17", "16.16", "16.15", "16.13"}
+func TestChampionPageScheduledPrewarmPatchListExcludesArchivedPatches(t *testing.T) {
+	patches := championPageScheduledPrewarmPatchList([]string{"16.17", "16.16", "16.17", ""})
+	want := []string{"16.17", "16.16"}
 	if len(patches) != len(want) {
 		t.Fatalf("patches = %v, want %v", patches, want)
 	}

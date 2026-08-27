@@ -520,25 +520,16 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 		statusDetails["refreshedPatches"]++
 	}
 	if cfg.ChampionPagePrewarmEnabled {
-		prewarmPatches := append([]string(nil), patches...)
-		stats, err := repo.PatchStats(ctx, analytics.RankedSoloQueueID)
-		if err != nil {
-			statusDetails["prewarmPatchDiscoveryErrors"]++
-			if firstErr == nil {
-				firstErr = err
-			}
-			log.Printf("champion page prewarm patch discovery failed err=%v", err)
-		} else {
-			prewarmPatches = championPagePrewarmPatchList(patches, stats)
-		}
+		// Only retained patches can change as the collector runs. Selectable
+		// archived patches are prewarmed once at startup and persisted; rebuilding
+		// them every scheduled cycle wastes memory and cannot produce new data.
+		prewarmPatches := championPageScheduledPrewarmPatchList(patches)
 		statusDetails["prewarmPatches"] = len(prewarmPatches)
+		log.Printf("champion page scheduled prewarm scope=retained-only patches=%s", strings.Join(prewarmPatches, ","))
+		apiServer.ClearChampionPageBundleMemoryCache()
+		defer apiServer.ClearChampionPageBundleMemoryCache()
 		for _, prewarmPatch := range prewarmPatches {
-			matchupsPerChampion := cfg.ChampionPagePrewarmMatchupsPerChampion
-			maxMatchupBundles := cfg.ChampionPagePrewarmMaxMatchupBundles
-			if !analytics.PatchInWindow(prewarmPatch, patch, cfg.CollectorPatchRetention) {
-				matchupsPerChampion = 0
-				maxMatchupBundles = 0
-			}
+			apiServer.ClearChampionPageBundleMemoryCache()
 			prewarmStartedAt := time.Now()
 			log.Printf(
 				"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d matchup_per_champion=%d matchup_min_games=%d matchup_max_bundles=%d rank_bucket=%s",
@@ -547,9 +538,9 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 				strings.Join(cfg.ChampionPagePrewarmRoles, ","),
 				cfg.ChampionPagePrewarmPerRole,
 				cfg.ChampionPagePrewarmMinGames,
-				matchupsPerChampion,
+				cfg.ChampionPagePrewarmMatchupsPerChampion,
 				cfg.ChampionPagePrewarmMatchupMinGames,
-				maxMatchupBundles,
+				cfg.ChampionPagePrewarmMaxMatchupBundles,
 				cfg.ChampionPagePrewarmRankBucket,
 			)
 			result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
@@ -558,12 +549,13 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 				PerRole:             cfg.ChampionPagePrewarmPerRole,
 				MinGames:            cfg.ChampionPagePrewarmMinGames,
 				Concurrency:         championPageStartupPrewarmConcurrency,
-				MatchupsPerChampion: matchupsPerChampion,
+				MatchupsPerChampion: cfg.ChampionPagePrewarmMatchupsPerChampion,
 				MatchupMinGames:     cfg.ChampionPagePrewarmMatchupMinGames,
-				MaxMatchupBundles:   maxMatchupBundles,
+				MaxMatchupBundles:   cfg.ChampionPagePrewarmMaxMatchupBundles,
 				RankBucket:          cfg.ChampionPagePrewarmRankBucket,
 				QueueID:             analytics.RankedSoloQueueID,
 			})
+			apiServer.ClearChampionPageBundleMemoryCache()
 			statusDetails["prewarmCandidates"] += result.Candidates
 			statusDetails["prewarmStored"] += result.Stored
 			statusDetails["prewarmSkipped"] += result.Skipped
@@ -622,9 +614,9 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 	return true
 }
 
-func championPagePrewarmPatchList(retained []string, stats []clickhouse.PatchStat) []string {
+func championPageScheduledPrewarmPatchList(retained []string) []string {
 	seen := map[string]bool{}
-	patches := make([]string, 0, len(retained)+len(stats))
+	patches := make([]string, 0, len(retained))
 	appendPatch := func(patch string) {
 		patch = strings.TrimSpace(patch)
 		if patch == "" || seen[patch] {
@@ -635,9 +627,6 @@ func championPagePrewarmPatchList(retained []string, stats []clickhouse.PatchSta
 	}
 	for _, patch := range retained {
 		appendPatch(patch)
-	}
-	for _, stat := range stats {
-		appendPatch(stat.Patch)
 	}
 	return patches
 }
