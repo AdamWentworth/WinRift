@@ -20,6 +20,16 @@ updates:
         patterns: ["*"]
     open-pull-requests-limit: 5
 
+  - package-ecosystem: gomod
+    directory: /apps/web/caddy
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      web-server-dependencies:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
