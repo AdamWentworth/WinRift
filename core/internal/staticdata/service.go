@@ -450,10 +450,11 @@ func itemNumber(value any) int {
 }
 
 func uint32FromInt(value int) (uint32, bool) {
-	if value < 0 || uint64(value) > uint64(^uint32(0)) {
+	parsed, err := strconv.ParseUint(strconv.Itoa(value), 10, 32)
+	if err != nil {
 		return 0, false
 	}
-	return uint32(value), true
+	return uint32(parsed), true
 }
 
 func hasItemTargets(item map[string]any) bool {
