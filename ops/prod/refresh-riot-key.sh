@@ -31,6 +31,8 @@ PATCHCTL_PRESSURE_CHECK_ATTEMPTS="${WINRIFT_PATCHCTL_PRESSURE_CHECK_ATTEMPTS:-60
 PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS="${WINRIFT_PATCHCTL_PRESSURE_CHECK_SLEEP_SECONDS:-10}"
 PATCH_ROLLOVER_RETRY_DELAY_SECONDS="${WINRIFT_PATCH_ROLLOVER_RETRY_DELAY_SECONDS:-20}"
 MONITOR_STOPPED_FOR_MAINTENANCE=0
+REQUESTED_CORE_IMAGE="${WINRIFT_CORE_IMAGE:-}"
+RESOLVED_CORE_IMAGE=""
 
 usage() {
   cat <<'EOF'
@@ -298,12 +300,62 @@ runtime_host_path_for_marker() {
   fi
 }
 
+core_image_is_immutable() {
+  [[ "$1" == *@sha256:* ]]
+}
+
+running_core_image() {
+  docker inspect --format '{{.Config.Image}}' winrift_api 2>/dev/null || true
+}
+
+deployed_core_image() {
+  local metadata_file="${DEPLOY_ROOT}/deployments/core.json"
+  if [[ ! -f "${metadata_file}" ]]; then
+    return 0
+  fi
+  awk -F'"' '$2 == "deployed_image" { print $4; exit }' "${metadata_file}"
+}
+
+resolve_core_image() {
+  local env_file_image=""
+  local current_image=""
+  local metadata_image=""
+
+  env_file_image="$(env_value WINRIFT_CORE_IMAGE)"
+  current_image="$(running_core_image)"
+  metadata_image="$(deployed_core_image)"
+
+  if [[ -n "${REQUESTED_CORE_IMAGE}" ]]; then
+    printf '%s' "${REQUESTED_CORE_IMAGE}"
+  elif core_image_is_immutable "${env_file_image}"; then
+    printf '%s' "${env_file_image}"
+  elif core_image_is_immutable "${current_image}"; then
+    printf '%s' "${current_image}"
+  elif core_image_is_immutable "${metadata_image}"; then
+    printf '%s' "${metadata_image}"
+  elif [[ -n "${env_file_image}" ]]; then
+    printf '%s' "${env_file_image}"
+  elif [[ -n "${current_image}" ]]; then
+    printf '%s' "${current_image}"
+  else
+    printf '%s' "${metadata_image}"
+  fi
+}
+
 compose() {
-  docker compose \
-    --project-directory "${PROJECT_DIRECTORY}" \
-    -f "${COMPOSE_FILE}" \
-    --env-file "${ENV_FILE}" \
-    "$@"
+  if [[ -n "${RESOLVED_CORE_IMAGE}" ]]; then
+    WINRIFT_CORE_IMAGE="${RESOLVED_CORE_IMAGE}" docker compose \
+      --project-directory "${PROJECT_DIRECTORY}" \
+      -f "${COMPOSE_FILE}" \
+      --env-file "${ENV_FILE}" \
+      "$@"
+  else
+    docker compose \
+      --project-directory "${PROJECT_DIRECTORY}" \
+      -f "${COMPOSE_FILE}" \
+      --env-file "${ENV_FILE}" \
+      "$@"
+  fi
 }
 
 patchctl() {
@@ -589,6 +641,15 @@ if [[ "${RESTART_SERVICES}" -eq 1 && "${COMPOSE_FILE_EXPLICIT}" -eq 0 && "${COMP
     echo "Installing production Compose file to ${DEPLOY_ROOT}/docker-compose.yml."
     install -m 0644 "${SCRIPT_DIR}/docker-compose.yml" "${DEPLOY_ROOT}/docker-compose.yml"
     COMPOSE_FILE="${DEPLOY_ROOT}/docker-compose.yml"
+  fi
+fi
+
+if [[ "${RESTART_SERVICES}" -eq 1 ]]; then
+  RESOLVED_CORE_IMAGE="$(resolve_core_image)"
+  if [[ -n "${RESOLVED_CORE_IMAGE}" ]]; then
+    echo "Preserving WinRift core image during service recreation: ${RESOLVED_CORE_IMAGE}"
+  else
+    echo "No existing WinRift core image could be resolved; Compose will use its configured default." >&2
   fi
 fi
 
