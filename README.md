@@ -8,7 +8,7 @@
   <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml/badge.svg?branch=master" alt="Core CI"></a>
   <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml/badge.svg?branch=master" alt="Web CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-all%20rights%20reserved-00c8dc" alt="All rights reserved"></a>
-  <a href="https://github.com/AdamWentworth/WinRift/releases"><img src="https://img.shields.io/github/v/release/AdamWentworth/WinRift?display_name=tag" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/version-v0.1.0-00c8dc" alt="Version v0.1.0">
 </p>
 
 WinRift is a solo portfolio application designed, built, and operated by **Adam Wentworth**. It is a production-capable, full-stack analytics project for League of Legends ranked data: it collects Riot match and timeline payloads, normalizes player builds and matchup context into ClickHouse, and serves a React app focused on practical build, rune, champion, summoner, and win-condition analysis.
