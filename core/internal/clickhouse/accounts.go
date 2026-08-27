@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -24,6 +25,11 @@ type SummonerAccountSnapshot struct {
 	SummonerLevel uint64
 	FetchedAt     time.Time
 	ExpiresAt     time.Time
+}
+
+type ChampionPageBundleCacheEntry struct {
+	Body      []byte
+	ExpiresAt time.Time
 }
 
 func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey string) ([]byte, bool, error) {
@@ -48,6 +54,55 @@ func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey stri
 		return nil, false, err
 	}
 	return []byte(payload), true, nil
+}
+
+func (r *Repository) CachedChampionPageBundles(ctx context.Context, cacheKeys []string) (map[string]ChampionPageBundleCacheEntry, error) {
+	keys := make([]string, 0, len(cacheKeys))
+	seen := make(map[string]bool, len(cacheKeys))
+	for _, cacheKey := range cacheKeys {
+		cacheKey = strings.TrimSpace(cacheKey)
+		if cacheKey == "" || seen[cacheKey] {
+			continue
+		}
+		seen[cacheKey] = true
+		keys = append(keys, cacheKey)
+	}
+	if len(keys) == 0 {
+		return map[string]ChampionPageBundleCacheEntry{}, nil
+	}
+
+	placeholders := make([]string, len(keys))
+	args := make([]any, len(keys))
+	for index, cacheKey := range keys {
+		placeholders[index] = "?"
+		args[index] = cacheKey
+	}
+	rows, err := r.db.QueryContext(
+		ctx,
+		fmt.Sprintf(`SELECT cache_key, payload_json, expires_at
+		FROM champion_page_bundle_cache FINAL
+		WHERE cache_key IN (%s) AND expires_at > now()`, strings.Join(placeholders, ",")),
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	entries := make(map[string]ChampionPageBundleCacheEntry, len(keys))
+	for rows.Next() {
+		var cacheKey string
+		var payload string
+		var expiresAt time.Time
+		if err := rows.Scan(&cacheKey, &payload, &expiresAt); err != nil {
+			return nil, err
+		}
+		entries[cacheKey] = ChampionPageBundleCacheEntry{Body: []byte(payload), ExpiresAt: expiresAt}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return entries, nil
 }
 
 func (r *Repository) StoreChampionPageBundle(ctx context.Context, cacheKey string, body []byte, ttl time.Duration) error {

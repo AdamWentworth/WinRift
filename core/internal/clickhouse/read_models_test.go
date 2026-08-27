@@ -547,6 +547,33 @@ func TestCachedChampionPageBundleUsesPersistentCache(t *testing.T) {
 	}
 }
 
+func TestCachedChampionPageBundlesLoadsCanonicalBundlesInOneQuery(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+	expiresAt := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+
+	mock.ExpectQuery("(?s)SELECT cache_key, payload_json, expires_at.*FROM champion_page_bundle_cache FINAL.*WHERE cache_key IN \\(\\?,\\?\\)").
+		WithArgs("champion-page:one", "champion-page:two").
+		WillReturnRows(sqlmock.NewRows([]string{"cache_key", "payload_json", "expires_at"}).
+			AddRow("champion-page:one", `{"champion":1}`, expiresAt).
+			AddRow("champion-page:two", `{"champion":2}`, expiresAt))
+
+	entries, err := repo.CachedChampionPageBundles(context.Background(), []string{"champion-page:one", "champion-page:two", "champion-page:one"})
+	if err != nil {
+		t.Fatalf("cached champion page bundles: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("entries = %d, want 2", len(entries))
+	}
+	if string(entries["champion-page:one"].Body) != `{"champion":1}` || !entries["champion-page:one"].ExpiresAt.Equal(expiresAt) {
+		t.Fatalf("first entry = %+v", entries["champion-page:one"])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestSummonerRankLeaderboardUsesIdentityAndProfileSummaries(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"winrift/core/internal/analytics"
+	"winrift/core/internal/clickhouse"
 	"winrift/core/internal/config"
 	"winrift/core/internal/riot"
 )
@@ -226,5 +227,44 @@ func TestChampionPageCanonicalAliasMatchesNoRoleFrontendRequest(t *testing.T) {
 	}
 	if championPageBundleCacheKey(alias) != championPageBundleCacheKey(incoming) {
 		t.Fatalf("alias key does not match no-role frontend request:\nalias:    %s\nincoming: %s", championPageBundleCacheKey(alias), championPageBundleCacheKey(incoming))
+	}
+}
+
+func TestHydrateChampionPageRequestsLoadsResolvedAndAutomaticRoleKeysIntoMemory(t *testing.T) {
+	server := Server{
+		cfg: config.Config{
+			CollectorCurrentPatch:   "16.17",
+			CollectorPatchRetention: 2,
+		},
+		responseCache: newResponseCache(),
+	}
+	request := championPagePrewarmRequest(62, "JUNGLE", "16.17", "", analytics.RankedSoloQueueID)
+	resolvedKey := championPageBundleCacheKey(request)
+	aliasKey := championPageBundleCacheKey(championPageCanonicalAliasRequest(request))
+	body := []byte(`{"champion":62}`)
+
+	result, err := server.hydrateChampionPageRequests(
+		context.Background(),
+		[]championPageBundleRequest{request},
+		func(_ context.Context, keys []string) (map[string]clickhouse.ChampionPageBundleCacheEntry, error) {
+			if len(keys) != 1 || keys[0] != resolvedKey {
+				t.Fatalf("hydration keys = %v, want %s", keys, resolvedKey)
+			}
+			return map[string]clickhouse.ChampionPageBundleCacheEntry{
+				resolvedKey: {Body: body, ExpiresAt: time.Now().Add(time.Hour)},
+			}, nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Candidates != 1 || result.Loaded != 1 || result.Missing != 0 {
+		t.Fatalf("hydration result = %+v", result)
+	}
+	for _, key := range []string{resolvedKey, aliasKey} {
+		cachedBody, ok := server.responseCache.get(key)
+		if !ok || string(cachedBody) != string(body) {
+			t.Fatalf("memory cache key %s ok=%t body=%s", key, ok, cachedBody)
+		}
 	}
 }

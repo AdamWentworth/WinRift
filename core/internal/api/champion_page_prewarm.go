@@ -41,6 +41,13 @@ type ChampionPagePrewarmResult struct {
 	MissingGuideIDs   []uint16
 }
 
+type ChampionPageHydrationResult struct {
+	Candidates      int
+	Loaded          int
+	Missing         int
+	MissingGuideIDs []uint16
+}
+
 func (s Server) PrewarmChampionPageBundles(ctx context.Context, options ChampionPagePrewarmOptions) (ChampionPagePrewarmResult, error) {
 	patch := strings.TrimSpace(options.Patch)
 	if patch == "" {
@@ -79,68 +86,10 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	result := ChampionPagePrewarmResult{}
 	var firstErr error
 	seenKeys := map[string]bool{}
-	canonicalRequests := []championPageBundleRequest{}
-	canonicalFilters := map[string]string{
-		"role":        "",
-		"patch":       patch,
-		"rank_bucket": rankBucket,
-	}
-	canonicalIndex, err := s.repo.QueryChampionGuideIndex(ctx, canonicalFilters, 1, max(perRole, 250))
+	canonicalRequests, err := s.championPageCanonicalRequests(ctx, patch, rankBucket, queueID, perRole, options.ChampionIDs)
 	if err != nil {
 		result.Errors++
 		firstErr = err
-	}
-	allPatchIndex := canonicalIndex
-	if patch != "" {
-		allPatchFilters := map[string]string{
-			"role":        "",
-			"patch":       "",
-			"rank_bucket": rankBucket,
-		}
-		allPatchIndex, err = s.repo.QueryChampionGuideIndex(ctx, allPatchFilters, 1, max(perRole, 250))
-		if err != nil {
-			result.Errors++
-			if firstErr == nil {
-				firstErr = err
-			}
-			allPatchIndex.Results = nil
-		}
-	}
-	championIDs := championPagePrewarmChampionIDs(canonicalIndex.Results, allPatchIndex.Results)
-	championIDs = filterChampionPagePrewarmChampionIDs(championIDs, options.ChampionIDs)
-	roleRates, roleErr := s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, patch)
-	if roleErr != nil {
-		result.Errors++
-		if firstErr == nil {
-			firstErr = roleErr
-		}
-	} else {
-		fallbackRoleRates := roleRates
-		if patch != "" {
-			fallbackRoleRates, roleErr = s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, "")
-			if roleErr != nil {
-				result.Errors++
-				if firstErr == nil {
-					firstErr = roleErr
-				}
-				fallbackRoleRates = nil
-			}
-		}
-		for _, championID := range championIDs {
-			role := primaryChampionRole(roleRates, championID)
-			if role == "" {
-				role = primaryChampionRole(fallbackRoleRates, championID)
-			}
-			if role == "" {
-				continue
-			}
-			request := championPagePrewarmRequest(championID, role, patch, rankBucket, queueID)
-			cacheKey := championPageBundleCacheKey(request)
-			if !seenKeys[cacheKey] {
-				seenKeys[cacheKey] = true
-				canonicalRequests = append(canonicalRequests, request)
-			}
-		}
 	}
 	canonicalResult, canonicalErr := s.prewarmChampionPageRequests(ctx, canonicalRequests, options.Concurrency, false, true)
 	mergeChampionPagePrewarmResult(&result, canonicalResult)
@@ -217,6 +166,123 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 		}
 	}
 	return result, firstErr
+}
+
+func (s Server) championPageCanonicalRequests(ctx context.Context, patch, rankBucket string, queueID uint16, perRole int, requestedChampionIDs []uint16) ([]championPageBundleRequest, error) {
+	canonicalFilters := map[string]string{
+		"role":        "",
+		"patch":       patch,
+		"rank_bucket": rankBucket,
+	}
+	canonicalIndex, err := s.repo.QueryChampionGuideIndex(ctx, canonicalFilters, 1, max(perRole, 250))
+	if err != nil {
+		return nil, err
+	}
+	allPatchIndex := canonicalIndex
+	if patch != "" {
+		allPatchFilters := map[string]string{
+			"role":        "",
+			"patch":       "",
+			"rank_bucket": rankBucket,
+		}
+		allPatchIndex, err = s.repo.QueryChampionGuideIndex(ctx, allPatchFilters, 1, max(perRole, 250))
+		if err != nil {
+			return nil, err
+		}
+	}
+	championIDs := championPagePrewarmChampionIDs(canonicalIndex.Results, allPatchIndex.Results)
+	championIDs = filterChampionPagePrewarmChampionIDs(championIDs, requestedChampionIDs)
+	roleRates, err := s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, patch)
+	if err != nil {
+		return nil, err
+	}
+	fallbackRoleRates := roleRates
+	if patch != "" {
+		fallbackRoleRates, err = s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, "")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	requests := make([]championPageBundleRequest, 0, len(championIDs))
+	seenKeys := make(map[string]bool, len(championIDs))
+	for _, championID := range championIDs {
+		role := primaryChampionRole(roleRates, championID)
+		if role == "" {
+			role = primaryChampionRole(fallbackRoleRates, championID)
+		}
+		if role == "" {
+			continue
+		}
+		request := championPagePrewarmRequest(championID, role, patch, rankBucket, queueID)
+		cacheKey := championPageBundleCacheKey(request)
+		if seenKeys[cacheKey] {
+			continue
+		}
+		seenKeys[cacheKey] = true
+		requests = append(requests, request)
+	}
+	return requests, nil
+}
+
+func (s Server) HydrateChampionPageBundles(ctx context.Context, options ChampionPagePrewarmOptions) (ChampionPageHydrationResult, error) {
+	patch := strings.TrimSpace(options.Patch)
+	if patch == "" {
+		patch = strings.TrimSpace(s.cfg.CollectorCurrentPatch)
+	}
+	if patch == "" {
+		return ChampionPageHydrationResult{}, nil
+	}
+	perRole := options.PerRole
+	if perRole <= 0 {
+		perRole = 200
+	}
+	rankBucket := strings.ToUpper(strings.TrimSpace(options.RankBucket))
+	queueID := options.QueueID
+	if queueID == 0 {
+		queueID = analytics.RankedSoloQueueID
+	}
+	requests, err := s.championPageCanonicalRequests(ctx, patch, rankBucket, queueID, perRole, options.ChampionIDs)
+	if err != nil {
+		return ChampionPageHydrationResult{}, err
+	}
+	return s.hydrateChampionPageRequests(ctx, requests, s.repo.CachedChampionPageBundles)
+}
+
+func (s Server) hydrateChampionPageRequests(
+	ctx context.Context,
+	requests []championPageBundleRequest,
+	load func(context.Context, []string) (map[string]clickhouse.ChampionPageBundleCacheEntry, error),
+) (ChampionPageHydrationResult, error) {
+	result := ChampionPageHydrationResult{Candidates: len(requests)}
+	keys := make([]string, 0, len(requests))
+	for _, request := range requests {
+		keys = append(keys, championPageBundleCacheKey(request))
+	}
+	entries, err := load(ctx, keys)
+	if err != nil {
+		return result, err
+	}
+	for _, request := range requests {
+		cacheKey := championPageBundleCacheKey(request)
+		entry, ok := entries[cacheKey]
+		if !ok || len(entry.Body) == 0 || !entry.ExpiresAt.After(time.Now()) {
+			result.Missing++
+			continue
+		}
+		ttl := s.championPageBundleTTL(request.Build.Patch)
+		s.responseCache.set(cacheKey, entry.Body, ttl)
+		s.responseCache.set(championPageBundleCacheKey(championPageCanonicalAliasRequest(request)), entry.Body, ttl)
+		guideGames, err := championPageGuideGames(entry.Body)
+		if err != nil {
+			return result, fmt.Errorf("decode hydrated champion page champion=%d patch=%s: %w", request.Build.ChampionID, request.Build.Patch, err)
+		}
+		if guideGames == 0 {
+			result.MissingGuideIDs = append(result.MissingGuideIDs, request.Build.ChampionID)
+		}
+		result.Loaded++
+	}
+	return result, nil
 }
 
 func (s Server) prewarmChampionPageRequests(ctx context.Context, requests []championPageBundleRequest, concurrency int, matchup, storeCanonicalAlias bool) (ChampionPagePrewarmResult, error) {
