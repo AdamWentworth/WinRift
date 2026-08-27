@@ -553,8 +553,8 @@ jobs:
               exit 1
             fi
 
-            WORKER_LOGS="$(docker logs winrift_worker 2>&1 || true)"
-            API_LOGS="$(docker logs winrift_api 2>&1 || true)"
+            WORKER_LOGS="$(docker logs --tail 5000 winrift_worker 2>&1 || true)"
+            API_LOGS="$(docker logs --tail 5000 winrift_api 2>&1 || true)"
             ALL_COMPLETE=1
             for REQUIRED_PATCH in "${REQUIRED_CURRENT_PATCHES[@]}"; do
               if grep -Fq "champion page canonical startup prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then

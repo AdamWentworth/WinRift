@@ -48,7 +48,7 @@ func maintainChampionPageMemoryCache(ctx context.Context, cfg config.Config, rep
 		log.Printf("champion page API memory hydration fallback discovery failed current_patch=%s err=%v", patch, err)
 	}
 	patches := championPageHydrationPatchList(patch, cfg.CollectorPatchRetention, stats)
-	stablePatchesHydrated := map[string]bool{}
+	patchesHydrated := map[string]bool{}
 	for {
 		currentResult, currentErr := server.HydrateChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
 			Patch:      patch,
@@ -86,7 +86,7 @@ func maintainChampionPageMemoryCache(ctx context.Context, cfg config.Config, rep
 				totalCandidates := currentResult.Candidates
 				totalLoaded := currentResult.Loaded
 				for _, archivedPatch := range patches[1:] {
-					if stablePatchesHydrated[archivedPatch] {
+					if patchesHydrated[archivedPatch] {
 						continue
 					}
 					archivedResult, err := server.HydrateChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
@@ -107,14 +107,17 @@ func maintainChampionPageMemoryCache(ctx context.Context, cfg config.Config, rep
 						log.Printf("champion page API memory hydration incomplete patch=%s scope=all candidates=%d loaded=%d missing=%d retry_in=%s", archivedPatch, archivedResult.Candidates, archivedResult.Loaded, archivedResult.Missing, championPageHydrationRetryInterval)
 						continue
 					}
-					if !analytics.PatchInWindow(archivedPatch, patch, cfg.CollectorPatchRetention) {
-						stablePatchesHydrated[archivedPatch] = true
-					}
+					patchesHydrated[archivedPatch] = true
 					log.Printf("champion page API memory hydration patch complete patch=%s scope=all candidates=%d loaded=%d missing=%d", archivedPatch, archivedResult.Candidates, archivedResult.Loaded, archivedResult.Missing)
 				}
 				if allPatchesReady {
 					log.Printf("champion page API memory hydration complete patch=%s candidates=%d loaded=%d missing=%d missing_guide_champions=%d fallback_patch=%s fallback_loaded=%d refresh_in=%s", patch, currentResult.Candidates, currentResult.Loaded, currentResult.Missing, len(currentResult.MissingGuideIDs), fallbackPatch, fallbackLoaded, championPageHydrationRefreshInterval)
 					log.Printf("champion page API memory hydration all patches complete current_patch=%s patches=%s candidates=%d loaded=%d refresh_in=%s", patch, strings.Join(patches, ","), totalCandidates, totalLoaded, championPageHydrationRefreshInterval)
+					for _, retainedPatch := range patches[1:] {
+						if analytics.PatchInWindow(retainedPatch, patch, cfg.CollectorPatchRetention) {
+							delete(patchesHydrated, retainedPatch)
+						}
+					}
 					delay = championPageHydrationRefreshInterval
 				}
 			}
