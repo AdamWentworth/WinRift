@@ -1,4 +1,4 @@
-FROM node:24-slim AS dependencies
+FROM node:25-slim AS dependencies
 
 WORKDIR /app
 ENV NPM_CONFIG_AUDIT=false \
