@@ -6,6 +6,13 @@ import { getAnalyticsPatches, getBuildAdvice, getChampionGuideIndex, getChampion
 import type { LiveGame } from './api/types';
 
 const withAbortSignal = () => expect.objectContaining({ signal: expect.any(AbortSignal) });
+const scrollToMock = vi.fn();
+
+Object.defineProperty(window, 'scrollTo', {
+  configurable: true,
+  value: scrollToMock,
+  writable: true,
+});
 
 const buildAdviceFixture = vi.hoisted(() => () => ({
   filters: {
@@ -174,6 +181,7 @@ describe('App', () => {
   afterEach(() => {
     cleanup();
     window.history.replaceState({}, '', '/');
+    scrollToMock.mockClear();
     vi.mocked(getLiveGame).mockReset();
     vi.mocked(getSummonerLeaderboard).mockReset();
     vi.mocked(getSummonerProfile).mockReset();
@@ -471,6 +479,25 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
     expect(window.location.pathname).toBe('/champions/MonkeyKing');
     expect(getLiveGame).not.toHaveBeenCalled();
+    queryClient.clear();
+  });
+
+  it('starts each in-app route at the top of the document', async () => {
+    const { queryClient } = renderApp();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Champions' })).toBeInTheDocument());
+    scrollToMock.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Champions' }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/champions'));
+    expect(scrollToMock).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' });
+
+    scrollToMock.mockClear();
+    window.history.pushState({}, '', '/champions/MonkeyKing');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    await waitFor(() => expect(screen.getByText('WinRift Build Atlas')).toBeInTheDocument());
+    expect(scrollToMock).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' });
     queryClient.clear();
   });
 

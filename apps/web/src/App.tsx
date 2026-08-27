@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAnalyticsPatches, getChampionPageBundle, getChampionSplashes, getChampions, getItems, getRunes, getSummonerSpells } from './api/client';
 import type { Champion } from './api/types';
@@ -36,6 +36,7 @@ export function App() {
   const [selectedAnalyticsPatch, setSelectedAnalyticsPatch] = useState(() => storedAnalyticsPatch());
   const [summonerBackgroundChampionIds, setSummonerBackgroundChampionIds] = useState<number[]>([]);
   const [backgroundSplashCatalogEnabled, setBackgroundSplashCatalogEnabled] = useState(false);
+  const routePath = pathForRoute(route);
   const needsGameMetadata = (route.kind === 'summoner' && Boolean(route.gameName)) || (route.kind === 'champion' && Boolean(route.championSlug));
   const needsWinConditionDetailBackground = route.kind === 'win-condition-detail' || route.kind === 'flex-archetype';
   const champions = useQuery({ queryKey: ['champions'], queryFn: ({ signal }) => getChampions({ signal }), staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
@@ -74,6 +75,18 @@ export function App() {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  useLayoutEffect(() => {
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [routePath]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setBackgroundSplashCatalogEnabled(true), BACKGROUND_SPLASH_CATALOG_DELAY_MS);
