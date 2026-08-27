@@ -1,6 +1,6 @@
 # Collector Runbook
 
-For server deployment, storage, backups, and production lifecycle notes, also see [Deployment And Operations](ops-deployment.md) and [Storage Policy](storage-policy.md).
+For server deployment and rollback, see [Production Operations](../ops/prod/README.md). For retention behavior, see [Storage Policy](storage-policy.md).
 
 ## Start Infrastructure
 
@@ -183,7 +183,7 @@ Safety knobs:
 - `MONITOR_ALERT_RETRY_MINUTES`: interval before retrying an alert that the SMTP provider rejected or failed to deliver.
 - `ALERT_EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TO`: SMTP email alert settings used by the monitor.
 - `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
-- `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.10`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch. The production `riotkey` helper advances this automatically when Data Dragon reports a newer patch.
+- `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.17`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch. The production `riotkey` helper advances this automatically when Data Dragon reports a newer patch.
 - `COLLECTOR_PATCH_RETENTION_COUNT`: number of same-season patch buckets to keep eligible for ingestion. With `COLLECTOR_CURRENT_PATCH=16.17` and `COLLECTOR_PATCH_RETENTION_COUNT=2`, the collector accepts `16.17` and `16.16`, then stops the current PUUID as soon as it sees `16.15` or older. When Riot moves to `16.18`, bump `COLLECTOR_CURRENT_PATCH` to `16.18` so the active window becomes `16.18` and `16.17`.
 - `COLLECTOR_PRUNE_OLD_PATCHES_ON_START`: when true, worker startup deletes ClickHouse rows from raw, normalized, timeline, live aggregate, and compiled metric tables for patches outside the active retention window. Keep this false anywhere you want to preserve old patch history.
 - `COLLECTOR_IDLE_SLEEP_SECONDS`: short pause when a sweep does no Riot work and no regional rate-limit wait is required.

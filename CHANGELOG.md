@@ -26,7 +26,7 @@ All notable WinRift milestones are recorded here. The project follows milestone-
 
 ### Repository
 
-- Added branded GitHub presentation, current documentation navigation, owner-maintenance guidance, issue/PR templates, CodeQL, and hardened dependency checks.
-- Clarified sole authorship, view-only portfolio presentation, and the repository's no-contribution policy.
+- Added branded sole-owner portfolio presentation, a curated current-system documentation index, CodeQL, and hardened dependency checks.
+- Removed community-project boilerplate, completed roadmaps, dated audits, and superseded design journals from the public surface.
 - Brought the maintained Go and web dependency sets current, including ClickHouse, React, Vite, Vitest, TypeScript, jsdom, and Testing Library updates.
-- Established the first view-only portfolio milestone release.
+- Established the internal `v0.1.0` portfolio milestone.
