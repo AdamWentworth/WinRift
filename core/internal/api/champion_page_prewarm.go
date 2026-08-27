@@ -48,6 +48,14 @@ type ChampionPageHydrationResult struct {
 	MissingGuideIDs []uint16
 }
 
+// ClearChampionPageBundleMemoryCache releases worker-side build bodies after
+// they have been persisted. The API runs in a separate process and hydrates its
+// own long-lived response cache, so the prewarm worker does not need to retain
+// every archived payload.
+func (s Server) ClearChampionPageBundleMemoryCache() {
+	s.responseCache.deletePrefix(championPageBundleCacheKeyPrefix)
+}
+
 func (s Server) PrewarmChampionPageBundles(ctx context.Context, options ChampionPagePrewarmOptions) (ChampionPagePrewarmResult, error) {
 	patch := strings.TrimSpace(options.Patch)
 	if patch == "" {
@@ -364,7 +372,8 @@ func (s Server) storeChampionPageCanonicalAlias(ctx context.Context, request cha
 	aliasRequest := championPageCanonicalAliasRequest(request)
 	aliasKey := championPageBundleCacheKey(aliasRequest)
 	ttl := s.championPageBundleTTL(request.Build.Patch)
-	s.responseCache.set(aliasKey, body, ttl)
+	s.responseCache.setShared(championPageBundleCacheKey(request), body, ttl)
+	s.responseCache.setShared(aliasKey, body, ttl)
 	storeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	if err := s.repo.StoreChampionPageBundle(storeCtx, aliasKey, body, ttl); err != nil {

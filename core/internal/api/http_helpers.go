@@ -263,6 +263,19 @@ func (c *responseCache) setShared(key string, body []byte, ttl time.Duration) {
 	}
 }
 
+func (c *responseCache) deletePrefix(prefix string) {
+	if c == nil || prefix == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for key := range c.entries {
+		if strings.HasPrefix(key, prefix) {
+			delete(c.entries, key)
+		}
+	}
+}
+
 func (s Server) writeCachedJSON(w http.ResponseWriter, status int, cacheKey string, ttl time.Duration, value any) {
 	body, err := json.Marshal(value)
 	if err != nil {

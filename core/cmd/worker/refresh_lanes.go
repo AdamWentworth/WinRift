@@ -240,6 +240,7 @@ func prewarmChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiSe
 func prewarmArchivedChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiServer api.Server, stats []clickhouse.PatchStat) {
 	patches := championPageArchivedPrewarmPatchList(cfg.CollectorCurrentPatch, stats)
 	totalErrors := 0
+	apiServer.ClearChampionPageBundleMemoryCache()
 	for _, patch := range patches {
 		startedAt := time.Now()
 		log.Printf(
@@ -255,6 +256,7 @@ func prewarmArchivedChampionPagesOnStartup(ctx context.Context, cfg config.Confi
 			RankBucket:    cfg.ChampionPagePrewarmRankBucket,
 			QueueID:       analytics.RankedSoloQueueID,
 		})
+		apiServer.ClearChampionPageBundleMemoryCache()
 		if err != nil {
 			totalErrors += result.Errors
 			if result.Errors == 0 {

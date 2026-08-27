@@ -268,3 +268,18 @@ func TestHydrateChampionPageRequestsLoadsResolvedAndAutomaticRoleKeysIntoMemory(
 		}
 	}
 }
+
+func TestClearChampionPageBundleMemoryCacheKeepsUnrelatedResponses(t *testing.T) {
+	server := Server{responseCache: newResponseCache()}
+	server.responseCache.set(championPageBundleCacheKeyPrefix+"one", []byte(`{"page":1}`), time.Hour)
+	server.responseCache.set("static:champions", []byte(`{"static":true}`), time.Hour)
+
+	server.ClearChampionPageBundleMemoryCache()
+
+	if _, ok := server.responseCache.get(championPageBundleCacheKeyPrefix + "one"); ok {
+		t.Fatal("champion page cache entry was not cleared")
+	}
+	if body, ok := server.responseCache.get("static:champions"); !ok || string(body) != `{"static":true}` {
+		t.Fatalf("unrelated cache entry ok=%t body=%s", ok, body)
+	}
+}
