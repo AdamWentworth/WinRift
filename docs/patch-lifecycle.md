@@ -109,5 +109,5 @@ Derived summary rows and metrics also remain:
 Optional marker:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action collecting -patch 16.11 -platform NA1 -queue 420
+docker compose run --rm api /winrift-patchctl -action collecting -patch 16.17 -platform NA1 -queue 420
 ```

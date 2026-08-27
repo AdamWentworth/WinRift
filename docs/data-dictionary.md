@@ -135,7 +135,7 @@ Refresh options:
 
 - Worker: `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true` with `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10` refreshes the current patch item-slot and starting-loadout read models automatically.
 - Local/dev API: `POST /api/dev/analytics/item-slots/refresh`
-- CLI: `patchctl -action item-slots -patch 16.10 -queue 420`
+- CLI: `patchctl -action item-slots -patch 16.17 -queue 420`
 
 ## `build_signature_analytics`
 
@@ -156,7 +156,7 @@ Refresh options:
 - Worker: `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED=true` with `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES=10`
 - Worker page cache: `CHAMPION_PAGE_PREWARM_ENABLED=true` precomputes canonical champion and high-volume role page bundles for every selectable stored patch so they can be served from `champion_page_bundle_cache`. The same lane prewarms a bounded set of common opponent-filtered bundles for retained patches with `CHAMPION_PAGE_PREWARM_MATCHUPS_PER_CHAMPION` and `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES`.
 - Local/dev API: `POST /api/dev/analytics/champion-guides/refresh`
-- CLI: `patchctl -action champion-guides -patch 16.10 -queue 420`
+- CLI: `patchctl -action champion-guides -patch 16.17 -queue 420`
 
 The same refresh lane also populates `team_kill_summary`, `champion_role_analytics`, `champion_guide_summary_analytics`, `champion_guide_scope_analytics`, `champion_skill_analytics`, `champion_ban_analytics`, `champion_matchup_analytics`, `champion_signature_analytics`, and `build_signature_analytics`.
 
@@ -189,7 +189,7 @@ Rollups are stored as normal rows: `platform = ALL`, `rank_bucket = ALL`, and `g
 Refresh options:
 
 - Worker: `WIN_CONDITION_ANALYTICS_REFRESH_ENABLED=true` with `WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES=15` refreshes the current patch automatically.
-- CLI: `patchctl -action win-conditions -patch 16.10 -platform NA1 -queue 420`
+- CLI: `patchctl -action win-conditions -patch 16.17 -platform NA1 -queue 420`
 
 ## `participants`
 

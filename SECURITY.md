@@ -1,16 +1,16 @@
 # Security Policy
 
-WinRift is an MVP analytics project in active development. The production-style deployment described in this repository is intended for private-LAN use unless and until public authentication, abuse protection, and operational monitoring are added.
+WinRift is a source-available analytics project with a private-LAN production deployment. The current monitoring and deployment controls are designed for that trusted-network boundary; they are not a substitute for public authentication, edge abuse protection, or internet-facing threat monitoring.
 
 ## Supported Branch
 
 | Branch | Status |
 |--------|--------|
-| `master` | Active development |
+| `master` / `0.1.x` | Supported |
 
 ## Reporting A Vulnerability
 
-Please open a private security advisory on GitHub if available, or contact the repository owner directly through GitHub.
+Please [open a private GitHub security advisory](https://github.com/AdamWentworth/WinRift/security/advisories/new), or contact the repository owner directly through GitHub.
 
 Do not open a public issue containing:
 

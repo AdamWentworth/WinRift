@@ -1,5 +1,7 @@
 # Remaining Work
 
+> **Historical status journal:** the implementation items below record the path to `v0.1.0` and are no longer the active backlog. See [Current Next Steps](next-steps.md) for present priorities.
+
 This is the next-session list from the live app rebuild work. The project is moving in the right direction, but a few areas now deserve cleanup before we keep stacking features on top.
 
 For the broader cleanup pass, see `docs/product/tech-debt-roadmap.md`.

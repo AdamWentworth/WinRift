@@ -7,11 +7,20 @@ timeout_seconds="${WINRIFT_PERF_TIMEOUT_SECONDS:-15}"
 warmups="${WINRIFT_PERF_WARMUPS:-1}"
 runs="${WINRIFT_PERF_RUNS:-3}"
 strict_thresholds="${WINRIFT_PERF_STRICT:-0}"
-perf_patch="${WINRIFT_PERF_PATCH:-16.10}"
+perf_patch="${WINRIFT_PERF_PATCH:-}"
 jsonl_path="${WINRIFT_PERF_JSONL:-}"
 
 failures=0
 warnings=0
+
+if [[ -z "${perf_patch}" ]]; then
+  patch_payload="$(curl -fsS --max-time "${timeout_seconds}" "${base_url}/api/analytics/patches?queueId=420")"
+  perf_patch="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("currentPatch", ""))' <<<"${patch_payload}")"
+  if [[ -z "${perf_patch}" ]]; then
+    echo "Unable to resolve the current patch from /api/analytics/patches." >&2
+    exit 1
+  fi
+fi
 
 if [[ -n "${jsonl_path}" ]]; then
   : >"${jsonl_path}"

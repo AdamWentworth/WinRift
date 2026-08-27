@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a focused product, analytics, or developer-experience improvement.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user or maintainer need would this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the desired behavior without prescribing unnecessary implementation detail.
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Data, performance, and policy tradeoffs
+      description: Consider Riot API budget, sample quality, page latency, private deployment, and live-game policy where relevant.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

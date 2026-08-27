@@ -68,8 +68,10 @@ CLICKHOUSE_USER=winrift
 CLICKHOUSE_PASSWORD=winrift
 
 CORS_ORIGINS=http://localhost:5173
-COLLECTOR_CURRENT_PATCH=16.11
+COLLECTOR_CURRENT_PATCH=16.17
 ```
+
+The collector patch is an explicit ingestion boundary rather than an automatic rollout. Update it deliberately when Riot advances to a new patch; frontend patch selection is driven by the API's current-patch response.
 
 ### Important Runtime Knobs
 

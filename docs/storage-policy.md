@@ -66,11 +66,11 @@ Operational/cache tables:
 Active collection should keep the current patch and most recent previous patch:
 
 ```text
-COLLECTOR_CURRENT_PATCH=16.10
+COLLECTOR_CURRENT_PATCH=16.17
 COLLECTOR_PATCH_RETENTION_COUNT=2
 ```
 
-With those settings, the worker accepts `16.10` and `16.9`. When the current patch becomes `16.11`, update the env value and the window becomes `16.11` and `16.10`.
+With those settings, the worker accepts `16.17` and `16.16`. When the current patch becomes `16.18`, update the env value and the window becomes `16.18` and `16.17`.
 
 The worker stops walking a PUUID's match history when it reaches a patch older than the active window. That saves request budget and avoids filling the database with stale matches.
 

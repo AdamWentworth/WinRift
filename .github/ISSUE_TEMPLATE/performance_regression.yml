@@ -1,0 +1,65 @@
+name: Performance regression
+description: Report a route or API response that exceeds WinRift's documented performance budget.
+title: "[Performance] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        WinRift treats page speed as a correctness requirement. Please provide a measured result rather than a general impression, while keeping all private deployment details redacted.
+  - type: input
+    id: route
+    attributes:
+      label: Route or endpoint
+      placeholder: /champions/Irelia or /api/analytics/champion-page?...
+    validations:
+      required: true
+  - type: input
+    id: patch
+    attributes:
+      label: Patch
+      placeholder: "16.17"
+    validations:
+      required: true
+  - type: dropdown
+    id: load_type
+    attributes:
+      label: Load type
+      options:
+        - First navigation after deployment or startup
+        - First navigation in a new browser session
+        - Repeat navigation
+        - Direct API request
+    validations:
+      required: true
+  - type: input
+    id: latency
+    attributes:
+      label: Measured latency
+      placeholder: 820 ms
+    validations:
+      required: true
+  - type: input
+    id: cache
+    attributes:
+      label: X-WinRift-Cache header
+      placeholder: hit, miss, or not available
+  - type: textarea
+    id: method
+    attributes:
+      label: Measurement method
+      description: Include the sanitized command, browser timing method, number of runs, and whether a warmup was used.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or screenshots
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed tokens, Riot IDs, private hostnames, addresses, and other sensitive data.
+          required: true

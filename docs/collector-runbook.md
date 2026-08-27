@@ -52,7 +52,7 @@ RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS=120
 RIOT_AUTH_FAILURE_EXIT=true
 RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
 COLLECTOR_INTERVAL_SECONDS=120
-COLLECTOR_CURRENT_PATCH=16.10
+COLLECTOR_CURRENT_PATCH=16.17
 COLLECTOR_PATCH_RETENTION_COUNT=2
 COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false
 COLLECTOR_IDLE_SLEEP_SECONDS=15
@@ -122,13 +122,13 @@ make status
 
 At startup, the worker resolves env seeds into `collector_frontier` and stores their Riot ID aliases. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, runs an account-alias lane for stored participant PUUIDs that do not yet have a saved `gameName#tagLine`, periodically refreshes current patch item-slot/champion-guide/win-condition read models, refreshes summoner profile summaries, and records Riot requests in a rolling regional budget ledger. Live lookups can also nudge low-sample live participants into `collector_frontier` with `source='live-backfill'`, letting champion-specific card stats improve in the background without blocking the lookup. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
 
-Patch retention is intentionally tied to `COLLECTOR_CURRENT_PATCH`. For example, `COLLECTOR_CURRENT_PATCH=16.11` with `COLLECTOR_PATCH_RETENTION_COUNT=2` stores `16.11` and `16.10`; when it is bumped to `16.12`, the active window becomes `16.12` and `16.11`, so `16.10` is no longer eligible and can be pruned on startup if `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true`.
+Patch retention is intentionally tied to `COLLECTOR_CURRENT_PATCH`. For example, `COLLECTOR_CURRENT_PATCH=16.17` with `COLLECTOR_PATCH_RETENTION_COUNT=2` stores `16.17` and `16.16`; when it is bumped to `16.18`, the active window becomes `16.18` and `16.17`, so `16.16` is no longer eligible and can be pruned on startup if `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true`.
 
 For broad multi-platform collection, use smaller per-platform budgets. For example:
 
 ```text
 COLLECTOR_PLATFORMS=NA1,EUW1,EUN1,KR,BR1,LA1,LA2,JP1,OC1,TR1,RU,SG2,TW2,VN2
-COLLECTOR_CURRENT_PATCH=16.10
+COLLECTOR_CURRENT_PATCH=16.17
 COLLECTOR_PATCH_RETENTION_COUNT=2
 COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true
 COLLECTOR_FRONTIER_BATCH_SIZE=1
@@ -184,7 +184,7 @@ Safety knobs:
 - `ALERT_EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TO`: SMTP email alert settings used by the monitor.
 - `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
 - `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.10`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch. The production `riotkey` helper advances this automatically when Data Dragon reports a newer patch.
-- `COLLECTOR_PATCH_RETENTION_COUNT`: number of same-season patch buckets to keep eligible for ingestion. With `COLLECTOR_CURRENT_PATCH=16.10` and `COLLECTOR_PATCH_RETENTION_COUNT=2`, the collector accepts `16.10` and `16.9`, then stops the current PUUID as soon as it sees `16.8` or older. When Riot moves to `16.11`, bump `COLLECTOR_CURRENT_PATCH` to `16.11` so the active window becomes `16.11` and `16.10`.
+- `COLLECTOR_PATCH_RETENTION_COUNT`: number of same-season patch buckets to keep eligible for ingestion. With `COLLECTOR_CURRENT_PATCH=16.17` and `COLLECTOR_PATCH_RETENTION_COUNT=2`, the collector accepts `16.17` and `16.16`, then stops the current PUUID as soon as it sees `16.15` or older. When Riot moves to `16.18`, bump `COLLECTOR_CURRENT_PATCH` to `16.18` so the active window becomes `16.18` and `16.17`.
 - `COLLECTOR_PRUNE_OLD_PATCHES_ON_START`: when true, worker startup deletes ClickHouse rows from raw, normalized, timeline, live aggregate, and compiled metric tables for patches outside the active retention window. Keep this false anywhere you want to preserve old patch history.
 - `COLLECTOR_IDLE_SLEEP_SECONDS`: short pause when a sweep does no Riot work and no regional rate-limit wait is required.
 - `COLLECTOR_RATE_LIMIT_REQUESTS`: Riot application request bucket size for one region.

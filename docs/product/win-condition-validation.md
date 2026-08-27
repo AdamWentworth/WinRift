@@ -5,7 +5,7 @@ The win-condition model should be treated as a testable strategic model, not a f
 ## Endpoint
 
 ```bash
-curl 'http://localhost:8000/api/analytics/win-conditions/validation?patch=16.10&platform=ALL&rankBucket=ALL&minGames=50' | jq
+curl 'http://localhost:8000/api/analytics/win-conditions/validation?patch=16.17&platform=ALL&rankBucket=ALL&minGames=50' | jq
 ```
 
 Query parameters:

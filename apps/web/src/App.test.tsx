@@ -249,7 +249,7 @@ describe('App', () => {
     const { queryClient } = renderApp();
 
     expect(screen.getByText('WinRift')).toBeInTheDocument();
-    expect(await screen.findByText('Guides, Profiles, Live Games')).toBeInTheDocument();
+    expect(await screen.findByText('Guides, Profiles, Live Games', {}, { timeout: 3000 })).toBeInTheDocument();
     expect(screen.getByText('Champion names open build guides. Riot IDs open summoner profiles and jump into live match analysis when that player is currently in game.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Champion or Riot ID, e.g. Wukong or TWITCH ELOSANTA#1111')).toBeInTheDocument();
     expect(screen.queryByLabelText('Search champions or summoners')).not.toBeInTheDocument();

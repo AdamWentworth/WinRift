@@ -1,5 +1,7 @@
 # Tech Debt Roadmap
 
+> **Historical completion record:** this roadmap documents the cleanup that produced the `v0.1.0` repository. See [Current Next Steps](next-steps.md) for the active backlog.
+
 WinRift is now far enough along that the main risk is not missing features. The main risk is letting working prototype surfaces harden into awkward architecture. This document tracks cleanup that would make the repo easier to show, maintain, and extend.
 
 ## Priority 1: Public-Repo Polish

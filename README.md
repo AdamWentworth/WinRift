@@ -1,6 +1,17 @@
-# ⚔️ WinRift - League Build Matchup Analytics
+<p align="center">
+  <img src="apps/web/public/images/brand/winrift-icon-wide-2.png" alt="WinRift" width="560">
+</p>
 
-WinRift is a full-stack analytics project for League of Legends ranked data. It collects Riot match and timeline payloads, normalizes player builds and matchup context into ClickHouse, and serves a React app focused on practical build, rune, champion, summoner, and win-condition analysis.
+<h1 align="center">Fast, Patch-Aware League Analytics</h1>
+
+<p align="center">
+  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml/badge.svg?branch=master" alt="Core CI"></a>
+  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml/badge.svg?branch=master" alt="Web CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-source--available-00c8dc" alt="Source-available license"></a>
+  <a href="https://github.com/AdamWentworth/WinRift/releases"><img src="https://img.shields.io/github/v/release/AdamWentworth/WinRift?display_name=tag" alt="Latest release"></a>
+</p>
+
+WinRift is a production-capable, full-stack analytics project for League of Legends ranked data. It collects Riot match and timeline payloads, normalizes player builds and matchup context into ClickHouse, and serves a React app focused on practical build, rune, champion, summoner, and win-condition analysis.
 
 The current rebuild is centered on one product idea: the best build is often matchup-specific. WinRift compares what champions build overall with what performs into the champion they are actually facing.
 
@@ -49,7 +60,7 @@ WinRift/
 | Collector | Go worker | Riot rate-limit aware match, timeline, rank, and alias ingestion |
 | Monitor | Go worker-side monitor | API health, auth marker, worker container state, heartbeat logging, and SMTP alerting |
 | Analytics Store | ClickHouse | Raw payload retention plus normalized tables and precomputed read models |
-| Deployment | Docker Compose, GHCR, GitHub Actions | Private LAN API/worker deployment to a lightweight home server |
+| Deployment | Docker Compose, GHCR, GitHub Actions | Private-LAN web, API, worker, monitoring, and ClickHouse deployment to a lightweight home server |
 | Static Assets | Riot Data Dragon CDN | Champion, item, rune, spell, splash, and profile icon images |
 
 Go is used for the API and collector because the target deployment is a lightweight home server: small binaries, low idle memory, straightforward concurrency, and explicit control over Riot API rate limits.
@@ -71,16 +82,26 @@ Go is used for the API and collector because the target deployment is a lightwei
 
 ## 🧭 Project Status
 
-WinRift is an active MVP rebuild. The core collection pipeline, ClickHouse schema, private deployment flow, live-match UI, champion guides, tier list, summoner profiles, and win-condition analytics are implemented enough to demonstrate the product direction.
+WinRift `v0.1.0` is a working private-LAN product and a public source portfolio. The server runs the production web application, API, ClickHouse, monitoring, and Riot-aware collector; GitHub Actions test, scan, package, deploy, and performance-check the system.
 
 The app is not yet a public internet service. Current production use is private-LAN first: the server owns the production web application, API, ClickHouse, monitoring, and worker collection, while Vite remains available for laptop development against that private API.
 
 Near-term work:
 
-- validate worker health/email alerting on the production server,
 - tighten public deployment/auth policy before any internet-facing API,
 - continue validating tier-list and win-condition scoring against larger samples,
-- add more frontend smoke/e2e coverage around live-match and champion-guide flows.
+- keep current and archived champion-page performance inside the enforced deploy budgets,
+- expand focused product validation without reintroducing request waterfalls or on-demand analytics scans.
+
+### Performance Baseline
+
+The August 27, 2026 production audit exercised every selectable champion/patch page combination after startup prewarming:
+
+| Requests | Cache hits | Average | p95 | Maximum |
+|----------|------------|--------:|----:|--------:|
+| 1,557 | 1,557 | 11.6 ms | 20.3 ms | 40.1 ms |
+
+The production deployment also runs a strict Playwright route gate for champion guides and other high-traffic pages. A failed readiness, cache-hit, completeness, or latency assertion blocks the web deployment. See [Performance Guardrails](docs/product/performance-guardrails.md).
 
 ---
 
@@ -97,10 +118,10 @@ Set at least:
 
 ```env
 RIOT_API_KEY=replace_with_your_riot_development_key
-COLLECTOR_CURRENT_PATCH=16.11
+COLLECTOR_CURRENT_PATCH=16.17
 ```
 
-The real `.env` is intentionally ignored. Do not commit Riot keys, ClickHouse passwords, or production LAN settings.
+The real `.env` is intentionally ignored. Do not commit Riot keys, ClickHouse passwords, or production LAN settings. `COLLECTOR_CURRENT_PATCH` is an operator-controlled ingestion boundary; update it deliberately when Riot advances to a new patch.
 
 ### 2. Start Local App Without Collector
 
@@ -262,6 +283,8 @@ Development-only endpoints are intended for local or private-LAN use, not public
 
 | Workspace | README |
 |-----------|--------|
+| Release history | [CHANGELOG.md](CHANGELOG.md) |
+| Documentation index | [docs/README.md](docs/README.md) |
 | Web app | [apps/web/README.md](apps/web/README.md) |
 | Go core service | [core/README.md](core/README.md) |
 | Production ops | [ops/prod/README.md](ops/prod/README.md) |
@@ -312,6 +335,13 @@ Web tests and production build:
 cd apps/web
 npm test
 npm run build
+```
+
+Production route timing against an available API:
+
+```bash
+cd apps/web
+npm run perf:routes
 ```
 
 Local Docker smoke:
@@ -374,4 +404,4 @@ See [ops/prod/README.md](ops/prod/README.md) and [docs/ops-deployment.md](docs/o
 
 WinRift started as an experiment in modeling League team win conditions. The rebuild keeps that strategic idea, but puts the foundation on matchup-specific builds, trustworthy data collection, and precomputed analytics that can load quickly in a real app.
 
-The project is still an MVP, but the architecture is intentionally shaped for long-running collection, patch-aware analytics, and public-facing product polish.
+The first production milestone is complete. The next phase is less about proving the architecture and more about maintaining trustworthy data, fast pages, disciplined public exposure, and strong product judgment as the corpus grows.
