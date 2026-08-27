@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -40,6 +41,26 @@ func TestWriteRiotErrorKeepsRateLimitStatus(t *testing.T) {
 
 	if recorder.Code != http.StatusTooManyRequests {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
+	}
+}
+
+func TestAnalyticsPatchesServesProactivelyWarmedResponse(t *testing.T) {
+	server := Server{responseCache: newResponseCache()}
+	body := []byte(`{"currentPatch":"16.17","queueId":420,"results":[]}`)
+	server.responseCache.set(analyticsPatchesCacheKey(analytics.RankedSoloQueueID), body, time.Minute)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/analytics/patches?queueId=420", nil)
+	server.analyticsPatches(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", recorder.Code)
+	}
+	if got := recorder.Header().Get("X-WinRift-Cache"); got != "hit" {
+		t.Fatalf("X-WinRift-Cache = %q, want hit", got)
+	}
+	if got := strings.TrimSpace(recorder.Body.String()); got != string(body) {
+		t.Fatalf("body = %s, want %s", got, body)
 	}
 }
 

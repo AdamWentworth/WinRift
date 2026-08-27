@@ -19,6 +19,7 @@ import (
 
 const championPageHydrationRetryInterval = 5 * time.Second
 const championPageHydrationRefreshInterval = 30 * time.Minute
+const analyticsPatchCacheRefreshInterval = 2 * time.Minute
 
 func main() {
 	cfg := config.Load()
@@ -30,11 +31,30 @@ func main() {
 	}
 	staticService := staticdata.NewService(riotClient)
 	server := api.NewServer(cfg, riotClient, repo, staticService)
+	if err := server.WarmAnalyticsPatches(context.Background(), analytics.RankedSoloQueueID); err != nil {
+		log.Printf("analytics patch cache initial warm failed err=%v", err)
+	}
+	go maintainAnalyticsPatchCache(context.Background(), server)
 	go maintainChampionPageMemoryCache(context.Background(), cfg, repo, server)
 
 	log.Printf("winrift api listening on %s", cfg.HTTPAddr)
 	if err := http.ListenAndServe(cfg.HTTPAddr, server.Routes()); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func maintainAnalyticsPatchCache(ctx context.Context, server api.Server) {
+	ticker := time.NewTicker(analyticsPatchCacheRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := server.WarmAnalyticsPatches(ctx, analytics.RankedSoloQueueID); err != nil {
+				log.Printf("analytics patch cache refresh failed err=%v", err)
+			}
+		}
 	}
 }
 

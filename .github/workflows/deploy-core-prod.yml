@@ -383,6 +383,7 @@ jobs:
           fi
 
           smoke_json_endpoint health "${HEALTH_URL}"
+          smoke_cached_endpoint patches "${API_BASE}/api/analytics/patches?queueId=420"
           smoke_cached_endpoint leaderboard "${API_BASE}/api/summoners/leaderboard?platform=NA1&limit=10"
 
           if command -v python3 >/dev/null 2>&1; then

@@ -583,16 +583,49 @@ func (s Server) analyticsItemSlotsBatch(w http.ResponseWriter, r *http.Request) 
 
 func (s Server) analyticsPatches(w http.ResponseWriter, r *http.Request) {
 	queueID := uint16(queryInt(r.URL.Query().Get("queueId"), analytics.RankedSoloQueueID))
-	stats, err := s.repo.PatchStats(r.Context(), queueID)
+	cacheKey := analyticsPatchesCacheKey(queueID)
+	if body, ok := s.responseCache.get(cacheKey); ok {
+		writeJSONBytes(w, http.StatusOK, body, true)
+		return
+	}
+	body, cacheHit, shared, err := s.pageFlights.do(r.Context(), cacheKey, func() ([]byte, bool, error) {
+		if body, ok := s.responseCache.get(cacheKey); ok {
+			return body, true, nil
+		}
+		body, err := s.refreshAnalyticsPatches(r.Context(), queueID)
+		return body, false, err
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeJSONBytes(w, http.StatusOK, body, cacheHit || shared)
+}
+
+func analyticsPatchesCacheKey(queueID uint16) string {
+	return "analytics-patches:" + strconv.Itoa(int(queueID))
+}
+
+func (s Server) WarmAnalyticsPatches(ctx context.Context, queueID uint16) error {
+	_, err := s.refreshAnalyticsPatches(ctx, queueID)
+	return err
+}
+
+func (s Server) refreshAnalyticsPatches(ctx context.Context, queueID uint16) ([]byte, error) {
+	stats, err := s.repo.PatchStats(ctx, queueID)
+	if err != nil {
+		return nil, err
+	}
+	body, err := json.Marshal(map[string]any{
 		"currentPatch": s.cfg.CollectorCurrentPatch,
 		"queueId":      queueID,
 		"results":      patchStatsResponse(stats, s.cfg.CollectorCurrentPatch),
 	})
+	if err != nil {
+		return nil, err
+	}
+	s.responseCache.set(analyticsPatchesCacheKey(queueID), body, analyticsResponseCacheTTL)
+	return body, nil
 }
 
 type itemSlotAnalyticsRequest struct {
