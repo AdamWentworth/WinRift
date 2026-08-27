@@ -1,4 +1,4 @@
-FROM node:24-slim AS dependencies
+FROM node:25-slim AS dependencies
 
 WORKDIR /app
 ENV NPM_CONFIG_AUDIT=false \
@@ -23,7 +23,7 @@ ARG VITE_API_URL=""
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
-FROM caddy:2.10-alpine
+FROM caddy:2.11-alpine
 
 COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv
