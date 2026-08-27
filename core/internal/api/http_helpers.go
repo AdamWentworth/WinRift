@@ -168,8 +168,54 @@ type responseCache struct {
 	entries map[string]cachedAPIResponse
 }
 
+type responseFlightCall struct {
+	done     chan struct{}
+	body     []byte
+	cacheHit bool
+	err      error
+}
+
+type responseFlightGroup struct {
+	mu    sync.Mutex
+	calls map[string]*responseFlightCall
+}
+
 func newResponseCache() *responseCache {
 	return &responseCache{entries: map[string]cachedAPIResponse{}}
+}
+
+func newResponseFlightGroup() *responseFlightGroup {
+	return &responseFlightGroup{calls: map[string]*responseFlightCall{}}
+}
+
+func (g *responseFlightGroup) do(ctx context.Context, key string, fn func() ([]byte, bool, error)) ([]byte, bool, bool, error) {
+	if g == nil || key == "" {
+		body, cacheHit, err := fn()
+		return body, cacheHit, false, err
+	}
+	g.mu.Lock()
+	if call, ok := g.calls[key]; ok {
+		g.mu.Unlock()
+		select {
+		case <-call.done:
+			return append([]byte(nil), call.body...), call.cacheHit, true, call.err
+		case <-ctx.Done():
+			return nil, false, true, ctx.Err()
+		}
+	}
+	call := &responseFlightCall{done: make(chan struct{})}
+	g.calls[key] = call
+	g.mu.Unlock()
+
+	body, cacheHit, err := fn()
+	g.mu.Lock()
+	call.body = append([]byte(nil), body...)
+	call.cacheHit = cacheHit
+	call.err = err
+	close(call.done)
+	delete(g.calls, key)
+	g.mu.Unlock()
+	return body, cacheHit, false, err
 }
 
 func (c *responseCache) get(key string) ([]byte, bool) {

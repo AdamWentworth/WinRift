@@ -23,6 +23,11 @@ on:
         required: false
         default: "http://127.0.0.1:8000/api/health"
         type: string
+      champion_page_max_ms:
+        description: "Maximum allowed response time for every prewarmed canonical champion page"
+        required: false
+        default: "500"
+        type: string
 
 permissions:
   contents: read
@@ -471,3 +476,117 @@ jobs:
           fi
 
           echo "Deployment smoke checks passed."
+
+      - name: Wait For Champion-Page Prewarm Coverage
+        if: ${{ inputs.start_worker }}
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DEPLOY_ROOT="${{ inputs.deploy_root }}"
+          ENV_FILE="${DEPLOY_ROOT}/.env"
+          CURRENT_PATCH="$(grep -E '^COLLECTOR_CURRENT_PATCH=' "${ENV_FILE}" | tail -1 | cut -d= -f2-)"
+          if [[ -z "${CURRENT_PATCH}" ]]; then
+            echo "COLLECTOR_CURRENT_PATCH is empty; cannot verify champion-page prewarming." >&2
+            exit 1
+          fi
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "python3 is required to resolve the mature fallback patch." >&2
+            exit 1
+          fi
+
+          HEALTH_URL="${{ inputs.api_health_url }}"
+          API_BASE="${HEALTH_URL%/api/health}"
+          if [[ "${API_BASE}" == "${HEALTH_URL}" ]]; then
+            API_BASE="http://127.0.0.1:8000"
+          fi
+          PATCH_BODY="$(curl -fsS "${API_BASE}/api/analytics/patches?queueId=420")"
+          FALLBACK_PATCH="$(python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          current = sys.argv[1]
+          def key(value):
+              try:
+                  major, minor = str(value).split(".")[:2]
+                  return int(major), int(minor)
+              except (TypeError, ValueError):
+                  return 0, 0
+          previous = sorted(
+              ((str(row.get("patch", "")), int(row.get("matches", 0) or 0)) for row in data.get("results", [])),
+              key=lambda row: key(row[0]),
+              reverse=True,
+          )
+          previous = [row for row in previous if row[0] and key(row[0]) < key(current) and row[1] > 0]
+          print(next((patch for patch, matches in previous if matches >= 5000), previous[0][0] if previous else ""))
+          ' "${CURRENT_PATCH}" <<<"${PATCH_BODY}")"
+          REQUIRED_PATCHES=("${CURRENT_PATCH}")
+          if [[ -n "${FALLBACK_PATCH}" && "${FALLBACK_PATCH}" != "${CURRENT_PATCH}" ]]; then
+            REQUIRED_PATCHES+=("${FALLBACK_PATCH}")
+          fi
+
+          echo "Waiting for champion-page prewarming to finish for: ${REQUIRED_PATCHES[*]}."
+          for _ in $(seq 1 180); do
+            WORKER_STATUS="$(docker inspect --format '{{.State.Status}}' winrift_worker 2>/dev/null || true)"
+            if [[ "${WORKER_STATUS}" != "running" ]]; then
+              echo "Worker stopped while waiting for champion-page prewarming. Status: ${WORKER_STATUS}" >&2
+              docker logs --tail 300 winrift_worker || true
+              exit 1
+            fi
+
+            WORKER_LOGS="$(docker logs winrift_worker 2>&1 || true)"
+            ALL_COMPLETE=1
+            for REQUIRED_PATCH in "${REQUIRED_PATCHES[@]}"; do
+              if grep -Fq "champion page prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
+                echo "Champion-page prewarming reported errors for ${REQUIRED_PATCH}." >&2
+                grep -F "champion page prewarm completed with errors patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1 >&2
+                exit 1
+              fi
+              if ! grep -Fq "champion page prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}"; then
+                ALL_COMPLETE=0
+              fi
+            done
+            if [[ "${ALL_COMPLETE}" -eq 1 ]]; then
+              for REQUIRED_PATCH in "${REQUIRED_PATCHES[@]}"; do
+                grep -F "champion page prewarm complete patch=${REQUIRED_PATCH} " <<<"${WORKER_LOGS}" | tail -1
+              done
+              echo "Required champion-page prewarming completed."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Timed out waiting 30 minutes for champion-page prewarming on: ${REQUIRED_PATCHES[*]}." >&2
+          docker logs --tail 300 winrift_worker || true
+          exit 1
+
+      - name: All-Champion Performance Gate
+        if: ${{ inputs.start_worker }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          HEALTH_URL="${{ inputs.api_health_url }}"
+          API_BASE="${HEALTH_URL%/api/health}"
+          if [[ "${API_BASE}" == "${HEALTH_URL}" ]]; then
+            API_BASE="http://127.0.0.1:8000"
+          fi
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "python3 is required for the champion-page production performance gate." >&2
+            exit 1
+          fi
+
+          python3 "${GITHUB_WORKSPACE}/ops/prod/champion-page-perf-audit.py" \
+            --base-url "${API_BASE}" \
+            --max-ms "${{ inputs.champion_page_max_ms }}" \
+            --concurrency 4 \
+            --timeout-seconds 5 \
+            --json "${RUNNER_TEMP}/champion-page-performance.json"
+
+      - name: Upload Champion-Page Performance Report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: champion-page-performance
+          path: ${{ runner.temp }}/champion-page-performance.json
+          if-no-files-found: ignore

@@ -24,9 +24,9 @@ Build advice and champion item paths use `build_signature_analytics` for current
 
 Summary refreshes should stage new rows before deleting older compiled rows. Champion-guide, summoner-profile, item-slot/loadout, and win-condition lanes now insert a fresh snapshot into ReplacingMergeTree read models, then remove rows with an older `compiled_at`. Public reads keep seeing the previous snapshot during the rebuild, and a failed refresh leaves the old snapshot intact instead of briefly exposing empty tables.
 
-After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. The prewarm limit should be broad enough to cover normal champion browsing, not only the five highest-played champions per role. Prewarming covers the retained patch window so the UI's default previous-patch view can stay fast while the current patch is still thin.
+After the champion-guide lane refreshes, the worker can also prewarm champion-page bundles into `champion_page_bundle_cache`. This is controlled by `CHAMPION_PAGE_PREWARM_*` env vars and is ClickHouse/local cache work only; it does not spend Riot API budget. Every selectable patch gets a canonical page for each indexed champion plus the configured high-volume role pages. Retained-patch bundles expire after two hours so they follow refreshes; archived-patch bundles remain reusable for 30 days because their source data is stable.
 
-Exact opponent-filtered champion pages are the expensive cold path because they assemble the same guide bundle plus matchup-specific item panels. The worker therefore prewarms a bounded number of common opponent bundles per selected champion/role. Keep `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES` conservative; the default is `100` per patch. Warm responses should be effectively instant, but the first build of an uncached exact matchup can still take seconds.
+Exact opponent-filtered champion pages are the expensive cold path because they assemble the same guide bundle plus matchup-specific item panels. The worker therefore prewarms a bounded number of common opponent bundles for retained patches only. Keep `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES` conservative; the default is `100` per patch. Simultaneous misses for the same page are coalesced into one build, so a burst of first visitors cannot multiply the same ClickHouse work. Warm responses should be effectively instant, but the first build of an obscure, uncached exact matchup can still take seconds.
 
 ## Profiling Checklist
 
@@ -59,6 +59,18 @@ Useful local env vars:
 For exact matchup cold-path checks, temporarily run with `WINRIFT_PERF_WARMUPS=0`. A cold miss can still be slower than a warmed page, but common matchup pages should stop showing multi-second first loads after the worker prewarm lane has run.
 - `WINRIFT_PERF_JSONL`: optional file path for machine-readable JSONL output.
 - `WINRIFT_PERF_STRICT`: fail on threshold warnings when set to `1` or `true`.
+
+The strict all-champion audit checks the actual canonical request used by `/champions/<champion>` for every champion in static metadata. It requires an API cache hit, a complete bundled response, a resolved role, and a total response time at or below 500 ms. When the current-patch guide is empty, it also checks the same mature-patch fallback the frontend will request and requires that fallback to contain guide data.
+
+```bash
+python3 ops/prod/champion-page-perf-audit.py \
+  --base-url http://SERVER_LAN_IP:8000 \
+  --max-ms 500 \
+  --concurrency 4 \
+  --json champion-page-performance.json
+```
+
+`deploy-core-prod` waits for the current-patch prewarm completion log and then runs this audit as a required deployment gate. The manual `perf-smoke` workflow runs it too. A missing prewarm entry, slow response, incomplete bundle, or empty fallback fails the workflow rather than being downgraded to a warning.
 
 Targets for private-LAN reads:
 

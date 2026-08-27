@@ -17,8 +17,10 @@ import (
 
 const defaultItemSlotMinGames = 5
 const analyticsResponseCacheTTL = 10 * time.Minute
-const championPageBundleCacheTTL = 2 * time.Hour
-const championPageBundleCacheKeyPrefix = "champion-page:v4:"
+const championPageBundleCurrentCacheTTL = 2 * time.Hour
+const championPageBundleArchivedCacheTTL = 30 * 24 * time.Hour
+const championPageBundleBuildTimeout = 2 * time.Minute
+const championPageBundleCacheKeyPrefix = "champion-page:v5:"
 
 func (s Server) analyticsBuilds(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
@@ -74,19 +76,38 @@ func (s Server) analyticsChampionPage(w http.ResponseWriter, r *http.Request) {
 		writeJSONBytes(w, http.StatusOK, body, true)
 		return
 	}
-	if body, ok, err := s.repo.CachedChampionPageBundle(r.Context(), cacheKey); err != nil {
-		log.Printf("champion page persistent cache lookup failed key=%s err=%v", cacheKey, err)
-	} else if ok {
-		s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
-		writeJSONBytes(w, http.StatusOK, body, true)
-		return
-	}
-	response, err := s.buildChampionPageBundle(r.Context(), request)
+	ttl := s.championPageBundleTTL(request.Build.Patch)
+	body, cacheHit, shared, err := s.pageFlights.do(r.Context(), cacheKey, func() ([]byte, bool, error) {
+		if body, ok := s.responseCache.get(cacheKey); ok {
+			return body, true, nil
+		}
+		buildCtx, cancel := context.WithTimeout(context.Background(), championPageBundleBuildTimeout)
+		defer cancel()
+		if body, ok, err := s.repo.CachedChampionPageBundle(buildCtx, cacheKey); err != nil {
+			log.Printf("champion page persistent cache lookup failed key=%s err=%v", cacheKey, err)
+		} else if ok {
+			s.responseCache.set(cacheKey, body, ttl)
+			return body, true, nil
+		}
+		response, err := s.buildChampionPageBundle(buildCtx, request)
+		if err != nil {
+			return nil, false, err
+		}
+		body, err := json.Marshal(response)
+		if err != nil {
+			return nil, false, err
+		}
+		s.responseCache.set(cacheKey, body, ttl)
+		if err := s.repo.StoreChampionPageBundle(context.Background(), cacheKey, body, ttl); err != nil {
+			log.Printf("champion page persistent cache store failed key=%s err=%v", cacheKey, err)
+		}
+		return body, false, nil
+	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.writeCachedChampionPageJSON(w, http.StatusOK, cacheKey, championPageBundleCacheTTL, response)
+	writeJSONBytes(w, http.StatusOK, body, cacheHit || shared)
 }
 
 type championPageBundleRequest struct {
@@ -150,6 +171,13 @@ func championPageBundleCacheKey(request championPageBundleRequest) string {
 	query.Set("indexLimit", strconv.Itoa(request.IndexLimit))
 	query.Set("queueId", strconv.Itoa(int(request.QueueID)))
 	return championPageBundleCacheKeyPrefix + query.Encode()
+}
+
+func (s Server) championPageBundleTTL(patch string) time.Duration {
+	if analytics.PatchInWindow(patch, s.cfg.CollectorCurrentPatch, s.cfg.CollectorPatchRetention) {
+		return championPageBundleCurrentCacheTTL
+	}
+	return championPageBundleArchivedCacheTTL
 }
 
 func canonicalChampionPageRankBucket(rankBucket string) string {
@@ -240,6 +268,13 @@ func (s Server) resolveChampionPageBundleRequest(ctx context.Context, request ch
 			return request, err
 		}
 		request.Build.Role = primaryChampionRole(roleRates, request.Build.ChampionID)
+		if request.Build.Role == "" && strings.TrimSpace(request.Build.Patch) != "" {
+			fallbackRoleRates, err := s.repo.ChampionRoleRatesForPatch(ctx, []uint16{request.Build.ChampionID}, request.QueueID, "")
+			if err != nil {
+				return request, err
+			}
+			request.Build.Role = primaryChampionRole(fallbackRoleRates, request.Build.ChampionID)
+		}
 	}
 	request.Build.ItemContext = normalizedItemContext(request.Build.ItemContext, request.Build.Role)
 	return request, nil

@@ -20,6 +20,7 @@ type Server struct {
 	collector     collector.Collector
 	winConds      winconditions.Analyzer
 	responseCache *responseCache
+	pageFlights   *responseFlightGroup
 }
 
 func NewServer(cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repository, staticService *staticdata.Service) Server {
@@ -27,7 +28,7 @@ func NewServer(cfg config.Config, riotClient *riot.Client, repo *clickhouse.Repo
 	if err != nil {
 		log.Printf("win condition catalog load failed err=%v", err)
 	}
-	return Server{cfg: cfg, riot: riotClient, repo: repo, static: staticService, collector: collector.New(riotClient, repo), winConds: winconditions.NewAnalyzer(catalog), responseCache: newResponseCache()}
+	return Server{cfg: cfg, riot: riotClient, repo: repo, static: staticService, collector: collector.New(riotClient, repo), winConds: winconditions.NewAnalyzer(catalog), responseCache: newResponseCache(), pageFlights: newResponseFlightGroup()}
 }
 
 func (s Server) Routes() http.Handler {

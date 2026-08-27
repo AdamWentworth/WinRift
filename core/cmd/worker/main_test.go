@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"winrift/core/internal/clickhouse"
 	"winrift/core/internal/config"
 	"winrift/core/internal/riot"
 	"winrift/core/internal/runstate"
@@ -166,5 +167,26 @@ func TestRefreshStatusRecorderWritesSuccessAndFailure(t *testing.T) {
 	}
 	if byName["summoner-profile-analytics"].LastError != "boom" {
 		t.Fatalf("last error = %q, want boom", byName["summoner-profile-analytics"].LastError)
+	}
+}
+
+func TestChampionPagePrewarmPatchListIncludesSelectableArchivedPatches(t *testing.T) {
+	patches := championPagePrewarmPatchList(
+		[]string{"16.17", "16.16"},
+		[]clickhouse.PatchStat{
+			{Patch: "16.17"},
+			{Patch: "16.16"},
+			{Patch: "16.15"},
+			{Patch: "16.13"},
+		},
+	)
+	want := []string{"16.17", "16.16", "16.15", "16.13"}
+	if len(patches) != len(want) {
+		t.Fatalf("patches = %v, want %v", patches, want)
+	}
+	for index := range want {
+		if patches[index] != want[index] {
+			t.Fatalf("patches = %v, want %v", patches, want)
+		}
 	}
 }

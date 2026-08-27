@@ -296,28 +296,48 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 			continue
 		}
 		statusDetails["refreshedPatches"]++
-		if cfg.ChampionPagePrewarmEnabled {
+	}
+	if cfg.ChampionPagePrewarmEnabled {
+		prewarmPatches := append([]string(nil), patches...)
+		stats, err := repo.PatchStats(ctx, analytics.RankedSoloQueueID)
+		if err != nil {
+			statusDetails["prewarmPatchDiscoveryErrors"]++
+			if firstErr == nil {
+				firstErr = err
+			}
+			log.Printf("champion page prewarm patch discovery failed err=%v", err)
+		} else {
+			prewarmPatches = championPagePrewarmPatchList(patches, stats)
+		}
+		statusDetails["prewarmPatches"] = len(prewarmPatches)
+		for _, prewarmPatch := range prewarmPatches {
+			matchupsPerChampion := cfg.ChampionPagePrewarmMatchupsPerChampion
+			maxMatchupBundles := cfg.ChampionPagePrewarmMaxMatchupBundles
+			if !analytics.PatchInWindow(prewarmPatch, patch, cfg.CollectorPatchRetention) {
+				matchupsPerChampion = 0
+				maxMatchupBundles = 0
+			}
 			prewarmStartedAt := time.Now()
 			log.Printf(
 				"champion page prewarm start patch=%s queue=%d roles=%s per_role=%d min_games=%d matchup_per_champion=%d matchup_min_games=%d matchup_max_bundles=%d rank_bucket=%s",
-				refreshPatch,
+				prewarmPatch,
 				analytics.RankedSoloQueueID,
 				strings.Join(cfg.ChampionPagePrewarmRoles, ","),
 				cfg.ChampionPagePrewarmPerRole,
 				cfg.ChampionPagePrewarmMinGames,
-				cfg.ChampionPagePrewarmMatchupsPerChampion,
+				matchupsPerChampion,
 				cfg.ChampionPagePrewarmMatchupMinGames,
-				cfg.ChampionPagePrewarmMaxMatchupBundles,
+				maxMatchupBundles,
 				cfg.ChampionPagePrewarmRankBucket,
 			)
 			result, err := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
-				Patch:               refreshPatch,
+				Patch:               prewarmPatch,
 				Roles:               cfg.ChampionPagePrewarmRoles,
 				PerRole:             cfg.ChampionPagePrewarmPerRole,
 				MinGames:            cfg.ChampionPagePrewarmMinGames,
-				MatchupsPerChampion: cfg.ChampionPagePrewarmMatchupsPerChampion,
+				MatchupsPerChampion: matchupsPerChampion,
 				MatchupMinGames:     cfg.ChampionPagePrewarmMatchupMinGames,
-				MaxMatchupBundles:   cfg.ChampionPagePrewarmMaxMatchupBundles,
+				MaxMatchupBundles:   maxMatchupBundles,
 				RankBucket:          cfg.ChampionPagePrewarmRankBucket,
 				QueueID:             analytics.RankedSoloQueueID,
 			})
@@ -333,7 +353,7 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 			if err != nil {
 				log.Printf(
 					"champion page prewarm completed with errors patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_cached=%d matchup_skipped=%d errors=%d duration=%s err=%v",
-					refreshPatch,
+					prewarmPatch,
 					analytics.RankedSoloQueueID,
 					result.Candidates,
 					result.Stored,
@@ -353,7 +373,7 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 			} else {
 				log.Printf(
 					"champion page prewarm complete patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d matchup_candidates=%d matchup_stored=%d matchup_cached=%d matchup_skipped=%d errors=%d duration=%s",
-					refreshPatch,
+					prewarmPatch,
 					analytics.RankedSoloQueueID,
 					result.Candidates,
 					result.Stored,
@@ -377,6 +397,26 @@ func maybeRefreshChampionGuideAnalytics(ctx context.Context, cfg config.Config, 
 	log.Printf("champion guide analytics scheduled refresh complete patches=%s queue=%d duration=%s", patchLabel, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond))
 	refreshStatus.succeed("champion-guide-analytics", startedAt, statusDetails)
 	return true
+}
+
+func championPagePrewarmPatchList(retained []string, stats []clickhouse.PatchStat) []string {
+	seen := map[string]bool{}
+	patches := make([]string, 0, len(retained)+len(stats))
+	appendPatch := func(patch string) {
+		patch = strings.TrimSpace(patch)
+		if patch == "" || seen[patch] {
+			return
+		}
+		seen[patch] = true
+		patches = append(patches, patch)
+	}
+	for _, patch := range retained {
+		appendPatch(patch)
+	}
+	for _, stat := range stats {
+		appendPatch(stat.Patch)
+	}
+	return patches
 }
 
 func maybeRefreshWinConditionAnalytics(ctx context.Context, cfg config.Config, repo *clickhouse.Repository, refreshStatus *refreshStatusRecorder, platforms []string, lastRefresh *time.Time) bool {

@@ -13,6 +13,11 @@ on:
         required: false
         default: false
         type: boolean
+      champion_page_max_ms:
+        description: "Strict maximum for every canonical champion-page response."
+        required: false
+        default: "500"
+        type: string
 
 permissions:
   contents: read
@@ -29,3 +34,20 @@ jobs:
           WINRIFT_PERF_BASE_URL: ${{ inputs.api_base_url }}
           WINRIFT_PERF_STRICT: ${{ inputs.strict_thresholds && '1' || '0' }}
         run: bash ops/perf-smoke.sh
+
+      - name: Run Strict All-Champion Performance Audit
+        run: |
+          python3 ops/prod/champion-page-perf-audit.py \
+            --base-url "${{ inputs.api_base_url }}" \
+            --max-ms "${{ inputs.champion_page_max_ms }}" \
+            --concurrency 4 \
+            --timeout-seconds 5 \
+            --json "${RUNNER_TEMP}/champion-page-performance.json"
+
+      - name: Upload Champion-Page Performance Report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: champion-page-performance
+          path: ${{ runner.temp }}/champion-page-performance.json
+          if-no-files-found: ignore

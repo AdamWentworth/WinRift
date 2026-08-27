@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,7 +45,7 @@ func (r *Repository) QueryBuilds(ctx context.Context, filters map[string]string,
 }
 
 func (r *Repository) queryBuildsSummary(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, bool, error) {
-	hasSummary, err := r.BuildSignatureAnalyticsHasData(ctx, filters["patch"])
+	sourceSQL, hasSummary, err := r.buildSignatureSummarySource(ctx, filters["patch"])
 	if err != nil {
 		return nil, false, err
 	}
@@ -68,7 +69,7 @@ func (r *Repository) queryBuildsSummary(ctx context.Context, filters map[string]
 			toUInt64(sum(wins)) AS wins,
 			toUInt64(sum(games)) AS games,
 			wins / games AS win_rate
-		FROM (`+buildSignatureSummarySourceSQL()+`)
+		FROM (`+sourceSQL+`)
 		WHERE 1 = 1`, roleScope.selectExpr, opponentBucketExpr)
 	args := []any{}
 	if filters["champion_id"] != "" {
@@ -103,29 +104,37 @@ func (r *Repository) queryBuildsSummary(ctx context.Context, filters map[string]
 
 func (r *Repository) BuildSignatureAnalyticsHasData(ctx context.Context, patch string) (bool, error) {
 	patch = strings.TrimSpace(patch)
-	query := "SELECT count() FROM build_signature_analytics WHERE 1 = 1"
+	hasCurrent, err := r.buildSignatureTableHasData(ctx, "build_signature_analytics", patch)
+	if err != nil || hasCurrent {
+		return hasCurrent, err
+	}
+	return r.buildSignatureTableHasData(ctx, "patch_build_metrics", patch)
+}
+
+func (r *Repository) buildSignatureTableHasData(ctx context.Context, table, patch string) (bool, error) {
+	switch table {
+	case "build_signature_analytics", "patch_build_metrics":
+	default:
+		return false, fmt.Errorf("unsupported build signature table %q", table)
+	}
+	query := "SELECT toUInt8(1) FROM " + table + " WHERE 1 = 1"
 	args := []any{}
 	if patch != "" {
 		query += " AND patch = ?"
 		args = append(args, patch)
 	}
 	query += " LIMIT 1"
-	var count uint64
-	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+	var exists uint8
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&exists); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
 		return false, err
 	}
-	if count > 0 {
+	if exists > 0 {
 		return true, nil
 	}
-	query = "SELECT count() FROM patch_build_metrics WHERE 1 = 1"
-	args = []any{}
-	if patch != "" {
-		query += " AND patch = ?"
-		args = append(args, patch)
-	}
-	query += " LIMIT 1"
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
-	return count > 0, err
+	return false, nil
 }
 
 func buildSignatureSummarySourceSQL() string {
@@ -170,6 +179,46 @@ func buildSignatureSummarySourceSQL() string {
 		) AS bsa
 			ON bsa.patch = pbm.patch AND bsa.queue_id = pbm.queue_id
 		WHERE bsa.patch = ''`
+}
+
+func (r *Repository) buildSignatureSummarySource(ctx context.Context, patch string) (string, bool, error) {
+	patch = strings.TrimSpace(patch)
+	if patch == "" {
+		hasSummary, err := r.BuildSignatureAnalyticsHasData(ctx, "")
+		return buildSignatureSummarySourceSQL(), hasSummary, err
+	}
+	hasCurrent, err := r.buildSignatureTableHasData(ctx, "build_signature_analytics", patch)
+	if err != nil {
+		return "", false, err
+	}
+	if hasCurrent {
+		return buildSignatureTableSourceSQL("build_signature_analytics"), true, nil
+	}
+	hasArchived, err := r.buildSignatureTableHasData(ctx, "patch_build_metrics", patch)
+	if err != nil || !hasArchived {
+		return "", hasArchived, err
+	}
+	return buildSignatureTableSourceSQL("patch_build_metrics"), true, nil
+}
+
+func buildSignatureTableSourceSQL(table string) string {
+	return `
+		SELECT
+			patch,
+			platform,
+			queue_id,
+			champion_id,
+			role,
+			opponent_champion_id,
+			rank_bucket,
+			final_items_signature,
+			core2_signature,
+			core3_signature,
+			rune_signature,
+			spell_signature,
+			wins,
+			games
+		FROM ` + table + ` FINAL`
 }
 
 func (r *Repository) queryBuildsLiveScan(ctx context.Context, filters map[string]string, minGames, limit int) ([]BuildRow, error) {

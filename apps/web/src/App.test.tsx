@@ -348,6 +348,40 @@ describe('App', () => {
     queryClient.clear();
   });
 
+  it('keeps the current patch selected and labels a mature guide fallback', async () => {
+    vi.mocked(getAnalyticsPatches).mockResolvedValueOnce({
+      currentPatch: '16.17',
+      queueId: 420,
+      results: [
+        { patch: '16.17', matches: 2426, participantSamples: 24260, rawMatches: 2426, compiledMatches: 0, current: true },
+        { patch: '16.16', matches: 62495, participantSamples: 624950, rawMatches: 62495, compiledMatches: 0, current: false },
+      ],
+    });
+    vi.mocked(getChampionPageBundle).mockImplementation(async (request) => {
+      const bundle = championPageBundleFixture();
+      bundle.filters.patch = request.patch ?? '';
+      bundle.guide.summary.patchBucket = request.patch ?? '';
+      if (request.patch === '16.17') {
+        bundle.guide.summary.games = 0;
+        bundle.guideIndex.results = [];
+      }
+      return bundle;
+    });
+    const { queryClient } = renderApp();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Champions' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Wukong/i }));
+
+    const patchSelect = await screen.findByLabelText('Analytics data patch');
+    expect(patchSelect).toHaveValue('16.17');
+    await waitFor(() => expect(getChampionPageBundle).toHaveBeenCalledWith(
+      expect.objectContaining({ championId: 62, patch: '16.16', role: undefined }),
+      withAbortSignal(),
+    ));
+    expect(await screen.findByText('16.16 guide data while 16.17 fills')).toBeInTheDocument();
+    queryClient.clear();
+  });
+
   it('opens the role tier list and links into champion guides', async () => {
     const { queryClient } = renderApp();
 

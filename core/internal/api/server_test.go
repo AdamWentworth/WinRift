@@ -1,12 +1,16 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"winrift/core/internal/config"
 	"winrift/core/internal/riot"
 )
 
@@ -53,6 +57,81 @@ func TestLoggingResponseWriterCapturesFirstStatusAndBytes(t *testing.T) {
 	}
 	if writer.bytes != 2 {
 		t.Fatalf("bytes = %d, want 2", writer.bytes)
+	}
+}
+
+func TestChampionPageBundleTTLUsesLongLivedArchivedCache(t *testing.T) {
+	server := Server{cfg: config.Config{
+		CollectorCurrentPatch:   "16.17",
+		CollectorPatchRetention: 2,
+	}}
+
+	for _, patch := range []string{"16.17", "16.16"} {
+		if got := server.championPageBundleTTL(patch); got != championPageBundleCurrentCacheTTL {
+			t.Fatalf("TTL for retained patch %s = %s, want %s", patch, got, championPageBundleCurrentCacheTTL)
+		}
+	}
+	if got := server.championPageBundleTTL("16.15"); got != championPageBundleArchivedCacheTTL {
+		t.Fatalf("TTL for archived patch = %s, want %s", got, championPageBundleArchivedCacheTTL)
+	}
+}
+
+func TestResponseFlightGroupCoalescesDuplicateWorkAndLetsWaitersCancel(t *testing.T) {
+	group := newResponseFlightGroup()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	leaderDone := make(chan struct {
+		body   []byte
+		shared bool
+		err    error
+	}, 1)
+	var calls atomic.Int32
+
+	go func() {
+		body, _, shared, err := group.do(context.Background(), "champion-page", func() ([]byte, bool, error) {
+			calls.Add(1)
+			close(started)
+			<-release
+			return []byte("bundle"), false, nil
+		})
+		leaderDone <- struct {
+			body   []byte
+			shared bool
+			err    error
+		}{body: body, shared: shared, err: err}
+	}()
+
+	<-started
+	waiterCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, shared, err := group.do(waiterCtx, "champion-page", func() ([]byte, bool, error) {
+		calls.Add(1)
+		return []byte("duplicate"), false, nil
+	})
+	if err != context.Canceled {
+		t.Fatalf("waiter error = %v, want context.Canceled", err)
+	}
+	if !shared {
+		t.Fatal("duplicate waiter was not marked shared")
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("build calls = %d, want 1", got)
+	}
+
+	close(release)
+	select {
+	case result := <-leaderDone:
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		if result.shared {
+			t.Fatal("leader was marked shared")
+		}
+		if string(result.body) != "bundle" {
+			t.Fatalf("leader body = %q, want bundle", result.body)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("leader did not finish")
 	}
 }
 

@@ -8,7 +8,7 @@ import {
   championIdFromRoute,
   championRouteSlug,
 } from './lib/lookup';
-import { recommendedAnalyticsPatch, storedAnalyticsPatch, storeAnalyticsPatch } from './lib/analyticsPatch';
+import { fallbackAnalyticsPatch, recommendedAnalyticsPatch, storedAnalyticsPatch, storeAnalyticsPatch } from './lib/analyticsPatch';
 import { appShellClass, pathForRoute, readRoute, type AppRoute } from './lib/appRouting';
 import { itemContextForRole } from './lib/championRoles';
 import { patchBucketFromVersion } from './lib/patches';
@@ -56,14 +56,18 @@ export function App() {
   const runes = useQuery({ queryKey: ['runes'], queryFn: ({ signal }) => getRunes({ signal }), enabled: needsGameMetadata, staleTime: queryStaleTime.static, gcTime: queryGcTime.static });
   const staticPatch = useMemo(() => patchBucketFromVersion(champions.data?.version), [champions.data?.version]);
   const patchOptions = analyticsPatches.data?.results ?? [];
+  const currentAnalyticsPatch = analyticsPatches.data?.currentPatch || staticPatch;
   const activeAnalyticsPatch = useMemo(() => {
     const selected = patchOptions.find((patch) => patch.patch === selectedAnalyticsPatch);
     if (selected) return selected.patch;
     if (!patchOptions.length && !analyticsPatches.isError) {
       return selectedAnalyticsPatch || '';
     }
-    return recommendedAnalyticsPatch(patchOptions, staticPatch) || staticPatch;
-  }, [analyticsPatches.isError, patchOptions, selectedAnalyticsPatch, staticPatch]);
+    return recommendedAnalyticsPatch(patchOptions, currentAnalyticsPatch) || currentAnalyticsPatch;
+  }, [analyticsPatches.isError, currentAnalyticsPatch, patchOptions, selectedAnalyticsPatch]);
+  const championGuideFallbackPatch = activeAnalyticsPatch === currentAnalyticsPatch
+    ? fallbackAnalyticsPatch(patchOptions, currentAnalyticsPatch)
+    : '';
 
   useEffect(() => {
     const onPopState = () => setRoute(readRoute());
@@ -260,7 +264,7 @@ export function App() {
             analyticsPatch={activeAnalyticsPatch}
             analyticsPatchLoading={analyticsPatches.isLoading}
             analyticsPatchOptions={patchOptions}
-            currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
+            currentAnalyticsPatch={currentAnalyticsPatch}
             onAnalyticsPatchChange={updateAnalyticsPatch}
             onChampionIntent={prefetchChampionGuide}
             onSelectChampion={openChampionGuide}
@@ -279,9 +283,10 @@ export function App() {
             runes={runes.data}
             initialChampionId={initialChampionId}
             analyticsPatch={activeAnalyticsPatch}
+            analyticsFallbackPatch={championGuideFallbackPatch}
             analyticsPatchLoading={analyticsPatches.isLoading}
             analyticsPatchOptions={patchOptions}
-            currentAnalyticsPatch={analyticsPatches.data?.currentPatch || staticPatch}
+            currentAnalyticsPatch={currentAnalyticsPatch}
             onAnalyticsPatchChange={updateAnalyticsPatch}
             onChampionChange={openChampionGuide}
           />

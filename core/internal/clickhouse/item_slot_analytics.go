@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"math"
@@ -305,16 +306,19 @@ func (r *Repository) queryStartingItemLoadoutsSummary(ctx context.Context, filte
 }
 
 func (r *Repository) StartingLoadoutAnalyticsHasData(ctx context.Context, itemContext, patch string) (bool, error) {
-	query := "SELECT count() FROM starting_loadout_analytics WHERE item_context = ?"
+	query := "SELECT toUInt8(1) FROM starting_loadout_analytics WHERE item_context = ?"
 	args := []any{normalizedItemContext(itemContext)}
 	if strings.TrimSpace(patch) != "" {
 		query += " AND patch = ?"
 		args = append(args, patch)
 	}
 	query += " LIMIT 1"
-	var count uint64
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&count)
-	return count > 0, err
+	var exists uint8
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return exists > 0, err
 }
 
 func (r *Repository) queryItemSlotsSummary(ctx context.Context, filters map[string]string, itemContext string, minGames, limit int) ([]ItemSlotRow, error) {
@@ -636,9 +640,12 @@ func (r *Repository) scanItemSlotRows(ctx context.Context, query string, args []
 }
 
 func (r *Repository) ItemSlotAnalyticsHasData(ctx context.Context, itemContext string) (bool, error) {
-	var count uint64
-	err := r.db.QueryRowContext(ctx, "SELECT count() FROM item_slot_analytics WHERE item_context = ? LIMIT 1", normalizedItemContext(itemContext)).Scan(&count)
-	return count > 0, err
+	var exists uint8
+	err := r.db.QueryRowContext(ctx, "SELECT toUInt8(1) FROM item_slot_analytics WHERE item_context = ? LIMIT 1", normalizedItemContext(itemContext)).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return exists > 0, err
 }
 
 func (r *Repository) RefreshItemSlotAnalytics(ctx context.Context, patch string, queueID uint16, contexts []ItemSlotAnalyticsContext) error {

@@ -47,6 +47,7 @@ type Props = {
   runes?: RuneData;
   initialChampionId?: number;
   analyticsPatch?: string;
+  analyticsFallbackPatch?: string;
   analyticsPatchLoading?: boolean;
   analyticsPatchOptions?: AnalyticsPatchStat[];
   currentAnalyticsPatch?: string;
@@ -62,6 +63,7 @@ export function BuildGuidePage({
   runes,
   initialChampionId,
   analyticsPatch,
+  analyticsFallbackPatch = '',
   analyticsPatchLoading = false,
   analyticsPatchOptions = [],
   currentAnalyticsPatch = '',
@@ -109,13 +111,46 @@ export function BuildGuidePage({
     enabled: Boolean(championId && patch && (!roleTouched || role)),
     staleTime: queryStaleTime.championGuide,
   });
-  const bundleRoleRates = championPageQuery.data?.roleRates.results ?? [];
+  const primaryBundle = championPageQuery.data;
+  const fallbackRole = queryRole;
+  const shouldLoadFallback = Boolean(
+    primaryBundle
+    && primaryBundle.guide.summary.games <= 0
+    && analyticsFallbackPatch
+    && analyticsFallbackPatch !== patch,
+  );
+  const fallbackPageQuery = useQuery({
+    queryKey: ['champion-page', CHAMPION_PAGE_QUERY_VERSION, championId, fallbackRole || 'AUTO', analyticsFallbackPatch, rankBucket, opponentChampionId],
+    queryFn: ({ signal }) => getChampionPageBundle({
+      championId,
+      role: fallbackRole || undefined,
+      itemContext: fallbackRole ? itemContextForRole(fallbackRole) : undefined,
+      opponentChampionId: opponentChampionId || undefined,
+      patch: analyticsFallbackPatch,
+      rankBucket,
+      minGames: opponentChampionId ? 3 : 5,
+      championMinGames: 10,
+      guideMinGames: 5,
+      guideLimit: 12,
+      indexMinGames: 1,
+      indexLimit: 250,
+      queueId: DEFAULT_QUEUE_ID,
+      limit: 4,
+    }, { signal }),
+    enabled: Boolean(championId && shouldLoadFallback),
+    staleTime: queryStaleTime.championGuide,
+  });
+  const fallbackInUse = Boolean(fallbackPageQuery.data && fallbackPageQuery.data.guide.summary.games > 0);
+  const pageBundle = fallbackInUse ? fallbackPageQuery.data : primaryBundle;
+  const effectiveDataPatch = fallbackInUse ? analyticsFallbackPatch : patch;
+  const bundleRoleRates = pageBundle?.roleRates.results ?? [];
   const activeRoleRates = seededRoleRates.length ? seededRoleRates : bundleRoleRates;
   const mainRole = useMemo(() => mainChampionRole(activeRoleRates, championId), [activeRoleRates, championId]);
-  const resolvedRole = championPageQuery.data?.filters.role || mainRole || '';
+  const resolvedRole = pageBundle?.filters.role || mainRole || '';
   const displayRole = roleTouched ? role : resolvedRole;
-  const visibleLoading = useDelayedFlag(championPageQuery.isLoading && !championPageQuery.data, 180);
-  const showGuideData = Boolean(championPageQuery.data) || visibleLoading;
+  const waitingForFallback = shouldLoadFallback && fallbackPageQuery.isLoading && !fallbackPageQuery.data;
+  const visibleLoading = useDelayedFlag((championPageQuery.isLoading && !primaryBundle) || waitingForFallback, 180);
+  const showGuideData = Boolean(pageBundle) || visibleLoading;
 
   useEffect(() => {
     if (initialChampionId && championByKey(champions, initialChampionId) && initialChampionId !== championId) {
@@ -138,7 +173,7 @@ export function BuildGuidePage({
 
   useEffect(() => {
     setSelectedBuildVariantKey('');
-  }, [championId, queryRole, rankBucket, patch]);
+  }, [championId, effectiveDataPatch, queryRole, rankBucket]);
 
   const updateChampion = (value: number) => {
     setRoleTouched(false);
@@ -154,8 +189,8 @@ export function BuildGuidePage({
     setRole(value);
   };
 
-  const guide = championPageQuery.data?.guide;
-  const buildAdvice = championPageQuery.data?.buildAdvice;
+  const guide = pageBundle?.guide;
+  const buildAdvice = pageBundle?.buildAdvice;
   const guideForBuilds = buildAdvice ? mergeGuideWithBuildAdvice(guide, buildAdvice) : guide;
   const buildVariants = useMemo(() => groupBuildVariantsForDisplay(guideForBuilds?.buildVariants ?? [], items), [guideForBuilds?.buildVariants, items]);
   const selectedBuildVariant = selectedBuildVariantKey && selectedBuildVariantKey !== RECOMMENDED_BUILD_KEY
@@ -176,7 +211,7 @@ export function BuildGuidePage({
   const itemSlotContext = selectedVariantItemSlots.length
     ? `${selectedBuildVariantLabel} selected build family`
     : buildAdviceContext(buildAdvice, opponent?.name);
-  const guideIndex = championPageQuery.data?.guideIndex.results ?? [];
+  const guideIndex = pageBundle?.guideIndex.results ?? [];
   const coverageByChampionId = useMemo(() => {
     const map = new Map<number, ChampionGuideSummary>();
     for (const summary of guideIndex) {
@@ -189,7 +224,7 @@ export function BuildGuidePage({
   const splash = championSplashUrl(champions, championId);
   const rankLabel = ranks.find((candidate) => candidate.value === rankBucket)?.label ?? 'All Ranks';
   const titleRole = displayRole ? roleLabel(displayRole) : 'Role';
-  const heroGamesLabel = championPageQuery.data
+  const heroGamesLabel = pageBundle
     ? `${formatNumber(currentCoverage?.games ?? 0)} role games`
     : visibleLoading ? 'Loading role sample' : '\u00a0';
   const sampleContext = opponent ? `${champion?.name ?? championId} vs ${opponent.name}` : `${champion?.name ?? championId} overall`;
@@ -258,13 +293,15 @@ export function BuildGuidePage({
             selectedGames={currentCoverage?.games ?? 0}
             role={titleRole}
             rankLabel={rankLabel}
-            patch={patch}
+            patch={effectiveDataPatch}
           />
 
           <div className="guide-context-banner">
             <span>Current Sample</span>
             <b>{sampleContext}</b>
-            <em>{opponent ? 'matchup-filtered where possible, then widened carefully' : 'champion-wide until a matchup is selected'}</em>
+            <em>{fallbackInUse
+              ? `${effectiveDataPatch} guide data while ${patch} fills`
+              : opponent ? 'matchup-filtered where possible, then widened carefully' : 'champion-wide until a matchup is selected'}</em>
           </div>
 
           <BuildVariantTabs

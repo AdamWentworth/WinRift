@@ -31,7 +31,7 @@ func (r *Repository) queryChampionGuideItemPathsSummary(ctx context.Context, fil
 	if championID == "" {
 		return nil, false, nil
 	}
-	hasSummary, err := r.BuildSignatureAnalyticsHasData(ctx, filterValue(filters["patch"]))
+	sourceSQL, hasSummary, err := r.buildSignatureSummarySource(ctx, filterValue(filters["patch"]))
 	if err != nil {
 		return nil, false, err
 	}
@@ -46,7 +46,7 @@ func (r *Repository) queryChampionGuideItemPathsSummary(ctx context.Context, fil
 			toUInt64(sum(wins)) AS wins,
 			toUInt64(sum(games)) AS games,
 			wins / games AS win_rate
-		FROM (` + buildSignatureSummarySourceSQL() + `)
+		FROM (` + sourceSQL + `)
 		WHERE champion_id = ?
 			AND core3_signature != ''
 			AND final_items_signature != ''

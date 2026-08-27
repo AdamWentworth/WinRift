@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strconv"
@@ -352,7 +353,7 @@ func (r *Repository) championGuideAnalyticsHasData(ctx context.Context, table st
 		return false, fmt.Errorf("unsupported champion guide analytics table %q", table)
 	}
 	query := fmt.Sprintf(`
-		SELECT count()
+		SELECT toUInt8(1)
 		FROM %s FINAL
 		WHERE platform = 'ALL'
 			AND queue_id = ?`, table)
@@ -361,11 +362,15 @@ func (r *Repository) championGuideAnalyticsHasData(ctx context.Context, table st
 		query += " AND patch = ?"
 		args = append(args, filterValue(filters["patch"]))
 	}
-	var count uint64
-	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
+	query += " LIMIT 1"
+	var exists uint8
+	if err := r.db.QueryRowContext(ctx, query, args...).Scan(&exists); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
 		return false, err
 	}
-	return count > 0, nil
+	return exists > 0, nil
 }
 
 func championGuideBaseSQL(filters map[string]string, roleScope roleAnalyticsScope, includeChampion bool) (string, []any) {

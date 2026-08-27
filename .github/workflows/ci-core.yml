@@ -44,6 +44,10 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Test Production Performance Audit
+        working-directory: .
+        run: python3 -m unittest discover -s ops/prod/tests -p 'test_*.py'
+
       - name: Vet
         run: go vet ./...
 

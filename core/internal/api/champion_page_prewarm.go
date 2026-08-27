@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"winrift/core/internal/analytics"
+	"winrift/core/internal/clickhouse"
 )
 
 type ChampionPagePrewarmOptions struct {
@@ -71,6 +72,68 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	result := ChampionPagePrewarmResult{}
 	var firstErr error
 	seenKeys := map[string]bool{}
+	canonicalFilters := map[string]string{
+		"role":        "",
+		"patch":       patch,
+		"rank_bucket": rankBucket,
+	}
+	canonicalIndex, err := s.repo.QueryChampionGuideIndex(ctx, canonicalFilters, 1, max(perRole, 250))
+	if err != nil {
+		result.Errors++
+		firstErr = err
+	}
+	allPatchIndex := canonicalIndex
+	if patch != "" {
+		allPatchFilters := map[string]string{
+			"role":        "",
+			"patch":       "",
+			"rank_bucket": rankBucket,
+		}
+		allPatchIndex, err = s.repo.QueryChampionGuideIndex(ctx, allPatchFilters, 1, max(perRole, 250))
+		if err != nil {
+			result.Errors++
+			if firstErr == nil {
+				firstErr = err
+			}
+			allPatchIndex.Results = nil
+		}
+	}
+	championIDs := championPagePrewarmChampionIDs(canonicalIndex.Results, allPatchIndex.Results)
+	roleRates, roleErr := s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, patch)
+	if roleErr != nil {
+		result.Errors++
+		if firstErr == nil {
+			firstErr = roleErr
+		}
+	} else {
+		fallbackRoleRates := roleRates
+		if patch != "" {
+			fallbackRoleRates, roleErr = s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, "")
+			if roleErr != nil {
+				result.Errors++
+				if firstErr == nil {
+					firstErr = roleErr
+				}
+				fallbackRoleRates = nil
+			}
+		}
+		for _, championID := range championIDs {
+			role := primaryChampionRole(roleRates, championID)
+			if role == "" {
+				role = primaryChampionRole(fallbackRoleRates, championID)
+			}
+			if role == "" {
+				continue
+			}
+			request := championPagePrewarmRequest(championID, role, patch, rankBucket, queueID)
+			if err := s.prewarmChampionPageBundle(ctx, request, seenKeys, false, &result); err != nil {
+				result.Errors++
+				if firstErr == nil {
+					firstErr = err
+				}
+			}
+		}
+	}
 	for _, role := range roles {
 		filters := map[string]string{
 			"role":        role,
@@ -93,23 +156,7 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 			if summaryRole == "" {
 				summaryRole = role
 			}
-			request := championPageBundleRequest{
-				Build: buildAdviceRequest{
-					ChampionID:       summary.ChampionID,
-					Role:             summaryRole,
-					Patch:            patch,
-					RankBucket:       rankBucket,
-					MinGames:         defaultItemSlotMinGames,
-					ChampionMinGames: max(defaultItemSlotMinGames, 10),
-					OptionLimit:      4,
-					ItemContext:      normalizedItemContext("", summaryRole),
-				},
-				GuideMinGames: 5,
-				GuideLimit:    12,
-				IndexMinGames: 1,
-				IndexLimit:    250,
-				QueueID:       queueID,
-			}
+			request := championPagePrewarmRequest(summary.ChampionID, summaryRole, patch, rankBucket, queueID)
 			if err := s.prewarmChampionPageBundle(ctx, request, seenKeys, false, &result); err != nil {
 				result.Errors++
 				if firstErr == nil {
@@ -156,8 +203,24 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 	return result, firstErr
 }
 
+func championPagePrewarmChampionIDs(indexes ...[]clickhouse.ChampionGuideSummary) []uint16 {
+	seen := map[uint16]bool{}
+	championIDs := []uint16{}
+	for _, index := range indexes {
+		for _, summary := range index {
+			if summary.ChampionID == 0 || seen[summary.ChampionID] {
+				continue
+			}
+			seen[summary.ChampionID] = true
+			championIDs = append(championIDs, summary.ChampionID)
+		}
+	}
+	return championIDs
+}
+
 func (s Server) prewarmChampionPageBundle(ctx context.Context, request championPageBundleRequest, seenKeys map[string]bool, matchup bool, result *ChampionPagePrewarmResult) error {
 	cacheKey := championPageBundleCacheKey(request)
+	ttl := s.championPageBundleTTL(request.Build.Patch)
 	if seenKeys[cacheKey] {
 		return nil
 	}
@@ -167,7 +230,7 @@ func (s Server) prewarmChampionPageBundle(ctx context.Context, request championP
 		result.MatchupCandidates++
 	}
 	if body, ok, err := s.repo.CachedChampionPageBundle(ctx, cacheKey); err == nil && ok {
-		s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
+		s.responseCache.set(cacheKey, body, ttl)
 		result.Skipped++
 		result.Cached++
 		if matchup {
@@ -182,15 +245,35 @@ func (s Server) prewarmChampionPageBundle(ctx context.Context, request championP
 	if err != nil {
 		return err
 	}
-	if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, championPageBundleCacheTTL); err != nil {
+	if err := s.repo.StoreChampionPageBundle(ctx, cacheKey, body, ttl); err != nil {
 		return err
 	}
-	s.responseCache.set(cacheKey, body, championPageBundleCacheTTL)
+	s.responseCache.set(cacheKey, body, ttl)
 	result.Stored++
 	if matchup {
 		result.MatchupStored++
 	}
 	return nil
+}
+
+func championPagePrewarmRequest(championID uint16, role, patch, rankBucket string, queueID uint16) championPageBundleRequest {
+	return championPageBundleRequest{
+		Build: buildAdviceRequest{
+			ChampionID:       championID,
+			Role:             role,
+			Patch:            patch,
+			RankBucket:       rankBucket,
+			MinGames:         defaultItemSlotMinGames,
+			ChampionMinGames: max(defaultItemSlotMinGames, 10),
+			OptionLimit:      4,
+			ItemContext:      normalizedItemContext("", role),
+		},
+		GuideMinGames: 5,
+		GuideLimit:    12,
+		IndexMinGames: 1,
+		IndexLimit:    250,
+		QueueID:       queueID,
+	}
 }
 
 func championPagePrewarmRoles(roles []string) []string {

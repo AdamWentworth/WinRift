@@ -249,7 +249,7 @@ func TestQueryBuildsUsesBuildSignatureReadModel(t *testing.T) {
 	mock.ExpectQuery("(?s)FROM build_signature_analytics WHERE").
 		WithArgs("16.11").
 		WillReturnRows(sqlmock.NewRows([]string{"count()"}).AddRow(1))
-	mock.ExpectQuery("(?s)FROM \\(.*build_signature_analytics FINAL.*patch_build_metrics AS pbm FINAL").
+	mock.ExpectQuery("(?s)FROM \\(.*FROM build_signature_analytics FINAL").
 		WithArgs("266", "16.11", 10, 40).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"champion_id",
@@ -374,7 +374,7 @@ func TestChampionGuideItemPathsUseBuildSignatureReadModel(t *testing.T) {
 	mock.ExpectQuery("(?s)FROM build_signature_analytics WHERE").
 		WithArgs("16.11").
 		WillReturnRows(sqlmock.NewRows([]string{"count()"}).AddRow(1))
-	mock.ExpectQuery("(?s)FROM \\(.*build_signature_analytics FINAL.*patch_build_metrics AS pbm FINAL").
+	mock.ExpectQuery("(?s)FROM \\(.*FROM build_signature_analytics FINAL").
 		WithArgs("266", "TOP", "16.11", 5, 60).
 		WillReturnRows(sqlmock.NewRows([]string{"core3_signature", "final_items_signature", "wins", "games", "win_rate"}).
 			AddRow("3071-3053-6333", "3071-3053-6333-3065", 8, 12, 0.6667))
