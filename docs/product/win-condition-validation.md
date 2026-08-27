@@ -182,7 +182,3 @@ Good follow-ups:
 - Compare static letter ratings against patch-relative score percentiles.
 - Add timeline validation for strategies, especially splitpush and siege.
 - Store generated validation snapshots per patch so model revisions can be compared over time.
-
-## Snapshots
-
-- [2026-05-31 Patch 16.10 Snapshot](./win-condition-validation-2026-05-31.md)

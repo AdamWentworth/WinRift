@@ -59,8 +59,6 @@ editor /srv/winrift/.env
 
 Set the real Riot key, ClickHouse password, current patch, platform list, and storage paths.
 
-For the one-time laptop database copy, follow [data-migration.md](data-migration.md).
-
 ## ⚙️ Important Environment
 
 | Key | Purpose |
@@ -137,8 +135,6 @@ flowchart LR
   Worker -->|true| Collect[Worker collects]
   Worker -->|false| Idle[API + DB only]
 ```
-
-See [../../docs/ops-deployment.md](../../docs/ops-deployment.md) for the full runbook.
 
 ## 🧭 Common Commands
 

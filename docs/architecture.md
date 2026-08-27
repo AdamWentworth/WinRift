@@ -1,6 +1,6 @@
 # Architecture
 
-WinRift now separates collection, analytics storage, public API, and UI.
+WinRift separates collection, analytics storage, the application API, and UI.
 
 ## Services
 
@@ -22,7 +22,3 @@ WinRift now separates collection, analytics storage, public API, and UI.
 7. `participant_matchups` creates one participant-opponent row per player, using same-position opponent when available.
 8. `build_analytics_mv` groups matchup rows by champion, role, opponent, patch, rank, item signatures, rune signature, and spell signature.
 9. The web app requests ranked aggregate patterns and displays counts, winrate, and confidence.
-
-## Legacy
-
-The old Mongo/Express/CRA/Python prototype has been retired from the working tree. The useful product and analytics ideas are captured in [Legacy Win Condition Audit](legacy-win-condition-audit.md), [Win Conditions](discussions/win-conditions.md), and the current Go win-condition/profile implementation.

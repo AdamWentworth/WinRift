@@ -92,15 +92,15 @@ SELECT
   max(score) AS max_score
 FROM
 (
-  SELECT 'SplitPush' AS axis, splitpush_rating AS rating, splitpush_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  SELECT 'SplitPush' AS axis, splitpush_rating AS rating, splitpush_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.17'
   UNION ALL
-  SELECT 'Pick' AS axis, pick_rating AS rating, pick_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  SELECT 'Pick' AS axis, pick_rating AS rating, pick_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.17'
   UNION ALL
-  SELECT 'Siege' AS axis, siege_rating AS rating, siege_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  SELECT 'Siege' AS axis, siege_rating AS rating, siege_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.17'
   UNION ALL
-  SELECT 'Control' AS axis, control_rating AS rating, control_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  SELECT 'Control' AS axis, control_rating AS rating, control_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.17'
   UNION ALL
-  SELECT 'TeamFight' AS axis, teamfight_rating AS rating, teamfight_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.10'
+  SELECT 'TeamFight' AS axis, teamfight_rating AS rating, teamfight_score AS score FROM match_team_win_conditions FINAL WHERE patch = '16.17'
 )
 GROUP BY axis, rating
 ORDER BY axis, avg_score DESC;
@@ -120,7 +120,7 @@ FROM
     arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 1)
       - arrayElement(arrayReverseSort([splitpush_score, pick_score, siege_score, control_score, teamfight_score]), 2) AS primary_margin
   FROM match_team_win_conditions FINAL
-  WHERE patch = '16.10'
+  WHERE patch = '16.17'
 )
 GROUP BY margin_bucket
 ORDER BY multiIf(margin_bucket = 'TIE', 0, margin_bucket = '1', 1, margin_bucket = '2-3', 2, margin_bucket = '4-6', 3, 4);
@@ -201,7 +201,7 @@ SELECT
   games,
   wins / games AS win_rate
 FROM patch_build_metrics FINAL
-WHERE patch = '16.10'
+WHERE patch = '16.17'
   AND platform = 'NA1'
   AND queue_id = 420
 ORDER BY win_rate DESC, games DESC
@@ -235,7 +235,7 @@ SELECT
   win_rate_percent,
   confidence_percent
 FROM patch_win_condition_metrics FINAL
-WHERE patch = '16.10'
+WHERE patch = '16.17'
   AND platform = 'ALL'
   AND queue_id = 420
   AND rank_bucket = 'ALL'

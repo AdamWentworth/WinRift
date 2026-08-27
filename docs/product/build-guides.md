@@ -50,7 +50,7 @@ Build variant labeling:
 - The `Recommended` tab is not a variant lane. It should use the broad champion/matchup build-advice data and the highest-support aggregate setup, while alternative tabs intentionally narrow to their detected family.
 - Recommended item slots use a support-aware score, with samples ramping toward full trust around 200 games, so tiny hot samples do not outrank much larger, well-supported choices.
 - The champion page should keep the lower item panels as the primary build presentation. The first panel is the legal fountain opener from the first shop burst, while core, fourth, fifth, and sixth panels are finished-item slots. It should dedupe core items and avoid showing the same core item again as a late option unless no better option exists.
-- Future refinement: add a small curated champion override map for cases where community jargon is specific and stable, such as Katarina AD/On Hit/Tank or Shyvana AP/Tank.
+- Future refinement: add a small curated champion override map for cases where player terminology is specific and stable, such as Katarina AD/On Hit/Tank or Shyvana AP/Tank.
 
 Known gaps:
 

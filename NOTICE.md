@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-WinRift is an independent community analytics project.
+WinRift is an independent solo portfolio application created by Adam Wentworth.
 
 ## Riot Games
 
