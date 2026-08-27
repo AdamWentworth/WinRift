@@ -669,6 +669,32 @@ func TestCachedChampionPageBundleRejectsLatestExpiredEntry(t *testing.T) {
 	}
 }
 
+func TestCachedChampionPageBundleRetriesMemoryPressure(t *testing.T) {
+	db, mock, cleanup := newMockRepository(t)
+	defer cleanup()
+	repo := &Repository{db: db}
+	query := "(?s)FROM champion_page_bundle_cache.*PREWHERE cache_key = \\? AND compiled_at =.*SELECT max\\(compiled_at\\).*WHERE cache_key = \\?"
+
+	mock.ExpectQuery(query).
+		WithArgs("champion-page:retry", "champion-page:retry").
+		WillReturnError(errors.New("code: 241, memory limit exceeded by OvercommitTracker"))
+	mock.ExpectQuery(query).
+		WithArgs("champion-page:retry", "champion-page:retry").
+		WillReturnRows(sqlmock.NewRows([]string{"payload_json", "expires_at"}).
+			AddRow(`{"ok":true}`, time.Now().Add(time.Hour)))
+
+	body, ok, err := repo.CachedChampionPageBundle(context.Background(), "champion-page:retry")
+	if err != nil {
+		t.Fatalf("cached champion page bundle: %v", err)
+	}
+	if !ok || string(body) != `{"ok":true}` {
+		t.Fatalf("retried bundle ok=%t body=%s; want cached payload", ok, string(body))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestCachedChampionPageBundlesLoadsCanonicalBundlesWithBoundedReads(t *testing.T) {
 	db, mock, cleanup := newMockRepository(t)
 	defer cleanup()

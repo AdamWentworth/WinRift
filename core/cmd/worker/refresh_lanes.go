@@ -31,7 +31,7 @@ type refreshSchedulerState struct {
 
 const (
 	championPageStartupPrewarmConcurrency  = 4
-	championPageArchivedPrewarmConcurrency = 2
+	championPageArchivedPrewarmConcurrency = 1
 	championPageStartupReadinessGrace      = 45 * time.Second
 )
 

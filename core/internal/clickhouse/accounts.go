@@ -31,6 +31,8 @@ type ChampionPageBundleCacheEntry struct {
 	ExpiresAt time.Time
 }
 
+const championPageCacheMemoryRetryDelay = time.Second
+
 func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey string) ([]byte, bool, error) {
 	entry, ok, err := r.cachedChampionPageBundleEntry(ctx, cacheKey)
 	if err != nil || !ok {
@@ -46,19 +48,21 @@ func (r *Repository) cachedChampionPageBundleEntry(ctx context.Context, cacheKey
 	}
 	var payload string
 	var expiresAt time.Time
-	err := r.db.QueryRowContext(
-		ctx,
-		`SELECT payload_json, expires_at
-		FROM champion_page_bundle_cache
-		PREWHERE cache_key = ? AND compiled_at = (
-			SELECT max(compiled_at)
+	err := retryAnalyticsMemoryPressureWithDelay(ctx, "champion page cache read", championPageCacheMemoryRetryDelay, func() error {
+		return r.db.QueryRowContext(
+			ctx,
+			`SELECT payload_json, expires_at
 			FROM champion_page_bundle_cache
-			WHERE cache_key = ?
-		)
-		LIMIT 1`,
-		cacheKey,
-		cacheKey,
-	).Scan(&payload, &expiresAt)
+			PREWHERE cache_key = ? AND compiled_at = (
+				SELECT max(compiled_at)
+				FROM champion_page_bundle_cache
+				WHERE cache_key = ?
+			)
+			LIMIT 1`,
+			cacheKey,
+			cacheKey,
+		).Scan(&payload, &expiresAt)
+	})
 	if err == sql.ErrNoRows {
 		return ChampionPageBundleCacheEntry{}, false, nil
 	}
