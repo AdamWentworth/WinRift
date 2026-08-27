@@ -3,7 +3,6 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -33,9 +32,17 @@ type ChampionPageBundleCacheEntry struct {
 }
 
 func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey string) ([]byte, bool, error) {
+	entry, ok, err := r.cachedChampionPageBundleEntry(ctx, cacheKey)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	return entry.Body, true, nil
+}
+
+func (r *Repository) cachedChampionPageBundleEntry(ctx context.Context, cacheKey string) (ChampionPageBundleCacheEntry, bool, error) {
 	cacheKey = strings.TrimSpace(cacheKey)
 	if cacheKey == "" {
-		return nil, false, nil
+		return ChampionPageBundleCacheEntry{}, false, nil
 	}
 	var payload string
 	var expiresAt time.Time
@@ -43,21 +50,25 @@ func (r *Repository) CachedChampionPageBundle(ctx context.Context, cacheKey stri
 		ctx,
 		`SELECT payload_json, expires_at
 		FROM champion_page_bundle_cache
-		PREWHERE cache_key = ?
-		ORDER BY compiled_at DESC
+		PREWHERE cache_key = ? AND compiled_at = (
+			SELECT max(compiled_at)
+			FROM champion_page_bundle_cache
+			WHERE cache_key = ?
+		)
 		LIMIT 1`,
+		cacheKey,
 		cacheKey,
 	).Scan(&payload, &expiresAt)
 	if err == sql.ErrNoRows {
-		return nil, false, nil
+		return ChampionPageBundleCacheEntry{}, false, nil
 	}
 	if err != nil {
-		return nil, false, err
+		return ChampionPageBundleCacheEntry{}, false, err
 	}
 	if !expiresAt.After(time.Now()) {
-		return nil, false, nil
+		return ChampionPageBundleCacheEntry{}, false, nil
 	}
-	return []byte(payload), true, nil
+	return ChampionPageBundleCacheEntry{Body: []byte(payload), ExpiresAt: expiresAt}, true, nil
 }
 
 func (r *Repository) CachedChampionPageBundles(ctx context.Context, cacheKeys []string) (map[string]ChampionPageBundleCacheEntry, error) {
@@ -75,38 +86,15 @@ func (r *Repository) CachedChampionPageBundles(ctx context.Context, cacheKeys []
 		return map[string]ChampionPageBundleCacheEntry{}, nil
 	}
 
-	placeholders := make([]string, len(keys))
-	args := make([]any, len(keys))
-	for index, cacheKey := range keys {
-		placeholders[index] = "?"
-		args[index] = cacheKey
-	}
-	rows, err := r.db.QueryContext(
-		ctx,
-		fmt.Sprintf(`SELECT cache_key, payload_json, expires_at
-		FROM champion_page_bundle_cache
-		PREWHERE cache_key IN (%s)
-		ORDER BY cache_key, compiled_at DESC
-		LIMIT 1 BY cache_key`, strings.Join(placeholders, ",")),
-		args...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	entries := make(map[string]ChampionPageBundleCacheEntry, len(keys))
-	for rows.Next() {
-		var cacheKey string
-		var payload string
-		var expiresAt time.Time
-		if err := rows.Scan(&cacheKey, &payload, &expiresAt); err != nil {
+	for _, cacheKey := range keys {
+		entry, ok, err := r.cachedChampionPageBundleEntry(ctx, cacheKey)
+		if err != nil {
 			return nil, err
 		}
-		entries[cacheKey] = ChampionPageBundleCacheEntry{Body: []byte(payload), ExpiresAt: expiresAt}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
+		if ok {
+			entries[cacheKey] = entry
+		}
 	}
 	return entries, nil
 }
