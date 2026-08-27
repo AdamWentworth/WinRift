@@ -4,14 +4,6 @@
 
 <h1 align="center">Fast, Patch-Aware League Analytics</h1>
 
-<p align="center">
-  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml/badge.svg?branch=master" alt="Core CI"></a>
-  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml/badge.svg?branch=master" alt="Web CI"></a>
-  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/codeql.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/codeql.yml/badge.svg?branch=master" alt="CodeQL"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-all%20rights%20reserved-00c8dc" alt="All rights reserved"></a>
-  <img src="https://img.shields.io/badge/version-v0.1.0-00c8dc" alt="Version v0.1.0">
-</p>
-
 WinRift is a solo portfolio application designed, built, deployed, and operated by **Adam Wentworth**. It turns Riot match and timeline data into fast, matchup-aware champion guides, live-game context, summoner profiles, tier lists, and team win-condition analysis.
 
 The source is public for hiring and technical review. WinRift is not open source, does not accept outside contributions, and grants no permission to run, reuse, redistribute, deploy, or derive work from the code. See [LICENSE](LICENSE).
@@ -44,17 +36,20 @@ The source is public for hiring and technical review. WinRift is not open source
 | Operations | Docker Compose, private GHCR packages, GitHub Actions, health checks, rollback metadata, and SMTP monitoring |
 | Deployment | Private home-server web, API, collector, monitor, and ClickHouse stack |
 
-```text
-Riot APIs
-   │
-   ▼
-Collector worker ──► ClickHouse raw + normalized data
-                           │
-                           ▼
-                   Compiled read models
-                           │
-                           ▼
-React app ◄──────── Go API + persistent page cache
+```mermaid
+flowchart LR
+  Seeds[Riot IDs / frontier PUUIDs] --> Worker[Go collector worker]
+  Worker --> Riot[Riot APIs]
+  Riot --> Raw[(raw_matches / raw_timelines)]
+  Raw --> Normalized[(participants / matchups / events)]
+  Normalized --> Summaries[(compiled ClickHouse read models)]
+  Summaries --> Cache[(champion page bundle cache)]
+  Cache --> API[Go API]
+  API --> Web[React frontend]
+
+  Worker -->|401/403| Stop[auth marker + worker exit]
+  Stop --> Monitor[monitor email alert]
+  Worker -->|429 Retry-After| Backoff[rate-limit sleep]
 ```
 
 The frontend and API run on the server behind the same origin. The collector is deliberately separate from normal development startup so ordinary UI work cannot silently consume Riot API budget.
