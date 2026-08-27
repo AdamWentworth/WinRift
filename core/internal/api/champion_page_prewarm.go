@@ -15,6 +15,7 @@ import (
 
 type ChampionPagePrewarmOptions struct {
 	Patch               string
+	ChampionIDs         []uint16
 	Roles               []string
 	PerRole             int
 	MinGames            int
@@ -37,6 +38,7 @@ type ChampionPagePrewarmResult struct {
 	MatchupStored     int
 	MatchupSkipped    int
 	MatchupCached     int
+	MissingGuideIDs   []uint16
 }
 
 func (s Server) PrewarmChampionPageBundles(ctx context.Context, options ChampionPagePrewarmOptions) (ChampionPagePrewarmResult, error) {
@@ -105,6 +107,7 @@ func (s Server) PrewarmChampionPageBundles(ctx context.Context, options Champion
 		}
 	}
 	championIDs := championPagePrewarmChampionIDs(canonicalIndex.Results, allPatchIndex.Results)
+	championIDs = filterChampionPagePrewarmChampionIDs(championIDs, options.ChampionIDs)
 	roleRates, roleErr := s.repo.ChampionRoleRatesForPatch(ctx, championIDs, queueID, patch)
 	if roleErr != nil {
 		result.Errors++
@@ -241,7 +244,11 @@ func (s Server) prewarmChampionPageRequests(ctx context.Context, requests []cham
 				localResult := ChampionPagePrewarmResult{}
 				err := s.prewarmChampionPageBundle(ctx, request, map[string]bool{}, matchup, &localResult)
 				if err == nil && storeCanonicalAlias {
-					err = s.storeChampionPageCanonicalAlias(ctx, request)
+					var guideGames int
+					guideGames, err = s.storeChampionPageCanonicalAlias(ctx, request)
+					if err == nil && guideGames == 0 {
+						localResult.MissingGuideIDs = append(localResult.MissingGuideIDs, request.Build.ChampionID)
+					}
 				}
 				if err != nil {
 					localResult.Errors++
@@ -279,10 +286,14 @@ func (s Server) prewarmChampionPageRequests(ctx context.Context, requests []cham
 	return result, firstErr
 }
 
-func (s Server) storeChampionPageCanonicalAlias(ctx context.Context, request championPageBundleRequest) error {
+func (s Server) storeChampionPageCanonicalAlias(ctx context.Context, request championPageBundleRequest) (int, error) {
 	body, ok := s.responseCache.get(championPageBundleCacheKey(request))
 	if !ok {
-		return fmt.Errorf("canonical champion page body missing after prewarm champion=%d patch=%s role=%s", request.Build.ChampionID, request.Build.Patch, request.Build.Role)
+		return 0, fmt.Errorf("canonical champion page body missing after prewarm champion=%d patch=%s role=%s", request.Build.ChampionID, request.Build.Patch, request.Build.Role)
+	}
+	guideGames, err := championPageGuideGames(body)
+	if err != nil {
+		return 0, fmt.Errorf("decode canonical champion page champion=%d patch=%s: %w", request.Build.ChampionID, request.Build.Patch, err)
 	}
 	aliasRequest := championPageCanonicalAliasRequest(request)
 	aliasKey := championPageBundleCacheKey(aliasRequest)
@@ -290,7 +301,24 @@ func (s Server) storeChampionPageCanonicalAlias(ctx context.Context, request cha
 	s.responseCache.set(aliasKey, body, ttl)
 	storeCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	return s.repo.StoreChampionPageBundle(storeCtx, aliasKey, body, ttl)
+	if err := s.repo.StoreChampionPageBundle(storeCtx, aliasKey, body, ttl); err != nil {
+		return 0, err
+	}
+	return guideGames, nil
+}
+
+func championPageGuideGames(body []byte) (int, error) {
+	var payload struct {
+		Guide struct {
+			Summary struct {
+				Games int `json:"games"`
+			} `json:"summary"`
+		} `json:"guide"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return 0, err
+	}
+	return payload.Guide.Summary.Games, nil
 }
 
 func mergeChampionPagePrewarmResult(target *ChampionPagePrewarmResult, addition ChampionPagePrewarmResult) {
@@ -306,6 +334,26 @@ func mergeChampionPagePrewarmResult(target *ChampionPagePrewarmResult, addition 
 	target.MatchupStored += addition.MatchupStored
 	target.MatchupSkipped += addition.MatchupSkipped
 	target.MatchupCached += addition.MatchupCached
+	target.MissingGuideIDs = append(target.MissingGuideIDs, addition.MissingGuideIDs...)
+}
+
+func filterChampionPagePrewarmChampionIDs(championIDs, requested []uint16) []uint16 {
+	if len(requested) == 0 {
+		return championIDs
+	}
+	allowed := make(map[uint16]bool, len(requested))
+	for _, championID := range requested {
+		if championID > 0 {
+			allowed[championID] = true
+		}
+	}
+	filtered := make([]uint16, 0, len(allowed))
+	for _, championID := range championIDs {
+		if allowed[championID] {
+			filtered = append(filtered, championID)
+		}
+	}
+	return filtered
 }
 
 func championPagePrewarmChampionIDs(indexes ...[]clickhouse.ChampionGuideSummary) []uint16 {

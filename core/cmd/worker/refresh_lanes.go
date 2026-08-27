@@ -164,11 +164,24 @@ func prewarmChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiSe
 	}
 	patches := championPageStartupPrewarmPatchList(currentPatch, cfg.CollectorPatchRetention, stats)
 	hadErrors := false
-	for _, patch := range patches {
+	var fallbackChampionIDs []uint16
+	for index, patch := range patches {
+		if index > 0 && hadErrors {
+			break
+		}
 		startedAt := time.Now()
-		log.Printf("champion page canonical startup prewarm start patch=%s queue=%d concurrency=%d", patch, analytics.RankedSoloQueueID, championPageStartupPrewarmConcurrency)
+		scope := "all"
+		if index > 0 {
+			scope = "current-guide-gaps"
+		}
+		log.Printf("champion page canonical startup prewarm start patch=%s queue=%d concurrency=%d scope=%s requested_champions=%d", patch, analytics.RankedSoloQueueID, championPageStartupPrewarmConcurrency, scope, len(fallbackChampionIDs))
+		if index > 0 && len(fallbackChampionIDs) == 0 {
+			log.Printf("champion page canonical startup prewarm complete patch=%s queue=%d candidates=0 stored=0 cached=0 skipped=0 errors=0 duration=%s scope=%s", patch, analytics.RankedSoloQueueID, time.Since(startedAt).Round(time.Millisecond), scope)
+			continue
+		}
 		result, prewarmErr := apiServer.PrewarmChampionPageBundles(ctx, api.ChampionPagePrewarmOptions{
 			Patch:         patch,
+			ChampionIDs:   fallbackChampionIDs,
 			CanonicalOnly: true,
 			Concurrency:   championPageStartupPrewarmConcurrency,
 			RankBucket:    cfg.ChampionPagePrewarmRankBucket,
@@ -190,8 +203,11 @@ func prewarmChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiSe
 			)
 			continue
 		}
+		if index == 0 {
+			fallbackChampionIDs = append([]uint16(nil), result.MissingGuideIDs...)
+		}
 		log.Printf(
-			"champion page canonical startup prewarm complete patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d errors=%d duration=%s",
+			"champion page canonical startup prewarm complete patch=%s queue=%d candidates=%d stored=%d cached=%d skipped=%d errors=%d duration=%s scope=%s missing_guide_champions=%d",
 			patch,
 			analytics.RankedSoloQueueID,
 			result.Candidates,
@@ -200,6 +216,8 @@ func prewarmChampionPagesOnStartup(ctx context.Context, cfg config.Config, apiSe
 			result.Skipped,
 			result.Errors,
 			time.Since(startedAt).Round(time.Millisecond),
+			scope,
+			len(result.MissingGuideIDs),
 		)
 	}
 	if hadErrors {
