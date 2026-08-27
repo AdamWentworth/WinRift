@@ -76,15 +76,15 @@ This avoids awkward "which machine has the real dataset?" problems. The server b
 
 The production-like setup follows the same private-runner pattern used by the other home-server projects:
 
-- CI builds and pushes `ghcr.io/adamwentworth/winrift-core` from `core/Dockerfile`.
+- CI builds and pushes `ghcr.io/adamwentworth/winrift-core` and `ghcr.io/adamwentworth/winrift-web`.
 - A manual GitHub Actions deploy runs on the self-hosted runner labeled `self-hosted`, `linux`, `x64`, `prod`.
 - Durable server state lives at `/srv/winrift`.
 - ClickHouse data, hot data, logs, and backups live on the mounted storage SSD under `/mnt/storage/clickhouse`.
-- The API is bound to the private LAN by default. Do not router-forward it.
+- The production web app is bound to private-LAN port `8082` by default. Do not router-forward it.
+- The web container proxies same-origin `/api` requests to the API over the Compose network.
 - The worker starts only after the API passes health.
 
-This intentionally does not create a public web domain. For now, use the laptop frontend against the server API over the private home network.
-The web container is intentionally not part of the production Compose file yet because the current frontend Dockerfile is optimized for local Vite development. When we want a private or public hosted frontend, add a production static-web image and either bind it privately or put it behind the same reverse-proxy pattern used by the rest of the home-server stack.
+This intentionally does not create or expose a public web domain. The existing host reverse proxy owns ports `80` and `443`; it can later route a private or public hostname to port `8082` without changing the WinRift container.
 
 Server layout:
 
@@ -128,11 +128,12 @@ The deploy workflow also checks that `/mnt/storage` is mounted and refuses to st
 The production Compose file is [ops/prod/docker-compose.yml](../ops/prod/docker-compose.yml). It runs:
 
 - `winrift_clickhouse`
+- `winrift_web`
 - `winrift_api`
 - `winrift_worker`
 - `winrift_monitor`
 
-The worker uses `restart: "no"` on purpose. If the Riot key expires and the worker exits, Docker should not repeatedly restart it and spend requests against a bad key.
+The worker uses `restart: on-failure:3`. Riot authentication failures write an `auth_failed` heartbeat and exit successfully, so they remain stopped for operator action. Unexpected crashes and OOMs exit unsuccessfully and receive three bounded recovery attempts.
 The monitor uses `restart: unless-stopped` because it is the thing that tells you the worker stopped.
 
 ## CI/CD
@@ -144,6 +145,13 @@ Core CI is [ci-core.yml](../.github/workflows/ci-core.yml):
 3. Validate the production Compose file.
 4. Run Trivy scans and upload an SBOM.
 5. On `main`/`master`, push `ghcr.io/adamwentworth/winrift-core:sha-<commit>` and `ghcr.io/adamwentworth/winrift-core:latest` through GitHub Container Registry.
+
+Web CI is [ci-web.yml](../.github/workflows/ci-web.yml):
+
+1. Run frontend unit tests and the production TypeScript/Vite build.
+2. Build the Caddy production image.
+3. Run filesystem and image vulnerability scans and upload an SBOM.
+4. On `main`/`master`, publish immutable SHA and `latest` web tags.
 
 Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml). The normal path is intentionally simple: leave `image_ref` blank and the server pulls `ghcr.io/adamwentworth/winrift-core:latest`, matching the home-server service pattern used in PokeGoNexus. CI still publishes `sha-<commit>` tags for auditability and emergency pinned deploys, but they are not the day-to-day deployment path.
 
@@ -160,13 +168,19 @@ Core deploy is [deploy-core-prod.yml](../.github/workflows/deploy-core-prod.yml)
 11. Writes deployment metadata to `/srv/winrift/deployments/core.json`.
 12. Runs post-deploy smoke checks for container state, `/api/health`, leaderboard/profile cache-hit behavior, and worker refresh-status readability when the status file exists.
 
+Web deploy is [deploy-web-prod.yml](../.github/workflows/deploy-web-prod.yml). It resolves the requested web image to an immutable digest, preserves the running image for rollback, deploys only `winrift_web`, verifies `/healthz`, same-origin `/api/health`, SPA deep-route fallback, and immutable asset headers, then runs the strict Playwright route-performance suite against the deployed container. Deployment metadata is written to `/srv/winrift/deployments/web.json`.
+
 The server-wide `docker-image-retention.timer` checks disk pressure weekly. At 65% root usage it prunes Docker images older than seven days that are not referenced by a container. This keeps deployment and rollback tags from growing without bound while preserving every running or stopped workload and all persistent volumes. Installation commands are in [ops/prod/README.md](../ops/prod/README.md).
 
 Use `image_ref` only when you intentionally need a pinned image. It accepts `latest`, `sha-<full-commit>`, or a full image reference.
 
 For the one-time laptop database bootstrap, use [ops/prod/data-migration.md](../ops/prod/data-migration.md). The important rule is to deploy with `start_worker=false`, verify restored match counts, and only then start the worker.
 
-## Laptop Frontend Against Server API
+## Production Web And Laptop Development
+
+The production application is available at `http://SERVER_LAN_IP:8082`. Its Caddy container serves the React build and proxies `/api` internally, avoiding production browser CORS and API-address configuration.
+
+Laptop Vite development remains available against the server API:
 
 With `WINRIFT_API_BIND=0.0.0.0`, the API listens on the server's private LAN address. Do not expose or router-forward this port.
 

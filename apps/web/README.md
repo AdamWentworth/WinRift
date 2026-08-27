@@ -24,6 +24,7 @@ apps/web/
 │   ├── styles/        # Main app stylesheet
 │   └── main.tsx       # React entrypoint
 ├── index.html
+├── Caddyfile           # Production SPA server and same-origin API proxy
 ├── package.json
 ├── vite.config.ts
 └── Dockerfile
@@ -41,7 +42,7 @@ Default URL:
 
 - `http://localhost:5173`
 
-By default the app calls:
+By default the local development app calls:
 
 - `http://localhost:8000`
 
@@ -71,6 +72,8 @@ VITE_API_URL=http://SERVER_LAN_IP:8000
 | `VITE_API_URL` | API base URL used by browser requests. |
 
 No Riot key belongs in frontend environment variables. All Riot requests go through the Go API.
+
+Production builds default to same-origin API calls. The Caddy image serves the compiled SPA, proxies `/api/*` to the internal `api:8000` service, and preserves React deep routes through an `index.html` fallback.
 
 ## 🧭 App Routes
 

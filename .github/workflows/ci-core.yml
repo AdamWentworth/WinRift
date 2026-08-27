@@ -8,6 +8,7 @@ on:
       - "ops/prod/**"
       - ".github/workflows/ci-core.yml"
       - ".github/workflows/deploy-core-prod.yml"
+      - ".dockerignore"
   push:
     branches: ["main", "master"]
     paths:
@@ -16,6 +17,7 @@ on:
       - "ops/prod/**"
       - ".github/workflows/ci-core.yml"
       - ".github/workflows/deploy-core-prod.yml"
+      - ".dockerignore"
   workflow_dispatch: {}
 
 permissions:
@@ -43,6 +45,15 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      - name: Formatting
+        run: |
+          files="$(gofmt -l .)"
+          if [[ -n "${files}" ]]; then
+            echo "The following Go files need gofmt:" >&2
+            echo "${files}" >&2
+            exit 1
+          fi
 
       - name: Test Production Performance Audit
         working-directory: .

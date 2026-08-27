@@ -7,4 +7,6 @@ core/.pytest_cache
 apps/web/dist
 *.tsbuildinfo
 legacy/**/__pycache__
-.env
+**/.env
+**/.env.*
+!**/.env.example

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"winrift/core/internal/riot"
 	"winrift/core/internal/runstate"
 )
+
+var exitProcess = os.Exit
 
 func isRiotAuthError(err error) bool {
 	return riot.IsAuthFailure(err)
@@ -24,7 +27,10 @@ func isRiotRateLimitError(err error) bool {
 
 func stopForRiotAuthFailure(cfg config.Config, platformCount int) {
 	writeWorkerHeartbeat(cfg, "auth_failed", platformCount, 0, 0, "Riot API key is missing, expired, or not authorized")
-	log.Fatalf("collector stopping: Riot API key is missing, expired, or not authorized")
+	log.Printf("collector stopping: Riot API key is missing, expired, or not authorized")
+	// Authentication failures are intentional stops. Exiting successfully keeps
+	// Docker's on-failure policy from retrying a key that needs operator action.
+	exitProcess(0)
 }
 
 func writeWorkerHeartbeat(cfg config.Config, status string, platforms, activePlatforms, requests int, message string) {

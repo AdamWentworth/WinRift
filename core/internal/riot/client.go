@@ -315,7 +315,7 @@ func AuthFailureMarkerExists(cfg config.Config) bool {
 	return authFailureMarkerExists(cfg.RiotAuthFailureMarkerPath)
 }
 
-func StartAuthFailureMonitor(cfg config.Config, component string) {
+func StartAuthFailureMonitor(cfg config.Config, component string, onFailure ...func()) {
 	if !cfg.RiotAuthFailureExit {
 		return
 	}
@@ -328,7 +328,12 @@ func StartAuthFailureMonitor(cfg config.Config, component string) {
 		defer ticker.Stop()
 		for range ticker.C {
 			if _, err := os.Stat(marker); err == nil {
-				log.Fatalf("%s stopping: Riot API auth failure marker exists path=%s", component, marker)
+				log.Printf("%s stopping: Riot API auth failure marker exists path=%s", component, marker)
+				if len(onFailure) > 0 && onFailure[0] != nil {
+					onFailure[0]()
+					return
+				}
+				os.Exit(1)
 			} else if !errors.Is(err, os.ErrNotExist) {
 				log.Printf("%s auth failure marker check failed path=%s err=%v", component, marker, err)
 			}

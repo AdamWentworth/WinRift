@@ -1,17 +1,18 @@
 # WinRift Production Ops 🚀
 
-`ops/prod` contains the private server deployment shape for WinRift's core runtime. It is designed for a home-server setup where ClickHouse, the API, and the collector worker run on the server while frontend development can continue from a laptop against the private-LAN API.
+`ops/prod` contains the private server deployment shape for WinRift. It runs the production web app, API, ClickHouse, collector worker, and monitor on the home server while preserving a separate laptop Vite workflow for development.
 
 ## 📦 What Runs
 
 | Service | Purpose | Notes |
 |---------|---------|-------|
 | `winrift_clickhouse` | Persistent analytics database | Data, hot data, logs, and backups should live on the storage SSD. |
+| `winrift_web` | Production React application | Caddy serves static assets and proxies same-origin `/api` requests. |
 | `winrift_api` | Private-LAN API | Bound to `0.0.0.0:8000` by default. |
-| `winrift_worker` | Riot collector worker | Started explicitly, `restart: "no"` to avoid expired-key loops. |
+| `winrift_worker` | Riot collector worker | Auth failures remain stopped; unexpected failures receive three bounded restart attempts. |
 | `winrift_monitor` | Health and alert monitor | Watches API health, Riot auth marker, and worker heartbeat. |
 
-The frontend is intentionally not deployed here yet. Run it locally with `VITE_API_URL` pointed at the server API.
+The server-hosted frontend listens on private-LAN port `8082` by default. Ports `80` and `443` remain available to the host's existing reverse proxy, which can later map a hostname to WinRift without changing the application container.
 
 ## 🗂️ Runtime State
 
@@ -20,7 +21,7 @@ The frontend is intentionally not deployed here yet. Run it locally with `VITE_A
 ├── .env              # Server-local secrets/config, never committed
 ├── schema.sql        # Deployed ClickHouse schema
 ├── runtime/          # Auth markers, worker heartbeat, monitor alert state
-└── deployments/      # Deployment metadata
+└── deployments/      # Core and web deployment metadata
 
 /mnt/storage/clickhouse/
 ├── data/             # ClickHouse data files
@@ -75,6 +76,8 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `WINRIFT_CLICKHOUSE_CONFIG_DIR` | Mounted ClickHouse config override directory. |
 | `WINRIFT_CLICKHOUSE_USERS_DIR` | Mounted ClickHouse user/profile override directory. |
 | `WINRIFT_RUNTIME_STATE_DIR` | Shared runtime marker directory. |
+| `WINRIFT_WEB_BIND` | Private-LAN address used by the production web container. |
+| `WINRIFT_WEB_PORT` | Host port for the production web app; defaults to `8082`. |
 | `API_REQUEST_LOGS_ENABLED` | Enables grep-friendly API timing logs. |
 | `WORKER_REFRESH_STATUS_PATH` | Runtime JSON file for worker refresh health. |
 | `ANALYTICS_REFRESH_SCHEDULER_INTERVAL_SECONDS` | Background summary/prewarm cadence; only one due refresh family runs per tick. |
@@ -84,7 +87,17 @@ For the one-time laptop database copy, follow [data-migration.md](data-migration
 | `ALERT_EMAIL_ENABLED` | Enables SMTP email alerts for auth failure or down worker state. |
 | `SMTP_TO` | Comma-separated alert recipient list. |
 
-## 🖥️ Laptop Development Against Server API
+## 🌐 Production Web And Laptop Development
+
+Open the deployed private-LAN application at:
+
+```text
+http://SERVER_LAN_IP:8082
+```
+
+The production build uses same-origin `/api` requests, so browsers do not need a separate API URL or CORS exception.
+
+For local Vite development against the server API:
 
 ```bash
 cd apps/web
@@ -96,6 +109,8 @@ This lets the server keep collecting and serving data while the laptop only runs
 ## 🔁 Deployment Flow
 
 Core production deploys use the latest published core image by default. Normal flow is: push to GitHub, wait for Core CI to publish `ghcr.io/adamwentworth/winrift-core:latest`, then run `deploy-core-prod` with `image_ref` left blank. Pinned `sha-<commit>` images still exist for audit/rollback work, but day-to-day deploys should follow `latest`.
+
+Web production deploys follow the same immutable-image model. Web CI tests and builds the frontend, scans the source and container, uploads an SBOM, and publishes `ghcr.io/adamwentworth/winrift-web:sha-<commit>`. Run `deploy-web-prod` with that exact image when certifying a release. The workflow installs the current Compose file, deploys with automatic rollback, verifies health/API proxy/deep-route/cache behavior, and runs the strict Playwright route gate against the deployed site.
 
 After the API, monitor, and optional worker are recreated, the deploy workflow runs a post-deploy smoke pass. It verifies container state, `/api/health`, leaderboard/profile cache-hit behavior, and the worker refresh-status JSON when present. With the worker enabled, startup first prewarms every canonical current-patch champion page plus the mature-fallback pages for champions whose current guide is empty, then prewarms every canonical page for every selectable archived patch. The API bulk-hydrates all of those canonical bundles from the persistent cache into its own in-process cache, refreshes changing retained patches every 30 minutes, and keeps stable archived patches resident for the process lifetime. Deployment waits for every worker readiness marker and the all-patch API memory-hydration marker, then strictly audits every champion and selectable patch combination at a 500 ms default ceiling. A deploy fails if any page is uncached, incomplete, slow, or unable to provide a mature fallback when current-patch guide data is empty.
 

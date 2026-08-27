@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -142,6 +143,9 @@ func TestCheckSuppressesTransientAPIFailureDuringStartupGrace(t *testing.T) {
 
 func newDockerContainerMonitor(t *testing.T, running bool) (Service, func()) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("production Docker socket monitoring requires Unix-domain sockets")
+	}
 	dir := t.TempDir()
 	socketPath := filepath.Join(dir, "docker.sock")
 	listener, err := net.Listen("unix", socketPath)

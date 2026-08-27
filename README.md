@@ -73,7 +73,7 @@ Go is used for the API and collector because the target deployment is a lightwei
 
 WinRift is an active MVP rebuild. The core collection pipeline, ClickHouse schema, private deployment flow, live-match UI, champion guides, tier list, summoner profiles, and win-condition analytics are implemented enough to demonstrate the product direction.
 
-The app is not yet a public hosted service. Current production-style use is private-LAN first: the server owns ClickHouse, API, and worker collection, while frontend development can happen from a laptop against that private API.
+The app is not yet a public internet service. Current production use is private-LAN first: the server owns the production web application, API, ClickHouse, monitoring, and worker collection, while Vite remains available for laptop development against that private API.
 
 Near-term work:
 
@@ -359,12 +359,12 @@ Typical lifecycle:
 
 The current production shape is intentionally private:
 
-- ClickHouse, API, and worker run on the home server.
+- The production web app, ClickHouse, API, and worker run on the home server.
 - The monitor runs beside them and sends private SMTP alerts.
 - The worker collects from the server only.
-- The API is available on the private LAN.
-- The frontend can be developed on a laptop while pointing to the server API.
-- GitHub Actions build and deploy the Go core image to the server through a self-hosted runner.
+- The web app is available on the private LAN and proxies `/api` to the internal API service.
+- The frontend can still be developed on a laptop while pointing to the server API.
+- GitHub Actions build, scan, publish, and deploy immutable core and web images through a self-hosted runner.
 
 See [ops/prod/README.md](ops/prod/README.md) and [docs/ops-deployment.md](docs/ops-deployment.md).
 

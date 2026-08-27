@@ -40,6 +40,31 @@ func TestIsRiotRateLimitError(t *testing.T) {
 	}
 }
 
+func TestStopForRiotAuthFailureWritesHeartbeatAndExitsSuccessfully(t *testing.T) {
+	originalExit := exitProcess
+	defer func() { exitProcess = originalExit }()
+
+	exitCode := -1
+	exitProcess = func(code int) { exitCode = code }
+	heartbeatPath := filepath.Join(t.TempDir(), "worker-heartbeat.json")
+	stopForRiotAuthFailure(config.Config{MonitorWorkerHeartbeatPath: heartbeatPath}, 14)
+
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0", exitCode)
+	}
+	body, err := os.ReadFile(heartbeatPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var heartbeat runstate.WorkerHeartbeat
+	if err := json.Unmarshal(body, &heartbeat); err != nil {
+		t.Fatal(err)
+	}
+	if heartbeat.Status != "auth_failed" || heartbeat.Platforms != 14 {
+		t.Fatalf("heartbeat = %+v, want auth_failed with 14 platforms", heartbeat)
+	}
+}
+
 func TestAllocatePlatformBudgetSharesAvailableBudget(t *testing.T) {
 	cfg := config.Config{
 		CollectorInterval:          120 * time.Second,

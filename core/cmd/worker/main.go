@@ -18,7 +18,6 @@ import (
 func main() {
 	cfg := config.Load()
 	riot.ClearAuthFailureMarker(cfg)
-	riot.StartAuthFailureMonitor(cfg, "winrift worker")
 	riotClient := riot.NewClient(cfg)
 	repo, err := clickhouse.NewRepository(cfg)
 	if err != nil {
@@ -41,6 +40,9 @@ func main() {
 	staticService := staticdata.NewService(riotClient)
 	apiServer := api.NewServer(cfg, riotClient, repo, staticService)
 	platforms := collectorPlatforms(cfg)
+	riot.StartAuthFailureMonitor(cfg, "winrift worker", func() {
+		stopForRiotAuthFailure(cfg, len(platforms))
+	})
 	platformCountsByRegion := countPlatformsByRegion(platforms)
 	writeWorkerHeartbeat(cfg, "starting", len(platforms), 0, 0, "worker startup")
 	log.Printf(

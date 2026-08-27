@@ -52,11 +52,28 @@ services:
       clickhouse:
         condition: service_healthy
 
+  web:
+    image: ${WINRIFT_WEB_IMAGE:-ghcr.io/adamwentworth/winrift-web:latest}
+    container_name: winrift_web
+    restart: unless-stopped
+    ports:
+      - "${WINRIFT_WEB_BIND:-0.0.0.0}:${WINRIFT_WEB_PORT:-8082}:8080"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 4
+      start_period: 10s
+
   worker:
     image: ${WINRIFT_CORE_IMAGE:-ghcr.io/adamwentworth/winrift-core:latest}
     container_name: winrift_worker
     command: ["/winrift-worker"]
-    restart: "no"
+    # Auth failures exit successfully and remain stopped; unexpected failures
+    # receive a small bounded number of automatic recovery attempts.
+    restart: on-failure:3
     cpus: "1.0"
     mem_limit: 1g
     memswap_limit: 1536m

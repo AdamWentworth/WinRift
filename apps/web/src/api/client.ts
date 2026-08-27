@@ -1,6 +1,8 @@
 import type { AccountAliasResolution, AccountAliasSearchResponse, AnalyticsBuildResponse, AnalyticsItemSlotBatchRequest, AnalyticsItemSlotBatchResponse, AnalyticsItemSlotResponse, AnalyticsPatchesResponse, BuildAdviceResponse, BuildFilters, ChampionData, ChampionGuideIndexResponse, ChampionGuideResponse, ChampionPageBundleResponse, ChampionRoleRatesResponse, ChampionSplashData, ItemData, LiveGame, RuneData, SummonerLeaderboardResponse, SummonerProfile, SummonerSpellData, WinConditionAnalysisRequest, WinConditionAnalysisResponse } from './types';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// Production serves the frontend and API from one origin. Local development can
+// still opt into a separate API host through VITE_API_URL.
+const API_URL = (import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8000' : '')).replace(/\/$/, '');
 
 export type RequestOptions = {
   signal?: AbortSignal;
