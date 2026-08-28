@@ -4,6 +4,15 @@
 
 <h1 align="center">Fast, Patch-Aware League Analytics</h1>
 
+<p align="center">
+  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-core.yml/badge.svg?branch=master" alt="Core CI status" /></a>
+  <a href="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml"><img src="https://github.com/AdamWentworth/WinRift/actions/workflows/ci-web.yml/badge.svg?branch=master" alt="Web CI status" /></a>
+  <img src="https://img.shields.io/badge/Go-API-00ADD8?logo=go&amp;logoColor=white" alt="Go API" />
+  <img src="https://img.shields.io/badge/React%20%2B%20TypeScript-Web-20232A?logo=react&amp;logoColor=61DAFB" alt="React and TypeScript web app" />
+  <img src="https://img.shields.io/badge/ClickHouse-Analytics-FFCC01?logo=clickhouse&amp;logoColor=111827" alt="ClickHouse analytics" />
+  <img src="https://img.shields.io/badge/Docker-Deployment-2496ED?logo=docker&amp;logoColor=white" alt="Docker deployment" />
+</p>
+
 WinRift is a solo portfolio application designed, built, deployed, and operated by **Adam Wentworth**. It turns Riot match and timeline data into fast, matchup-aware champion guides, live-game context, summoner profiles, tier lists, and team win-condition analysis.
 
 The source is public for hiring and technical review. WinRift is not open source, does not accept outside contributions, and grants no permission to run, reuse, redistribute, deploy, or derive work from the code. See [LICENSE](LICENSE).
