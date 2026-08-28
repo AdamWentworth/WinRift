@@ -251,7 +251,7 @@ export const WIN_CONDITION_ROUTE_SLUGS: Record<WinConditionKey, string> = {
 };
 
 export function conditionIconUrl(condition: string) {
-  return `/images/win_condition_icons/${condition}.png`;
+  return `/images/win_condition_icons/${condition}.webp`;
 }
 
 export function winConditionDefinition(condition: string) {

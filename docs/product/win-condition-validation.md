@@ -173,12 +173,9 @@ It does not prove:
 
 It does help decide where the model deserves trust, where the thresholds may be wrong, and where we need deeper timeline features.
 
-## Next Improvements
+## Validation Backlog
 
-Good follow-ups:
-
-- Add role-specific validation to see whether the same champion profile behaves differently by role.
-- Add champion-pair residuals to detect synergy and anti-synergy.
-- Compare static letter ratings against patch-relative score percentiles.
-- Add timeline validation for strategies, especially splitpush and siege.
-- Store generated validation snapshots per patch so model revisions can be compared over time.
+- Add role-specific validation to test whether one champion profile behaves differently by role.
+- Compare static letter ratings with patch-relative score percentiles.
+- Add timeline evidence for strategy execution, especially split push and siege.
+- Persist validation snapshots so model revisions can be compared across patches.

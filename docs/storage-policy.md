@@ -1,248 +1,151 @@
 # Storage Policy
 
-WinRift intentionally stores both raw Riot payloads and normalized analytics rows for active patches. ClickHouse compression makes this practical, and raw payloads let us rebuild read models when we improve the model later.
+WinRift keeps raw Riot payloads only while they are useful for active-model iteration. Closed patches are compiled into durable summaries before bulky match, timeline, and event detail is pruned.
 
-The policy is not "store everything forever." The policy is "keep raw current enough to iterate, compile old patches into summaries, then prune raw payload and timeline detail."
+The policy is:
+
+1. retain raw and normalized detail for the active patch window;
+2. build compact app-facing read models continuously;
+3. archive a patch before it leaves the ingestion window;
+4. retain historical summaries and the normalized lookup index;
+5. prune raw payloads and high-volume timeline detail from closed patches.
 
 ## Data Classes
 
-Hot raw/current data:
+Active raw and normalized data includes:
 
-- `raw_matches`
-- `raw_timelines`
-- `participants`
-- `participant_matchups`
-- `participant_performance`
-- `timeline_participant_frames`
-- `timeline_item_events`
-- `timeline_skill_events`
-- `timeline_combat_events`
-- `timeline_objective_events`
-- `champion_bans`
+- `raw_matches`, `raw_timelines`
+- `participants`, `participant_matchups`, `participant_performance`
+- timeline frames plus item, skill, combat, and objective events
+- champion bans and team kill summaries
 
-Current read models:
+Current read models include:
 
-- `item_slot_analytics`
-- `starting_loadout_analytics`
-- `build_signature_analytics`
-- `champion_role_analytics`
-- `champion_skill_analytics`
-- `champion_ban_analytics`
-- `champion_build_variant_analytics`
-- `match_team_win_conditions`
-- `patch_win_condition_metrics`
-- `summoner_profile_summary`
-- `summoner_champion_summary`
-- `summoner_champion_role_summary`
+- item slots and starting loadouts
+- champion role, guide, matchup, skill, ban, signature, and build-variant summaries
+- champion-page bundle cache
+- win-condition team rows and patch metrics
+- summoner identity, profile, champion, recent-match, and build summaries
 
-Historical compact metrics:
+Historical compact data includes:
 
+- `patch_snapshots`
 - `patch_build_metrics`
 - `patch_item_timing_metrics`
 - `patch_power_curve_metrics`
 - `patch_win_condition_metrics`
-- `patch_snapshots`
 
-Historical normalized app index:
+The normalized participant index remains after raw pruning because archived champion pages, tier lists, profiles, and matchup drilldowns still depend on it. It should be removed only after equivalent durable summaries exist for every app surface.
 
-- `participants`
-- `participant_matchups`
-- `participant_performance`
-
-This index is intentionally retained after raw pruning for now. It is far smaller than raw match/timeline payloads and keeps old patch pages, champion guides, tier lists, profiles, and matchup drilldowns alive. Only prune it after we add equivalent durable summary tables for every app surface.
-
-Operational/cache tables:
-
-- `collector_frontier`
-- `summoner_rank_snapshots`
-- `summoner_account_snapshots`
-- `riot_account_aliases`
-- `riot_request_events`
-
-`riot_request_events` already has a one-day TTL. Rank/account snapshots are caches and can be regenerated from Riot if needed, subject to rate limits.
+Operational caches such as frontier state, account aliases, and rank snapshots are regenerable. `riot_request_events` has a one-day TTL.
 
 ## Patch Retention
 
-Active collection should keep the current patch and most recent previous patch:
+Production normally collects the current and immediately previous patch:
 
 ```text
 COLLECTOR_CURRENT_PATCH=16.17
 COLLECTOR_PATCH_RETENTION_COUNT=2
 ```
 
-With those settings, the worker accepts `16.17` and `16.16`. When the current patch becomes `16.18`, update the env value and the window becomes `16.18` and `16.17`.
+The worker stops walking a PUUID's history when it reaches a patch outside that window. Advancing `COLLECTOR_CURRENT_PATCH` changes the ingestion boundary; it does not by itself prove that the departing patch was safely archived.
 
-The worker stops walking a PUUID's match history when it reaches a patch older than the active window. That saves request budget and avoids filling the database with stale matches.
-
-Only set this after confirming the old patch has been archived or backed up:
+Keep startup pruning disabled unless the rollover procedure has verified the archive:
 
 ```text
-COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true
+COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false
 ```
 
-Startup pruning is raw-only and requires patches to be marked `closed`. It should not be treated as a casual startup default on a production server; prefer running `patchctl -action archive` deliberately.
+The production `riotkey` helper performs bounded, resumable rollover maintenance before moving the patch boundary.
 
-## Closing A Patch
+## Archive and Prune
 
-When a patch is done:
+Compile a completed patch and prune its raw detail:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
+docker compose run --rm api \
+  /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
 ```
 
-The archive step writes compact metrics and app-facing summaries, then prunes raw/timeline detail by default. To do the compile/summary pass first and inspect counts before deleting raw rows:
+To compile first and retain raw rows for an inspection window:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 7 -prune-raw=false
+docker compose run --rm api \
+  /winrift-patchctl -action archive -patch 16.9 -platform ALL -queue 420 \
+  -retain-days 7 -prune-raw=false
 ```
 
-Then prune raw rows later:
+Prune the raw rows later:
 
 ```bash
-docker compose run --rm api /winrift-patchctl -action delete-raw -patch 16.9 -platform ALL -queue 420
+docker compose run --rm api \
+  /winrift-patchctl -action delete-raw -patch 16.9 -platform ALL -queue 420
 ```
 
-`platform = ALL` resolves the patch's stored platforms from ClickHouse. Single-platform compile/delete still exists for emergency or partial repairs.
+`platform=ALL` resolves the patch's stored platforms from ClickHouse. Single-platform operations remain available for partial repair.
 
 ## Disk Placement
 
-For the dev laptop, the default Docker named volume is fine:
+Use local SSD/NVMe storage for active ClickHouse writes. A NAS is better suited to backups and closed-patch exports than to primary database writes.
 
-```text
-clickhouse_data:/var/lib/clickhouse
-```
-
-For the home server, prefer this order:
-
-1. Local SSD/NVMe if enough space is available.
-2. Dedicated local HDD/SSD mounted at `/mnt/storage/clickhouse`.
-3. NAS as backup/archive storage.
-4. NAS as primary ClickHouse storage only if local disk is impossible and you accept slower, more fragile writes.
-
-ClickHouse is happier with local disk for active writes. The NAS is a better place for nightly compressed backups and closed-patch archives.
-
-The current laptop ClickHouse volume is about `56G`. Active ClickHouse parts are much smaller than that, so some of the volume is likely merge/temp/detached overhead from heavy ingest and restarts. Treat that as a warning: the server's mounted data SSD is about `119G`, which is enough for the initial migration but not enough for casual unbounded growth.
-
-## ClickHouse System Logs
-
-ClickHouse's own `system.*_log` tables can outgrow the actual WinRift dataset if left at defaults. On the production server this happened with `system.text_log`, `system.processors_profile_log`, `system.query_log`, and `system.part_log`.
-
-WinRift now ships bounded ClickHouse config in `ops/clickhouse/`:
-
-- `ops/clickhouse/config.d/winrift-system-logs.xml` keeps ClickHouse system log tables on a one-day TTL and lowers `text_log` to warning level.
-- `ops/clickhouse/users.d/winrift-query-logging.xml` disables per-query, query-view, query-thread, and processor-profile logging for the default profile.
-
-These tables are diagnostic history only. Clearing them does not delete Riot match data, normalized participants, build analytics, champion guides, profile summaries, or win-condition summaries.
-
-Useful storage check:
-
-```bash
-docker compose exec clickhouse clickhouse-client --query "
-  SELECT database, formatReadableSize(sum(bytes_on_disk)) AS active_size, sum(rows) AS rows
-  FROM system.parts
-  WHERE active
-  GROUP BY database
-  ORDER BY sum(bytes_on_disk) DESC"
-```
-
-If the system database is unexpectedly large, inspect table sizes:
-
-```bash
-docker compose exec clickhouse clickhouse-client --query "
-  SELECT database, table, formatReadableSize(sum(bytes_on_disk)) AS size, sum(rows) AS rows
-  FROM system.parts
-  WHERE active
-  GROUP BY database, table
-  ORDER BY sum(bytes_on_disk) DESC
-  LIMIT 30"
-```
-
-Use the production env value to move ClickHouse without changing app code:
+Production paths are configured rather than embedded in application code:
 
 ```text
 WINRIFT_CLICKHOUSE_DATA_DIR=/mnt/storage/clickhouse/data
+WINRIFT_CLICKHOUSE_HOT_DIR=/mnt/storage/clickhouse/hot
 WINRIFT_CLICKHOUSE_LOG_DIR=/mnt/storage/clickhouse/logs
 WINRIFT_CLICKHOUSE_BACKUP_DIR=/mnt/storage/clickhouse/backups
 ```
 
-## Backup Targets
+The production deployment workflow refuses to start ClickHouse when its storage mount guard is not satisfied, which prevents database files from silently filling the OS disk.
 
-Suggested server/NAS layout:
+## ClickHouse Diagnostics
 
-```text
-/mnt/storage/clickhouse/
-  data/
-  logs/
-  backups/
+ClickHouse system logs can outgrow application data if left unbounded. Configuration under `ops/clickhouse/`:
 
-/mnt/nas/winrift/
-  backups/
-  closed-patch-exports/
-  asset-cache/
-```
+- applies a one-day TTL to system log tables;
+- lowers `text_log` to warning level;
+- disables per-query, view, thread, processor-profile, and high-frequency query-metric logging for the application profile.
 
-Backups are for disaster recovery. Closed-patch exports are optional smaller artifacts we can generate later from compact metrics. Asset cache is for optional Data Dragon splash art caching and should stay outside git.
+These tables contain diagnostics, not Riot match data or WinRift read models. Production cleanup commands live in [Production Operations](../ops/prod/README.md).
 
-## Volume Backup
+## Backup and Restore
 
-First find the actual Compose volume name:
+Backups protect the database; closed-patch summaries limit how much must be restored. A backup target should be outside the active ClickHouse disk.
 
-```bash
-docker volume ls | grep clickhouse_data
-```
+For a simple cold backup:
 
-Then make a cold backup. This is the safest simple backup because ClickHouse is stopped while files are copied:
+1. stop the app stack;
+2. archive the resolved ClickHouse volume or host-path directory;
+3. copy the archive to the backup target;
+4. restart ClickHouse and the API;
+5. verify health and representative read endpoints before starting the worker.
 
-```bash
-make down
-docker run --rm \
-  -v winrift_clickhouse_data:/var/lib/clickhouse:ro \
-  -v /mnt/nas/winrift/backups:/backup \
-  alpine sh -c 'tar -czf /backup/clickhouse-$(date +%F-%H%M).tgz -C /var/lib/clickhouse .'
-make up
-```
+A restore drill follows the inverse order:
 
-Replace `winrift_clickhouse_data` with the real volume name from `docker volume ls`.
+1. stop the stack;
+2. preserve the existing data directory;
+3. restore into a clean ClickHouse path;
+4. start ClickHouse and the API only;
+5. verify table counts, patch metadata, and cached page endpoints;
+6. start the worker after the restored database is known good.
 
-For production, do this on a maintenance cadence or add a backup job that stops only the app stack long enough to capture a consistent archive.
+Do not combine an uncertain restore with new collector writes.
 
-## Restore Drill
-
-Restores should be practiced before relying on backups.
-
-High-level restore flow:
-
-1. Stop the stack with `make down`.
-2. Move the existing ClickHouse volume or host-path directory aside.
-3. Restore the backup into a clean ClickHouse data directory.
-4. Start ClickHouse and API with `make up`.
-5. Verify basic counts and read endpoints before starting the worker.
-
-Do not start the worker until the restored database has been checked. A restore problem should not be mixed with new collection writes.
-
-## What To Keep Long-Term
+## Long-Term Retention
 
 Keep indefinitely:
 
-- closed-patch compact metrics
-- app-facing summary tables
-- normalized app index until equivalent durable summaries exist
-- `patch_snapshots`
-- win-condition profile JSON and narrative docs
-- enough metadata to explain how a metric was produced
+- closed-patch compact metrics and app-facing summaries;
+- the normalized app index until fully replaced by durable summaries;
+- patch snapshots;
+- win-condition profile data and enough metadata to reproduce each metric.
 
-Keep only for active/current analysis:
+Keep only for active analysis:
 
-- raw matches and raw timelines
-- per-frame timeline rows
-- item/combat/objective event detail
-- raw champion ban rows
+- raw matches and timelines;
+- per-frame timeline rows;
+- item, skill, combat, and objective event detail;
+- raw champion-ban rows.
 
-This gives us trend history per patch without letting raw payloads grow forever.
-
-## Open Improvements
-
-- Add a formal ClickHouse migration command.
-- Add a production backup script once the server storage path is chosen.
-- Add a closed-patch export command for compact metric snapshots.
-- Add disk-usage dashboard queries to track raw, timeline, summary, and cache tables separately.
+This preserves patch history and portfolio-relevant analytics without allowing raw payload growth to become the storage strategy.

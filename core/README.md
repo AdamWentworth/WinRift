@@ -1,8 +1,8 @@
-# Core Service (Go) ⚙️
+# Core Service (Go)
 
 `core` contains WinRift's Go runtime: the private API, Riot collector worker, health monitor, ClickHouse schema, analytics read models, and patch archive tool.
 
-## ✨ Highlights
+## Highlights
 
 - Single Go module with separate `api`, `worker`, `monitor`, and `patchctl` binaries.
 - Riot API client with route/platform mapping, `Retry-After` handling, auth-failure tripwire, and request logging.
@@ -10,7 +10,7 @@
 - Collector frontier system for long-running match discovery without random API probing.
 - Precomputed read models for item slots, champion guides, win conditions, and summoner profiles.
 
-## 📦 Layout
+## Layout
 
 ```plaintext
 core/
@@ -31,7 +31,7 @@ core/
 └── testdata/         # Sanitized fixtures
 ```
 
-## 🔌 HTTP API
+## HTTP API
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -40,17 +40,31 @@ core/
 | `GET /api/account/alias` | Stored alias lookup |
 | `GET /api/account/aliases` | Stored alias autocomplete |
 | `GET /api/summoner/profile` | Stored summoner profile summary |
+| `GET /api/summoners/leaderboard` | Stored ranked-player index |
 | `GET /api/live-game` | Live match lookup and enrichment |
+| `GET /api/analytics/builds` | Build aggregate query |
 | `GET /api/analytics/champion-page` | Bundled champion guide payload |
 | `GET /api/analytics/champion-guides` | Champion guide index and tier-list input |
 | `GET /api/analytics/build-advice` | Champion-wide and matchup-specific build advice |
 | `GET /api/analytics/item-slots` | Item slot read model |
 | `POST /api/analytics/item-slots/batch` | Batch item slot lookup |
+| `GET /api/analytics/champion-roles` | Champion role distribution |
+| `GET /api/analytics/patches` | Current and archived analytics patches |
 | `POST /api/analytics/win-conditions` | Win-condition pairing metrics |
+| `GET /api/analytics/win-conditions/diagnostics` | Win-condition diagnostics |
+| `GET /api/analytics/win-conditions/validation` | Model validation report |
 | `GET /api/static/{kind}` | Data Dragon metadata |
 | `POST /api/dev/collector/seed` | Local/dev collection seed endpoint |
 
-## ⚙️ Environment Variables
+Development-only refresh routes rebuild item-slot, champion-guide, and summoner-profile read models. They are disabled outside development.
+
+## Riot Integration
+
+Player-facing identity uses Riot IDs (`gameName#tagLine`). Account-V1 resolves Riot IDs to PUUIDs; Match-V5 supplies match and timeline payloads; League-V4 supplies cached ranked snapshots; Spectator-V5 supplies active-game context. Platform and regional routing are centralized in `internal/riot`.
+
+The Riot client reads its key from the environment, never logs it, treats `404` as ordinary absence, and honors bounded `429 Retry-After` responses. A `401` or `403` writes the shared authentication marker: the worker stops, while the API remains available for cached, static, and analytics traffic and returns `503 RIOT_API_KEY_UNAVAILABLE` only for Riot-dependent endpoints.
+
+## Environment Variables
 
 ### Minimal Local `.env`
 
@@ -96,7 +110,7 @@ The collector patch is an explicit ingestion boundary rather than an automatic r
 | `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES` | `10` | Champion guide read-model refresh cadence. |
 | `WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES` | `15` | Win-condition read-model refresh cadence. |
 
-## 🚀 Local Run
+## Local Run
 
 Start ClickHouse from the repo root:
 
@@ -132,7 +146,7 @@ cd core
 go run ./cmd/patchctl -action archive -patch 16.9 -platform ALL -queue 420 -retain-days 0
 ```
 
-## 🧪 Testing
+## Testing
 
 ```bash
 cd core
@@ -141,7 +155,7 @@ go test ./...
 
 Tests use sanitized fixtures under `testdata/`. Do not reintroduce raw user/account payloads as fixtures.
 
-## 🔁 Collector Flow
+## Collector Flow
 
 ```mermaid
 flowchart LR
@@ -156,7 +170,7 @@ flowchart LR
 
 The worker discovers through real participants from stored ranked games. It does not guess IDs or brute-force Riot APIs.
 
-## 🗃️ ClickHouse Model
+## ClickHouse Model
 
 Core table groups:
 
@@ -168,7 +182,7 @@ Core table groups:
 
 The schema source of truth is [internal/clickhouse/schema.sql](internal/clickhouse/schema.sql).
 
-## 🔐 Safety Notes
+## Safety Notes
 
 - The API key is read from environment only.
 - API keys are not logged.

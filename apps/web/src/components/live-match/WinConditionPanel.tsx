@@ -439,5 +439,5 @@ function planPairRead(metric: WinConditionMetric) {
 }
 
 function ratingImageUrl(rating: string) {
-  return `/images/win_condition_ratings/${rating}.png`;
+  return `/images/win_condition_ratings/${rating}.webp`;
 }

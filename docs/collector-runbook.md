@@ -1,16 +1,33 @@
 # Collector Runbook
 
+This runbook covers collection, patch rollover, and failure recovery. Configuration defaults live in [`.env.example`](../.env.example); production-only paths and deployment values live in [`ops/prod/winrift.env.example`](../ops/prod/winrift.env.example). Those files are authoritative for environment keys.
+
 For server deployment and rollback, see [Production Operations](../ops/prod/README.md). For retention behavior, see [Storage Policy](storage-policy.md).
 
-## Start Infrastructure
+## Local Startup
+
+Start ClickHouse, the API, and the development web app:
 
 ```bash
 make up
 ```
 
-## Seed From API
+Run the worker only when collection is intentional:
 
-Call the dev-only endpoint while `ENVIRONMENT=development`:
+```bash
+make up-worker
+make logs-worker
+```
+
+The worker is profile-gated so ordinary UI development cannot silently consume Riot API budget. Pause it without stopping the API or ClickHouse:
+
+```bash
+make stop-worker
+```
+
+## Seed Collection
+
+In development, seed a Riot ID through the API:
 
 ```bash
 curl -X POST http://localhost:8000/api/dev/collector/seed \
@@ -22,221 +39,93 @@ curl -X POST http://localhost:8000/api/dev/collector/seed \
   }'
 ```
 
-This resolves seeds, inserts them into `collector_frontier`, immediately collects a small batch, and inserts discovered match participants back into the frontier.
+This resolves the account, inserts it into `collector_frontier`, collects a bounded batch, and adds discovered match participants back to the frontier. Use `"frontierOnly": true` to enqueue the seed without collecting immediately.
 
-Watch API-triggered collection live in another terminal:
+Worker startup can also read `COLLECTOR_SEED_RIOT_IDS`, `COLLECTOR_SEED_PUUIDS`, or a bounded Challenger ladder seed. Keep explicit seed and request counts small while using a Riot development key.
 
-```bash
-docker compose logs -f api
-```
+## Worker Cycle
 
-The logs show seed resolution, match id lookup, already-ingested skips, match/timeline fetches, normalization counts, inserts, and final request counters. Rank enrichment is handled by the worker's separate rank lane, not by API-triggered match insertion.
+Each sweep:
 
-Use `frontierOnly` when you want to seed without collecting immediately:
+1. selects due frontier rows by platform and priority;
+2. resolves recent Match-V5 IDs;
+3. fetches missing match and timeline payloads;
+4. writes raw payloads and normalized participant, matchup, item, skill, combat, and objective facts;
+5. returns discovered participants to the frontier;
+6. runs bounded rank and account-alias enrichment lanes;
+7. refreshes due analytics read models and summoner-profile summaries;
+8. records a heartbeat, refresh status, and regional request-budget events.
 
-```json
-{"riotIds": [{"gameName": "Example", "tagLine": "NA1", "platform": "NA1"}], "frontierOnly": true}
-```
+Live lookups can enqueue low-sample participants with `source='live-backfill'`. That improves later champion context without blocking the live response.
 
-## Seed Worker
+## Patch Window and Prewarming
 
-Set one or both in `.env`:
+`COLLECTOR_CURRENT_PATCH` is the explicit ingestion boundary. With the default retention count of two, a current value of `16.17` accepts `16.17` and `16.16`; older matches stop the frontier walk. Change the current patch only during an intentional rollover.
 
-```text
-COLLECTOR_SEED_RIOT_IDS=Example#NA1
-COLLECTOR_SEED_PUUIDS=
-COLLECTOR_PLATFORMS=NA1
-RIOT_MIN_REQUEST_INTERVAL_MS=75
-RIOT_RATE_LIMIT_MAX_RETRIES=3
-RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS=120
-RIOT_AUTH_FAILURE_EXIT=true
-RIOT_AUTH_FAILURE_MARKER_PATH=/run/winrift/riot-auth-failed
-COLLECTOR_INTERVAL_SECONDS=120
-COLLECTOR_CURRENT_PATCH=16.17
-COLLECTOR_PATCH_RETENTION_COUNT=2
-COLLECTOR_PRUNE_OLD_PATCHES_ON_START=false
-COLLECTOR_IDLE_SLEEP_SECONDS=15
-COLLECTOR_FRONTIER_BATCH_SIZE=3
-COLLECTOR_MAX_REQUESTS_PER_PASS=0
-COLLECTOR_RATE_LIMIT_REQUESTS=100
-COLLECTOR_RATE_LIMIT_WINDOW_SECONDS=120
-COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS=10
-COLLECTOR_RECHECK_HOURS=24
-COLLECTOR_DISCOVERY_DELAY_MINUTES=60
-COLLECTOR_AUTO_SEED_CHALLENGER=false
-COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM=3
-RANK_ENRICHMENT_ENABLED=false
-RANK_SNAPSHOT_TTL_HOURS=24
-RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
-ACCOUNT_ALIAS_ENRICHMENT_ENABLED=true
-ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS=3
-ITEM_SLOT_ANALYTICS_REFRESH_ENABLED=true
-ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES=10
-WIN_CONDITION_ANALYTICS_REFRESH_ENABLED=true
-WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES=15
-```
+Analytics refreshes do not consume Riot API budget. They read local ClickHouse data and rebuild compact item-slot, guide, win-condition, and profile summaries.
 
-Then run:
+Champion-page readiness has priority at worker startup:
 
-```bash
-make up-worker
-```
+- every canonical champion is warmed for the current patch;
+- champions without enough current-patch guide data receive a mature fallback;
+- every canonical champion is warmed for every selectable archived patch;
+- automatic-role and resolved-role aliases are stored;
+- changing retained patches are refreshed on schedule;
+- immutable archived bundles remain reusable for 30 days;
+- common retained-patch matchup bundles are warmed within a hard cap.
 
-For a detached worker, follow progress with:
+Worker readiness markers and the full champion/patch performance audit prevent a production deploy from completing while canonical pages are cold, incomplete, or slow.
 
-```bash
-make logs-worker
-```
+## Production Key Rotation and Rollover
 
-To pause only the collector and leave ClickHouse/API running:
-
-```bash
-make stop-worker
-```
-
-That is just a wrapper for:
-
-```bash
-docker compose --profile worker stop worker
-```
-
-## Full Shutdown
-
-Use this when putting the project down, especially before leaving the laptop unattended:
-
-```bash
-make down
-```
-
-This includes the `worker` Compose profile and removes orphan containers:
-
-```bash
-docker compose --profile worker down --remove-orphans
-```
-
-Do not use profile-less stop/down commands as the canonical shutdown path when the collector has been running. The worker is profile-gated, and leaving it out can leave a collector container alive while ClickHouse/API are stopped. Verify with:
-
-```bash
-make status
-```
-
-At startup, the worker resolves env seeds into `collector_frontier` and stores their Riot ID aliases. If `COLLECTOR_AUTO_SEED_CHALLENGER=true`, it also seeds each configured platform from that platform's Challenger Solo/Duo ladder. Each sweep walks `COLLECTOR_PLATFORMS`, pulls due frontier rows per platform, collects recent ranked matches, stores normalized rows, queues discovered participants, runs a separate rank lane for participants that lack a fresh rank snapshot, runs an account-alias lane for stored participant PUUIDs that do not yet have a saved `gameName#tagLine`, periodically refreshes current patch item-slot/champion-guide/win-condition read models, refreshes summoner profile summaries, and records Riot requests in a rolling regional budget ledger. Live lookups can also nudge low-sample live participants into `collector_frontier` with `source='live-backfill'`, letting champion-specific card stats improve in the background without blocking the lookup. It only sleeps when no useful work was done or when all regional budgets are temporarily full.
-
-Patch retention is intentionally tied to `COLLECTOR_CURRENT_PATCH`. For example, `COLLECTOR_CURRENT_PATCH=16.17` with `COLLECTOR_PATCH_RETENTION_COUNT=2` stores `16.17` and `16.16`; when it is bumped to `16.18`, the active window becomes `16.18` and `16.17`, so `16.16` is no longer eligible and can be pruned on startup if `COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true`.
-
-For broad multi-platform collection, use smaller per-platform budgets. For example:
-
-```text
-COLLECTOR_PLATFORMS=NA1,EUW1,EUN1,KR,BR1,LA1,LA2,JP1,OC1,TR1,RU,SG2,TW2,VN2
-COLLECTOR_CURRENT_PATCH=16.17
-COLLECTOR_PATCH_RETENTION_COUNT=2
-COLLECTOR_PRUNE_OLD_PATCHES_ON_START=true
-COLLECTOR_FRONTIER_BATCH_SIZE=1
-COLLECTOR_MAX_REQUESTS_PER_PASS=0
-RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS=5
-ACCOUNT_ALIAS_ENRICHMENT_ENABLED=true
-ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS=3
-COLLECTOR_AUTO_SEED_CHALLENGER=true
-```
-
-`PH2` and `TH2` are known Riot platform values, but their platform API hostnames did not resolve from the local Docker network during testing. Leave them out unless those hosts resolve in your environment.
-
-## Safety
-
-Keep match counts low on a development key. The client honors Riot 429 `Retry-After` with bounded retries, but large crawl seeds can still consume a daily development-key window quickly.
-
-If Riot returns 401 or 403, the process that saw it writes `RIOT_AUTH_FAILURE_MARKER_PATH`. The worker exits immediately. The API stays online, but Riot-dependent endpoints return `503 RIOT_API_KEY_UNAVAILABLE` and the Riot client short-circuits additional Riot calls while the marker exists. Cached analytics, static metadata, and health checks remain available. This prevents an expired or unauthorized development key from being retried every collector interval without making the whole app look dead. The frontier row is marked `blocked` when the failure happens during a collection pass.
-
-On the production server, use the installed refresh helper after getting a new Riot development key:
+After obtaining a new Riot development key, run on the production host:
 
 ```bash
 riotkey
 ```
 
-The helper prompts for the key with hidden input, shows a masked preview, and requires typing `YES` before it updates `/srv/winrift/.env`. After confirmation, it clears the auth marker, stops the monitor and worker for an intentional maintenance window, starts ClickHouse if needed, checks Data Dragon for the latest patch bucket, archives and prunes raw data that falls outside the new retention window, updates `COLLECTOR_CURRENT_PATCH` when the patch advanced, recreates the API, restarts the monitor, and starts the worker. Patch maintenance is resumable and retries until it succeeds; completed batches are detected in ClickHouse and skipped on every retry. Pressing Ctrl+C remains the explicit escape hatch, in which case the helper restores the monitor and leaves the worker stopped rather than collecting under a stale patch marker. If Riot briefly returns `401` while a refreshed development key propagates, the helper clears the marker and retries worker startup before failing. If `riotkey` is not on the interactive shell `PATH`, run `/srv/winrift/refresh-riot-key`. If you need to test only the env-file update path, pass `--no-restart` with a temporary `--env-file`; use `--show-key` only when a full-key preview is deliberately required. Use `--no-patch-rollover` only when you intentionally want to refresh the key without moving the collector to a newly published patch.
+The helper hides the entered key, displays only a masked preview, and requires explicit confirmation. It preserves the running immutable image, pauses worker/monitor activity, updates the server-local env file, checks Data Dragon for a newer patch, archives data outside the new retention window in bounded batches, recreates the API, and restarts monitoring and collection.
 
-Patch rollover maintenance is deliberately paced. Backfills walk source match IDs in 250-match batches, check destination completeness through the match-ID primary key, copy only missing normalized participant data, and restrict the remaining raw JSON work to those same bounded batches. The helper also runs `patchctl` with conservative ClickHouse query settings by default: `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_THREADS=2`, `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_MEMORY_MB=2304`, `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_OPEN_CONNS=2`, and `WINRIFT_PATCHCTL_CLICKHOUSE_MAX_EXECUTION_TIME_SECONDS=1800`. `patchctl` waits between archive phases when one-minute load is above `WINRIFT_PATCHCTL_MAX_LOAD_1M` (default: host CPU count) or available memory is below `WINRIFT_PATCHCTL_MIN_AVAILABLE_MEMORY_MB` (default: 1024). Tune these only if the server has more room or if maintenance needs to be even gentler.
+Useful exceptions:
 
-The worker also writes `MONITOR_WORKER_HEARTBEAT_PATH` on startup and after each sweep. The optional monitor container reads that heartbeat plus `/api/health`, the auth-failure marker, and, in production, the worker Docker container state. In production, keep `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` so a stopped worker sends an email instead of quietly falling behind. Unresolved alerts repeat after `MONITOR_ALERT_COOLDOWN_MINUTES`; failed SMTP deliveries retry after `MONITOR_ALERT_RETRY_MINUTES`. Stale heartbeat observations are logged but do not send email.
+- `refresh-riot-key --no-patch-rollover` performs a deliberate key-only refresh.
+- `refresh-riot-key --show-key` reveals the full key only when explicitly requested.
+- `refresh-riot-key --no-restart` is intended for isolated env-file tests.
 
-Riot 404s are different: they mean the requested resource is absent, such as an unknown Riot ID or a player not currently being in a live game. They do not write the auth-failure marker.
+Patch maintenance is resumable. Completed batches are detected and skipped on retry. If interrupted, the helper restores monitoring and leaves the worker stopped rather than collecting under an uncertain patch marker.
 
-If Riot returns 429, the client sleeps for `Retry-After` and retries up to `RIOT_RATE_LIMIT_MAX_RETRIES`. If Riot asks for a longer wait than `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`, the collector defers that region for the rest of the pass and resumes on the next cycle.
+## Failure Behavior
 
-Safety knobs:
+| Condition | Behavior |
+|---|---|
+| Riot `401` or `403` | Write the auth marker; stop the worker; keep cached/static/analytics API routes available. |
+| Riot `404` | Treat as ordinary absence, such as an unknown Riot ID or no active game. |
+| Riot `429` | Honor `Retry-After` within the configured ceiling; otherwise defer the region until a later cycle. |
+| Regional budget exhausted | Wait for that region's window while other regions or local refresh work may continue. |
+| Analytics refresh failure | Record the failure and keep the previous compiled snapshot readable. |
+| Missing or down worker | Monitor container state and heartbeat; alert only when the worker is configured as required. |
 
-- `COLLECTOR_FRONTIER_BATCH_SIZE`: max PUUIDs checked per worker pass.
-- `COLLECTOR_PLATFORMS`: comma-separated platform routing values to collect, such as `NA1,EUW1,KR`.
-- `RIOT_MIN_REQUEST_INTERVAL_MS`: process-local spacing between Riot requests. `75`ms stays under the `20 requests / 1 second` bucket.
-- `RIOT_RATE_LIMIT_MAX_RETRIES`: max immediate sleeps/retries for Riot 429 responses.
-- `RIOT_RATE_LIMIT_MAX_SLEEP_SECONDS`: longest 429 `Retry-After` sleep before deferring the region to the next collector cycle.
-- `RIOT_AUTH_FAILURE_EXIT`: when true, the worker stops when a Riot auth failure marker appears. The API does not exit; it reports Riot-backed endpoints as unavailable.
-- `RIOT_AUTH_FAILURE_MARKER_PATH`: shared marker file path used by API and worker to coordinate auth-failure behavior.
-- `MONITOR_WORKER_HEARTBEAT_PATH`: worker heartbeat JSON file used by the monitor.
-- `WORKER_REFRESH_STATUS_PATH`: worker-written JSON file with latest refresh start/success/failure times, durations, row/context counts, and last errors.
-- `MONITOR_WORKER_REQUIRED`: when true, missing heartbeat is an alert condition.
-- `MONITOR_WORKER_STALE_AFTER_MINUTES`: max heartbeat age before the monitor logs a stale-heartbeat observation.
-- `MONITOR_WORKER_CONTAINER_NAME`: optional Docker container name used by the monitor to detect that the collector worker is actually down.
-- `MONITOR_DOCKER_SOCKET_PATH`: Docker socket path used when `MONITOR_WORKER_CONTAINER_NAME` is set.
-- `MONITOR_STARTUP_GRACE_SECONDS`: short grace window after monitor startup before worker-down container checks send email.
-- `MONITOR_ALERT_COOLDOWN_MINUTES`: interval between successfully delivered reminders for an unresolved issue; production defaults to 24 hours.
-- `MONITOR_ALERT_RETRY_MINUTES`: interval before retrying an alert that the SMTP provider rejected or failed to deliver.
-- `ALERT_EMAIL_ENABLED`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TO`: SMTP email alert settings used by the monitor.
-- `COLLECTOR_INTERVAL_SECONDS`: two-minute budget window used for budget-exhausted frontier retry timing.
-- `COLLECTOR_CURRENT_PATCH`: current patch bucket, such as `16.17`. When set with the default two-patch retention window, the collector stores only the current patch and previous patch. The production `riotkey` helper advances this automatically when Data Dragon reports a newer patch.
-- `COLLECTOR_PATCH_RETENTION_COUNT`: number of same-season patch buckets to keep eligible for ingestion. With `COLLECTOR_CURRENT_PATCH=16.17` and `COLLECTOR_PATCH_RETENTION_COUNT=2`, the collector accepts `16.17` and `16.16`, then stops the current PUUID as soon as it sees `16.15` or older. When Riot moves to `16.18`, bump `COLLECTOR_CURRENT_PATCH` to `16.18` so the active window becomes `16.18` and `16.17`.
-- `COLLECTOR_PRUNE_OLD_PATCHES_ON_START`: when true, worker startup deletes ClickHouse rows from raw, normalized, timeline, live aggregate, and compiled metric tables for patches outside the active retention window. Keep this false anywhere you want to preserve old patch history.
-- `COLLECTOR_IDLE_SLEEP_SECONDS`: short pause when a sweep does no Riot work and no regional rate-limit wait is required.
-- `COLLECTOR_RATE_LIMIT_REQUESTS`: Riot application request bucket size for one region.
-- `COLLECTOR_RATE_LIMIT_WINDOW_SECONDS`: Riot application request bucket window.
-- `COLLECTOR_RATE_LIMIT_RESERVE_REQUESTS`: requests held back per region as safety headroom.
-- `COLLECTOR_MAX_REQUESTS_PER_PASS`: optional manual cap on match-history/match/timeline requests per platform. `0` means auto-calculate from the regional budget.
-- `COLLECTOR_AUTO_SEED_CHALLENGER`: seed each platform from its Challenger Solo/Duo ladder on worker startup.
-- `COLLECTOR_AUTO_SEED_LIMIT_PER_PLATFORM`: max Challenger ladder entries to seed per platform at startup.
-- `COLLECTOR_DISCOVERY_DELAY_MINUTES`: delay before newly discovered participants are eligible.
-- `COLLECTOR_RECHECK_HOURS`: delay before revisiting a checked PUUID.
-- `RANK_ENRICHMENT_ENABLED`: when true, the worker runs a separate rank lane after each platform's match lane.
-- `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS`: max rank lane requests per platform. These are subtracted from the same regional Riot request budget as match collection, but they are not spent inside individual match ingestion.
-- `RANK_SNAPSHOT_TTL_HOURS`: freshness window before a rank snapshot can be refreshed.
-- `ACCOUNT_ALIAS_ENRICHMENT_ENABLED`: when true, the worker runs a separate account-alias lane after the match/rank lanes. It resolves stored participant PUUIDs into Riot ID aliases and saves them in `riot_account_aliases` for tagless frontend lookup.
-- `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS`: max account-alias requests per platform. These are subtracted from the same regional Riot request budget as match collection.
-- `ITEM_SLOT_ANALYTICS_REFRESH_ENABLED`: when true, the analytics scheduler starts immediately after canonical champion-page startup warming and refreshes the current patch `item_slot_analytics` and `starting_loadout_analytics` summaries whenever the interval has elapsed. It no longer waits for a potentially long collector sweep before starting.
-- `ITEM_SLOT_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch item-slot and starting-loadout summary refreshes. This is ClickHouse work plus cached Data Dragon item metadata lookup, not Riot match/league API budget.
-- `CHAMPION_GUIDE_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes champion-guide read models, including champion skill paths, ban rates, build signatures, and alternative build variants.
-- `CHAMPION_GUIDE_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled champion-guide read-model refreshes. This is ClickHouse/local aggregation work, not Riot API budget.
-- `CHAMPION_PAGE_PREWARM_ENABLED`: when true, the worker stores ready-to-serve champion page bundles after champion-guide refreshes complete. Canonical champion pages and high-volume role pages are warmed for every selectable stored patch; common matchup pages are additionally warmed for the retained patch window.
-- `CHAMPION_PAGE_PREWARM_PER_ROLE`: number of indexed champion pages to prewarm per configured role. The default is intentionally broad so champion guide pages do not make the first visitor pay for cold bundle assembly.
-- `CHAMPION_PAGE_PREWARM_MIN_GAMES`: minimum role games required before a champion can be selected for prewarming.
-- `CHAMPION_PAGE_PREWARM_MATCHUPS_PER_CHAMPION`: number of common opponent-filtered champion page bundles to prewarm for each selected champion/role. This targets the otherwise slow first load after a user picks a matchup lens.
-- `CHAMPION_PAGE_PREWARM_MATCHUP_MIN_GAMES`: minimum exact matchup games required before an opponent bundle is prewarmed.
-- `CHAMPION_PAGE_PREWARM_MAX_MATCHUP_BUNDLES`: hard cap on exact matchup bundles per patch refresh. The default is `100`; keep this bounded so the worker does not spend the whole refresh cycle building obscure pages. Worker logs report `stored` for newly written bundles and `cached` for existing unexpired persistent bundles, so a high cached count is healthy reuse rather than failed prewarming.
-- `CHAMPION_PAGE_PREWARM_ROLES`: comma-separated roles to prewarm. Defaults to `TOP,JUNGLE,MIDDLE,BOTTOM,UTILITY`.
-- `CHAMPION_PAGE_PREWARM_RANK_BUCKET`: optional rank bucket for prewarmed pages. Leave blank for the all-ranks pages the frontend usually opens first.
+The worker heartbeat and refresh-status files are shared with the monitor. In production, `MONITOR_WORKER_REQUIRED=true` and `MONITOR_WORKER_CONTAINER_NAME=winrift_worker` distinguish an intentionally disabled worker from an unexpected stop.
 
-When champion-page prewarming is enabled, worker startup gives user-facing readiness priority over collection: it warms every canonical current-patch page, inspects those completed bundles, and warms the mature fallback only for champions whose current guide has no games. It then warms every canonical selectable archived-patch page once into the long-lived persistent cache and leaves a short readiness window for deployment certification before Riot collection begins. Scheduled guide refreshes rebuild role and common-matchup bundles only for the retained collector window because those are the only patches whose source data can change; worker-side page bodies are released between patches. Cold item/loadout fallbacks prune timeline scans to the selected champion's match IDs so a missing read-model partition cannot trigger a whole-history scan.
-- `WIN_CONDITION_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes the current patch `match_team_win_conditions` and `patch_win_condition_metrics` summaries at startup and then after collector sweeps when the interval has elapsed.
-- `WIN_CONDITION_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled current-patch win-condition summary refreshes. This is ClickHouse/local profile work, not Riot API budget. The default is longer than item slots because it rebuilds per-platform strategy metrics and then the combined `ALL` aggregate.
-- `SUMMONER_PROFILE_ANALYTICS_REFRESH_ENABLED`: when true, the worker refreshes compact summoner profile and champion-comfort summaries from retained participant rows.
-- `SUMMONER_PROFILE_ANALYTICS_REFRESH_INTERVAL_MINUTES`: minutes between scheduled summoner profile read-model refreshes. This is ClickHouse/local aggregation work, not Riot API budget.
+## Request Budget
 
-Rank enrichment is off by default. Turn it on only after basic match ingestion is working. When enabled, the rank lane chooses distinct participant PUUIDs from ClickHouse that do not already have a fresh `summoner_rank_snapshots` row, prioritizing players attached to the most `UNKNOWN` participant rows. Account-alias enrichment is on by default with a small cap because it improves the lookup UX and does not need to be refreshed often.
-
-## Request Formula
-
-For each region, the worker computes a usable cycle budget:
+For each region, usable requests per cycle are calculated as:
 
 ```text
-usable_region_requests = min(rate_limit_requests, rate_limit_requests * interval / rate_limit_window) - reserve_requests
+usable = min(bucket_size, bucket_size * cycle / bucket_window) - reserve
 ```
 
-With the local defaults, that is `100 * 120 / 120 - 10 = 90` Riot requests per region per rolling two-minute window. The worker splits currently available regional budget across active platforms in that region, reserves up to `RANK_ENRICHMENT_MAX_REQUESTS_PER_PASS` for the rank lane, then up to `ACCOUNT_ALIAS_MAX_REQUESTS_PER_PASS` for the alias lane, and gives the remainder to match collection. If a region spends all 90 requests in 30 seconds, it waits about 90 seconds for that region; if it spends them in 60 seconds, it waits about 60 seconds.
+With the default 100-request, 120-second bucket and a 10-request reserve, the worker can use 90 requests per region per window. A frontier row costs one match-ID request plus two requests for each new match: one match payload and one timeline payload. Rank and alias enrichment are separately capped but share the same regional budget.
 
-Match collection costs `1 + (2 * matches)` requests per frontier row: one match-id lookup, then one match payload and one timeline payload per new ranked match. Rank enrichment costs one request per rank candidate and account-alias enrichment costs one request per PUUID alias candidate. Both are capped separately and subtracted from the same regional request budget, so they can steadily improve metadata coverage without turning every collected match into a burst of extra Riot calls.
+The reserve protects interactive account and live-game requests. Do not increase collector throughput merely because a short test pass succeeds; sustained Riot limits and daily development-key behavior are the real constraints.
 
-Live champion stat backfill is controlled by:
+## Shutdown
 
-- `LIVE_BACKFILL_ENABLED`: enables queueing low-sample live participants into the collector frontier.
-- `LIVE_BACKFILL_MIN_CHAMPION_GAMES`: minimum collected games on the current champion before no backfill is queued.
-- `LIVE_BACKFILL_MAX_SEEDS`: max frontier nudges per live lookup.
-- `LIVE_BACKFILL_PRIORITY`: frontier priority for live backfill nudges.
-- `LIVE_BACKFILL_DELAY_SECONDS`: optional delay before the backfill row is due.
+Use the canonical shutdown path after collection:
+
+```bash
+make down
+make status
+```
+
+`make down` includes the worker and monitor profiles and removes orphan containers. Avoid profile-less `docker compose down` as the normal path after running the collector, because it can leave a profile-gated worker behind.

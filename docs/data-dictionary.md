@@ -29,6 +29,14 @@ Cached ranked metadata keyed by `platform`, `puuid`, and `queue_type`.
 
 Important columns: tier, division, league points, wins, losses, rank bucket, fetched time, and expiry time. Current ingestion uses `RANKED_SOLO_5x5` snapshots for participant `rank_bucket` when rank enrichment is enabled. Unranked players are cached as `UNRANKED` so they are not repeatedly queried.
 
+## `riot_account_aliases`
+
+Normalized Riot ID lookup rows keyed by platform, normalized game name, tag line, and PUUID. The alias enrichment lane updates last-seen and compile timestamps so tagless autocomplete and stored-profile lookup do not require a Riot request.
+
+## `summoner_account_snapshots`
+
+Expiring Summoner-V4 account metadata keyed by platform and PUUID. It stores summoner/account ids, profile icon, level, fetch time, and expiry time for profile identity reads.
+
 ## `summoner_identity_summary`
 
 Read model for summoner-facing identity fields.
@@ -69,6 +77,10 @@ One row per platform, queue, PUUID, champion, role, final/core item signatures, 
 
 Short-lived persisted JSON cache for exact champion-page API requests. The API also keeps these payloads in memory, but this table lets warmed pages remain fast across API restarts until the cache expiry.
 
+## `riot_request_events`
+
+Rolling regional Riot request-budget ledger. Rows contain route, source, request count, and event time and expire after one day. Collector, rank, alias, account, and live requests share this ledger when enforcing regional budgets.
+
 ## `team_kill_summary`
 
 Current read model for team kill totals.
@@ -86,6 +98,10 @@ One row per patch, platform, queue, champion, and role. It stores games and comp
 Current read model for champion guide headers, tier-list rows, and champion ranking data.
 
 One row per patch, queue, champion, role, and rank bucket. It stores wins, games, performance sums, and summed kill-participation contribution. The API turns these into winrate, confidence, pick rate, impact score, and role rank without scanning participant rows during normal champion-page or tier-list loads.
+
+## `champion_guide_scope_analytics`
+
+Comparison population for one patch, platform, queue, role, and rank bucket. Participant and match counts supply sample-relative pick presence and stable role-ranking denominators without rescanning participant rows.
 
 ## `champion_matchup_analytics`
 
@@ -223,6 +239,10 @@ Stored event types: `ITEM_PURCHASED`, `ITEM_SOLD`, `ITEM_DESTROYED`, and `ITEM_U
 
 Important columns: timestamp, participant, item id, before id, and after id.
 
+## `timeline_skill_events`
+
+One row per `SKILL_LEVEL_UP` timeline event. It stores the participant, skill slot, level-up order, level-up type, and timestamp. Champion skill paths and build-family-specific skill orders compile from these rows.
+
 ## `timeline_combat_events`
 
 One row per `CHAMPION_KILL`.
@@ -236,6 +256,18 @@ One row per major map/objective event.
 Stored event types: `ELITE_MONSTER_KILL`, `BUILDING_KILL`, and `TURRET_PLATE_DESTROYED`.
 
 Important columns: timestamp, killer, team, monster type/subtype, building type, tower type, lane type, and map position.
+
+## `champion_bans`
+
+One row per champion ban in a stored draft. It records match, team, champion, pick turn, patch, platform, and queue and provides the raw sample for champion ban summaries.
+
+## `champion_skill_analytics`
+
+Compiled skill-order signatures keyed by patch, platform, queue, champion, role, and rank bucket. Guide responses read wins and games from this table before considering retained timeline data.
+
+## `champion_ban_analytics`
+
+Compiled champion ban counts keyed by patch, platform, queue, and champion. Ban rates are explicitly sample-relative: bans divided by stored ranked matches for the selected scope.
 
 ## `build_analytics_mv`
 

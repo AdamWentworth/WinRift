@@ -69,44 +69,17 @@ Champion guide and tier-list rankings use strict role buckets. This does not exc
 
 These stats are still correlations, not isolated champion power. Better champions attract better players, some champions farm more because of role/function, and losing teams naturally have worse damage/economy/vision. The score is useful for ranking stored performance patterns, but it should stay labeled as WinRift's internal read rather than objective truth.
 
-## Follow-Up Notes
+## Validation Boundaries
 
-The current tier-list pass is good enough for MVP, but it should be revisited after the stored corpus is much larger.
+The score is reviewed against larger samples and across patches rather than treated as a permanent formula. The highest-value validation questions are:
 
-Things that feel solid:
+- whether the `S+` threshold remains calibrated as role samples grow;
+- whether role weights produce stable, credible ordering across patches;
+- whether final totals should be replaced by per-minute or share-of-team signals;
+- whether matchup strength, lane state, composition, and one-trick concentration materially change the ordering;
+- whether ban pressure needs a cap or transformation to separate competitive respect from frustration.
 
-- strict role buckets for champion rankings, while still letting flex champions count in the role they actually played
-- S+ as a score threshold instead of a fixed quota
-- sample-shrunk winrate plus Wilson confidence, so tiny hot samples do not dominate
-- lower ban-rate weight, because ban rate can reflect frustration or popularity as much as champion strength
-- top-lane durability pressure as part of impact, especially damage taken/mitigated while not dying
-
-Things to validate later:
-
-- Whether `tierScore >= 59` remains the right S+ display threshold once each role has far more games.
-- Whether the current role weights produce sensible leaderboards by role across multiple patches.
-- Whether durable top-lane pressure is over- or under-valued compared with splitpush pressure, lane leads, and objective pressure.
-- Whether impact should use per-minute fields everywhere instead of final totals.
-- Whether low-pick one-trick champions need a mastery-bias caveat or a separate niche-strength label.
-- Whether ban rate should be capped, log-scaled, or split into "respect ban" versus "annoyance ban" once we have more context.
-- Whether matchup-adjusted winrate should become the main rank signal instead of global role winrate.
-
-Future improvement:
-
-- Validate the role weights against larger samples and adjust by patch.
-- Consider per-minute normalization for short games versus long games.
-- Add lane matchup difficulty and team-composition context.
-- Consider separate early/mid/late impact scores from timeline snapshots.
-- Consider pick-ban presence by rank and region once the sample is large enough.
-
-Other signals worth considering later:
-
-- matchup-adjusted winrate, so champions are not rewarded only for farming favorable pairings
-- damage share and gold share, not just raw damage/gold
-- objective participation by team context, especially for junglers and roam supports
-- death timing, since one late death can matter more than three low-stakes early deaths
-- lane-dominance proxies from 10/15 minute gold, XP, CS, and damage deltas
-- player-mastery bias, since niche champions often have higher one-trick concentration
+Any future signal must improve held-out or cross-patch behavior before it receives user-facing weight. More inputs are not automatically a better ranking.
 
 ## Product Language
 
