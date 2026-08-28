@@ -17,8 +17,6 @@ __pycache__/
 .env.*
 !.env.example
 
-legacy/data/lol_data.db
-legacy/data/lol_data/
 *.pyc
 *.db
 *.sqlite
@@ -26,6 +24,4 @@ legacy/data/lol_data/
 *.dump
 *.backup
 *.psd
-data/lol_data/
-data/dumps/
 backups/

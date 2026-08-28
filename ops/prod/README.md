@@ -1,8 +1,8 @@
-# WinRift Production Ops 🚀
+# WinRift Production Operations
 
 `ops/prod` contains the private server deployment shape for WinRift. It runs the production web app, API, ClickHouse, collector worker, and monitor on the home server while preserving a separate laptop Vite workflow for development.
 
-## 📦 What Runs
+## Services
 
 | Service | Purpose | Notes |
 |---------|---------|-------|
@@ -12,9 +12,9 @@
 | `winrift_worker` | Riot collector worker | Auth failures remain stopped; unexpected failures receive three bounded restart attempts. |
 | `winrift_monitor` | Health and alert monitor | Watches API health, Riot auth marker, and worker heartbeat. |
 
-The server-hosted frontend listens on private-LAN port `8082` by default. Ports `80` and `443` remain available to the host's existing reverse proxy, which can later map a hostname to WinRift without changing the application container.
+The server-hosted frontend listens on private-LAN port `8082` by default and proxies `/api` to the internal API container.
 
-## 🗂️ Runtime State
+## Runtime State
 
 ```plaintext
 /srv/winrift/
@@ -39,9 +39,9 @@ ClickHouse system diagnostics are intentionally bounded by `ops/clickhouse` conf
 - `text_log` is warning-level,
 - ClickHouse system log tables use a one-day TTL.
 
-This protects the small storage SSD from internal ClickHouse logs growing larger than the WinRift dataset.
+This prevents ClickHouse diagnostics from growing without relation to the WinRift dataset.
 
-## 🧰 Server Bootstrap
+## Server Bootstrap
 
 Run once on the server:
 
@@ -59,7 +59,7 @@ editor /srv/winrift/.env
 
 Set the real Riot key, ClickHouse password, current patch, platform list, and storage paths.
 
-## ⚙️ Important Environment
+## Important Environment
 
 | Key | Purpose |
 |-----|---------|
@@ -85,7 +85,7 @@ Set the real Riot key, ClickHouse password, current patch, platform list, and st
 | `ALERT_EMAIL_ENABLED` | Enables SMTP email alerts for auth failure or down worker state. |
 | `SMTP_TO` | Comma-separated alert recipient list. |
 
-## 🌐 Production Web And Laptop Development
+## Production Web and Laptop Development
 
 Open the deployed private-LAN application at:
 
@@ -104,13 +104,13 @@ VITE_API_URL=http://SERVER_LAN_IP:8000 npm run dev
 
 This lets the server keep collecting and serving data while the laptop only runs the frontend dev server.
 
-## 🔁 Deployment Flow
+## Deployment Flow
 
 Core production deploys use the latest published core image by default. Normal flow is: push to GitHub, wait for Core CI to publish `ghcr.io/adamwentworth/winrift-core:latest`, then run `deploy-core-prod` with `image_ref` left blank. Pinned `sha-<commit>` images still exist for audit/rollback work, but day-to-day deploys should follow `latest`.
 
 Web production deploys follow the same immutable-image model. Web CI tests and builds the frontend, scans the source and container, uploads an SBOM, and publishes `ghcr.io/adamwentworth/winrift-web:sha-<commit>`. Run `deploy-web-prod` with that exact image when certifying a release. The workflow installs the current Compose file, deploys with automatic rollback, verifies health/API proxy/deep-route/cache behavior, and runs the strict Playwright route gate against the deployed site.
 
-After the API, monitor, and optional worker are recreated, the deploy workflow runs a post-deploy smoke pass. It verifies container state, `/api/health`, leaderboard/profile cache-hit behavior, and the worker refresh-status JSON when present. With the worker enabled, startup first prewarms every canonical current-patch champion page plus the mature-fallback pages for champions whose current guide is empty, then prewarms every canonical page for every selectable archived patch. The API bulk-hydrates all of those canonical bundles from the persistent cache into its own in-process cache, refreshes changing retained patches every 30 minutes, and keeps stable archived patches resident for the process lifetime. Deployment waits for every worker readiness marker and the all-patch API memory-hydration marker, then strictly audits every champion and selectable patch combination at a 500 ms default ceiling. A deploy fails if any page is uncached, incomplete, slow, or unable to provide a mature fallback when current-patch guide data is empty.
+After recreating the API, monitor, and optional worker, deployment verifies container state, `/api/health`, cached profile reads, and worker refresh status. Worker startup prewarms canonical current and archived champion pages, supplies mature fallback where the current guide is empty, and hydrates the API's in-process cache from persistent bundles. Deployment then audits every champion and selectable patch at a 500 ms default ceiling. Uncached, incomplete, slow, or missing-fallback pages fail the deployment.
 
 The production host also uses `docker-image-retention.timer` to keep deployment images from filling the OS disk. Once a week it checks root filesystem usage. If usage is at least 65%, it removes images that are older than seven days and are not referenced by any container. Running and stopped containers, volumes, and build caches are left alone.
 
@@ -136,7 +136,7 @@ flowchart LR
   Worker -->|false| Idle[API + DB only]
 ```
 
-## 🧭 Common Commands
+## Common Commands
 
 Refresh the daily Riot development key:
 
@@ -144,7 +144,7 @@ Refresh the daily Riot development key:
 riotkey
 ```
 
-Paste the new key when prompted. The helper hides the input, shows a masked preview, and requires typing `YES` before it updates `/srv/winrift/.env`. Before it recreates anything, it resolves and preserves the exact immutable core image from the running API or the last successful deployment record, so a key refresh cannot silently replace a tested deployment with the floating `latest` tag. After confirmation, it clears the auth-failure marker, stops the monitor and worker for an intentional maintenance window, starts ClickHouse if needed, checks Data Dragon for a newer patch, archives and prunes raw data outside the new retention window with bounded batches and conservative ClickHouse query caps, updates `COLLECTOR_CURRENT_PATCH` when needed, recreates the API, restarts the monitor, and starts the worker. Rollover maintenance retries until it succeeds and skips batches already completed by an earlier attempt. If Riot briefly returns `401` while a refreshed development key propagates, the helper clears the marker and retries worker startup before failing. If the shortcut is not on the interactive shell `PATH`, use `/srv/winrift/refresh-riot-key`. Use `refresh-riot-key --show-key` only when you deliberately want the full key visible, or `refresh-riot-key --no-patch-rollover` when you intentionally want a key-only refresh.
+The helper hides the key, requires confirmation, preserves the deployed immutable image, performs bounded patch rollover when needed, recreates the API, and restores monitoring and collection. It is resumable and skips completed maintenance batches. Use `/srv/winrift/refresh-riot-key` when the shortcut is unavailable, `--no-patch-rollover` for a deliberate key-only refresh, and `--show-key` only when full-key display is intentional.
 
 The deploy workflow installs both `/srv/winrift/refresh-riot-key` and the short `riotkey` wrapper automatically. To install them manually on the server before the next deploy:
 
@@ -231,7 +231,7 @@ cd /srv/winrift
 docker compose --profile worker --env-file /srv/winrift/.env stop worker
 ```
 
-## 🗃️ Archive An Old Patch
+## Archive an Old Patch
 
 After a Riot patch rolls over and the collector window moves on, archive the old patch before pruning:
 
@@ -243,7 +243,7 @@ docker compose --env-file /srv/winrift/.env run --rm api \
 
 This keeps app summaries and the small normalized lookup index, while deleting bulky raw/timeline payloads.
 
-## 🔐 Safety Notes
+## Safety Notes
 
 - Keep `/srv/winrift/.env` server-local and uncommitted.
 - Keep `winrift_worker` on `restart: "no"`.

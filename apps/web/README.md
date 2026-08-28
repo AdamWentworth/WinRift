@@ -1,8 +1,8 @@
-# WinRift Web App 🖥️
+# WinRift Web App
 
 `apps/web` is the Vite + React + TypeScript frontend for WinRift. It is built as a single-page app with lightweight route parsing, TanStack Query data fetching, and a League-styled analytics UI.
 
-## ✨ Highlights
+## Highlights
 
 - Universal homepage lookup for champions and Riot IDs.
 - Live match page with mode rail: match overview, focused builds, and win conditions.
@@ -11,7 +11,7 @@
 - Summoner profile pages with ranked summary, champion history, recent games, and build usage.
 - Global animated splash-art background system with champion-scoped art on guide pages.
 
-## 📦 Layout
+## Layout
 
 ```plaintext
 apps/web/
@@ -21,7 +21,7 @@ apps/web/
 │   ├── components/live-match/
 │   │                  # Live-match mode panels and card components
 │   ├── lib/           # Routing, role icons, static-data helpers, tier helpers
-│   ├── styles/        # Main app stylesheet
+│   ├── styles/        # Modular page and component styles
 │   └── main.tsx       # React entrypoint
 ├── index.html
 ├── Caddyfile           # Production SPA server and same-origin API proxy
@@ -30,11 +30,11 @@ apps/web/
 └── Dockerfile
 ```
 
-## 🚀 Local Run
+## Local Run
 
 ```bash
 cd apps/web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -65,7 +65,7 @@ For a private server setup:
 VITE_API_URL=http://SERVER_LAN_IP:8000
 ```
 
-## ⚙️ Environment
+## Environment
 
 | Key | Purpose |
 |-----|---------|
@@ -75,7 +75,7 @@ No Riot key belongs in frontend environment variables. All Riot requests go thro
 
 Production builds default to same-origin API calls. The Caddy image serves the compiled SPA, proxies `/api/*` to the internal `api:8000` service, and preserves React deep routes through an `index.html` fallback.
 
-## 🧭 App Routes
+## App Routes
 
 | Route | Purpose |
 |-------|---------|
@@ -83,12 +83,15 @@ Production builds default to same-origin API calls. The Caddy image serves the c
 | `/champions` | Alphabetical champion directory |
 | `/champions/:champion` | Champion guide page |
 | `/tier-list` | Role-aware champion ranking |
+| `/win-conditions` | Composition-strategy directory |
+| `/teamfight`, `/splitpush`, `/pick`, `/siege`, `/control` | Win-condition detail pages |
+| `/flex` | Flexible champion-archetype reference |
 | `/summoners` | Summoner lookup shell |
-| `/summoners/:platform/:riotId` | Summoner profile, with live-game state when available |
+| `/summoners/:platform/:gameName/:tagLine` | Summoner profile, with live-game state when available |
 
-The app uses browser history directly instead of a router package. Route helpers live in [src/lib/lookup.ts](src/lib/lookup.ts).
+The app uses browser history directly instead of a router package. Route parsing and path generation live in [src/lib/appRouting.ts](src/lib/appRouting.ts); Riot ID path helpers live in [src/lib/lookup.ts](src/lib/lookup.ts).
 
-## 🔌 API Dependencies
+## API Dependencies
 
 The main API calls are:
 
@@ -98,14 +101,16 @@ The main API calls are:
 - `GET /api/static/summoner-spells`
 - `GET /api/live-game`
 - `GET /api/summoner/profile`
+- `GET /api/summoners/leaderboard`
 - `GET /api/analytics/champion-page`
 - `GET /api/analytics/champion-guides`
 - `GET /api/analytics/build-advice`
+- `GET /api/analytics/patches`
 - `POST /api/analytics/win-conditions`
 
 The frontend expects the backend to serve precomputed analytics. Heavy winrate/build aggregation should not happen in browser code.
 
-## 🧪 Testing
+## Testing
 
 ```bash
 cd apps/web
@@ -115,7 +120,7 @@ npm run build
 
 Tests are written with Vitest and React Testing Library. Build validation runs TypeScript first, then Vite.
 
-## 🎬 Demo Media Capture
+## Demo Media Capture
 
 ```bash
 cd apps/web
@@ -130,7 +135,7 @@ Default output:
 - 8 videos: desktop and mobile for champion discovery, tier list, summoner profile, and live match analysis.
 - `manifest.json` listing the generated media paths.
 
-## 🎨 UI Notes
+## UI Notes
 
 - Use the global background stage rather than page-specific decorative backgrounds.
 - Champion guide backgrounds should scope splash art to the active champion when possible.
@@ -138,7 +143,7 @@ Default output:
 - Build advice should distinguish exact matchup samples from champion-wide fallback data.
 - Text should stay concise; dense analytics panels should favor clear labels and tables over explanatory paragraphs.
 
-## 🔐 Safety Notes
+## Safety Notes
 
 - Do not expose API keys in client code.
 - Live game views should present contextual stats, not direct real-time commands.

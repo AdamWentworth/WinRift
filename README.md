@@ -12,11 +12,11 @@ The source is public for hiring and technical review. WinRift is not open source
 
 | Universal lookup | Champion guide |
 |---|---|
-| ![WinRift universal lookup homepage](docs/assets/screenshots/homepage.png) | ![WinRift champion guide page](docs/assets/screenshots/champion-guide.png) |
+| ![WinRift universal lookup homepage](docs/assets/screenshots/homepage.webp) | ![WinRift champion guide page](docs/assets/screenshots/champion-guide.webp) |
 
 | Live match scout |
 |---|
-| ![WinRift live match analysis page](docs/assets/screenshots/live-match.png) |
+| ![WinRift live match analysis page](docs/assets/screenshots/live-match.webp) |
 
 - **Champion guides:** role- and patch-aware builds, runes, spells, skill orders, matchups, and build variants.
 - **Focused matchup builds:** compare champion-wide item patterns with what performs into a selected opponent.
@@ -80,13 +80,12 @@ See [Performance Guardrails](docs/product/performance-guardrails.md).
 apps/web/       React frontend, Caddy image, and browser timing tests
 core/           Go API, collector, monitor, patch tool, and analytics services
 ops/prod/       Private-server Compose, deployment helpers, and operator tests
-docs/           Curated architecture, analytics, data, and operations references
+docs/           Curated analytics, data, quality, and operations references
 .github/        CI, security scanning, performance, and deployment workflows
 ```
 
 Selected references:
 
-- [Architecture](docs/architecture.md)
 - [Data Dictionary](docs/data-dictionary.md)
 - [Collector Runbook](docs/collector-runbook.md)
 - [Production Operations](ops/prod/README.md)
@@ -95,7 +94,7 @@ Selected references:
 - [Analytics Philosophy](docs/product/analytics-philosophy.md)
 - [Win-Condition Validation](docs/product/win-condition-validation.md)
 
-## Owner Verification
+## Quality Gates
 
 ```bash
 cd core
