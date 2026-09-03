@@ -97,7 +97,7 @@ WINRIFT_CLICKHOUSE_LOG_DIR=/mnt/storage/clickhouse/logs
 WINRIFT_CLICKHOUSE_BACKUP_DIR=/mnt/storage/clickhouse/backups
 ```
 
-The production deployment workflow refuses to start ClickHouse when its storage mount guard is not satisfied, which prevents database files from silently filling the OS disk.
+The private HomeOps deployment workflow refuses to start ClickHouse when its storage mount guard is not satisfied, which prevents database files from silently filling the OS disk.
 
 ## ClickHouse Diagnostics
 

@@ -1,6 +1,6 @@
 # WinRift Production Operations
 
-`ops/prod` contains the private server deployment shape for WinRift. It runs the production web app, API, ClickHouse, collector worker, and monitor on the home server while preserving a separate laptop Vite workflow for development.
+`ops/prod` documents WinRift's production contract and retains owner maintenance tools. GitHub-hosted WinRift CI publishes immutable images; the separate private HomeOps repository owns the production runner, fixed Compose model, deployment scripts, health gates, and rollback authority. Public-repository workflow code never executes on the home server.
 
 ## Services
 
@@ -106,11 +106,13 @@ This lets the server keep collecting and serving data while the laptop only runs
 
 ## Deployment Flow
 
-Core production deploys use the latest published core image by default. Normal flow is: push to GitHub, wait for Core CI to publish `ghcr.io/adamwentworth/winrift-core:latest`, then run `deploy-core-prod` with `image_ref` left blank. Pinned `sha-<commit>` images still exist for audit/rollback work, but day-to-day deploys should follow `latest`.
+Core and web CI run entirely on GitHub-hosted runners. After verification and container scanning, each pipeline publishes a private `sha-<commit>` GHCR image carrying an OCI revision label and the component's deployment-verification assets. Production never deploys `latest`.
 
-Web production deploys follow the same immutable-image model. Web CI tests and builds the frontend, scans the source and container, uploads an SBOM, and publishes `ghcr.io/adamwentworth/winrift-web:sha-<commit>`. Run `deploy-web-prod` with that exact image when certifying a release. The workflow installs the current Compose file, deploys with automatic rollback, verifies health/API proxy/deep-route/cache behavior, and runs the strict Playwright route gate against the deployed site.
+When automatic dispatch is enabled, the successful component pipeline sends only the allowlisted repository identity, full `master` SHA, and component name to HomeOps. HomeOps independently confirms that SHA is the current WinRift `master`, pulls the corresponding private image, verifies its embedded revision, resolves its repository digest, and serializes the deployment on the private production runner. Manual deployments use the same HomeOps workflow and validation path.
 
-After recreating the API, monitor, and optional worker, deployment verifies container state, `/api/health`, cached profile reads, and worker refresh status. Worker startup prewarms canonical current and archived champion pages, supplies mature fallback where the current guide is empty, and hydrates the API's in-process cache from persistent bundles. Deployment then audits every champion and selectable patch at a 500 ms default ceiling. Uncached, incomplete, slow, or missing-fallback pages fail the deployment.
+Core deployment keeps collection quiet during API replacement, restores the monitor and optional worker, waits for current and archived champion-page prewarming, and audits every champion/selectable-patch response at a 500 ms ceiling. Web deployment verifies container health, same-origin API proxying, deep routes, immutable asset caching, and strict browser route budgets. Either component rolls back to its previous digest if any deployment gate fails.
+
+The WinRift repository variable `HOMEOPS_AUTO_DEPLOY=true` enables dispatch only after `HOMEOPS_DISPATCH_TOKEN` is configured with narrowly scoped permission to create dispatches in HomeOps. HomeOps must also have GitHub Actions read access to the private `winrift-core` and `winrift-web` packages. Until those controls are configured, CI still publishes immutable images and production deployment remains manually available from HomeOps.
 
 The production host also uses `docker-image-retention.timer` to keep deployment images from filling the OS disk. Once a week it checks root filesystem usage. If usage is at least 65%, it removes images that are older than seven days and are not referenced by any container. Running and stopped containers, volumes, and build caches are left alone.
 
@@ -126,9 +128,11 @@ sudo systemctl enable --now docker-image-retention.timer
 
 ```mermaid
 flowchart LR
-  Push[Push to GitHub] --> CI[Core CI]
-  CI --> Image[Build GHCR core image]
-  Image --> Deploy[Self-hosted runner deploy]
+  Push[Push to WinRift master] --> CI[GitHub-hosted CI]
+  CI --> Image[Immutable SHA image]
+  Image --> Dispatch[Allowlisted dispatch]
+  Dispatch --> HomeOps[Private HomeOps workflow]
+  HomeOps --> Deploy[Private production runner]
   Deploy --> Compose[Server Docker Compose]
   Compose --> API[API up]
   Compose --> Worker{start_worker?}
@@ -146,7 +150,7 @@ riotkey
 
 The helper hides the key, requires confirmation, preserves the deployed immutable image, performs bounded patch rollover when needed, recreates the API, and restores monitoring and collection. It is resumable and skips completed maintenance batches. Use `/srv/winrift/refresh-riot-key` when the shortcut is unavailable, `--no-patch-rollover` for a deliberate key-only refresh, and `--show-key` only when full-key display is intentional.
 
-The deploy workflow installs both `/srv/winrift/refresh-riot-key` and the short `riotkey` wrapper automatically. To install them manually on the server before the next deploy:
+The key-rotation helper remains server-local during the HomeOps migration. To install or refresh it manually:
 
 ```bash
 install -m 0644 ops/prod/docker-compose.yml /srv/winrift/docker-compose.yml
