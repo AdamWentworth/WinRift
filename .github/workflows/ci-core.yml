@@ -9,7 +9,6 @@ on:
       - "ops/clickhouse/**"
       - "ops/prod/**"
       - ".github/workflows/ci-core.yml"
-      - ".github/workflows/deploy-core-prod.yml"
       - ".dockerignore"
   workflow_dispatch: {}
 
@@ -80,7 +79,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build Container Image
-        run: docker build --pull -t winrift-core:ci-${{ github.sha }} -f core/Dockerfile .
+        run: |
+          docker build --pull \
+            --build-arg "WINRIFT_BUILD_SHA=${GITHUB_SHA}" \
+            -t "winrift-core:ci-${GITHUB_SHA}" \
+            -f core/Dockerfile \
+            .
+
+      - name: Verify Image Identity And Deployment Assets
+        run: |
+          set -euo pipefail
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "winrift-core:ci-${GITHUB_SHA}")
+          [[ "${revision}" == "${GITHUB_SHA}" ]]
+          container=$(docker create "winrift-core:ci-${GITHUB_SHA}")
+          trap 'docker rm "${container}" >/dev/null 2>&1 || true' EXIT
+          docker cp "${container}:/usr/share/winrift/deployment/schema.sql" /tmp/winrift-schema.sql
+          docker cp "${container}:/usr/share/winrift/deployment/champion-page-perf-audit.py" /tmp/champion-page-perf-audit.py
+          docker cp "${container}:/usr/share/winrift/deployment/perf-smoke.sh" /tmp/perf-smoke.sh
+          [[ -s /tmp/winrift-schema.sql ]]
+          python3 -m py_compile /tmp/champion-page-perf-audit.py
+          bash -n /tmp/perf-smoke.sh
 
       - name: Validate Production Compose
         run: |
@@ -159,3 +177,34 @@ jobs:
       - name: GHCR Push Skipped
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "GHCR push skipped for pull request builds."
+
+  request-production-deployment:
+    name: Request private HomeOps core deployment
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.HOMEOPS_AUTO_DEPLOY == 'true'
+    needs: core-container-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Dispatch approved revision to HomeOps
+        env:
+          HOMEOPS_DISPATCH_TOKEN: ${{ secrets.HOMEOPS_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HOMEOPS_DISPATCH_TOKEN}" ]]; then
+            echo "HOMEOPS_DISPATCH_TOKEN is not configured." >&2
+            exit 1
+          fi
+          payload=$(jq -n \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            '{event_type:"deploy-winrift-core",client_payload:{repository:$repository,sha:$sha,component:"core"}}')
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${HOMEOPS_DISPATCH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/AdamWentworth/HomeOps/dispatches \
+            --data "${payload}"

@@ -103,8 +103,8 @@ Strict mode fails on route-readiness or request-count regressions. Results are w
 
 ## Deployment Enforcement
 
-- `deploy-core-prod` waits for startup prewarm completion and runs the full champion/patch audit.
-- `deploy-web-prod` verifies health, same-origin API proxying, deep routes, cache behavior, and strict Playwright route timing.
+- Private HomeOps core deployment waits for startup prewarm completion and runs the full champion/patch audit extracted from the approved core image.
+- Private HomeOps web deployment verifies health, same-origin API proxying, deep routes, cache behavior, and the strict Playwright route gate extracted from the approved web image.
 - Normal CI runs Go tests/vet, frontend tests/build, CodeQL, container vulnerability scans, and SBOM generation.
 
 ## Current Production Baseline

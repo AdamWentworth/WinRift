@@ -12,11 +12,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/winrift-api ./cmd/api \
 
 FROM gcr.io/distroless/static-debian12
 
+ARG WINRIFT_BUILD_SHA=development
+
 WORKDIR /
+LABEL org.opencontainers.image.source="https://github.com/AdamWentworth/WinRift" \
+      org.opencontainers.image.revision="${WINRIFT_BUILD_SHA}"
 COPY --from=build /out/winrift-api /winrift-api
 COPY --from=build /out/winrift-worker /winrift-worker
 COPY --from=build /out/winrift-monitor /winrift-monitor
 COPY --from=build /out/winrift-patchctl /winrift-patchctl
+COPY core/internal/clickhouse/schema.sql /usr/share/winrift/deployment/schema.sql
+COPY ops/prod/champion-page-perf-audit.py /usr/share/winrift/deployment/champion-page-perf-audit.py
+COPY ops/perf-smoke.sh /usr/share/winrift/deployment/perf-smoke.sh
 
 EXPOSE 8000
 CMD ["/winrift-api"]

@@ -7,9 +7,7 @@ on:
     paths:
       - "apps/web/**"
       - ".github/workflows/ci-web.yml"
-      - ".github/workflows/deploy-web-prod.yml"
       - "ops/prod/docker-compose.yml"
-      - "ops/prod/deploy-image-utils.sh"
       - ".dockerignore"
   workflow_dispatch: {}
 
@@ -67,7 +65,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build Production Web Image
-        run: docker build --pull -t winrift-web:ci-${{ github.sha }} -f apps/web/Dockerfile .
+        run: |
+          docker build --pull \
+            --build-arg "WINRIFT_BUILD_SHA=${GITHUB_SHA}" \
+            -t "winrift-web:ci-${GITHUB_SHA}" \
+            -f apps/web/Dockerfile \
+            .
+
+      - name: Verify Image Identity And Route Gate
+        run: |
+          set -euo pipefail
+          revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "winrift-web:ci-${GITHUB_SHA}")
+          [[ "${revision}" == "${GITHUB_SHA}" ]]
+          container=$(docker create "winrift-web:ci-${GITHUB_SHA}")
+          gate_dir=$(mktemp -d)
+          trap 'docker rm "${container}" >/dev/null 2>&1 || true; find "${gate_dir}" -depth -delete' EXIT
+          docker cp "${container}:/usr/share/winrift/deployment/route-perf/." "${gate_dir}/"
+          for file in package.json package-lock.json playwright.config.ts tests/perf/route-performance.spec.ts; do
+            [[ -s "${gate_dir}/${file}" ]]
+          done
 
       - name: Validate Production Web Container
         shell: bash
@@ -163,3 +179,34 @@ jobs:
       - name: GHCR Push Skipped
         if: ${{ github.event_name == 'pull_request' }}
         run: echo "GHCR push skipped for pull request builds."
+
+  request-production-deployment:
+    name: Request private HomeOps web deployment
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && vars.HOMEOPS_AUTO_DEPLOY == 'true'
+    needs: web-container-security
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Dispatch approved revision to HomeOps
+        env:
+          HOMEOPS_DISPATCH_TOKEN: ${{ secrets.HOMEOPS_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HOMEOPS_DISPATCH_TOKEN}" ]]; then
+            echo "HOMEOPS_DISPATCH_TOKEN is not configured." >&2
+            exit 1
+          fi
+          payload=$(jq -n \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            '{event_type:"deploy-winrift-web",client_payload:{repository:$repository,sha:$sha,component:"web"}}')
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${HOMEOPS_DISPATCH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/AdamWentworth/HomeOps/dispatches \
+            --data "${payload}"

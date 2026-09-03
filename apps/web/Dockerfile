@@ -37,13 +37,19 @@ RUN go mod download all \
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
+ARG WINRIFT_BUILD_SHA=development
+
 ENV XDG_CONFIG_HOME=/tmp/caddy-config \
     XDG_DATA_HOME=/tmp/caddy-data
 
+LABEL org.opencontainers.image.source="https://github.com/AdamWentworth/WinRift" \
+      org.opencontainers.image.revision="${WINRIFT_BUILD_SHA}"
 COPY apps/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/dist /srv
 COPY --from=caddy-build /out/caddy /usr/bin/caddy
 COPY --from=caddy-build /out/healthcheck /healthcheck
+COPY apps/web/package.json apps/web/package-lock.json apps/web/playwright.config.ts /usr/share/winrift/deployment/route-perf/
+COPY apps/web/tests/perf/route-performance.spec.ts /usr/share/winrift/deployment/route-perf/tests/perf/route-performance.spec.ts
 
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=4 \

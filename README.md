@@ -42,8 +42,8 @@ The source is public for hiring and technical review. WinRift is not open source
 | API | Go `net/http` services with typed handlers and response caching |
 | Collection | Riot-aware Go worker with regional budgets, backoff, frontier scheduling, and rank/alias enrichment |
 | Analytics | ClickHouse raw retention, normalized tables, compiled read models, and persistent page bundles |
-| Operations | Docker Compose, private GHCR packages, GitHub Actions, health checks, rollback metadata, and SMTP monitoring |
-| Deployment | Private home-server web, API, collector, monitor, and ClickHouse stack |
+| Operations | Docker Compose, private GHCR packages, health checks, rollback metadata, and SMTP monitoring |
+| Deployment | GitHub-hosted CI publishes immutable images; private HomeOps controls the home-server production runner |
 
 ```mermaid
 flowchart LR
@@ -90,7 +90,7 @@ apps/web/       React frontend, Caddy image, and browser timing tests
 core/           Go API, collector, monitor, patch tool, and analytics services
 ops/prod/       Private-server Compose, deployment helpers, and operator tests
 docs/           Curated analytics, data, quality, and operations references
-.github/        CI, security scanning, performance, and deployment workflows
+.github/        GitHub-hosted CI, security scanning, and HomeOps deployment dispatch
 ```
 
 Selected references:
