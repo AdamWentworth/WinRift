@@ -19,13 +19,13 @@ The source is public for hiring and technical review. WinRift is not open source
 
 ## Product
 
-| Universal lookup | Champion guide |
+| Champion discovery and guides | Tier list |
 |---|---|
-| ![WinRift universal lookup homepage](docs/assets/screenshots/homepage.webp) | ![WinRift champion guide page](docs/assets/screenshots/champion-guide.webp) |
+| ![WinRift champion discovery and guide demo](docs/assets/demos/winrift-champion-discovery-desktop.gif) | ![WinRift tier list demo](docs/assets/demos/winrift-tier-list-desktop.gif) |
 
-| Live match scout |
-|---|
-| ![WinRift live match analysis page](docs/assets/screenshots/live-match.webp) |
+| Summoner profiles | Live match scout |
+|---|---|
+| ![WinRift summoner profile demo](docs/assets/demos/winrift-summoner-profile-desktop.gif) | ![WinRift live match analysis demo](docs/assets/demos/winrift-live-match-analysis-desktop.gif) |
 
 - **Champion guides:** role- and patch-aware builds, runes, spells, skill orders, matchups, and build variants.
 - **Focused matchup builds:** compare champion-wide item patterns with what performs into a selected opponent.
