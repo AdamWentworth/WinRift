@@ -15,7 +15,7 @@
 
 WinRift is a solo portfolio application designed, built, deployed, and operated by **Adam Wentworth**. It turns Riot match and timeline data into fast, matchup-aware champion guides, live-game context, summoner profiles, tier lists, and team win-condition analysis.
 
-The source is public for hiring and technical review. WinRift is not open source, does not accept outside contributions, and grants no permission to run, reuse, redistribute, deploy, or derive work from the code. See [LICENSE](LICENSE).
+Original source code and text documentation are licensed under the [Apache License 2.0](LICENSE). WinRift does not currently accept outside contributions. Riot-owned assets, data, and trademarks are excluded; see [NOTICE.md](NOTICE.md).
 
 ## Product
 
@@ -133,6 +133,6 @@ python3 ops/prod/champion-page-perf-audit.py \
 
 ## Ownership
 
-Copyright © 2026 Adam Wentworth. All rights reserved.
+Copyright © 2026 Adam Wentworth. Original source code is licensed under the Apache License 2.0.
 
 Riot Games owns the names, trademarks, artwork, and Data Dragon material referenced by the project. WinRift is not endorsed by Riot Games. See [NOTICE.md](NOTICE.md).
