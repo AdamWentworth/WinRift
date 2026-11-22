@@ -23,7 +23,7 @@ ARG VITE_API_URL=""
 ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
-FROM golang:1.26.7 AS caddy-build
+FROM golang:1.26.11 AS caddy-build
 
 WORKDIR /src
 COPY apps/web/caddy/go.mod /src/go.mod
