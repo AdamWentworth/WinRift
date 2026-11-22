@@ -150,6 +150,18 @@ riotkey
 
 The helper hides the key, requires confirmation, preserves the deployed immutable image, performs bounded patch rollover when needed, recreates the API, and restores monitoring and collection. It is resumable and skips completed maintenance batches. Use `/srv/winrift/refresh-riot-key` when the shortcut is unavailable, `--no-patch-rollover` for a deliberate key-only refresh, and `--show-key` only when full-key display is intentional.
 
+### Riot Key Updater App
+
+From a WinRift clone on Windows, run `python ops/prod/riot-key-app.py`. On Linux or macOS, run `python3 ops/prod/riot-key-app.py`. The app needs Python 3.8 or later with Tkinter and the OpenSSH client. Use an existing SSH key or agent for an account that can run the server's key updater.
+
+1. Enter the server’s full IP address, its short machine name, and your SSH username. Use **Verify and save server** to check the machine’s identity and save the target on this computer. If SSH has never trusted that address, verify the server’s host key through your usual SSH setup first.
+2. Paste a fresh key into the hidden field. For a collector that needs to move to the latest game patch, select **Advance to the latest patch and archive older data**.
+3. Select **Update Riot key** and confirm the displayed machine name and IP address. Leave the app open until it reports the result. The server helper restarts the WinRift API and collector.
+
+The app saves only the server details in `.winrift/riot-key-target.json` in your home directory. The key travels over SSH and the server stores it in its existing WinRift environment file.
+
+### Terminal Launcher
+
 From a trusted clone, use the launcher with Python 3 and the OpenSSH client. Replace `winrift-prod` with a trusted SSH alias or `user@host` for the WinRift server. Use an account that can run the existing server helper, and verify the server's host key when setting up SSH access.
 
 ```powershell

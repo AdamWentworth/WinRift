@@ -86,7 +86,7 @@ riotkey
 
 The helper hides the entered key, displays only a masked preview, and requires explicit confirmation. It preserves the running immutable image, pauses worker/monitor activity, updates the server-local env file, checks Data Dragon for a newer patch, archives data outside the new retention window in bounded batches, recreates the API, and restarts monitoring and collection.
 
-From another machine with a trusted clone and SSH access, use the [Riot key launcher](../ops/prod/README.md#common-commands). Pass `--rollover` to match the server command's patch behavior.
+From another machine with a WinRift clone and SSH access, use the [Riot key updater app](../ops/prod/README.md#riot-key-updater-app). Enable the latest-patch option to match the server command's patch behavior. The [terminal launcher](../ops/prod/README.md#terminal-launcher) offers the same option as `--rollover`.
 
 Useful exceptions:
 
