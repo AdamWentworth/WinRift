@@ -33,44 +33,65 @@ class RiotKeyClientTests(unittest.TestCase):
             self.assertEqual(list(path.parent.iterdir()), [path])
 
     def test_wrong_server_is_rejected_before_sending_key(self):
-        with patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, "wrong-host\n", "")) as run:
+        result = subprocess.CompletedProcess([], 0, "wrong-host\n", "")
+        with patch("subprocess.run", return_value=result), patch("subprocess.Popen") as open_ssh:
             with self.assertRaisesRegex(UpdaterError, "did not identify itself"):
                 client["update_key"](TARGET, TEST_KEY)
-        run.assert_called_once()
-        self.assertNotIn("input", run.call_args.kwargs)
+        open_ssh.assert_not_called()
 
     def test_untrusted_server_is_rejected_before_sending_key(self):
         result = subprocess.CompletedProcess([], 255, "", "Host key verification failed.")
-        with patch("subprocess.run", return_value=result) as run:
+        with patch("subprocess.run", return_value=result), patch("subprocess.Popen") as open_ssh:
             with self.assertRaisesRegex(UpdaterError, "could not verify"):
                 client["update_key"](TARGET, TEST_KEY)
-        run.assert_called_once()
-        self.assertNotIn("input", run.call_args.kwargs)
+        open_ssh.assert_not_called()
 
     def test_key_is_delivered_on_stdin_after_host_verification(self):
+        verified = subprocess.CompletedProcess([], 0, "winrift-host\n", "")
         for rollover in (False, True):
-            responses = [
-                subprocess.CompletedProcess([], 0, "winrift-host\n", ""),
-                subprocess.CompletedProcess([], 0, "Riot key refresh complete.\n", ""),
-            ]
-            with self.subTest(rollover=rollover), patch("subprocess.run", side_effect=responses) as run:
-                client["update_key"](TARGET, TEST_KEY, rollover=rollover)
-                check, update = run.call_args_list
-                self.assertEqual(check.kwargs["stdin"], subprocess.DEVNULL)
-                args = update.args[0]
+            with self.subTest(rollover=rollover), patch("subprocess.run", return_value=verified) as check:
+                with patch("subprocess.Popen") as open_ssh:
+                    process = open_ssh.return_value
+                    process.stdout = iter(["Riot key refresh complete.\n"])
+                    process.wait.return_value = 0
+                    client["update_key"](TARGET, TEST_KEY, rollover=rollover)
+                self.assertEqual(check.call_args.kwargs["stdin"], subprocess.DEVNULL)
+                args = open_ssh.call_args.args[0]
                 self.assertEqual(args[-4:-1], ["-l", "operator", "192.0.2.77"])
                 self.assertIn("StrictHostKeyChecking=yes", args)
                 self.assertIn("hostname -s", args[-1])
                 self.assertIn("--stdin --yes", args[-1])
                 self.assertEqual("--no-patch-rollover" in args[-1], not rollover)
                 self.assertNotIn(TEST_KEY, " ".join(args))
-                self.assertEqual(update.kwargs["input"], TEST_KEY + "\n")
+                self.assertEqual(open_ssh.call_args.kwargs["stdin"], subprocess.PIPE)
+                self.assertEqual(open_ssh.call_args.kwargs["stderr"], subprocess.STDOUT)
+                process.stdin.write.assert_called_once_with(TEST_KEY + "\n")
 
-    def test_helper_output_is_not_exposed_on_failure(self):
-        responses = [
-            subprocess.CompletedProcess([], 0, "winrift-host\n", ""),
-            subprocess.CompletedProcess([], 1, "", TEST_KEY),
-        ]
-        with patch("subprocess.run", side_effect=responses), self.assertRaises(UpdaterError) as error:
-            client["update_key"](TARGET, TEST_KEY)
+    def test_streams_redacted_output_before_waiting_for_exit(self):
+        verified = subprocess.CompletedProcess([], 0, "winrift-host\n", "")
+        with patch("subprocess.run", return_value=verified), patch("subprocess.Popen") as open_ssh:
+            process = open_ssh.return_value
+            process.stdout = iter([
+                "\x1b[32mRestarting API\x1b[0m\n",
+                f"Riot key {TEST_KEY} rejected. Previous: RGAPI-another-key-for-tests\n",
+            ])
+            process.wait.return_value = 1
+            logs = []
+
+            def record(line):
+                process.wait.assert_not_called()
+                logs.append(line)
+
+            with self.assertRaises(UpdaterError) as error:
+                client["update_key"](TARGET, TEST_KEY, on_output=record)
+        self.assertEqual(logs, ["Restarting API\n", "Riot key [Riot key hidden] rejected. Previous: [Riot key hidden]\n"])
         self.assertNotIn(TEST_KEY, str(error.exception))
+
+    def test_ssh_exit_without_confirmation_is_not_success(self):
+        verified = subprocess.CompletedProcess([], 0, "winrift-host\n", "")
+        with patch("subprocess.run", return_value=verified), patch("subprocess.Popen") as open_ssh:
+            process = open_ssh.return_value
+            process.stdout = iter(["Restarting API\n"])
+            process.wait.return_value = 0
+            with self.assertRaisesRegex(UpdaterError, "didn’t finish"):
+                client["update_key"](TARGET, TEST_KEY)

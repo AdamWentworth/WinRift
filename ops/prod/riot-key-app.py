@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from queue import Empty, SimpleQueue
 import tkinter as tk
 from tkinter import font, messagebox, ttk
 
@@ -15,6 +16,7 @@ MUTED = "#a9c5ce"
 ACCENT = "#5385ff"
 ERROR = "#ffa6a6"
 SUCCESS = "#9ddcb9"
+LOG_LINES = 2000
 APP_DIR = Path(__file__).resolve().parent
 ICON = APP_DIR / "winrift-icon.png"
 if not ICON.is_file():
@@ -25,6 +27,7 @@ class KeyUpdater:
     def __init__(self, root):
         self.root = root
         self.executor = ThreadPoolExecutor(max_workers=1)
+        self.output = SimpleQueue()
         self.pending = None
         self.verified = None
         self.address = tk.StringVar(master=root)
@@ -73,6 +76,21 @@ class KeyUpdater:
             key_panel, text="Update Riot key", style="Accent.TButton", command=self.update,
         )
         self.update_button.grid(row=3, column=0, sticky="e")
+
+        activity = self.panel(frame, "Update log")
+        activity.pack_configure(fill="both", expand=True)
+        activity.columnconfigure(0, weight=1)
+        activity.rowconfigure(1, weight=1)
+        self.log = tk.Text(
+            activity, height=8, width=44, wrap="word", state="disabled", font="TkFixedFont",
+            background=BACKGROUND, foreground=TEXT, selectbackground="#365caa", selectforeground=TEXT,
+            highlightbackground=BORDER, highlightcolor=ACCENT, highlightthickness=1, borderwidth=0, padx=8, pady=8,
+        )
+        scrollbar = ttk.Scrollbar(activity, orient="vertical", command=self.log.yview)
+        self.log.configure(yscrollcommand=scrollbar.set)
+        self.log.grid(row=1, column=0, sticky="nsew")
+        scrollbar.grid(row=1, column=1, sticky="ns", padx=(4, 0))
+        self.write_log("Server output appears here during a key update.\n")
         self.status_label = ttk.Label(frame, textvariable=self.status, foreground=MUTED, wraplength=500)
         self.status_label.pack(fill="x", pady=(2, 0))
         self.status_label.bind("<Configure>", lambda event: self.status_label.configure(wraplength=event.width))
@@ -138,6 +156,19 @@ class KeyUpdater:
         self.status.set(text)
         self.status_label.configure(foreground=color)
 
+    def write_log(self, text, *, clear=False):
+        follow = clear or self.log.yview()[1] >= 0.999
+        self.log.configure(state="normal")
+        if clear:
+            self.log.delete("1.0", "end")
+        self.log.insert("end", text)
+        lines = int(self.log.index("end-1c").split(".")[0])
+        if lines > LOG_LINES:
+            self.log.delete("1.0", f"{lines - LOG_LINES + 1}.0")
+        self.log.configure(state="disabled")
+        if follow:
+            self.log.see("end")
+
     def target_changed(self, *_):
         self.verified = None
         self.set_status("Verify these server details before updating the key.")
@@ -188,9 +219,10 @@ class KeyUpdater:
         if not messagebox.askyesno("Confirm key update", details, default=messagebox.NO, parent=self.root):
             return
         self.key.set("")
+        self.write_log(f"Starting a key update on {target.hostname}.\n", clear=True)
         self.start_task(
             f"Updating WinRift on {target.hostname}. Leave this window open until it finishes.",
-            lambda: update_key(target, key, rollover=rollover),
+            lambda: update_key(target, key, rollover=rollover, on_output=self.output.put),
             lambda: self.set_status(f"Riot key updated on {target.hostname}. WinRift’s collector restarted.", SUCCESS),
         )
 
@@ -201,7 +233,15 @@ class KeyUpdater:
         self.root.after(80, self.finish_task, on_success)
 
     def finish_task(self, on_success):
-        if not self.pending.done():
+        lines = []
+        for _ in range(200):
+            try:
+                lines.append(self.output.get_nowait())
+            except Empty:
+                break
+        if lines:
+            self.write_log("".join(lines))
+        if not self.pending.done() or not self.output.empty():
             self.root.after(80, self.finish_task, on_success)
             return
         try:

@@ -10,6 +10,13 @@ from pathlib import Path
 
 SETTINGS_PATH = Path.home() / ".winrift" / "riot-key-target.json"
 HELPER = "/srv/winrift/refresh-riot-key"
+SSH_PROCESS_OPTIONS = {
+    "encoding": "utf-8",
+    "errors": "replace",
+    "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
+}
+TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+RIOT_KEY_IN_OUTPUT = re.compile(r"RGAPI-[A-Za-z0-9_.-]+", re.IGNORECASE)
 
 
 class UpdaterError(Exception):
@@ -70,17 +77,19 @@ def validate_key(key):
     return key
 
 
-def run_ssh(target, command, *, key=None):
-    args = [
+def ssh_command(target, command):
+    return [
         "ssh", "-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
         "-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3",
         "-o", "ClearAllForwardings=yes", "-a", "-x", "-l", target.username, target.address, command,
     ]
-    input_options = {"stdin": subprocess.DEVNULL, "timeout": 15} if key is None else {"input": key + "\n"}
+
+
+def run_ssh(target, command):
     try:
         return subprocess.run(
-            args, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), **input_options,
+            ssh_command(target, command), stdin=subprocess.DEVNULL, capture_output=True,
+            check=False, timeout=15, **SSH_PROCESS_OPTIONS,
         )
     except FileNotFoundError:
         raise UpdaterError("Install the OpenSSH client and make sure ssh is on PATH.") from None
@@ -107,17 +116,40 @@ def verify_target(target):
         raise UpdaterError("The server could not verify the WinRift key updater.")
 
 
-def update_key(target, key, *, rollover=False):
+def update_key(target, key, *, rollover=False, on_output=None):
     key = validate_key(key)
     verify_target(target)
     expected_host = shlex.quote(target.hostname)
     command = f'[ "$(hostname -s)" = {expected_host} ] || exit 73; exec {HELPER} --stdin --yes'
     if not rollover:
         command += " --no-patch-rollover"
-    result = run_ssh(target, command, key=key)
-    if result.returncode == 73:
+    completed = False
+    try:
+        process = subprocess.Popen(
+            ssh_command(target, command), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, **SSH_PROCESS_OPTIONS,
+        )
+    except OSError:
+        raise UpdaterError("The app couldn’t start SSH. Check your OpenSSH installation.") from None
+    with process:
+        try:
+            with process.stdin:
+                process.stdin.write(key + "\n")
+        except BrokenPipeError:
+            # SSH can exit before it reads the key. Read its output and exit code.
+            pass
+        for line in process.stdout:
+            line = TERMINAL_ESCAPE.sub("", line)
+            if line.rstrip() == "Riot key refresh complete.":
+                completed = True
+            if on_output is not None:
+                line = line.replace(key, "[Riot key hidden]")
+                on_output(RIOT_KEY_IN_OUTPUT.sub("[Riot key hidden]", line))
+        status = process.wait()
+
+    if status == 73:
         raise UpdaterError("The server’s machine name changed. Verify the target again before retrying.")
-    if result.returncode == 255:
+    if status == 255:
         raise UpdaterError("SSH disconnected during the update. Check WinRift on the server before retrying.")
-    if result.returncode or "Riot key refresh complete." not in result.stdout.splitlines():
+    if status or not completed:
         raise UpdaterError("The server didn’t finish the update. Check WinRift and the Riot key before retrying.")

@@ -158,7 +158,7 @@ On Linux or macOS, run `python3 ops/prod/riot-key-app.py` from a clone. The app 
 
 1. Enter the server’s full IP address, its short machine name, and your SSH username. Use **Verify and save server** to check the machine’s identity and save the target on this computer. If SSH has never trusted that address, verify the server’s host key through your usual SSH setup first.
 2. Paste a fresh key into the hidden field. For a collector that needs to move to the latest game patch, select **Advance to the latest patch and archive older data**.
-3. Select **Update Riot key** and confirm the displayed machine name and IP address. Leave the app open until it reports the result. The server helper restarts the WinRift API and collector.
+3. Select **Update Riot key** and confirm the displayed machine name and IP address. Watch the **Update log** for server restarts, patch progress, and errors. The log hides Riot keys and keeps the latest output visible until you start another update or close the app.
 
 The app saves only the server details in `.winrift/riot-key-target.json` in your home directory. The key travels over SSH and the server stores it in its existing WinRift environment file.
 
