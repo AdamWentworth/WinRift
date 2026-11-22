@@ -150,6 +150,18 @@ riotkey
 
 The helper hides the key, requires confirmation, preserves the deployed immutable image, performs bounded patch rollover when needed, recreates the API, and restores monitoring and collection. It is resumable and skips completed maintenance batches. Use `/srv/winrift/refresh-riot-key` when the shortcut is unavailable, `--no-patch-rollover` for a deliberate key-only refresh, and `--show-key` only when full-key display is intentional.
 
+From a trusted clone, use the launcher with Python 3 and the OpenSSH client. Replace `winrift-prod` with a trusted SSH alias or `user@host` for the WinRift server. Use an account that can run the existing server helper, and verify the server's host key when setting up SSH access.
+
+```powershell
+python ops/prod/riot-key.py winrift-prod
+```
+
+```bash
+python3 ops/prod/riot-key.py winrift-prod
+```
+
+Paste the new key at the hidden prompt and type `YES` to confirm. The launcher defaults to a key-only refresh. Add `--rollover` to also check for a newer patch and archive data outside the retention window, as the server's `riotkey` command does by default.
+
 The key-rotation helper remains server-local during the HomeOps migration. To install or refresh it manually:
 
 ```bash
