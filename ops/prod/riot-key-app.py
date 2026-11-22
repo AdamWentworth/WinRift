@@ -15,7 +15,10 @@ MUTED = "#a9c5ce"
 ACCENT = "#5385ff"
 ERROR = "#ffa6a6"
 SUCCESS = "#9ddcb9"
-ICON = Path(__file__).resolve().parents[2] / "apps/web/public/images/brand/winrift-icon.png"
+APP_DIR = Path(__file__).resolve().parent
+ICON = APP_DIR / "winrift-icon.png"
+if not ICON.is_file():
+    ICON = APP_DIR.parents[1] / "apps/web/public/images/brand/winrift-icon.png"
 
 
 class KeyUpdater:

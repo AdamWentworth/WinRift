@@ -152,7 +152,9 @@ The helper hides the key, requires confirmation, preserves the deployed immutabl
 
 ### Riot Key Updater App
 
-From a WinRift clone on Windows, run `python ops/prod/riot-key-app.py`. On Linux or macOS, run `python3 ops/prod/riot-key-app.py`. The app needs Python 3.8 or later with Tkinter and the OpenSSH client. Use an existing SSH key or agent for an account that can run the server's key updater.
+On Windows, run `./ops/prod/install-riot-key-app.ps1` once in PowerShell from a WinRift clone. It installs the app for your Windows user and creates **WinRift Key Updater** shortcuts on the Desktop and in the Start menu. Run the installer again to update the app. Use `-Python` with the full path to `python.exe` if you have more than one installation.
+
+On Linux or macOS, run `python3 ops/prod/riot-key-app.py` from a clone. The app needs Python 3.8 or later with Tkinter and the OpenSSH client. Use an existing SSH key or agent for an account that can run the server's key updater.
 
 1. Enter the server’s full IP address, its short machine name, and your SSH username. Use **Verify and save server** to check the machine’s identity and save the target on this computer. If SSH has never trusted that address, verify the server’s host key through your usual SSH setup first.
 2. Paste a fresh key into the hidden field. For a collector that needs to move to the latest game patch, select **Advance to the latest patch and archive older data**.
