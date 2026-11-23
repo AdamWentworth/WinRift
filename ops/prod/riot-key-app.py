@@ -29,7 +29,6 @@ class KeyUpdater:
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.output = SimpleQueue()
         self.pending = None
-        self.verified = None
         self.address = tk.StringVar(master=root)
         self.username = tk.StringVar(master=root)
         self.hostname = tk.StringVar(master=root)
@@ -150,7 +149,7 @@ class KeyUpdater:
             self.address.set(target.address)
             self.hostname.set(target.hostname)
             self.username.set(target.username)
-            self.set_status("Verify the saved server to enable key updates.")
+            self.set_status(f"Paste a fresh key to update WinRift on {target.hostname}.")
 
     def set_status(self, text, color=MUTED):
         self.status.set(text)
@@ -170,25 +169,24 @@ class KeyUpdater:
             self.log.see("end")
 
     def target_changed(self, *_):
-        self.verified = None
-        self.set_status("Verify these server details before updating the key.")
-        self.sync_controls()
+        self.set_status("The app will verify these server details before sending a key.")
 
     def sync_controls(self):
         busy = self.pending is not None
         for widget in (self.address_entry, self.hostname_entry, self.username_entry, self.verify_button,
                        self.key_entry, self.rollover_check):
             widget.state(["disabled" if busy else "!disabled"])
-        can_update = not busy and self.verified is not None and bool(self.key.get().strip())
+        can_update = not busy and bool(self.key.get().strip())
         self.update_button.state(["!disabled" if can_update else "disabled"])
 
+    def current_target(self):
+        return Target.parse(self.address.get(), self.username.get(), self.hostname.get())
+
     def verify(self):
-        self.verified = None
         try:
-            target = Target.parse(self.address.get(), self.username.get(), self.hostname.get())
+            target = self.current_target()
         except UpdaterError as error:
             self.set_status(str(error), ERROR)
-            self.sync_controls()
             return
 
         def ready():
@@ -198,16 +196,13 @@ class KeyUpdater:
                 self.set_status("Server verified, but this computer couldn’t save its settings.", ERROR)
             else:
                 self.set_status(f"Verified and saved {target.hostname} at {target.address}.", SUCCESS)
-            self.verified = target
             self.key_entry.focus_set()
 
         self.start_task("Verifying server over SSH…", lambda: verify_target(target), ready)
 
     def update(self):
-        target = self.verified
-        if target is None:
-            return
         try:
+            target = self.current_target()
             key = validate_key(self.key.get())
         except UpdaterError as error:
             self.set_status(str(error), ERROR)
@@ -219,7 +214,7 @@ class KeyUpdater:
         if not messagebox.askyesno("Confirm key update", details, default=messagebox.NO, parent=self.root):
             return
         self.key.set("")
-        self.write_log(f"Starting a key update on {target.hostname}.\n", clear=True)
+        self.write_log(f"Checking SSH identity of {target.hostname} before sending the key.\n", clear=True)
         self.start_task(
             f"Updating WinRift on {target.hostname}. Leave this window open until it finishes.",
             lambda: update_key(target, key, rollover=rollover, on_output=self.output.put),
@@ -247,10 +242,8 @@ class KeyUpdater:
         try:
             self.pending.result()
         except UpdaterError as error:
-            self.verified = None
             self.set_status(str(error), ERROR)
         except Exception:
-            self.verified = None
             self.set_status("The operation ended unexpectedly. Check WinRift before trying again.", ERROR)
         else:
             on_success()

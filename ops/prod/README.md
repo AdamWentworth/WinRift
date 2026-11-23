@@ -152,13 +152,17 @@ The helper hides the key, requires confirmation, preserves the deployed immutabl
 
 ### Riot Key Updater App
 
-On Windows, run `./ops/prod/install-riot-key-app.ps1` once in PowerShell from a WinRift clone. It installs the app for your Windows user and creates **WinRift Key Updater** shortcuts on the Desktop and in the Start menu. Run the installer again to update the app. Use `-Python` with the full path to `python.exe` if you have more than one installation.
+The updater needs Python 3.8 or later with Tkinter, an OpenSSH client, and SSH key or agent access to the account that runs the server helper. Use a currently supported Python release on a new machine. The updater runs independently of the WinRift web app and server stack.
 
-On Linux or macOS, run `python3 ops/prod/riot-key-app.py` from a clone. The app needs Python 3.8 or later with Tkinter and the OpenSSH client. Use an existing SSH key or agent for an account that can run the server's key updater.
+**Windows 10/11.** From a WinRift clone, run `./ops/prod/install-riot-key-app.ps1` in PowerShell. The installer creates **WinRift Key Updater** shortcuts on the Desktop and in the Start menu for your Windows user. You can pin the Start menu shortcut to the taskbar. To update, pull the latest revision and rerun the installer. Pass `-Python` with the full path to `python.exe` to select a specific installation. If `ssh -V` fails, install the [OpenSSH Client optional feature](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse).
 
-1. Enter the server’s full IP address, its short machine name, and your SSH username. Use **Verify and save server** to check the machine’s identity and save the target on this computer. If SSH has never trusted that address, verify the server’s host key through your usual SSH setup first.
+**Linux.** Install Python with Tkinter and OpenSSH using your distribution's package manager. On Ubuntu or Debian, the packages are `python3-tk` and `openssh-client`. Run `python3 ops/prod/riot-key-app.py` from the clone in a desktop session. This command also works on macOS with the same prerequisites.
+
+**Network access.** Enter the server's full LAN IP when connected at home or through a VPN that routes to the home network. If SSH is reachable at a separate VPN IP, enter that address and keep the server's actual short machine name. SSH must trust the address on the computer running the updater, and the server firewall must permit the connection from that network.
+
+1. Enter the server’s full IP address, its short machine name, and your SSH username. Use **Verify and save server** whenever you want to save a target on this computer. If SSH has never trusted that address, verify the server’s host key through your usual SSH setup first.
 2. Paste a fresh key into the hidden field. For a collector that needs to move to the latest game patch, select **Advance to the latest patch and archive older data**.
-3. Select **Update Riot key** and confirm the displayed machine name and IP address. Watch the **Update log** for server restarts, patch progress, and errors. The log hides Riot keys and keeps the latest output visible until you start another update or close the app.
+3. Select **Update Riot key** and confirm the displayed machine name and IP address. The app verifies the server’s identity before sending the key. Watch the **Update log** for server restarts, patch progress, and errors. The log hides Riot keys and keeps the latest output visible until you start another update or close the app.
 
 The app saves only the server details in `.winrift/riot-key-target.json` in your home directory. The key travels over SSH and the server stores it in its existing WinRift environment file.
 
